@@ -316,7 +316,7 @@ public sealed class SpotifyModule : IConnectableModule
 
         var settings = await _settingsStore.LoadAsync(cancellationToken);
         var deviceId = string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId)
-            ? GetPreferredDeviceId()
+            ? GetRuntimeDeviceId()
             : settings.Spotify.PreferredDeviceId;
 
         await EnsureApiTokenAsync(forceRefresh: false, cancellationToken: cancellationToken);
@@ -342,7 +342,7 @@ public sealed class SpotifyModule : IConnectableModule
 
         var settings = await _settingsStore.LoadAsync(cancellationToken);
         var deviceId = string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId)
-            ? GetPreferredDeviceId()
+            ? GetRuntimeDeviceId()
             : settings.Spotify.PreferredDeviceId;
 
         await EnsureApiTokenAsync(forceRefresh: false, cancellationToken: cancellationToken);
@@ -473,12 +473,14 @@ public sealed class SpotifyModule : IConnectableModule
         await StartPlaylistAsync(
             settings.Spotify.StartPlaylistUri,
             startVolumePercent: settings.Spotify.StartVolumePercent,
-            cancellationToken);
+            cancellationToken: cancellationToken);
     }
 
     public async Task StartPlaylistAsync(
         string playlistUri,
         bool applyConfiguredStartVolume = false,
+        bool? shuffleOverride = null,
+        string? offsetTrackUri = null,
         CancellationToken cancellationToken = default)
     {
         var settings = await _settingsStore.LoadAsync(cancellationToken);
@@ -489,12 +491,16 @@ public sealed class SpotifyModule : IConnectableModule
         await StartPlaylistAsync(
             playlistUri,
             startVolumePercent,
+            shuffleOverride,
+            offsetTrackUri,
             cancellationToken);
     }
 
     public async Task StartPlaylistAsync(
         string playlistUri,
         int? startVolumePercent,
+        bool? shuffleOverride = null,
+        string? offsetTrackUri = null,
         CancellationToken cancellationToken = default)
     {
         EnsureConnected();
@@ -510,23 +516,35 @@ public sealed class SpotifyModule : IConnectableModule
         await EnsureApiTokenAsync(forceRefresh: false, cancellationToken: cancellationToken);
         try
         {
-            await StartPlaylistCoreAsync(playlistUri, startVolumePercent, cancellationToken);
+            await StartPlaylistCoreAsync(
+                playlistUri,
+                startVolumePercent,
+                shuffleOverride,
+                offsetTrackUri,
+                cancellationToken);
         }
         catch (InvalidOperationException exception) when (IsUnauthorized(exception))
         {
             await EnsureApiTokenAsync(forceRefresh: true, cancellationToken: cancellationToken);
-            await StartPlaylistCoreAsync(playlistUri, startVolumePercent, cancellationToken);
+            await StartPlaylistCoreAsync(
+                playlistUri,
+                startVolumePercent,
+                shuffleOverride,
+                offsetTrackUri,
+                cancellationToken);
         }
     }
 
     private async Task StartPlaylistCoreAsync(
         string playlistUri,
         int? startVolumePercent,
+        bool? shuffleOverride,
+        string? offsetTrackUri,
         CancellationToken cancellationToken)
     {
         var settings = await _settingsStore.LoadAsync(cancellationToken);
         var deviceId = string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId)
-            ? GetPreferredDeviceId()
+            ? GetRuntimeDeviceId()
             : settings.Spotify.PreferredDeviceId;
 
         if (settings.Spotify.AutoTransferToPreferredDevice)
@@ -542,20 +560,23 @@ public sealed class SpotifyModule : IConnectableModule
         // StartPlayback activates the player reliably. Shuffle used to run first
         // and Spotify rejects that request for an inactive device, so the actual
         // playlist start was never reached.
-        await _apiClient.StartPlaybackAsync(deviceId, playlistUri, cancellationToken);
+        await _apiClient.StartPlaybackAsync(
+            deviceId,
+            playlistUri,
+            offsetTrackUri,
+            cancellationToken);
 
         if (startVolumePercent.HasValue)
         {
-            await _apiClient.SetVolumeAsync(
-                Math.Clamp(startVolumePercent.Value, 0, 100),
-                deviceId,
-                cancellationToken);
+            var volume = Math.Clamp(startVolumePercent.Value, 0, 100);
+            await _apiClient.SetVolumeAsync(volume, deviceId, cancellationToken);
+            PatchPlaybackVolume(volume);
         }
 
-        await _apiClient.SetShuffleAsync(
-            settings.Spotify.ShuffleSelectedPlaylist,
-            deviceId,
-            cancellationToken);
+        var shuffleEnabled = shuffleOverride ?? settings.Spotify.ShuffleSelectedPlaylist;
+        await _apiClient.SetShuffleAsync(shuffleEnabled, deviceId, cancellationToken);
+        PatchPlaybackIsPlaying(true);
+        _playback = _playback with { ShuffleEnabled = shuffleEnabled };
     }
 
     private async Task EnsureApiTokenAsync(bool forceRefresh, CancellationToken cancellationToken)
@@ -594,104 +615,91 @@ public sealed class SpotifyModule : IConnectableModule
     public async Task PauseAsync(
         CancellationToken cancellationToken = default)
     {
-        EnsureConnected();
-
-        await _apiClient.PausePlaybackAsync(
-            GetPreferredDeviceId(),
+        await ExecutePlayerCommandAsync(
+            (deviceId, ct) => _apiClient.PausePlaybackAsync(deviceId, ct),
             cancellationToken);
-
+        PatchPlaybackIsPlaying(false);
     }
 
     public async Task ResumeAsync(
         CancellationToken cancellationToken = default)
     {
-        EnsureConnected();
-
-        await _apiClient.StartPlaybackAsync(
-            GetPreferredDeviceId(),
-            contextUri: null,
+        await ExecutePlayerCommandAsync(
+            (deviceId, ct) => _apiClient.StartPlaybackAsync(
+                deviceId,
+                contextUri: null,
+                offsetTrackUri: null,
+                cancellationToken: ct),
             cancellationToken);
-
+        PatchPlaybackIsPlaying(true);
     }
 
-    public Task NextAsync(
+    public async Task PlayPauseAsync(
         CancellationToken cancellationToken = default)
     {
         EnsureConnected();
-
-        return _apiClient.SkipNextAsync(
-            GetPreferredDeviceId(),
-            cancellationToken);
+        await RefreshPlaybackAsync(cancellationToken);
+        if (_playback.IsPlaying)
+            await PauseAsync(cancellationToken);
+        else
+            await ResumeAsync(cancellationToken);
     }
 
-    public Task PreviousAsync(
+    public async Task NextAsync(
         CancellationToken cancellationToken = default)
     {
-        EnsureConnected();
-
-        return _apiClient.SkipPreviousAsync(
-            GetPreferredDeviceId(),
+        await ExecutePlayerCommandAsync(
+            (deviceId, ct) => _apiClient.SkipNextAsync(deviceId, ct),
             cancellationToken);
     }
 
-    public Task SetVolumeAsync(
+    public async Task PreviousAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await ExecutePlayerCommandAsync(
+            (deviceId, ct) => _apiClient.SkipPreviousAsync(deviceId, ct),
+            cancellationToken);
+    }
+
+    public async Task SetVolumeAsync(
         int volumePercent,
         CancellationToken cancellationToken = default)
     {
-        EnsureConnected();
-
-        return _apiClient.SetVolumeAsync(
-            volumePercent,
-            GetPreferredDeviceId(),
+        var clamped = Math.Clamp(volumePercent, 0, 100);
+        await ExecutePlayerCommandAsync(
+            (deviceId, ct) => _apiClient.SetVolumeAsync(clamped, deviceId, ct),
             cancellationToken);
+        PatchPlaybackVolume(clamped);
+    }
+
+    public async Task AdjustVolumeAsync(
+        int deltaPercent,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureConnected();
+        await RefreshPlaybackAsync(cancellationToken);
+        var current = _playback.Device?.VolumePercent ?? 50;
+        await SetVolumeAsync(current + deltaPercent, cancellationToken);
     }
 
     public async Task SetShuffleAsync(
         bool enabled,
         CancellationToken cancellationToken = default)
     {
-        EnsureConnected();
-
-        await EnsureApiTokenAsync(forceRefresh: false, cancellationToken: cancellationToken);
-        try
-        {
-            await _apiClient.SetShuffleAsync(
-                enabled,
-                GetPreferredDeviceId(),
-                cancellationToken);
-        }
-        catch (InvalidOperationException exception) when (IsUnauthorized(exception))
-        {
-            await EnsureApiTokenAsync(forceRefresh: true, cancellationToken: cancellationToken);
-            await _apiClient.SetShuffleAsync(
-                enabled,
-                GetPreferredDeviceId(),
-                cancellationToken);
-        }
+        await ExecutePlayerCommandAsync(
+            (deviceId, ct) => _apiClient.SetShuffleAsync(enabled, deviceId, ct),
+            cancellationToken);
+        _playback = _playback with { ShuffleEnabled = enabled };
     }
 
     public async Task SetRepeatAsync(
         string repeatMode,
         CancellationToken cancellationToken = default)
     {
-        EnsureConnected();
-
-        await EnsureApiTokenAsync(forceRefresh: false, cancellationToken: cancellationToken);
-        try
-        {
-            await _apiClient.SetRepeatAsync(
-                repeatMode,
-                GetPreferredDeviceId(),
-                cancellationToken);
-        }
-        catch (InvalidOperationException exception) when (IsUnauthorized(exception))
-        {
-            await EnsureApiTokenAsync(forceRefresh: true, cancellationToken: cancellationToken);
-            await _apiClient.SetRepeatAsync(
-                repeatMode,
-                GetPreferredDeviceId(),
-                cancellationToken);
-        }
+        await ExecutePlayerCommandAsync(
+            (deviceId, ct) => _apiClient.SetRepeatAsync(repeatMode, deviceId, ct),
+            cancellationToken);
+        _playback = _playback with { RepeatMode = repeatMode };
     }
 
     public async Task SeekAsync(
@@ -705,22 +713,10 @@ public sealed class SpotifyModule : IConnectableModule
             ? Math.Clamp(positionMs, 0, durationMs)
             : Math.Max(0, positionMs);
 
-        await EnsureApiTokenAsync(forceRefresh: false, cancellationToken: cancellationToken);
-        try
-        {
-            await _apiClient.SeekPlaybackAsync(
-                clampedPosition,
-                GetPreferredDeviceId(),
-                cancellationToken);
-        }
-        catch (InvalidOperationException exception) when (IsUnauthorized(exception))
-        {
-            await EnsureApiTokenAsync(forceRefresh: true, cancellationToken: cancellationToken);
-            await _apiClient.SeekPlaybackAsync(
-                clampedPosition,
-                GetPreferredDeviceId(),
-                cancellationToken);
-        }
+        await ExecutePlayerCommandAsync(
+            (deviceId, ct) => _apiClient.SeekPlaybackAsync(clampedPosition, deviceId, ct),
+            cancellationToken);
+        _playback = _playback with { ProgressMs = clampedPosition };
     }
 
     public async Task FadeToAsync(
@@ -731,9 +727,8 @@ public sealed class SpotifyModule : IConnectableModule
     {
         EnsureConnected();
 
-        var snapshot = _playback;
         var currentVolume =
-            snapshot.Device?.VolumePercent ?? 100;
+            _playback.Device?.VolumePercent ?? 100;
 
         var target = Math.Clamp(
             targetVolumePercent,
@@ -753,10 +748,7 @@ public sealed class SpotifyModule : IConnectableModule
                 currentVolume +
                 (target - currentVolume) * progress);
 
-            await _apiClient.SetVolumeAsync(
-                volume,
-                GetPreferredDeviceId(),
-                cancellationToken);
+            await SetVolumeAsync(volume, cancellationToken);
 
             if (step < steps)
             {
@@ -768,11 +760,8 @@ public sealed class SpotifyModule : IConnectableModule
 
         if (pauseAtEnd && target == 0)
         {
-            await _apiClient.PausePlaybackAsync(
-                GetPreferredDeviceId(),
-                cancellationToken);
+            await PauseAsync(cancellationToken);
         }
-
     }
 
     public async Task<ModuleStatus> GetStatusAsync(
@@ -858,11 +847,65 @@ public sealed class SpotifyModule : IConnectableModule
         return refreshed;
     }
 
-    private string? GetPreferredDeviceId()
+    private async Task ExecutePlayerCommandAsync(
+        Func<string?, CancellationToken, Task> action,
+        CancellationToken cancellationToken)
+    {
+        EnsureConnected();
+        await EnsureApiTokenAsync(forceRefresh: false, cancellationToken: cancellationToken);
+        var deviceId = await ResolveControlDeviceIdAsync(cancellationToken);
+        try
+        {
+            await action(deviceId, cancellationToken);
+        }
+        catch (InvalidOperationException exception) when (IsUnauthorized(exception))
+        {
+            await EnsureApiTokenAsync(forceRefresh: true, cancellationToken: cancellationToken);
+            deviceId = await ResolveControlDeviceIdAsync(cancellationToken);
+            await action(deviceId, cancellationToken);
+        }
+    }
+
+    private async Task<string?> ResolveControlDeviceIdAsync(CancellationToken cancellationToken)
+    {
+        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId))
+        {
+            return settings.Spotify.PreferredDeviceId;
+        }
+
+        return GetRuntimeDeviceId();
+    }
+
+    private string? GetRuntimeDeviceId()
     {
         return _playback.Device?.Id
             ?? _devices.FirstOrDefault(device => device.IsActive)?.Id
             ?? _devices.FirstOrDefault()?.Id;
+    }
+
+    private void PatchPlaybackIsPlaying(bool isPlaying)
+    {
+        _playback = _playback with { IsPlaying = isPlaying, HasPlayback = true };
+        if (isPlaying || _playback.Track is not null)
+        {
+            _lastValidPlaybackAt = DateTimeOffset.UtcNow;
+            _consecutiveEmptyPlaybackSnapshots = 0;
+        }
+    }
+
+    private void PatchPlaybackVolume(int volumePercent)
+    {
+        var clamped = Math.Clamp(volumePercent, 0, 100);
+        if (_playback.Device is null)
+        {
+            return;
+        }
+
+        _playback = _playback with
+        {
+            Device = _playback.Device with { VolumePercent = clamped }
+        };
     }
 
     private void EnsureConnected()

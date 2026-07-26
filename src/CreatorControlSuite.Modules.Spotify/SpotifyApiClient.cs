@@ -353,6 +353,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
     public async Task StartPlaybackAsync(
         string? deviceId,
         string? contextUri,
+        string? offsetTrackUri = null,
         CancellationToken cancellationToken = default)
     {
         var url = "me/player/play";
@@ -363,9 +364,17 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 Uri.EscapeDataString(deviceId);
         }
 
-        object? body = string.IsNullOrWhiteSpace(contextUri)
-            ? null
-            : new { context_uri = contextUri };
+        object? body = null;
+        if (!string.IsNullOrWhiteSpace(contextUri))
+        {
+            body = string.IsNullOrWhiteSpace(offsetTrackUri)
+                ? new { context_uri = contextUri }
+                : new
+                {
+                    context_uri = contextUri,
+                    offset = new { uri = offsetTrackUri.Trim() }
+                };
+        }
 
         using var response = await SendAsync(
             HttpMethod.Put,

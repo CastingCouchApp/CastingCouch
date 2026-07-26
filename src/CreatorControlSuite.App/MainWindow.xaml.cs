@@ -6370,7 +6370,9 @@ public partial class MainWindow : Window
                 };
                 content.AppendLine($"powershell -NoProfile -ExecutionPolicy Bypass -Command \"$s=Get-Content -Raw '{StreamDeckRuntimeStateFile.Replace("'", "''")}'|ConvertFrom-Json; if({stateExpression}){{exit 0}}else{{exit 1}}\"");
                 content.AppendLine("if errorlevel 1 goto stateoff");
-                var alternateArgs = string.IsNullOrWhiteSpace(alternateParameter) ? alternateCommand : $"{alternateCommand} value=\"{alternateParameter.Replace("\"", "\"\"")}\"";
+                var alternateArgs = string.IsNullOrWhiteSpace(alternateParameter)
+                    ? alternateCommand
+                    : FormatStreamDeckCommandArgs(alternateCommand, alternateParameter);
                 content.AppendLine($"start \"\" /wait /min \"{clientPath}\" {alternateArgs}");
                 content.AppendLine("goto end");
                 content.AppendLine(":stateoff");
@@ -6379,7 +6381,7 @@ public partial class MainWindow : Window
             foreach (var step in steps)
             {
                 stepNumber++;
-                var args = string.IsNullOrWhiteSpace(step.Parameter) ? step.Command : $"{step.Command} value=\"{step.Parameter.Replace("\"", "\"\"")}\"";
+                var args = FormatStreamDeckCommandArgs(step.Command, step.Parameter);
                 var successLabel = $"step_{stepNumber}_ok";
                 for (var attempt = 0; attempt <= retryCount; attempt++)
                 {
@@ -6403,6 +6405,24 @@ public partial class MainWindow : Window
             StreamDeckActionCreateStatusText.Text = ex.Message;
             StreamDeckActionCreateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(220, 90, 90));
         }
+    }
+
+    private static string FormatStreamDeckCommandArgs(string command, string parameter)
+    {
+        if (string.IsNullOrWhiteSpace(parameter))
+            return command;
+
+        var key = command switch
+        {
+            "spotify.volume" => "volume",
+            "spotify.playlist" => "uri",
+            "obs.scene" => "scene",
+            "obs.mute" => "input",
+            "alert.test" or "alerts.test" => "type",
+            _ => "value"
+        };
+
+        return $"{command} {key}=\"{parameter.Replace("\"", "\"\"")}\"";
     }
 
     private void OpenStreamDeckActionsFolder()
@@ -10133,8 +10153,10 @@ private Task ApplyCombinedAlertDuckingAsync()
                         _settings.Spotify.SetVolumeOnLiveTransition &&
                         !_settings.Spotify.MuteOnLiveTransition)
                     {
+                        var liveVolume = Math.Clamp(_settings.Spotify.LiveVolumePercent, 0, 100);
+                        await _spotifyModule.SetVolumeAsync(liveVolume);
                         _spotifyAutomationLog.Add(rule.Name,
-                            "Veraltete Pause-Regel für die Game-Szene übersprungen; konfiguriert ist nur eine Lautstärkeänderung.");
+                            $"Live-Lautstärke gesetzt: {liveVolume} % (veraltete Pause-Regel übersprungen).");
                         continue;
                     }
 
@@ -10142,7 +10164,10 @@ private Task ApplyCombinedAlertDuckingAsync()
                     {
                         case "StartPlaylist":
                             if (string.IsNullOrWhiteSpace(rule.PlaylistUri)) throw new InvalidOperationException("Keine Playlist in der Regel hinterlegt.");
-                            await _spotifyModule.StartPlaylistAsync(rule.PlaylistUri, rule.Shuffle);
+                            await _spotifyModule.StartPlaylistAsync(
+                                rule.PlaylistUri,
+                                applyConfiguredStartVolume: false,
+                                shuffleOverride: rule.Shuffle);
                             break;
                         case "Pause": await _spotifyModule.PauseAsync(); break;
                         case "SetVolume": await _spotifyModule.SetVolumeAsync(Math.Clamp(rule.VolumePercent, 0, 100)); break;
@@ -13281,7 +13306,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 await _spotifyModule.StartPlaylistAsync(
                     playlistUri,
                     startVolumePercent: persisted.Spotify.StartVolumePercent,
-                    CancellationToken.None);
+                    cancellationToken: CancellationToken.None);
 
                 _spotifyStartPlaylistTriggeredForCurrentStream = true;
                 AddDashboardNotification("Spotify-Startplaylist wurde gestartet.", "Info");
@@ -19372,8 +19397,11 @@ private Task ApplyCombinedAlertDuckingAsync()
                     if (string.IsNullOrWhiteSpace(rule.SpotifyPlaylistUri))
                         throw new InvalidOperationException("Für die Spotify-Automation wurde keine Playlist-URI eingetragen.");
                     if (rule.SpotifyFadeSeconds > 0) await _spotifyModule.SetVolumeAsync(0, spotifyToken);
-                    await _spotifyModule.SetShuffleAsync(rule.SpotifyPlaylistShuffle, spotifyToken);
-                    await _spotifyModule.StartPlaylistAsync(rule.SpotifyPlaylistUri, applyConfiguredStartVolume: false, spotifyToken);
+                    await _spotifyModule.StartPlaylistAsync(
+                        rule.SpotifyPlaylistUri,
+                        applyConfiguredStartVolume: false,
+                        shuffleOverride: rule.SpotifyPlaylistShuffle,
+                        cancellationToken: spotifyToken);
                     await ApplySpotifyAutomationVolumeAsync(rule, spotifyToken);
                 }
 
@@ -20896,15 +20924,29 @@ private Task ApplyCombinedAlertDuckingAsync()
             throw new InvalidOperationException($"Für die Spotify-Gruppe '{group}' wurde noch kein vorheriger Wiedergabezustand gesichert.");
 
         if (rule.SpotifyFadeSeconds > 0) await _spotifyModule.SetVolumeAsync(0, cancellationToken);
-        await _spotifyModule.SetShuffleAsync(state.ShuffleEnabled, cancellationToken);
         await _spotifyModule.SetRepeatAsync(state.RepeatMode, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(state.ContextUri))
-            await _spotifyModule.StartPlaylistAsync(state.ContextUri, applyConfiguredStartVolume: false, cancellationToken);
+        {
+            await _spotifyModule.StartPlaylistAsync(
+                state.ContextUri,
+                applyConfiguredStartVolume: false,
+                shuffleOverride: state.ShuffleEnabled,
+                offsetTrackUri: state.Track?.Uri,
+                cancellationToken: cancellationToken);
+        }
         else if (state.Track is not null)
+        {
             await _spotifyModule.PlayTrackAsync(state.Track, cancellationToken);
+            await _spotifyModule.SetShuffleAsync(state.ShuffleEnabled, cancellationToken);
+        }
 
-        if (state.ProgressMs > 0) await _spotifyModule.SeekAsync(state.ProgressMs, cancellationToken);
+        if (state.ProgressMs > 0)
+        {
+            // Kurz warten, bis Spotify den Kontext/Track aktiviert hat, bevor Seek greift.
+            await Task.Delay(350, cancellationToken);
+            await _spotifyModule.SeekAsync(state.ProgressMs, cancellationToken);
+        }
 
         var restoreVolumeRule = new TimedAutomationRuleSettings
         {

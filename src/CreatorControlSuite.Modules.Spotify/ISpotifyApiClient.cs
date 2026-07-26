@@ -65,6 +65,7 @@ public interface ISpotifyApiClient
     Task StartPlaybackAsync(
         string? deviceId,
         string? contextUri,
+        string? offsetTrackUri = null,
         CancellationToken cancellationToken = default);
 
     Task PlayTrackAsync(

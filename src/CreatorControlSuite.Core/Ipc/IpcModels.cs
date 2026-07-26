@@ -30,11 +30,15 @@ public static class IpcCommandNames
     public const string ObsMute = "obs.mute";
     public const string SpotifyPlay = "spotify.play";
     public const string SpotifyPause = "spotify.pause";
+    public const string SpotifyToggle = "spotify.toggle";
     public const string SpotifyNext = "spotify.next";
     public const string SpotifyPrevious = "spotify.previous";
     public const string SpotifyVolume = "spotify.volume";
+    public const string SpotifyVolumeUp = "spotify.volumeup";
+    public const string SpotifyVolumeDown = "spotify.volumedown";
     public const string SpotifyVolume25 = "spotify.volume25";
     public const string SpotifyVolume50 = "spotify.volume50";
+    public const string SpotifyPlaylist = "spotify.playlist";
     public const string StreamStart = "stream.start";
     public const string StreamStop = "stream.stop";
 }

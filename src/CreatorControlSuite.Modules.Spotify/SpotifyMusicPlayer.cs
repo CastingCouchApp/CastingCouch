@@ -30,13 +30,7 @@ public sealed class SpotifyMusicPlayer : IMusicPlayer
         => _spotifyModule.PauseAsync(cancellationToken);
 
     public async Task PlayPauseAsync(CancellationToken cancellationToken = default)
-    {
-        var snapshot = _spotifyModule.GetSnapshot();
-        if (snapshot.Playback.IsPlaying)
-            await _spotifyModule.PauseAsync(cancellationToken);
-        else
-            await _spotifyModule.ResumeAsync(cancellationToken);
-    }
+        => await _spotifyModule.PlayPauseAsync(cancellationToken);
 
     public Task NextAsync(CancellationToken cancellationToken = default)
         => _spotifyModule.NextAsync(cancellationToken);

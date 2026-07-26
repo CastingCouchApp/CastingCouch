@@ -2279,6 +2279,8 @@
                                         <ComboBoxItem Content="Spotify vorheriger Titel" Tag="spotify.previous"/>
                                         <ComboBoxItem Content="Spotify lauter" Tag="spotify.volumeup"/>
                                         <ComboBoxItem Content="Spotify leiser" Tag="spotify.volumedown"/>
+                                        <ComboBoxItem Content="Spotify Lautstärke setzen" Tag="spotify.volume"/>
+                                        <ComboBoxItem Content="Spotify Playlist starten" Tag="spotify.playlist"/>
                                         <ComboBoxItem Content="OBS Szene wechseln" Tag="obs.scene"/>
                                         <ComboBoxItem Content="OBS Quelle umschalten" Tag="obs.source.toggle"/>
                                         <ComboBoxItem Content="OBS Audioquelle muten" Tag="obs.audio.toggle"/>
@@ -2292,7 +2294,7 @@
                                     </ComboBox>
                                     <TextBlock Text="Parameter / Ziel" Foreground="#FF7A18" FontWeight="SemiBold"/>
                                     <TextBox x:Name="StreamDeckActionParameterBox" Margin="0,6,0,4"/>
-                                    <TextBlock Text="Zum Beispiel Szenenname, Quellenname, Raid-Kanal oder Streamer.bot-Aktion." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                    <TextBlock Text="Zum Beispiel Szenenname, Spotify-Lautstärke (0–100), Playlist-URI, Quellenname oder Raid-Kanal." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
                                     <Grid Margin="0,0,0,10">
                                         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/></Grid.ColumnDefinitions>
                                         <StackPanel><TextBlock Text="Profil" Foreground="#FF7A18" FontWeight="SemiBold"/><TextBox x:Name="StreamDeckProfileNameBox" Text="Standard" Margin="0,6,0,0"/></StackPanel>

@@ -60,6 +60,11 @@ public sealed class StreamDeckProfileService
                 "stream.stop",
                 "OBS-Stream direkt beenden"),
             new StreamDeckActionDefinition(
+                "spotify-toggle",
+                "Spotify Play/Pause",
+                "spotify.toggle",
+                "Spotify Wiedergabe umschalten"),
+            new StreamDeckActionDefinition(
                 "spotify-play",
                 "Spotify Play",
                 "spotify.play",
@@ -79,6 +84,16 @@ public sealed class StreamDeckProfileService
                 "Spotify Zurück",
                 "spotify.previous",
                 "Vorheriger Spotify-Titel"),
+            new StreamDeckActionDefinition(
+                "spotify-volume-up",
+                "Spotify lauter",
+                "spotify.volumeup",
+                "Spotify Lautstärke um 5 Prozent erhöhen"),
+            new StreamDeckActionDefinition(
+                "spotify-volume-down",
+                "Spotify leiser",
+                "spotify.volumedown",
+                "Spotify Lautstärke um 5 Prozent verringern"),
             new StreamDeckActionDefinition(
                 "spotify-volume-25",
                 "Spotify 25%",

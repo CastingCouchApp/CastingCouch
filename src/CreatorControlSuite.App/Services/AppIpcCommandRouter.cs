@@ -99,7 +99,7 @@ public sealed class AppIpcCommandRouter : IIpcCommandRouter
             case IpcCommandNames.AlertTest:
                 await _featureGate.RequireAsync(FeatureCatalog.Alerts, ct);
                 await _alerts.EnqueueAsync(
-                    Get(command,"type","Follow"),
+                    GetAny(command, "Follow", "type", "value"),
                     Get(command,"user","StreamDeck"),
                     cancellationToken:ct);
                 return Ok(command,"Testalert eingereiht.");
@@ -114,13 +114,13 @@ public sealed class AppIpcCommandRouter : IIpcCommandRouter
                 return Ok(command,"Externe Alerts zurückgesetzt.");
             case IpcCommandNames.ObsScene:
                 await _featureGate.RequireAsync(FeatureCatalog.Obs, ct);
-                var scene=Get(command,"scene","");
+                var scene=GetAny(command, "", "scene", "value");
                 if(string.IsNullOrWhiteSpace(scene)) throw new InvalidOperationException("Argument scene fehlt.");
                 await _obs.SetCurrentProgramSceneAsync(scene,ct);
                 return Ok(command,"Szene aktiviert: "+scene);
             case IpcCommandNames.ObsMute:
                 await _featureGate.RequireAsync(FeatureCatalog.Obs, ct);
-                var input=Get(command,"input","");
+                var input=GetAny(command, "", "input", "value");
                 if(string.IsNullOrWhiteSpace(input)) throw new InvalidOperationException("Argument input fehlt.");
                 var muted=bool.TryParse(Get(command,"muted","true"),out var muteValue) && muteValue;
                 await _obs.SetInputMuteAsync(input,muted,ct);
@@ -131,6 +131,9 @@ public sealed class AppIpcCommandRouter : IIpcCommandRouter
             case IpcCommandNames.SpotifyPause:
                 await _spotify.PauseAsync(ct);
                 return Ok(command,"Spotify pausiert.");
+            case IpcCommandNames.SpotifyToggle:
+                await _spotify.PlayPauseAsync(ct);
+                return Ok(command,"Spotify Play/Pause umgeschaltet.");
             case IpcCommandNames.SpotifyNext:
                 await _spotify.NextAsync(ct);
                 return Ok(command,"Nächster Spotify-Titel.");
@@ -138,16 +141,36 @@ public sealed class AppIpcCommandRouter : IIpcCommandRouter
                 await _spotify.PreviousAsync(ct);
                 return Ok(command,"Vorheriger Spotify-Titel.");
             case IpcCommandNames.SpotifyVolume:
-                if(!int.TryParse(Get(command,"volume",""),out var volume))
+                if(!int.TryParse(GetAny(command, "", "volume", "value"),out var volume))
                     throw new InvalidOperationException("Argument volume fehlt oder ist ungültig.");
                 await _spotify.SetVolumeAsync(Math.Clamp(volume,0,100),ct);
                 return Ok(command,$"Spotify Lautstärke: {Math.Clamp(volume,0,100)} %.");
+            case IpcCommandNames.SpotifyVolumeUp:
+                await _spotify.AdjustVolumeAsync(5, ct);
+                return Ok(command,"Spotify Lautstärke erhöht.");
+            case IpcCommandNames.SpotifyVolumeDown:
+                await _spotify.AdjustVolumeAsync(-5, ct);
+                return Ok(command,"Spotify Lautstärke verringert.");
             case IpcCommandNames.SpotifyVolume25:
                 await _spotify.SetVolumeAsync(25,ct);
                 return Ok(command,"Spotify Lautstärke: 25 %.");
             case IpcCommandNames.SpotifyVolume50:
                 await _spotify.SetVolumeAsync(50,ct);
                 return Ok(command,"Spotify Lautstärke: 50 %.");
+            case IpcCommandNames.SpotifyPlaylist:
+                var playlistUri = GetAny(command, "", "uri", "playlist", "value");
+                if (string.IsNullOrWhiteSpace(playlistUri))
+                    throw new InvalidOperationException("Argument uri fehlt.");
+                var shuffleArg = GetAny(command, "", "shuffle");
+                bool? shuffleOverride = bool.TryParse(shuffleArg, out var shuffleValue)
+                    ? shuffleValue
+                    : null;
+                await _spotify.StartPlaylistAsync(
+                    playlistUri,
+                    applyConfiguredStartVolume: false,
+                    shuffleOverride: shuffleOverride,
+                    cancellationToken: ct);
+                return Ok(command, "Spotify-Playlist gestartet.");
             case IpcCommandNames.StreamStart:
                 await _featureGate.RequireAsync(FeatureCatalog.Obs, ct);
                 await _obs.StartStreamAsync(ct);
@@ -166,4 +189,15 @@ public sealed class AppIpcCommandRouter : IIpcCommandRouter
 
     private static string Get(IpcCommand c,string key,string fallback)=>
         c.Arguments.TryGetValue(key,out var value)?value:fallback;
+
+    private static string GetAny(IpcCommand c, string fallback, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (c.Arguments.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return fallback;
+    }
 }
