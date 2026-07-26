@@ -48,17 +48,14 @@ publish: build
 		-p:PublishReadyToRun=false \
 		-p:DebugType=embedded \
 		-p:ContinuousIntegrationBuild=true \
-		--no-restore \
 		-o $(PUBLISH_DIR)
 	$(DOTNET) publish $(CMDCLIENT) -c $(CONFIG) -r $(RID) \
 		--self-contained true \
 		-p:PublishSingleFile=true \
-		--no-restore \
 		-o $(PUBLISH_DIR)
 	$(DOTNET) publish $(UPDATER) -c $(CONFIG) -r $(RID) \
 		--self-contained true \
 		-p:PublishSingleFile=true \
-		--no-restore \
 		-o $(PUBLISH_DIR)
 
 app: restore test publish
