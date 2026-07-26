@@ -456,12 +456,7 @@
                                                                    FontSize="13"
                                                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                                                    Margin="0,0,0,8"/>
-                                                        <TextBlock x:Name="DashboardConnectionTooltipOkText"
-                                                                   Text="Alle Verbindungen OK"
-                                                                   Foreground="{DynamicResource SuccessBrush}"
-                                                                   FontSize="12"
-                                                                   Visibility="Collapsed"/>
-                                                        <StackPanel x:Name="DashboardConnectionTooltipBrokenPanel"/>
+                                                        <StackPanel x:Name="DashboardConnectionTooltipListPanel"/>
                                                     </StackPanel>
                                                 </ToolTip>
                                             </Border.ToolTip>

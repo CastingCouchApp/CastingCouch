@@ -12457,32 +12457,29 @@ private Task ApplyCombinedAlertDuckingAsync()
             : brokenCount == 1
                 ? "1 Verbindung offline"
                 : $"{brokenCount} Verbindungen offline";
-        DashboardConnectionTooltipOkText.Visibility = allOk
-            ? System.Windows.Visibility.Visible
-            : System.Windows.Visibility.Collapsed;
-        DashboardConnectionTooltipBrokenPanel.Visibility = allOk
-            ? System.Windows.Visibility.Collapsed
-            : System.Windows.Visibility.Visible;
 
-        DashboardConnectionTooltipBrokenPanel.Children.Clear();
-        if (!obsConnected)
-            DashboardConnectionTooltipBrokenPanel.Children.Add(
-                CreateBrokenConnectionTooltipRow("OBS", "Nicht verbunden"));
-        if (!twitchConnected)
-            DashboardConnectionTooltipBrokenPanel.Children.Add(
-                CreateBrokenConnectionTooltipRow("Twitch", "Nicht verbunden"));
-        if (!musicConnected)
-            DashboardConnectionTooltipBrokenPanel.Children.Add(
-                CreateBrokenConnectionTooltipRow(musicName, "Nicht verbunden"));
-        if (!streamerBotConnected)
-            DashboardConnectionTooltipBrokenPanel.Children.Add(
-                CreateBrokenConnectionTooltipRow("Streamer.bot", "Nicht verbunden"));
+        DashboardConnectionTooltipListPanel.Children.Clear();
+        DashboardConnectionTooltipListPanel.Children.Add(
+            CreateConnectionTooltipRow("OBS", obsConnected));
+        DashboardConnectionTooltipListPanel.Children.Add(
+            CreateConnectionTooltipRow("Twitch", twitchConnected));
+        DashboardConnectionTooltipListPanel.Children.Add(
+            CreateConnectionTooltipRow(musicName, musicConnected));
+        DashboardConnectionTooltipListPanel.Children.Add(
+            CreateConnectionTooltipRow("Streamer.bot", streamerBotConnected));
     }
 
-    private static System.Windows.FrameworkElement CreateBrokenConnectionTooltipRow(
+    private static System.Windows.FrameworkElement CreateConnectionTooltipRow(
         string name,
-        string detail)
+        bool connected)
     {
+        var successBrush = Application.Current.TryFindResource("SuccessBrush") as Brush
+            ?? new SolidColorBrush(Color.FromRgb(0x4C, 0xD9, 0x64));
+        var warningBrush = Application.Current.TryFindResource("WarningBrush") as Brush
+            ?? new SolidColorBrush(Color.FromRgb(0xE8, 0xA2, 0x3A));
+        var dangerBrush = Application.Current.TryFindResource("DangerBrush") as Brush
+            ?? System.Windows.Media.Brushes.IndianRed;
+
         var row = new System.Windows.Controls.StackPanel
         {
             Orientation = System.Windows.Controls.Orientation.Horizontal,
@@ -12492,7 +12489,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             Width = 7,
             Height = 7,
-            Fill = System.Windows.Media.Brushes.IndianRed,
+            Fill = connected ? successBrush : dangerBrush,
             Margin = new Thickness(0, 5, 8, 0)
         });
         row.Children.Add(new System.Windows.Controls.TextBlock
@@ -12505,9 +12502,8 @@ private Task ApplyCombinedAlertDuckingAsync()
         });
         row.Children.Add(new System.Windows.Controls.TextBlock
         {
-            Text = detail,
-            Foreground = Application.Current.TryFindResource("WarningBrush") as Brush
-                ?? new SolidColorBrush(Color.FromRgb(0xE8, 0xA2, 0x3A)),
+            Text = connected ? "Verbunden" : "Nicht verbunden",
+            Foreground = connected ? successBrush : warningBrush,
             FontSize = 12
         });
         return row;
