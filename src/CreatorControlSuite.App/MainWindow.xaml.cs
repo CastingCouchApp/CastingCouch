@@ -290,9 +290,16 @@ public partial class MainWindow : Window
     private bool _plannedStreamEndActive;
     private bool _streamEndFlowActive;
     private bool _streamEndAbortRequested;
+    private bool _allowMainWindowClose;
+    private bool _closeAfterStreamEnd;
     private bool _raidTargetIsOnline;
     private bool _awaitingManualRaid;
     private StreamEndDialogWindow? _activeStreamEndDialog;
+    private IReadOnlyList<TwitchChannelSuggestion>? _followedRaidTargetCache;
+    private DateTimeOffset _followedRaidTargetCacheAt = DateTimeOffset.MinValue;
+    private IReadOnlyList<TwitchChannelSuggestion>? _followedLiveRaidTargetCache;
+    private DateTimeOffset _followedLiveRaidTargetCacheAt = DateTimeOffset.MinValue;
+    private CancellationTokenSource? _raidTargetSuggestStatusCts;
     private TaskCompletionSource<bool>? _streamEndRaidDecisionTcs;
     private System.Net.WebSockets.ClientWebSocket? _streamerBotSocket;
     private System.Net.WebSockets.ClientWebSocket? _streamerBotEventSocket;
@@ -585,6 +592,7 @@ public partial class MainWindow : Window
         };
 
         Closed += (_, _) => _streamerHudService.Close();
+        Closing += OnMainWindowClosing;
 
         ObsDashboardStatus.MouseLeftButtonUp += (_, _) =>
             NavigateToServicesTab(2, ServicesObsButton);
@@ -3287,6 +3295,60 @@ public partial class MainWindow : Window
     private void TitleBarCloseButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void OnMainWindowClosing(object? sender, CancelEventArgs e)
+    {
+        if (_allowMainWindowClose)
+        {
+            return;
+        }
+
+        if (_streamEndFlowActive)
+        {
+            e.Cancel = true;
+            _activeStreamEndDialog?.Activate();
+            MessageBox.Show(
+                this,
+                "Das Streamende läuft noch. Bitte warte, bis der Stream beendet ist, oder brich den Ablauf ab.",
+                "Creator Control Suite",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (!_lastObsStreamActive)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        var result = MessageBox.Show(
+            this,
+            "Der Stream läuft noch. Die Anwendung kann erst geschlossen werden, wenn der Stream beendet ist.\n\nStreamende-Dialog öffnen?",
+            "Creator Control Suite",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _closeAfterStreamEnd = true;
+        _ = StopObsStreamAsync();
+    }
+
+    private void TryCloseApplicationAfterStreamEnd()
+    {
+        if (!_closeAfterStreamEnd)
+        {
+            return;
+        }
+
+        _closeAfterStreamEnd = false;
+        _allowMainWindowClose = true;
+        Dispatcher.BeginInvoke(new Action(Close));
     }
 
     private void UpdateTitleBarMaximizeButton()
@@ -7565,7 +7627,6 @@ public partial class MainWindow : Window
             .Select(channel => channel.Trim().TrimStart('@'))
             .Where(channel => !string.IsNullOrWhiteSpace(channel))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(channel => channel, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         _settings.Twitch.RaidChannels = channels;
@@ -7575,6 +7636,236 @@ public partial class MainWindow : Window
         ServicesTwitchRaidTargetBox.ItemsSource = channels;
         DashboardRaidChannelBox.SelectedItem = channels.FirstOrDefault(channel => string.Equals(channel, _settings.Twitch.SelectedRaidChannel, StringComparison.OrdinalIgnoreCase));
         ServicesTwitchRaidTargetBox.SelectedItem = DashboardRaidChannelBox.SelectedItem;
+    }
+
+    private void RememberRaidChannel(string channel)
+    {
+        channel = channel.Trim().TrimStart('@');
+        if (string.IsNullOrWhiteSpace(channel))
+        {
+            return;
+        }
+
+        _settings.Twitch.RaidChannels.RemoveAll(item =>
+            string.Equals(item, channel, StringComparison.OrdinalIgnoreCase));
+        _settings.Twitch.RaidChannels.Insert(0, channel);
+        if (_settings.Twitch.RaidChannels.Count > 40)
+        {
+            _settings.Twitch.RaidChannels.RemoveRange(40, _settings.Twitch.RaidChannels.Count - 40);
+        }
+
+        _settings.Twitch.SelectedRaidChannel = channel;
+        RefreshRaidChannelSelectors();
+    }
+
+    private async Task<IReadOnlyList<TwitchChannelSuggestion>> SuggestRaidTargetsAsync(
+        string query,
+        CancellationToken cancellationToken)
+    {
+        query = query.Trim().TrimStart('@');
+
+        var recentLogins = _settings.Twitch.RaidChannels
+            .Select(channel => channel.Trim().TrimStart('@'))
+            .Where(channel => !string.IsNullOrWhiteSpace(channel))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(channel => MatchesRaidQuery(channel, channel, query))
+            .ToList();
+
+        IReadOnlyList<TwitchChannelSuggestion> followed = [];
+        IReadOnlyList<TwitchChannelSuggestion> followedLive = [];
+        IReadOnlyList<TwitchChannelSuggestion> searched = [];
+        var liveByLogin = new Dictionary<string, TwitchChannelSuggestion>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            followed = await GetFollowedRaidTargetsCachedAsync(cancellationToken);
+        }
+        catch
+        {
+            // Scope fehlt oder Twitch offline – lokale Vorschläge reichen.
+        }
+
+        try
+        {
+            followedLive = await GetFollowedLiveRaidTargetsCachedAsync(cancellationToken);
+        }
+        catch
+        {
+            // Optional
+        }
+
+        if (query.Length >= 2)
+        {
+            try
+            {
+                searched = await _twitchModule.SearchChannelsAsync(query, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // Suche optional
+            }
+        }
+
+        try
+        {
+            var loginsToCheck = recentLogins
+                .Concat(followed
+                    .Where(item => MatchesRaidQuery(item.Login, item.DisplayName, query))
+                    .Select(item => item.Login)
+                    .Take(80))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (loginsToCheck.Count > 0)
+            {
+                foreach (var pair in await _twitchModule.GetLiveChannelsByLoginsAsync(loginsToCheck, cancellationToken))
+                {
+                    liveByLogin[pair.Key] = pair.Value;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Live-Status optional
+        }
+
+        foreach (var live in followedLive.Concat(searched.Where(item => item.IsLive)))
+        {
+            liveByLogin.TryAdd(live.Login, live with { IsLive = true, SourceLabel = "Live" });
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var results = new List<TwitchChannelSuggestion>(25);
+
+        // 1) Bereits geraidet – ganz oben; darin Live vor Offline
+        var recentSuggestions = recentLogins
+            .Select(login =>
+            {
+                var isLive = liveByLogin.TryGetValue(login, out var liveInfo);
+                var display = isLive ? liveInfo!.DisplayName : login;
+                return new TwitchChannelSuggestion(login, display, isLive, "Zuletzt");
+            })
+            .OrderByDescending(item => item.IsLive)
+            .ToList();
+
+        foreach (var item in recentSuggestions)
+        {
+            if (!seen.Add(item.Login))
+            {
+                continue;
+            }
+
+            results.Add(item);
+        }
+
+        // 2) Weitere Live-Kanäle (Follows + Suche)
+        foreach (var item in followedLive
+                     .Concat(searched.Where(x => x.IsLive))
+                     .Concat(liveByLogin.Values)
+                     .Where(item => MatchesRaidQuery(item.Login, item.DisplayName, query)))
+        {
+            if (!seen.Add(item.Login))
+            {
+                continue;
+            }
+
+            results.Add(item with { IsLive = true, SourceLabel = "Live" });
+            if (results.Count >= 25)
+            {
+                return results;
+            }
+        }
+
+        // 3) Offline: gefolgte, dann Suche
+        foreach (var item in followed
+                     .Where(item => MatchesRaidQuery(item.Login, item.DisplayName, query))
+                     .Concat(searched.Where(item => !item.IsLive)))
+        {
+            if (!seen.Add(item.Login))
+            {
+                continue;
+            }
+
+            results.Add(item with { IsLive = false });
+            if (results.Count >= 25)
+            {
+                break;
+            }
+        }
+
+        return results;
+    }
+
+    private async Task<IReadOnlyList<TwitchChannelSuggestion>> GetFollowedRaidTargetsCachedAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_followedRaidTargetCache is not null &&
+            DateTimeOffset.UtcNow - _followedRaidTargetCacheAt < TimeSpan.FromMinutes(10))
+        {
+            return _followedRaidTargetCache;
+        }
+
+        var followed = await _twitchModule.GetFollowedChannelsAsync(cancellationToken);
+        _followedRaidTargetCache = followed;
+        _followedRaidTargetCacheAt = DateTimeOffset.UtcNow;
+        return followed;
+    }
+
+    private async Task<IReadOnlyList<TwitchChannelSuggestion>> GetFollowedLiveRaidTargetsCachedAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_followedLiveRaidTargetCache is not null &&
+            DateTimeOffset.UtcNow - _followedLiveRaidTargetCacheAt < TimeSpan.FromMinutes(2))
+        {
+            return _followedLiveRaidTargetCache;
+        }
+
+        var live = await _twitchModule.GetFollowedLiveStreamsAsync(cancellationToken);
+        _followedLiveRaidTargetCache = live;
+        _followedLiveRaidTargetCacheAt = DateTimeOffset.UtcNow;
+        return live;
+    }
+
+    private static bool MatchesRaidQuery(string login, string displayName, string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return login.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+               displayName.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnStreamEndRaidTargetChanged(string channel)
+    {
+        _raidTargetSuggestStatusCts?.Cancel();
+        _raidTargetSuggestStatusCts?.Dispose();
+        _raidTargetSuggestStatusCts = new CancellationTokenSource();
+        var token = _raidTargetSuggestStatusCts.Token;
+        _ = Dispatcher.InvokeAsync(async () =>
+        {
+            try
+            {
+                await Task.Delay(350, token);
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                await RefreshRaidTargetStatusAsync(channel);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        });
     }
 
     private void UpdateDashboardRaidControlsVisibility()
@@ -7625,16 +7916,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!_settings.Twitch.RaidChannels.Contains(channel, StringComparer.OrdinalIgnoreCase))
-        {
-            _settings.Twitch.RaidChannels.Add(channel);
-        }
-
-        _settings.Twitch.SelectedRaidChannel = channel;
+        RememberRaidChannel(channel);
         ServicesTwitchNewRaidChannelBox.Clear();
-        RefreshRaidChannelSelectors();
-        DashboardRaidChannelBox.SelectedItem = channel;
-        ServicesTwitchRaidTargetBox.SelectedItem = channel;
         await _settingsStore.SaveAsync(_settings);
         await RefreshRaidTargetStatusAsync(channel);
     }
@@ -14169,6 +14452,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         await RefreshObsAsync();
         await LoadStreamHistoryAsync();
         await RefreshStatisticsAsync();
+        TryCloseApplicationAfterStreamEnd();
     }
 
     private void SetStreamEndStatus(string text)
@@ -14222,7 +14506,9 @@ private Task ApplyCombinedAlertDuckingAsync()
             channels,
             _settings.Twitch.SelectedRaidChannel,
             endSeconds,
-            OpenRaidChannelByName);
+            OpenRaidChannelByName,
+            SuggestRaidTargetsAsync,
+            OnStreamEndRaidTargetChanged);
         dialog.Owner = this;
         _activeStreamEndDialog = dialog;
 
@@ -14246,6 +14532,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             if (!_streamEndFlowActive)
             {
+                _closeAfterStreamEnd = false;
                 dialog.Close();
             }
             else
@@ -14272,7 +14559,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                     {
                         if (!string.IsNullOrWhiteSpace(channel))
                         {
-                            _settings.Twitch.SelectedRaidChannel = channel!;
+                            RememberRaidChannel(channel!);
                             DashboardRaidChannelBox.SelectedItem = channel;
                             ServicesTwitchRaidTargetBox.SelectedItem = channel;
                         }
@@ -14293,6 +14580,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                     await ExecuteStreamEndFlowAsync(mode);
                     if (_streamEndAbortRequested)
                     {
+                        _closeAfterStreamEnd = false;
                         dialog.MarkCompleted("Streamende abgebrochen. Stream läuft weiter.");
                     }
                     else
@@ -14303,6 +14591,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 catch (Exception exception)
                 {
                     ResetStreamEndFlowState();
+                    _closeAfterStreamEnd = false;
                     dialog.MarkCompleted($"Streamende fehlgeschlagen: {exception.Message}");
                     AddDashboardNotification($"Streamende fehlgeschlagen: {exception.Message}", "Fehler");
                 }
@@ -14327,6 +14616,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     private void AbortStreamEndFlowFromDialog()
     {
         _streamEndAbortRequested = true;
+        _closeAfterStreamEnd = false;
         _endSceneCountdownCts?.Cancel();
         _raidCountdownCts?.Cancel();
         if (_streamEndRaidDecisionTcs is { Task.IsCompleted: false })
@@ -14458,6 +14748,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                     {
                         DashboardWorkflowStageText.Text = "RAID AUSGEFÜHRT · STREAM LÄUFT WEITER";
                         AddDashboardNotification("Raid wurde ausgeführt. Automatisches Streamende ist deaktiviert.", "Info");
+                        _closeAfterStreamEnd = false;
                         ResetStreamEndFlowState();
                     }
 
@@ -14469,6 +14760,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
         catch (Exception exception)
         {
+            _closeAfterStreamEnd = false;
             ResetStreamEndFlowState();
             AddDashboardNotification($"Streamende fehlgeschlagen: {exception.Message}", "Fehler");
             throw;

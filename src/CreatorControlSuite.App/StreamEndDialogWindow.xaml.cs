@@ -1,13 +1,24 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using CreatorControlSuite.Core.Configuration;
+using CreatorControlSuite.Modules.Twitch.Models;
 
 namespace CreatorControlSuite.App;
 
 public partial class StreamEndDialogWindow : Window
 {
+    private static readonly TimeSpan SearchDebounce = TimeSpan.FromMilliseconds(280);
+
     private bool _flowStarted;
     private bool _allowClose;
+    private bool _suppressSearch;
     private readonly Action<string>? _openRaidChannel;
+    private readonly Func<string, CancellationToken, Task<IReadOnlyList<TwitchChannelSuggestion>>>? _suggestRaidTargets;
+    private readonly Action<string>? _raidTargetChanged;
+    private readonly DispatcherTimer _searchTimer;
+    private CancellationTokenSource? _searchCts;
 
     public StreamEndMode SelectedMode { get; private set; } = StreamEndMode.EndSceneThenStop;
     public string? SelectedRaidChannel { get; private set; }
@@ -25,21 +36,40 @@ public partial class StreamEndDialogWindow : Window
         IReadOnlyList<string> raidChannels,
         string? selectedRaidChannel,
         int endSceneSeconds,
-        Action<string>? openRaidChannel = null)
+        Action<string>? openRaidChannel = null,
+        Func<string, CancellationToken, Task<IReadOnlyList<TwitchChannelSuggestion>>>? suggestRaidTargets = null,
+        Action<string>? raidTargetChanged = null)
     {
         InitializeComponent();
         _openRaidChannel = openRaidChannel;
+        _suggestRaidTargets = suggestRaidTargets;
+        _raidTargetChanged = raidTargetChanged;
 
-        RaidChannelBox.ItemsSource = raidChannels;
-        if (!string.IsNullOrWhiteSpace(selectedRaidChannel))
-        {
-            RaidChannelBox.SelectedItem = raidChannels.FirstOrDefault(channel =>
-                string.Equals(channel, selectedRaidChannel, StringComparison.OrdinalIgnoreCase));
-        }
+        var initial = !string.IsNullOrWhiteSpace(selectedRaidChannel)
+            ? selectedRaidChannel.Trim().TrimStart('@')
+            : raidChannels.FirstOrDefault() ?? "";
+        RaidChannelSearchBox.Text = initial;
 
-        RaidChannelBox.SelectedItem ??= raidChannels.FirstOrDefault();
         SelectedEndSceneSeconds = Math.Max(0, endSceneSeconds);
         EndSceneSecondsBox.Text = SelectedEndSceneSeconds.ToString();
+
+        _searchTimer = new DispatcherTimer { Interval = SearchDebounce };
+        _searchTimer.Tick += async (_, _) =>
+        {
+            _searchTimer.Stop();
+            await SearchRaidTargetsAsync();
+        };
+
+        RaidChannelSearchBox.TextChanged += RaidChannelSearchBox_OnTextChanged;
+        RaidChannelSearchBox.PreviewKeyDown += RaidChannelSearchBox_OnPreviewKeyDown;
+        RaidChannelSearchBox.GotKeyboardFocus += async (_, _) =>
+        {
+            if (_suggestRaidTargets is not null)
+            {
+                await SearchRaidTargetsAsync();
+            }
+        };
+        RaidChannelSearchBox.LostKeyboardFocus += RaidChannelSearchBox_OnLostKeyboardFocus;
 
         ApplyInitialMode(initialMode);
         ImmediateRadio.Checked += (_, _) => UpdateModeDependentPanels();
@@ -56,7 +86,8 @@ public partial class StreamEndDialogWindow : Window
         };
         OpenRaidChannelButton.Click += (_, _) =>
         {
-            if (RaidChannelBox.SelectedItem is string channel)
+            var channel = GetRaidChannelText();
+            if (!string.IsNullOrWhiteSpace(channel))
             {
                 _openRaidChannel?.Invoke(channel);
             }
@@ -65,6 +96,17 @@ public partial class StreamEndDialogWindow : Window
         SkipRaidButton.Click += (_, _) => SkipRaidRequested?.Invoke();
         CancelRaidButton.Click += (_, _) => CancelRaidRequested?.Invoke();
         Closing += OnClosing;
+        Closed += (_, _) =>
+        {
+            _searchTimer.Stop();
+            _searchCts?.Cancel();
+            _searchCts?.Dispose();
+        };
+
+        if (!string.IsNullOrWhiteSpace(initial))
+        {
+            _raidTargetChanged?.Invoke(initial);
+        }
     }
 
     public void EnterRunningPhase(string phaseTitle, string status)
@@ -87,6 +129,7 @@ public partial class StreamEndDialogWindow : Window
         SkipRaidButton.Visibility = Visibility.Collapsed;
         CancelRaidButton.Visibility = Visibility.Collapsed;
         CancelRaidButton.IsEnabled = false;
+        CloseSuggestions();
     }
 
     public void ShowRaidActions(bool waitingForRaid)
@@ -165,7 +208,173 @@ public partial class StreamEndDialogWindow : Window
         RaidTargetPanel.Visibility = EndSceneRaidRadio.IsChecked == true
             ? Visibility.Visible
             : Visibility.Collapsed;
+        if (EndSceneRaidRadio.IsChecked != true)
+        {
+            CloseSuggestions();
+        }
     }
+
+    private void RaidChannelSearchBox_OnTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_suppressSearch || _suggestRaidTargets is null)
+        {
+            return;
+        }
+
+        _searchTimer.Stop();
+        _searchTimer.Start();
+    }
+
+    private void RaidChannelSearchBox_OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!RaidSuggestionsPopup.IsOpen || RaidSuggestionsBox.Items.Count == 0)
+        {
+            if (e.Key == Key.Escape)
+            {
+                CloseSuggestions();
+            }
+
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.Down:
+                MoveSuggestion(1);
+                e.Handled = true;
+                break;
+            case Key.Up:
+                MoveSuggestion(-1);
+                e.Handled = true;
+                break;
+            case Key.Enter:
+                if (RaidSuggestionsBox.SelectedItem is TwitchChannelSuggestion selected)
+                {
+                    ApplySuggestion(selected);
+                    e.Handled = true;
+                }
+
+                break;
+            case Key.Escape:
+                CloseSuggestions();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void RaidChannelSearchBox_OnLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (e.NewFocus is DependencyObject focus &&
+            (ReferenceEquals(focus, RaidSuggestionsBox) || IsDescendantOf(focus, RaidSuggestionsBox)))
+        {
+            return;
+        }
+
+        CloseSuggestions();
+    }
+
+    private void RaidSuggestionsBox_OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (ItemsControl.ContainerFromElement(RaidSuggestionsBox, e.OriginalSource as DependencyObject)
+            is ListBoxItem { DataContext: TwitchChannelSuggestion selected })
+        {
+            ApplySuggestion(selected);
+            e.Handled = true;
+        }
+    }
+
+    private async Task SearchRaidTargetsAsync()
+    {
+        if (_suggestRaidTargets is null)
+        {
+            return;
+        }
+
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = new CancellationTokenSource();
+        var token = _searchCts.Token;
+        var query = GetRaidChannelText();
+
+        try
+        {
+            var suggestions = await _suggestRaidTargets(query, token);
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            RaidSuggestionsBox.ItemsSource = suggestions;
+            if (suggestions.Count == 0)
+            {
+                CloseSuggestions();
+                return;
+            }
+
+            RaidSuggestionsBox.SelectedIndex = 0;
+            RaidSuggestionsPopup.IsOpen = true;
+        }
+        catch (OperationCanceledException)
+        {
+            // superseded
+        }
+        catch
+        {
+            if (!token.IsCancellationRequested)
+            {
+                CloseSuggestions();
+            }
+        }
+    }
+
+    private void ApplySuggestion(TwitchChannelSuggestion suggestion)
+    {
+        _suppressSearch = true;
+        try
+        {
+            RaidChannelSearchBox.Text = suggestion.Login;
+            RaidChannelSearchBox.CaretIndex = RaidChannelSearchBox.Text.Length;
+            CloseSuggestions();
+        }
+        finally
+        {
+            _suppressSearch = false;
+        }
+
+        _raidTargetChanged?.Invoke(suggestion.Login);
+        RaidChannelSearchBox.Focus();
+    }
+
+    private void MoveSuggestion(int delta)
+    {
+        var count = RaidSuggestionsBox.Items.Count;
+        if (count == 0)
+        {
+            return;
+        }
+
+        var next = RaidSuggestionsBox.SelectedIndex + delta;
+        if (next < 0)
+        {
+            next = count - 1;
+        }
+        else if (next >= count)
+        {
+            next = 0;
+        }
+
+        RaidSuggestionsBox.SelectedIndex = next;
+        RaidSuggestionsBox.ScrollIntoView(RaidSuggestionsBox.SelectedItem);
+    }
+
+    private void CloseSuggestions()
+    {
+        RaidSuggestionsPopup.IsOpen = false;
+        RaidSuggestionsBox.ItemsSource = null;
+    }
+
+    private string GetRaidChannelText() =>
+        RaidChannelSearchBox.Text.Trim().TrimStart('@');
 
     private void ConfirmSelection()
     {
@@ -177,10 +386,11 @@ public partial class StreamEndDialogWindow : Window
         else if (EndSceneRaidRadio.IsChecked == true)
         {
             SelectedMode = StreamEndMode.EndSceneRaidThenStop;
-            SelectedRaidChannel = RaidChannelBox.SelectedItem as string;
+            SelectedRaidChannel = GetRaidChannelText();
             if (string.IsNullOrWhiteSpace(SelectedRaidChannel))
             {
                 RaidTargetStatusText.Text = "Bitte ein Raid-Ziel auswählen.";
+                RaidChannelSearchBox.Focus();
                 return;
             }
 
@@ -203,6 +413,7 @@ public partial class StreamEndDialogWindow : Window
         }
 
         Confirmed = true;
+        CloseSuggestions();
         SelectionConfirmed?.Invoke(SelectedMode, SelectedRaidChannel, SelectedEndSceneSeconds);
     }
 
@@ -247,5 +458,20 @@ public partial class StreamEndDialogWindow : Window
 
         e.Cancel = true;
         CancelFlowRequested?.Invoke();
+    }
+
+    private static bool IsDescendantOf(DependencyObject? node, DependencyObject ancestor)
+    {
+        while (node is not null)
+        {
+            if (ReferenceEquals(node, ancestor))
+            {
+                return true;
+            }
+
+            node = System.Windows.Media.VisualTreeHelper.GetParent(node);
+        }
+
+        return false;
     }
 }

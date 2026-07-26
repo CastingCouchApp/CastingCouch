@@ -139,6 +139,7 @@ public sealed class TwitchSettings
         "channel:manage:broadcast",
         "channel:manage:raids",
         "moderator:read:followers",
+        "user:read:follows",
         "moderator:read:chatters",
         "moderator:manage:banned_users",
         "channel:read:subscriptions",

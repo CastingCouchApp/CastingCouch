@@ -133,6 +133,160 @@ public sealed class TwitchApiClient : ITwitchApiClient
             .ToList();
     }
 
+    public async Task<IReadOnlyList<TwitchChannelSuggestion>> SearchChannelsAsync(
+        string query,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await SendAsync<ChannelSearchListResponse>(
+            HttpMethod.Get,
+            "search/channels?query=" +
+            Uri.EscapeDataString(query) +
+            "&first=20",
+            body: null,
+            cancellationToken);
+
+        return response.Data
+            .OrderByDescending(channel => channel.IsLive)
+            .Select(channel => new TwitchChannelSuggestion(
+                channel.BroadcasterLogin,
+                string.IsNullOrWhiteSpace(channel.DisplayName)
+                    ? channel.BroadcasterLogin
+                    : channel.DisplayName,
+                channel.IsLive,
+                "Suche"))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelSuggestion>> GetFollowedChannelsAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        var results = new List<TwitchChannelSuggestion>();
+        string? cursor = null;
+
+        do
+        {
+            var url = "channels/followed?user_id=" +
+                      Uri.EscapeDataString(userId) +
+                      "&first=100";
+            if (!string.IsNullOrWhiteSpace(cursor))
+            {
+                url += "&after=" + Uri.EscapeDataString(cursor);
+            }
+
+            var response = await SendAsync<FollowedChannelsResponse>(
+                HttpMethod.Get,
+                url,
+                body: null,
+                cancellationToken);
+
+            results.AddRange(response.Data.Select(channel => new TwitchChannelSuggestion(
+                channel.BroadcasterLogin,
+                string.IsNullOrWhiteSpace(channel.BroadcasterName)
+                    ? channel.BroadcasterLogin
+                    : channel.BroadcasterName,
+                IsLive: false,
+                "Gefolgt")));
+
+            cursor = response.Pagination?.Cursor;
+            if (results.Count >= 300)
+            {
+                break;
+            }
+        }
+        while (!string.IsNullOrWhiteSpace(cursor));
+
+        return results;
+    }
+
+    public async Task<IReadOnlyList<TwitchChannelSuggestion>> GetFollowedLiveStreamsAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        var results = new List<TwitchChannelSuggestion>();
+        string? cursor = null;
+
+        do
+        {
+            var url = "streams/followed?user_id=" +
+                      Uri.EscapeDataString(userId) +
+                      "&first=100";
+            if (!string.IsNullOrWhiteSpace(cursor))
+            {
+                url += "&after=" + Uri.EscapeDataString(cursor);
+            }
+
+            var response = await SendAsync<StreamListResponse>(
+                HttpMethod.Get,
+                url,
+                body: null,
+                cancellationToken);
+
+            results.AddRange(response.Data
+                .Where(stream => !string.IsNullOrWhiteSpace(stream.UserLogin))
+                .Select(stream => new TwitchChannelSuggestion(
+                    stream.UserLogin,
+                    string.IsNullOrWhiteSpace(stream.UserName)
+                        ? stream.UserLogin
+                        : stream.UserName,
+                    IsLive: true,
+                    "Live")));
+
+            cursor = response.Pagination?.Cursor;
+            if (results.Count >= 100)
+            {
+                break;
+            }
+        }
+        while (!string.IsNullOrWhiteSpace(cursor));
+
+        return results;
+    }
+
+    public async Task<IReadOnlyDictionary<string, TwitchChannelSuggestion>> GetLiveChannelsByLoginsAsync(
+        IEnumerable<string> logins,
+        CancellationToken cancellationToken = default)
+    {
+        var unique = logins
+            .Select(login => login.Trim().TrimStart('@'))
+            .Where(login => !string.IsNullOrWhiteSpace(login))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(100)
+            .ToList();
+
+        if (unique.Count == 0)
+        {
+            return new Dictionary<string, TwitchChannelSuggestion>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var query = string.Join(
+            "&",
+            unique.Select(login => "user_login=" + Uri.EscapeDataString(login)));
+        var response = await SendAsync<StreamListResponse>(
+            HttpMethod.Get,
+            "streams?" + query,
+            body: null,
+            cancellationToken);
+
+        return response.Data
+            .Where(stream => !string.IsNullOrWhiteSpace(stream.UserLogin))
+            .GroupBy(stream => stream.UserLogin, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var stream = group.First();
+                    return new TwitchChannelSuggestion(
+                        stream.UserLogin,
+                        string.IsNullOrWhiteSpace(stream.UserName)
+                            ? stream.UserLogin
+                            : stream.UserName,
+                        IsLive: true,
+                        "Live");
+                },
+                StringComparer.OrdinalIgnoreCase);
+    }
+
     public async Task<TwitchRaidTargetStatus?> GetRaidTargetStatusAsync(
         string login,
         CancellationToken cancellationToken = default)
@@ -576,10 +730,19 @@ public sealed class TwitchApiClient : ITwitchApiClient
     {
         [JsonPropertyName("data")]
         public StreamData[] Data { get; set; } = [];
+
+        [JsonPropertyName("pagination")]
+        public PaginationData? Pagination { get; set; }
     }
 
     private sealed class StreamData
     {
+        [JsonPropertyName("user_login")]
+        public string UserLogin { get; set; } = "";
+
+        [JsonPropertyName("user_name")]
+        public string UserName { get; set; } = "";
+
         [JsonPropertyName("game_name")]
         public string GameName { get; set; } = "";
 
@@ -687,6 +850,48 @@ public sealed class TwitchApiClient : ITwitchApiClient
 
         [JsonPropertyName("box_art_url")]
         public string BoxArtUrl { get; set; } = "";
+    }
+
+    private sealed class ChannelSearchListResponse
+    {
+        [JsonPropertyName("data")]
+        public ChannelSearchData[] Data { get; set; } = [];
+    }
+
+    private sealed class ChannelSearchData
+    {
+        [JsonPropertyName("broadcaster_login")]
+        public string BroadcasterLogin { get; set; } = "";
+
+        [JsonPropertyName("display_name")]
+        public string DisplayName { get; set; } = "";
+
+        [JsonPropertyName("is_live")]
+        public bool IsLive { get; set; }
+    }
+
+    private sealed class FollowedChannelsResponse
+    {
+        [JsonPropertyName("data")]
+        public FollowedChannelData[] Data { get; set; } = [];
+
+        [JsonPropertyName("pagination")]
+        public PaginationData? Pagination { get; set; }
+    }
+
+    private sealed class FollowedChannelData
+    {
+        [JsonPropertyName("broadcaster_login")]
+        public string BroadcasterLogin { get; set; } = "";
+
+        [JsonPropertyName("broadcaster_name")]
+        public string BroadcasterName { get; set; } = "";
+    }
+
+    private sealed class PaginationData
+    {
+        [JsonPropertyName("cursor")]
+        public string? Cursor { get; set; }
     }
 
     private sealed class SendChatMessageResponse

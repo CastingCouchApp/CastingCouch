@@ -381,6 +381,52 @@ public sealed class TwitchModule : IConnectableModule
             cancellationToken);
     }
 
+    public Task<IReadOnlyList<TwitchChannelSuggestion>> SearchChannelsAsync(
+        string query,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
+        return _apiClient.SearchChannelsAsync(query, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<TwitchChannelSuggestion>> GetFollowedChannelsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
+        return _apiClient.GetFollowedChannelsAsync(_currentUser.Id, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<TwitchChannelSuggestion>> GetFollowedLiveStreamsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
+        return _apiClient.GetFollowedLiveStreamsAsync(_currentUser.Id, cancellationToken);
+    }
+
+    public Task<IReadOnlyDictionary<string, TwitchChannelSuggestion>> GetLiveChannelsByLoginsAsync(
+        IEnumerable<string> logins,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
+        return _apiClient.GetLiveChannelsByLoginsAsync(logins, cancellationToken);
+    }
+
     public TwitchConnectionSnapshot GetSnapshot()
     {
         return new TwitchConnectionSnapshot(

@@ -87,15 +87,41 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <ComboBox x:Name="RaidChannelBox"
-                                  Foreground="{DynamicResource TextPrimaryBrush}"
-                                  MinHeight="34"/>
+                        <Grid x:Name="RaidTargetTypeaheadHost">
+                            <TextBox x:Name="RaidChannelSearchBox"
+                                     MinHeight="34"
+                                     ToolTip="Tippe einen Kanalnamen – Zuletzt und Follows zuerst"/>
+                            <Popup x:Name="RaidSuggestionsPopup"
+                                   PlacementTarget="{Binding ElementName=RaidChannelSearchBox}"
+                                   Placement="Bottom"
+                                   StaysOpen="True"
+                                   AllowsTransparency="True"
+                                   PopupAnimation="Fade">
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}"
+                                        BorderBrush="{DynamicResource StrongBorderBrush}"
+                                        BorderThickness="1"
+                                        MinWidth="{Binding ActualWidth, ElementName=RaidChannelSearchBox}"
+                                        MaxHeight="240">
+                                    <ListBox x:Name="RaidSuggestionsBox"
+                                             DisplayMemberPath="DisplayLabel"
+                                             BorderThickness="0"
+                                             MaxHeight="238"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             PreviewMouseLeftButtonUp="RaidSuggestionsBox_OnPreviewMouseLeftButtonUp"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
                         <Button x:Name="OpenRaidChannelButton"
                                 Grid.Column="1"
                                 Content="ÖFFNEN"
                                 Margin="8,0,0,0"
                                 Padding="12,6"/>
                     </Grid>
+                    <TextBlock Text="Oben: bisherige Raid-Ziele, darunter Live-Kanäle, dann Follows/Suche."
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               FontSize="11"
+                               Margin="0,6,0,0"
+                               TextWrapping="Wrap"/>
                     <TextBlock x:Name="RaidTargetStatusText"
                                Text="Kein Ziel ausgewählt"
                                Foreground="{DynamicResource TextSecondaryBrush}"

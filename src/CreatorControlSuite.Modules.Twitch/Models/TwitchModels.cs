@@ -44,6 +44,26 @@ public sealed record TwitchCategory(
     string Id,
     string Name,
     string BoxArtUrl);
+
+public sealed record TwitchChannelSuggestion(
+    string Login,
+    string DisplayName,
+    bool IsLive,
+    string SourceLabel)
+{
+    public string DisplayLabel
+    {
+        get
+        {
+            var live = IsLive ? " · Live" : "";
+            var loginSuffix = string.Equals(Login, DisplayName, StringComparison.OrdinalIgnoreCase)
+                ? ""
+                : $" ({Login})";
+            return $"{DisplayName}{loginSuffix} · {SourceLabel}{live}";
+        }
+    }
+}
+
 public sealed record TwitchRaidTargetStatus(
     string Login,
     string DisplayName,

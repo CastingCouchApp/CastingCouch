@@ -29,6 +29,22 @@ public interface ITwitchApiClient
         string query,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<TwitchChannelSuggestion>> SearchChannelsAsync(
+        string query,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TwitchChannelSuggestion>> GetFollowedChannelsAsync(
+        string userId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TwitchChannelSuggestion>> GetFollowedLiveStreamsAsync(
+        string userId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<string, TwitchChannelSuggestion>> GetLiveChannelsByLoginsAsync(
+        IEnumerable<string> logins,
+        CancellationToken cancellationToken = default);
+
     Task<TwitchRaidTargetStatus?> GetRaidTargetStatusAsync(
         string login,
         CancellationToken cancellationToken = default);
