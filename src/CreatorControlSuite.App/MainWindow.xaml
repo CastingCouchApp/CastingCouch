@@ -505,22 +505,22 @@
                                             <Grid>
                                                 <Grid.RowDefinitions>
                                                     <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="*" MinHeight="180"/>
                                                     <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="*" MinHeight="120"/>
                                                 </Grid.RowDefinitions>
                                                 <TextBlock Text="AKTUELLE SZENE (OBS)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,12"/>
-                                                <Border Grid.Row="1" MinHeight="180" Background="{DynamicResource WindowBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,10" ClipToBounds="True" VerticalAlignment="Stretch">
+                                                <Border Grid.Row="1" Height="90" MinHeight="90" MaxHeight="90" Background="{DynamicResource WindowBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,10" ClipToBounds="True" VerticalAlignment="Top">
                                                     <Grid>
                                                         <Rectangle Fill="{DynamicResource PanelBackgroundBrush}"/>
                                                         <Image x:Name="DashboardObsScenePreviewImage" Stretch="Uniform"/>
                                                         <Border x:Name="DashboardObsScenePreviewPlaceholder" Background="{DynamicResource WindowBackgroundBrush}">
                                                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                                <TextBlock Text="OBS" Foreground="{DynamicResource AccentBrush}" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                                <TextBlock Text="Vorschau wird nach der OBS-Verbindung geladen" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0"/>
+                                                                <TextBlock Text="OBS" Foreground="{DynamicResource AccentBrush}" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="Vorschau wird nach der OBS-Verbindung geladen" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,4,0,0"/>
                                                             </StackPanel>
                                                         </Border>
-                                                        <Border Background="#A0000000" VerticalAlignment="Bottom" Padding="8,5">
-                                                            <TextBlock x:Name="DashboardCurrentSceneText" Text="AKTUELLE SZENE" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                                        <Border Background="#A0000000" VerticalAlignment="Bottom" Padding="8,4">
+                                                            <TextBlock x:Name="DashboardCurrentSceneText" Text="AKTUELLE SZENE" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                                                         </Border>
                                                     </Grid>
                                                 </Border>
@@ -534,7 +534,8 @@
                                     <Grid Grid.Column="1">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="*" MinHeight="220"/>
+                                            <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
                                         <Border x:Name="DashboardStreamEndModule" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource AccentMutedBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,10" Visibility="Collapsed" HorizontalAlignment="Stretch">
                                             <StackPanel>
@@ -581,7 +582,54 @@
                                                 </WrapPanel>
                                             </StackPanel>
                                         </Border>
-                                        <Border Grid.Row="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardStreamControlModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                        <Grid Grid.Row="1" Margin="0,0,0,10" MinHeight="220">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardTwitchEventsModule" Margin="0,0,4,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="*"/>
+                                                    </Grid.RowDefinitions>
+                                                    <TextBlock Text="LETZTE EVENTS" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                    <ListBox x:Name="DashboardTwitchEventsList" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" MinHeight="120" VerticalAlignment="Stretch"/>
+                                                </Grid>
+                                            </Border>
+                                            <Border Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardTwitchChatModule" Margin="4,0,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="*"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+                                                    <DockPanel>
+                                                        <TextBlock Text="CHAT (TWITCH)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                                        <TextBlock Text="LIVE" Foreground="#9B5CFF" HorizontalAlignment="Right"/>
+                                                    </DockPanel>
+                                                    <ListBox x:Name="DashboardTwitchChatList" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,8" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" MinHeight="120" VerticalAlignment="Stretch"/>
+                                                    <StackPanel Grid.Row="2">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBox x:Name="DashboardTwitchChatMessageBox"/>
+                                                            <Button x:Name="DashboardSendTwitchChatButton" Grid.Column="1" Content="SENDEN" Margin="8,0,0,0"/>
+                                                            <Button x:Name="DashboardOpenTwitchChatButton" Grid.Column="2" Content="CHAT ÖFFNEN" Margin="8,0,0,0"/>
+                                                        </Grid>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                            <TextBox x:Name="DashboardModerationUserBox" Width="150" ToolTip="Benutzername"/>
+                                                            <Button x:Name="DashboardTimeoutUserButton" Content="TIMEOUT 10 MIN" Margin="8,0,0,0"/>
+                                                            <Button x:Name="DashboardBanUserButton" Content="BANNEN" Margin="8,0,0,0"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                        <Border Grid.Row="2" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardStreamControlModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                             <StackPanel>
                                                 <TextBlock Text="SCHNELLZUGRIFF" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
                                                 <UniformGrid Columns="3" Margin="0,12,0,8">
@@ -651,69 +699,17 @@
                                         </Border>
                                     </Grid>
                             </Grid>
-                            <Grid x:Name="DashboardStreamingServicesRow" Grid.Row="2" Margin="0,0,0,10" MinHeight="400">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="1.27*" MinWidth="180"/>
-                                    <ColumnDefinition Width="2*" MinWidth="220"/>
-                                    <ColumnDefinition Width="1*" MinWidth="160"/>
-                                </Grid.ColumnDefinitions>
-                                    <Grid Grid.Column="0" Margin="0,0,6,0">
-                                        <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardTwitchEventsModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="*"/>
-                                                </Grid.RowDefinitions>
-                                                <TextBlock Text="LETZTE EVENTS" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                                                <ListBox x:Name="DashboardTwitchEventsList" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" MinHeight="120" VerticalAlignment="Stretch"/>
-                                            </Grid>
-                                        </Border>
+                            <Grid x:Name="DashboardStreamingServicesRow" Grid.Row="2" Margin="0,0,0,10" MinHeight="220">
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardTwitchUsersModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock x:Name="DashboardTwitchUsersHeaderText" Text="TWITCH · USER (0)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                        <ListBox x:Name="DashboardTwitchUsersList" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" MinHeight="120" VerticalAlignment="Stretch"/>
                                     </Grid>
-                                    <Grid Grid.Column="1" Margin="0,0,6,0">
-                                        <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardTwitchChatModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="*"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
-                                                <DockPanel>
-                                                    <TextBlock Text="CHAT (TWITCH)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                                                    <TextBlock Text="LIVE" Foreground="#9B5CFF" HorizontalAlignment="Right"/>
-                                                </DockPanel>
-                                                <ListBox x:Name="DashboardTwitchChatList" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,8" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" MinHeight="160" VerticalAlignment="Stretch"/>
-                                                <StackPanel Grid.Row="2">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBox x:Name="DashboardTwitchChatMessageBox"/>
-                                                        <Button x:Name="DashboardSendTwitchChatButton" Grid.Column="1" Content="SENDEN" Margin="8,0,0,0"/>
-                                                        <Button x:Name="DashboardOpenTwitchChatButton" Grid.Column="2" Content="CHAT ÖFFNEN" Margin="8,0,0,0"/>
-                                                    </Grid>
-                                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                                        <TextBox x:Name="DashboardModerationUserBox" Width="150" ToolTip="Benutzername"/>
-                                                        <Button x:Name="DashboardTimeoutUserButton" Content="TIMEOUT 10 MIN" Margin="8,0,0,0"/>
-                                                        <Button x:Name="DashboardBanUserButton" Content="BANNEN" Margin="8,0,0,0"/>
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                    </Grid>
-                                    <Grid Grid.Column="2">
-                                        <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardTwitchUsersModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="*"/>
-                                                </Grid.RowDefinitions>
-                                                <TextBlock x:Name="DashboardTwitchUsersHeaderText" Text="TWITCH · USER (0)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                                                <ListBox x:Name="DashboardTwitchUsersList" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" MinHeight="120" VerticalAlignment="Stretch"/>
-                                            </Grid>
-                                        </Border>
-                                    </Grid>
+                                </Border>
                             </Grid>
                             <Grid x:Name="DashboardRemainingWidgetsRow" Grid.Row="3" Margin="0" MinHeight="260">
                                 <Grid.ColumnDefinitions>
