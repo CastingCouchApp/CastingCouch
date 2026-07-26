@@ -6,8 +6,8 @@
         Height="650"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
-        Background="#101010"
-        Foreground="White">
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -21,14 +21,14 @@
                        FontWeight="Bold"/>
             <TextBlock x:Name="StepTitleText"
                        Text="Willkommen"
-                       Foreground="#FF8C00"
+                       Foreground="{DynamicResource AccentBrush}"
                        FontSize="18"
                        Margin="0,6,0,0"/>
         </StackPanel>
 
         <Border Grid.Row="1"
-                Background="#1A1A1A"
-                BorderBrush="#333"
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="12"
                 Padding="22"
@@ -41,7 +41,7 @@
                                    FontWeight="Bold"
                                    TextAlignment="Center"/>
                         <TextBlock Text="Dieser Assistent richtet die Grundwerte ein. Twitch und Spotify werden anschließend in der Suite autorisiert."
-                                   Foreground="#B5B5B5"
+                                   Foreground="{DynamicResource TextMutedBrush}"
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"
                                    FontSize="17"
@@ -52,7 +52,7 @@
                 <Grid x:Name="BrandingStep" Visibility="Collapsed">
                     <StackPanel Width="620">
                         <TextBlock Text="Name und Kanal"
-                                   Foreground="#FF8C00"
+                                   Foreground="{DynamicResource AccentBrush}"
                                    FontSize="22"
                                    FontWeight="Bold"/>
                         <TextBlock Text="Anzeigename" Margin="0,14,0,4"/>
@@ -65,7 +65,7 @@
                 <Grid x:Name="ObsStep" Visibility="Collapsed">
                     <StackPanel Width="620">
                         <TextBlock Text="OBS"
-                                   Foreground="#FF8C00"
+                                   Foreground="{DynamicResource AccentBrush}"
                                    FontSize="22"
                                    FontWeight="Bold"/>
                         <Grid Margin="0,14,0,0">
@@ -96,7 +96,7 @@
                 <Grid x:Name="OverlayStep" Visibility="Collapsed">
                     <StackPanel Width="620">
                         <TextBlock Text="Overlay"
-                                   Foreground="#FF8C00"
+                                   Foreground="{DynamicResource AccentBrush}"
                                    FontSize="22"
                                    FontWeight="Bold"/>
                         <TextBlock Text="Overlay-Ordner" Margin="0,14,0,4"/>
@@ -106,7 +106,7 @@
                                   IsChecked="True"
                                   Margin="0,12,0,0"/>
                         <TextBlock Text="Ein leerer Pfad verwendet den Standardordner unter LocalAppData."
-                                   Foreground="#AFAFAF"
+                                   Foreground="{DynamicResource TextMutedBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,12,0,0"/>
                     </StackPanel>
@@ -115,7 +115,7 @@
                 <Grid x:Name="SummaryStep" Visibility="Collapsed">
                     <StackPanel Width="680">
                         <TextBlock Text="Zusammenfassung"
-                                   Foreground="#FF8C00"
+                                   Foreground="{DynamicResource AccentBrush}"
                                    FontSize="22"
                                    FontWeight="Bold"/>
                         <TextBlock x:Name="SummaryText"
@@ -149,8 +149,8 @@
                         Margin="4"/>
                 <Button x:Name="NextButton"
                         Content="Weiter"
-                        Background="#FF8C00"
-                        Foreground="White"
+                        Background="{DynamicResource AccentBrush}"
+                        Foreground="{DynamicResource TextOnAccentBrush}"
                         FontWeight="Bold"
                         Padding="14,9"
                         Margin="4"/>

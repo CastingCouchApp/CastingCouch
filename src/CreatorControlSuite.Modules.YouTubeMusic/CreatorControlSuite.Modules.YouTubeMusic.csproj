@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../CreatorControlSuite.Core/CreatorControlSuite.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\ytmusic-bridge.js" />
+  </ItemGroup>
+</Project>

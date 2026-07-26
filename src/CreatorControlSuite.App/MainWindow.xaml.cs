@@ -17,6 +17,8 @@ using CreatorControlSuite.Modules.Twitch;
 using CreatorControlSuite.Modules.Twitch.Models;
 using CreatorControlSuite.Modules.Spotify;
 using CreatorControlSuite.Modules.Spotify.Models;
+using CreatorControlSuite.Modules.YouTubeMusic;
+using CreatorControlSuite.Core.Music;
 using CreatorControlSuite.Modules.Alerts;
 using CreatorControlSuite.Modules.Alerts.Models;
 using CreatorControlSuite.Modules.Overlay;
@@ -24,6 +26,7 @@ using CreatorControlSuite.Modules.Workflow;
 using CreatorControlSuite.Modules.Workflow.Models;
 using CreatorControlSuite.Modules.StreamDeck;
 using CreatorControlSuite.App.Services;
+using CreatorControlSuite.App.Themes;
 using CreatorControlSuite.Core.Ipc;
 using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Legal;
@@ -64,6 +67,8 @@ public partial class MainWindow : Window
     private readonly IObsWebSocketClient _obsClient;
     private readonly TwitchModule _twitchModule;
     private readonly SpotifyModule _spotifyModule;
+    private readonly YouTubeMusicModule _youTubeMusicModule;
+    private readonly IMusicPlayerRouter _musicPlayerRouter;
     private readonly AlertsModule _alertsModule;
     private readonly OverlayModule _overlayModule;
     private readonly WorkflowModule _workflowModule;
@@ -88,6 +93,7 @@ public partial class MainWindow : Window
     private readonly IWorkflowE2eService _workflowE2eService;
     private readonly IInstallerSelfTestService _installerSelfTestService;
     private readonly IBetaReadinessService _betaReadinessService;
+    private readonly IThemeService _themeService;
     private readonly ObservableCollection<AppLogEntry> _visibleLogs = [];
     private readonly ObservableCollection<SpotifyApiInspectorRow> _spotifyInspectorRows = [];
     private bool _logsPaused;
@@ -352,6 +358,8 @@ public partial class MainWindow : Window
         IObsWebSocketClient obsClient,
         TwitchModule twitchModule,
         SpotifyModule spotifyModule,
+        YouTubeMusicModule youTubeMusicModule,
+        IMusicPlayerRouter musicPlayerRouter,
         AlertsModule alertsModule,
         OverlayModule overlayModule,
         WorkflowModule workflowModule,
@@ -373,18 +381,24 @@ public partial class MainWindow : Window
         IWorkflowE2eService workflowE2eService,
         IInstallerSelfTestService installerSelfTestService,
         IBetaReadinessService betaReadinessService,
-        ExternalAlertActivityService externalAlertActivity)
+        ExternalAlertActivityService externalAlertActivity,
+        IThemeService themeService)
     {
         InitializeComponent();
+        StateChanged += (_, _) => UpdateTitleBarMaximizeButton();
+        UpdateTitleBarMaximizeButton();
 
         _settingsStore = settingsStore;
         _externalAlertActivity = externalAlertActivity;
+        _themeService = themeService;
         _externalAlertActivity.ActiveCountChanged += async (_, _) => await ApplyCombinedAlertDuckingAsync();
         _secretStore = secretStore;
         _diagnostics = diagnostics;
         _obsClient = obsClient;
         _twitchModule = twitchModule;
         _spotifyModule = spotifyModule;
+        _youTubeMusicModule = youTubeMusicModule;
+        _musicPlayerRouter = musicPlayerRouter;
         _alertsModule = alertsModule;
         _overlayModule = overlayModule;
         _workflowModule = workflowModule;
@@ -407,6 +421,10 @@ public partial class MainWindow : Window
         _workflowE2eService = workflowE2eService;
         _installerSelfTestService = installerSelfTestService;
         _betaReadinessService = betaReadinessService;
+
+        ThemeBox.SelectionChanged += ThemeBox_SelectionChanged;
+        _themeService.ThemeChanged += (_, _) => Dispatcher.Invoke(OnThemeChanged);
+        _ = RefreshThemePickerAsync();
 
         DashboardModuleOrderList.ItemsSource = _dashboardModuleOrderItems;
         DashboardModuleOrderList.PreviewMouseLeftButtonDown += DashboardModuleOrderList_PreviewMouseLeftButtonDown;
@@ -564,12 +582,24 @@ public partial class MainWindow : Window
             ShowPage(AlertsPage);
         };
 
+        DashboardConnectionSummaryChip.MouseLeftButtonUp += (_, _) =>
+            ShowServicesOverview();
+
         DashboardOpenObsServiceButton.Click += (_, _) =>
             NavigateToServicesTab(2, ServicesObsButton);
         DashboardOpenTwitchServiceButton.Click += (_, _) =>
             NavigateToServicesTab(1, ServicesTwitchButton);
         DashboardOpenSpotifyServiceButton.Click += (_, _) =>
-            NavigateToServicesTab(0, ServicesSpotifyButton);
+        {
+            if (IsSpotifyMusicProvider())
+                NavigateToServicesTab(0, ServicesSpotifyButton);
+            else
+            {
+                ServicesNavigationPanel.Visibility = Visibility.Collapsed;
+                ShowPage(MusicPlayerPage);
+                _ = RefreshMusicPlayerUiAsync();
+            }
+        };
         DashboardOpenStreamerBotServiceButton.Click += (_, _) =>
             NavigateToServicesTab(3, ServicesStreamerBotButton);
         DashboardOpenAlertsServiceButton.Click += (_, _) =>
@@ -583,6 +613,95 @@ public partial class MainWindow : Window
             ServicesNavigationPanel.Visibility = Visibility.Collapsed;
             ShowPage(DashboardPage);
         };
+        PlayerButton.Click += (_, _) =>
+        {
+            ServicesNavigationPanel.Visibility = Visibility.Collapsed;
+            ShowPage(MusicPlayerPage);
+            _ = RefreshMusicPlayerUiAsync();
+        };
+        DashboardOpenMusicPlayerButton.Click += (_, _) =>
+        {
+            ServicesNavigationPanel.Visibility = Visibility.Collapsed;
+            ShowPage(MusicPlayerPage);
+            _ = RefreshMusicPlayerUiAsync();
+        };
+        DashboardQuickOpenMusicPlayerButton.Click += (_, _) =>
+        {
+            ServicesNavigationPanel.Visibility = Visibility.Collapsed;
+            ShowPage(MusicPlayerPage);
+            _ = RefreshMusicPlayerUiAsync();
+        };
+        TitleBarMusicWidget.MouseLeftButtonUp += (_, _) =>
+        {
+            ServicesNavigationPanel.Visibility = Visibility.Collapsed;
+            ShowPage(MusicPlayerPage);
+            _ = RefreshMusicPlayerUiAsync();
+        };
+        TitleBarMusicPreviousButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PreviousAsync());
+        TitleBarMusicPlayPauseButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PlayPauseAsync());
+        TitleBarMusicNextButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.NextAsync());
+        MusicPlayerPreviousButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PreviousAsync());
+        MusicPlayerPlayPauseButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PlayPauseAsync());
+        MusicPlayerNextButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.NextAsync());
+        MusicPlayerConnectButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.ConnectActiveAsync());
+        MusicPlayerDisconnectButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.DisconnectActiveAsync());
+        MusicPlayerCopyBookmarkletButton.Click += async (_, _) =>
+        {
+            try
+            {
+                var bookmarklet = await _youTubeMusicModule.GetBookmarkletAsync();
+                Clipboard.SetText(bookmarklet);
+                MusicPlayerBridgeStatusText.Text = "Bookmarklet in die Zwischenablage kopiert.";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Bookmarklet", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        MusicPlayerOpenSpotifyServiceButton.Click += (_, _) =>
+            NavigateToServicesTab(0, ServicesSpotifyButton);
+        ServicesSpotifyOpenMusicSettingsButton.Click += (_, _) =>
+            NavigateToSettingsTab(0, SettingsButton);
+        ServicesSpotifyOpenPlayerButton.Click += (_, _) =>
+        {
+            ServicesNavigationPanel.Visibility = Visibility.Collapsed;
+            ShowPage(MusicPlayerPage);
+            _ = RefreshMusicPlayerUiAsync();
+        };
+        MusicPlayerProviderBox.SelectionChanged += (_, _) => UpdateMusicPlayerSettingsVisibility();
+        MusicPlayerProgressBar.PreviewMouseLeftButtonUp += async (_, _) =>
+        {
+            if (!_musicPlayerRouter.ActivePlayer.SupportsSeek)
+                return;
+            var snap = await _musicPlayerRouter.GetSnapshotAsync();
+            if (snap.DurationMs <= 0)
+                return;
+            var target = (int)(MusicPlayerProgressBar.Value * snap.DurationMs);
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.SeekAsync(target));
+        };
+        MusicPlayerVolumeSlider.ValueChanged += async (_, _) =>
+        {
+            if (_updatingMusicPlayerUi || !_musicPlayerRouter.ActivePlayer.SupportsVolume || !_settingsUiLoaded)
+                return;
+            MusicPlayerVolumeText.Text = $"{(int)MusicPlayerVolumeSlider.Value} %";
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.SetVolumeAsync((int)MusicPlayerVolumeSlider.Value));
+        };
+        _musicPlayerRouter.SnapshotChanged += (_, _) =>
+            Dispatcher.InvokeAsync(async () => await RefreshMusicPlayerUiAsync());
+        _musicPlayerRouter.ActiveProviderChanged += (_, _) =>
+            Dispatcher.InvokeAsync(async () =>
+            {
+                ApplyMusicProviderUiState();
+                await RefreshMusicPlayerUiAsync();
+            });
         ServicesButton.Click += (_, _) =>
         {
             ShowServicesOverview();
@@ -1209,6 +1328,7 @@ public partial class MainWindow : Window
                     : System.Windows.Media.Brushes.Gray;
                 ServicesObsStatusText.Text = ObsConnectionStatusText.Text;
                 ServicesObsStatusText.Foreground = ObsConnectionStatusText.Foreground;
+                RefreshDashboardServiceActionButtons();
             });
         };
 
@@ -1314,6 +1434,7 @@ public partial class MainWindow : Window
                 UpdateDashboardTwitchUser(
                     message,
                     role);
+                RefreshCommunityUi();
             });
 
             await _workflowModule.Service.RegisterChatMessageAsync();
@@ -1338,7 +1459,14 @@ public partial class MainWindow : Window
             if (twitchEvent.Type == "channel.follow")
             {
                 await RefreshTwitchFollowerCountAsync();
-            await RefreshTwitchGoalsAsync();
+                await RefreshTwitchGoalsAsync();
+            }
+            else if (twitchEvent.Type is
+                "channel.subscribe" or
+                "channel.subscription.message" or
+                "channel.subscription.gift")
+            {
+                await RefreshTwitchGoalsAsync();
             }
 
             var alertType = twitchEvent.Type switch
@@ -1381,6 +1509,7 @@ public partial class MainWindow : Window
             }
 
             RefreshWorkflowUi(_workflowModule.Service.State);
+            RefreshCommunityUi();
         };
 
         AuthorizeSpotifyButton.Click += async (_, _) =>
@@ -2430,6 +2559,7 @@ public partial class MainWindow : Window
         var navigationButtons = new Button[]
         {
             DashboardButton,
+            PlayerButton,
             ServicesButton,
             ServicesSpotifyButton,
             ServicesTwitchButton,
@@ -2457,11 +2587,11 @@ public partial class MainWindow : Window
         }
 
         activeButton.Background =
-            new System.Windows.Media.SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(42, 23, 10));
+            _themeService.GetBrush("NavActiveBackgroundBrush")
+            ?? new SolidColorBrush(Color.FromRgb(42, 23, 10));
         activeButton.Foreground =
-            new System.Windows.Media.SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(255, 122, 26));
+            _themeService.GetBrush("NavActiveForegroundBrush")
+            ?? new SolidColorBrush(Color.FromRgb(255, 122, 26));
         activeButton.FontWeight = FontWeights.SemiBold;
     }
 
@@ -2470,6 +2600,7 @@ public partial class MainWindow : Window
         var pages = new UIElement[]
         {
             DashboardPage,
+            MusicPlayerPage,
             ServicesPage,
             WorkflowPage,
             OverlayPage,
@@ -2494,6 +2625,10 @@ public partial class MainWindow : Window
         if (ReferenceEquals(page, DashboardPage))
         {
             SetActiveNavigationButton(DashboardButton);
+        }
+        else if (ReferenceEquals(page, MusicPlayerPage))
+        {
+            SetActiveNavigationButton(PlayerButton);
         }
         else if (ReferenceEquals(page, ServicesPage))
         {
@@ -3060,6 +3195,180 @@ public partial class MainWindow : Window
     private sealed record RemoteObsOutputState(bool StreamActive, bool StreamReconnecting, bool RecordActive, bool RecordPaused, string[] Transitions);
     private sealed record MultiPcAgentStatus(string MachineName, double CpuPercent, double MemoryMb, double UptimeMinutes, bool ObsRunning, bool SpotifyRunning, bool StreamerBotRunning, string Version, string Transport, string CertificateFingerprint, string[] AllowedCommands);
 
+    private void TitleBarMinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void TitleBarMaximizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+    }
+
+    private void TitleBarCloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void UpdateTitleBarMaximizeButton()
+    {
+        if (TitleBarMaximizeButton is null || TitleBarMaximizeIcon is null || TitleBarRestoreIcon is null)
+        {
+            return;
+        }
+
+        var maximized = WindowState == WindowState.Maximized;
+        TitleBarMaximizeIcon.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
+        TitleBarRestoreIcon.Visibility = maximized ? Visibility.Visible : Visibility.Collapsed;
+        TitleBarMaximizeButton.ToolTip = maximized ? "Wiederherstellen" : "Maximieren";
+    }
+
+    private void OnThemeChanged()
+    {
+        if (TryFindResource("AppFontFamily") is FontFamily fontFamily)
+        {
+            FontFamily = fontFamily;
+        }
+
+        // Code-behind local values would otherwise pin Classic colors after a theme swap.
+        DashboardConnectionSummaryChip?.ClearValue(Border.BackgroundProperty);
+        DashboardConnectionSummaryChip?.ClearValue(Border.BorderBrushProperty);
+        DashboardServiceStatusSection?.ClearValue(Border.BackgroundProperty);
+
+        var active = new Button?[]
+        {
+            DashboardButton, ServicesButton, WorkflowButton, StatisticsButton,
+            OverlaysButton, AlertsButton, SettingsButton, DiagnosticsButton,
+            ServicesSpotifyButton, ServicesTwitchButton, ServicesObsButton,
+            ServicesStreamerBotButton, ServicesStreamDeckButton
+        }.FirstOrDefault(b => b is not null && b.FontWeight == FontWeights.SemiBold);
+        if (active is not null)
+        {
+            SetActiveNavigationButton(active);
+        }
+    }
+
+    private async Task RefreshThemePickerAsync()
+    {
+        var premiumEnabled = await _featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes);
+        var desiredId = string.IsNullOrWhiteSpace(_settings.General.ThemeId)
+            ? ThemeCatalog.ClassicId
+            : _settings.General.ThemeId;
+        var desired = ThemeCatalog.Resolve(desiredId);
+        if (desired.IsPremium && !premiumEnabled)
+        {
+            desired = ThemeCatalog.Classic;
+            _settings.General.ThemeId = ThemeCatalog.ClassicId;
+        }
+
+        var previousLoading = _loadingSettingsIntoUi;
+        _loadingSettingsIntoUi = true;
+        try
+        {
+            ThemeBox.ItemsSource = _themeService.Themes;
+            ThemeBox.SelectedValue = desired.Id;
+            UpdateThemeDescription(desired, premiumEnabled);
+            _themeService.Apply(desired.Id);
+            if (TryFindResource("AppFontFamily") is System.Windows.Media.FontFamily fontFamily)
+            {
+                FontFamily = fontFamily;
+            }
+        }
+        finally
+        {
+            _loadingSettingsIntoUi = previousLoading;
+        }
+    }
+
+    private async void ThemeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loadingSettingsIntoUi || ThemeBox.SelectedItem is not ThemeDefinition selected)
+        {
+            return;
+        }
+
+        var premiumEnabled = await _featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes);
+        if (selected.IsPremium && !premiumEnabled)
+        {
+            ThemeLicenseHintText.Text =
+                "Premium-Themes erfordern die Pro-Edition. Classic bleibt verfügbar.";
+            ThemeLicenseHintText.Visibility = Visibility.Visible;
+            _loadingSettingsIntoUi = true;
+            try
+            {
+                ThemeBox.SelectedValue = ThemeCatalog.ClassicId;
+            }
+            finally
+            {
+                _loadingSettingsIntoUi = false;
+            }
+
+            selected = ThemeCatalog.Classic;
+        }
+        else
+        {
+            ThemeLicenseHintText.Visibility = Visibility.Collapsed;
+            ThemeLicenseHintText.Text = string.Empty;
+        }
+
+        UpdateThemeDescription(selected, premiumEnabled);
+        _settings.General.ThemeId = selected.Id;
+        _themeService.Apply(selected.Id);
+        if (TryFindResource("AppFontFamily") is System.Windows.Media.FontFamily fontFamily)
+        {
+            FontFamily = fontFamily;
+        }
+
+        // Re-apply active nav highlight with new brushes.
+        var active = new Button?[]
+        {
+            DashboardButton, ServicesButton, WorkflowButton, StatisticsButton,
+            OverlaysButton, AlertsButton, SettingsButton, DiagnosticsButton
+        }.FirstOrDefault(b => b is not null && b.FontWeight == FontWeights.SemiBold);
+        if (active is not null)
+        {
+            SetActiveNavigationButton(active);
+        }
+    }
+
+    private void UpdateThemeDescription(ThemeDefinition theme, bool premiumEnabled)
+    {
+        ThemeDescriptionText.Text = theme.Description;
+        if (theme.IsPremium && !premiumEnabled)
+        {
+            ThemeLicenseHintText.Text =
+                "Premium-Themes erfordern die Pro-Edition. Classic bleibt verfügbar.";
+            ThemeLicenseHintText.Visibility = Visibility.Visible;
+        }
+        else if (theme.IsPremium)
+        {
+            ThemeLicenseHintText.Text = "Premium-Theme (Pro).";
+            ThemeLicenseHintText.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ThemeLicenseHintText.Visibility = Visibility.Collapsed;
+            ThemeLicenseHintText.Text = string.Empty;
+        }
+    }
+
+    private string ResolveSelectedThemeId()
+    {
+        if (ThemeBox.SelectedValue is string id && !string.IsNullOrWhiteSpace(id))
+        {
+            return ThemeCatalog.Resolve(id).Id;
+        }
+
+        if (ThemeBox.SelectedItem is ThemeDefinition theme)
+        {
+            return theme.Id;
+        }
+
+        return ThemeCatalog.ClassicId;
+    }
+
     private async Task LoadSettingsAsync()
     {
         _loadingSettingsIntoUi = true;
@@ -3068,6 +3377,10 @@ public partial class MainWindow : Window
         _settings.Workflow.TimedAutomations ??= [];
         _settings.Workflow.RunOfShowSteps ??= [];
         _settings.Workflow.RunOfShowPlans ??= [];
+        _settings.MusicPlayer ??= new MusicPlayerSettings();
+        _settings.YouTubeMusic ??= new YouTubeMusicSettings();
+        if (string.IsNullOrWhiteSpace(_settings.MusicPlayer.ProviderId))
+            _settings.MusicPlayer.ProviderId = MusicProviderIds.Spotify;
         var migratedSceneAutomation = MigrateLegacyStartToGameAutomation();
         if (migratedSceneAutomation)
         {
@@ -3089,6 +3402,7 @@ public partial class MainWindow : Window
         ChannelNameBox.Text = _settings.Branding.ChannelName;
         StartWithWindowsBox.IsChecked = _settings.General.StartWithWindows;
         MinimizeToTrayBox.IsChecked = _settings.General.MinimizeToTray;
+        await RefreshThemePickerAsync();
         OverlayManifestPathBox.Text = _settings.General.OverlayManifestPath;
         UpdateOverlayManifestStatus();
         ConnectionWatchdogEnabledBox.IsChecked = _settings.General.ConnectionWatchdogEnabled;
@@ -3096,6 +3410,7 @@ public partial class MainWindow : Window
         ReconnectObsBox.IsChecked = _settings.General.ReconnectObs;
         ReconnectTwitchBox.IsChecked = _settings.General.ReconnectTwitch;
         ReconnectSpotifyBox.IsChecked = _settings.General.ReconnectSpotify;
+        ReconnectYouTubeMusicBox.IsChecked = _settings.General.ReconnectYouTubeMusic;
         ReconnectStreamerBotBox.IsChecked = _settings.General.ReconnectStreamerBot;
         _connectionWatchdogTimer.Interval = TimeSpan.FromSeconds(
             Math.Clamp(_settings.General.ConnectionWatchdogSeconds, 5, 300));
@@ -3136,6 +3451,12 @@ public partial class MainWindow : Window
         SpotifyAutoConnectBox.IsChecked = _settings.Spotify.AutoConnect;
         SpotifyConnectOnPrepareBox.IsChecked = _settings.Spotify.ConnectOnPrepare;
         SpotifyExecutablePathBox.Text = _settings.Spotify.ExecutablePath;
+        SelectMusicPlayerProviderBox(_settings.MusicPlayer.ProviderId);
+        YouTubeMusicBridgePortBox.Text = _settings.YouTubeMusic.BridgePort.ToString();
+        YouTubeMusicAutoConnectBox.IsChecked = _settings.YouTubeMusic.AutoConnect;
+        YouTubeMusicConnectOnPrepareBox.IsChecked = _settings.YouTubeMusic.ConnectOnPrepare;
+        UpdateMusicPlayerSettingsVisibility();
+        ApplyMusicProviderUiState();
         ServicesSpotifyAutoTransferPreferredBox.IsChecked = _settings.Spotify.AutoTransferToPreferredDevice;
         ServicesSpotifyUseActiveFallbackBox.IsChecked = _settings.Spotify.UseActiveDeviceWhenPreferredUnavailable;
         ServicesSpotifySmartAutomationBox.IsChecked = _settings.Spotify.SmartAutomationEnabled;
@@ -3299,10 +3620,27 @@ public partial class MainWindow : Window
             await ConnectTwitchAsync(showErrorDialog: false);
         }
 
-        if (_settings.Spotify.AutoConnect &&
+        if (IsSpotifyMusicProvider() &&
+            _settings.Spotify.AutoConnect &&
             !string.IsNullOrWhiteSpace(_settings.Spotify.ClientId))
         {
             await ConnectSpotifyAsync(showErrorDialog: false);
+        }
+        else if (IsYouTubeMusicProvider() && _settings.YouTubeMusic.AutoConnect)
+        {
+            try
+            {
+                await _musicPlayerRouter.ApplyProviderAsync(MusicProviderIds.YouTubeMusic);
+                await _musicPlayerRouter.ConnectActiveAsync();
+            }
+            catch
+            {
+                // Auto-Connect darf den Start nicht abbrechen.
+            }
+        }
+        else
+        {
+            await _musicPlayerRouter.RefreshFromSettingsAsync();
         }
         if (_settings.StreamerBot.AutoConnect)
         {
@@ -3352,7 +3690,16 @@ public partial class MainWindow : Window
             _settings.Branding.ChannelName = ChannelNameBox.Text.Trim();
             _settings.General.StartWithWindows = StartWithWindowsBox.IsChecked == true;
             _settings.General.MinimizeToTray = MinimizeToTrayBox.IsChecked == true;
+            _settings.General.ThemeId = ResolveSelectedThemeId();
             _settings.General.OverlayManifestPath = OverlayManifestPathBox.Text.Trim();
+            _settings.General.ConnectionWatchdogEnabled = ConnectionWatchdogEnabledBox.IsChecked == true;
+            if (int.TryParse(ConnectionWatchdogSecondsBox.Text.Trim(), out var watchdogSeconds))
+                _settings.General.ConnectionWatchdogSeconds = Math.Clamp(watchdogSeconds, 5, 300);
+            _settings.General.ReconnectObs = ReconnectObsBox.IsChecked == true;
+            _settings.General.ReconnectTwitch = ReconnectTwitchBox.IsChecked == true;
+            _settings.General.ReconnectSpotify = ReconnectSpotifyBox.IsChecked == true;
+            _settings.General.ReconnectYouTubeMusic = ReconnectYouTubeMusicBox.IsChecked == true;
+            _settings.General.ReconnectStreamerBot = ReconnectStreamerBotBox.IsChecked == true;
 
             _settings.Obs.Host = ObsHostBox.Text.Trim();
             _settings.Obs.Port = int.Parse(ObsPortBox.Text.Trim());
@@ -3377,6 +3724,14 @@ public partial class MainWindow : Window
             _settings.Spotify.AutoConnect = SpotifyAutoConnectBox.IsChecked == true;
             _settings.Spotify.ConnectOnPrepare = SpotifyConnectOnPrepareBox.IsChecked == true;
             _settings.Spotify.ExecutablePath = SpotifyExecutablePathBox.Text.Trim();
+            _settings.MusicPlayer ??= new MusicPlayerSettings();
+            _settings.YouTubeMusic ??= new YouTubeMusicSettings();
+            _settings.MusicPlayer.ProviderId = GetSelectedMusicPlayerProviderId();
+            if (!int.TryParse(YouTubeMusicBridgePortBox.Text.Trim(), out var ytPort) || ytPort is <= 0 or > 65535)
+                throw new InvalidOperationException("Ungültiger YouTube-Music-Bridge-Port.");
+            _settings.YouTubeMusic.BridgePort = ytPort;
+            _settings.YouTubeMusic.AutoConnect = YouTubeMusicAutoConnectBox.IsChecked == true;
+            _settings.YouTubeMusic.ConnectOnPrepare = YouTubeMusicConnectOnPrepareBox.IsChecked == true;
 
             // Der im Spotify-Bereich eingetragene Laufzeit-JSON-Pfad muss auch beim
             // allgemeinen Speichern erhalten bleiben. Sonst schreibt der laufende
@@ -3503,6 +3858,9 @@ public partial class MainWindow : Window
             RefreshRaidChannelSelectors();
 
             await _settingsStore.SaveAsync(_settings);
+            await _musicPlayerRouter.ApplyProviderAsync(_settings.MusicPlayer.ProviderId);
+            ApplyMusicProviderUiState();
+            await RefreshMusicPlayerUiAsync();
 
             await _secretStore.SaveAsync("obs.password", ObsPasswordBox.Password);
 
@@ -3524,7 +3882,7 @@ public partial class MainWindow : Window
     private static IReadOnlyList<string> GetDefaultDashboardModuleOrder() =>
     [
         "ConnectionStatus",
-        "StreamStatistics",
+        "Community",
         "ObsSceneControl",
         "StreamControl",
         "QuickServices",
@@ -3566,7 +3924,7 @@ public partial class MainWindow : Window
         "TwitchUsers" => "Twitch User",
         "TwitchEvents" => "Letzte Twitch-Events",
         "SpotifyPlayer" => "Spotify Player",
-        "StreamStatistics" => "Stream-Statistik",
+        "Community" => "Community",
         "SystemResources" => "Systemressourcen",
         "StreamDeckRemote" => "Stream Deck & Remote",
         "AdvancedShortcuts" => "Dashboard-Schnellzugriffe",
@@ -3590,6 +3948,9 @@ public partial class MainWindow : Window
     {
         var validKeys = GetDefaultDashboardModuleOrder();
         var normalized = (_settings.Dashboard.ModuleOrder ?? [])
+            .Select(key => string.Equals(key, "StreamStatistics", StringComparison.Ordinal)
+                ? "Community"
+                : key)
             .Where(key => validKeys.Contains(key, StringComparer.Ordinal))
             .Distinct(StringComparer.Ordinal)
             .ToList();
@@ -3604,6 +3965,30 @@ public partial class MainWindow : Window
 
         _settings.Dashboard.ModuleOrder = normalized;
         _settings.Dashboard.HiddenModules ??= [];
+        if (_settings.Dashboard.HiddenModules.RemoveAll(key =>
+                string.Equals(key, "StreamStatistics", StringComparison.Ordinal)) > 0
+            && !_settings.Dashboard.HiddenModules.Contains("Community", StringComparer.Ordinal))
+        {
+            _settings.Dashboard.HiddenModules.Add("Community");
+        }
+
+        MigrateDashboardModuleSettingKey(
+            _settings.Dashboard.ModuleZones,
+            "StreamStatistics",
+            "Community");
+        MigrateDashboardModuleSettingKey(
+            _settings.Dashboard.ModuleSizes,
+            "StreamStatistics",
+            "Community");
+        MigrateDashboardModuleSettingKey(
+            _settings.Dashboard.ModuleWidths,
+            "StreamStatistics",
+            "Community");
+        MigrateDashboardModuleSettingKey(
+            _settings.Dashboard.ModuleHeights,
+            "StreamStatistics",
+            "Community");
+
         _settings.Dashboard.ModuleWidths ??=
             new Dictionary<string, double>(StringComparer.Ordinal);
         _settings.Dashboard.ModuleHeights ??=
@@ -3621,6 +4006,19 @@ public partial class MainWindow : Window
                 _settings.Dashboard.ModuleHeights[key] = 180;
             }
         }
+    }
+
+    private static void MigrateDashboardModuleSettingKey<T>(
+        Dictionary<string, T>? map,
+        string fromKey,
+        string toKey)
+    {
+        if (map is null || !map.Remove(fromKey, out var value))
+        {
+            return;
+        }
+
+        map.TryAdd(toKey, value);
     }
 
     private void LoadDashboardModuleOrderEditor()
@@ -3677,7 +4075,7 @@ public partial class MainWindow : Window
         "TwitchUsers" => DashboardTwitchUsersModule,
         "TwitchEvents" => DashboardTwitchEventsModule,
         "SpotifyPlayer" => DashboardSpotifyPlayerModule,
-        "StreamStatistics" => DashboardStreamStatisticsModule,
+        "Community" => DashboardCommunityModule,
         "SystemResources" => DashboardSystemResourcesModule,
         "StreamDeckRemote" => DashboardStreamDeckRemoteModule,
         "AdvancedShortcuts" => DashboardAdvancedShortcutsModule,
@@ -3689,8 +4087,8 @@ public partial class MainWindow : Window
 
     private void ApplyDashboardModuleOrder()
     {
-        // 2.0.141: the approved dashboard reference uses a fixed static layout.
-        // Existing controls stay in their XAML positions and are not reparented.
+        // Responsive Dashboard: Module bleiben in ihren XAML-Grid-Slots.
+        // Reihenfolge wird nicht mehr zur Laufzeit umgehängt.
     }
 
     private void RemoveDashboardElementFromCurrentParent(
@@ -3987,6 +4385,18 @@ public partial class MainWindow : Window
         DashboardContentStack.Children.Insert(
             targetIndex,
             dragged);
+        SyncDashboardContentStackRows();
+    }
+
+    private void SyncDashboardContentStackRows()
+    {
+        for (var index = 0; index < DashboardContentStack.Children.Count; index++)
+        {
+            if (DashboardContentStack.Children[index] is UIElement child)
+            {
+                Grid.SetRow(child, index);
+            }
+        }
     }
 
     private void DashboardSection_PreviewMouseLeftButtonUp(
@@ -4380,13 +4790,13 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            // Das Dashboard verwendet ein festes, links verankertes Referenzlayout.
-            // Die frühere Größenlogik zentrierte einzelne Module bei schmalen Fenstern
-            // und erzeugte dadurch einen großen leeren Bereich neben der Navigation.
+            // Dashboard-Module füllen ihren Grid-Slot; feste Pixelbreiten
+            // würden das responsive Layout wieder brechen.
             element.Width = double.NaN;
             element.MinWidth = 0;
             element.MaxWidth = double.PositiveInfinity;
             element.HorizontalAlignment = HorizontalAlignment.Stretch;
+            element.VerticalAlignment = VerticalAlignment.Stretch;
         }
     }
 
@@ -6189,8 +6599,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        const double width = 430;
-        const double height = 72;
+        const double width = 260;
+        const double height = 28;
         var maximum = Math.Max(1, samples.Max());
 
         for (var index = 0; index < samples.Length; index++)
@@ -6471,8 +6881,6 @@ public partial class MainWindow : Window
             _currentLiveViewerCount = Math.Max(0, status.ViewerCount);
             await _creatorIntelligence.RecordAsync("twitch.viewer.sample", new { viewers = _currentLiveViewerCount, scene = _servicesObsCurrentScene, category = status.GameName, title = status.StreamTitle });
             RefreshTwitchProfessionalUi(status);
-            DashboardHeroViewerText.Text =
-                $"{_currentLiveViewerCount} Zuschauer";
 
             await _workflowModule.Service.AddViewerSampleAsync(
                 _currentLiveViewerCount);
@@ -7516,10 +7924,6 @@ public partial class MainWindow : Window
             : state.Detail;
 
         StreamDashboardStatus.Text = isLive ? "LIVE" : "OFFLINE";
-        DashboardHeroStreamStatusText.Text = isLive ? "LIVE" : "OFFLINE";
-        DashboardHeroStreamStatusBadge.Background = isLive
-            ? System.Windows.Media.Brushes.Firebrick
-            : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(75, 83, 89));
         UpdateStreamLivePulse(isLive);
 
         StreamDashboardLamp.Fill =
@@ -7528,18 +7932,35 @@ public partial class MainWindow : Window
                 : System.Windows.Media.Brushes.IndianRed;
 
         DashboardStreamDetailText.Text = isLive ? liveDetail : "00:00:00";
-        DashboardHeroViewerText.Text = _currentLiveViewerCount.ToString() + " Zuschauer";
-        DashboardHeroLiveTimeText.Text = isLive ? liveDetail : "00:00:00";
+        RefreshCommunityUi();
+        RefreshTwitchProfessionalUi();
+        UpdateDashboardSelectedStatistic();
+    }
+
+    private void RefreshCommunityUi()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            _ = Dispatcher.BeginInvoke(RefreshCommunityUi);
+            return;
+        }
+
+        var stats = _workflowModule.Service.SessionStats;
         DashboardHeroViewerText.Text = _currentLiveViewerCount.ToString();
         DashboardHeroFollowerText.Text = _currentFollowerCount.ToString();
+        DashboardChatAlertsText.Text = _currentActiveSubscriptionCount.ToString();
+        DashboardCommunityChattersText.Text = _twitchUserItems.Count.ToString();
+        DashboardCommunityUniqueChattersText.Text =
+            _twitchSessionUniqueChatters.Count.ToString();
         DashboardPeakViewersText.Text = stats.PeakViewers.ToString();
         DashboardAverageViewersText.Text = stats.AverageViewers.ToString("0.0");
         DashboardFollowersGainedText.Text = stats.FollowersGained.ToString();
-        DashboardChatAlertsText.Text = _currentActiveSubscriptionCount.ToString();
+        DashboardFollowerTotalText.Text = $"Gesamt: {_currentFollowerCount}";
         DashboardTwitchSessionMetricsText.Text =
             $"Subs {stats.NewSubscriptions} · Gift-Subs {stats.GiftSubscriptions} · Bits {stats.BitsCheered} · Raids {stats.IncomingRaids}";
-        RefreshTwitchProfessionalUi();
-        UpdateDashboardSelectedStatistic();
+        DashboardTwitchGoalsText.Text =
+            $"Follower-Ziel: {_currentFollowerCount:0} / {_settings.Twitch.FollowerGoal.Target:0} · " +
+            $"Sub-Ziel: {_currentActiveSubscriptionCount:0} / {_settings.Twitch.SubGoal.Target:0}";
     }
 
     private async Task RefreshObsPreviewTickAsync()
@@ -7594,16 +8015,18 @@ public partial class MainWindow : Window
                 ResetDashboardStreamQuality("OBS nicht verbunden");
             }
 
-            // Twitch live data
+            // Twitch live data — parallel Helix calls for lower latency
             if (_twitchModule.GetSnapshot().Authenticated)
             {
                 try
                 {
-                    await RefreshLiveViewerSampleAsync();
-                    await RefreshTwitchFollowerCountAsync();
-                    await RefreshTwitchGoalsAsync();
-                    await RefreshTwitchUsersAsync();
+                    await Task.WhenAll(
+                        RefreshLiveViewerSampleAsync(),
+                        RefreshTwitchFollowerCountAsync(),
+                        RefreshTwitchGoalsAsync(),
+                        RefreshTwitchUsersAsync());
                     RefreshTwitchUi();
+                    RefreshCommunityUi();
                 }
                 catch
                 {
@@ -7611,8 +8034,8 @@ public partial class MainWindow : Window
                 }
             }
 
-            // Spotify playback state
-            if (_spotifyModule.GetSnapshot().Authenticated)
+            // Music playback state (aktiver Provider)
+            if (IsSpotifyMusicProvider() && _spotifyModule.GetSnapshot().Authenticated)
             {
                 try
                 {
@@ -7624,10 +8047,12 @@ public partial class MainWindow : Window
                     // Spotify can temporarily rate-limit; the next cycle retries.
                 }
             }
-            else
+            else if (IsSpotifyMusicProvider())
             {
                 RefreshSpotifyUi();
             }
+
+            await RefreshMusicPlayerUiAsync();
 
             // Streamer.bot top status
             var streamerBotConnected =
@@ -8856,8 +9281,20 @@ private Task ApplyCombinedAlertDuckingAsync()
             SetPrepareProgress(50, "Twitch wird verbunden …", true);
             if (_settings.Twitch.ConnectOnPrepare && !_twitchModule.GetSnapshot().Authenticated) await ConnectTwitchAsync(showErrorDialog: false);
 
-            SetPrepareProgress(65, "Spotify wird verbunden …", true);
-            if (_settings.Spotify.ConnectOnPrepare && !_spotifyModule.GetSnapshot().Authenticated) await ConnectSpotifyAsync(showErrorDialog: false);
+            SetPrepareProgress(65, "Music Player wird verbunden …", true);
+            if (IsSpotifyMusicProvider() &&
+                _settings.Spotify.ConnectOnPrepare &&
+                !_spotifyModule.GetSnapshot().Authenticated)
+            {
+                await ConnectSpotifyAsync(showErrorDialog: false);
+            }
+            else if (IsYouTubeMusicProvider() &&
+                     _settings.YouTubeMusic.ConnectOnPrepare &&
+                     !_youTubeMusicModule.IsBridgeRunning)
+            {
+                await _musicPlayerRouter.ApplyProviderAsync(MusicProviderIds.YouTubeMusic);
+                await _musicPlayerRouter.ConnectActiveAsync();
+            }
 
             SetPrepareProgress(78, "Streamer.bot wird verbunden …", true);
             if (_settings.StreamerBot.ConnectOnPrepare && (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)) await ConnectStreamerBotAsync();
@@ -9403,6 +9840,278 @@ private Task ApplyCombinedAlertDuckingAsync()
         RefreshSpotifyAutomationLogUi();
     }
 
+    private bool IsSpotifyMusicProvider() =>
+        string.Equals(
+            MusicProviderIds.Normalize(_settings.MusicPlayer?.ProviderId),
+            MusicProviderIds.Spotify,
+            StringComparison.OrdinalIgnoreCase);
+
+    private bool IsYouTubeMusicProvider() =>
+        string.Equals(
+            MusicProviderIds.Normalize(_settings.MusicPlayer?.ProviderId),
+            MusicProviderIds.YouTubeMusic,
+            StringComparison.OrdinalIgnoreCase);
+
+    private bool GetActiveMusicConnected()
+    {
+        if (IsYouTubeMusicProvider())
+            return _youTubeMusicModule.IsBridgeRunning;
+
+        return _spotifyModule.GetSnapshot().Authenticated;
+    }
+
+    private string GetSelectedMusicPlayerProviderId()
+    {
+        if (MusicPlayerProviderBox.SelectedItem is ComboBoxItem item &&
+            item.Tag is string tag &&
+            !string.IsNullOrWhiteSpace(tag))
+        {
+            return MusicProviderIds.Normalize(tag);
+        }
+
+        return MusicProviderIds.Spotify;
+    }
+
+    private void SelectMusicPlayerProviderBox(string? providerId)
+    {
+        var normalized = MusicProviderIds.Normalize(providerId);
+        foreach (var item in MusicPlayerProviderBox.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(item.Tag?.ToString(), normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                MusicPlayerProviderBox.SelectedItem = item;
+                return;
+            }
+        }
+
+        if (MusicPlayerProviderBox.Items.Count > 0)
+            MusicPlayerProviderBox.SelectedIndex = 0;
+    }
+
+    private void UpdateMusicPlayerSettingsVisibility()
+    {
+        var providerId = GetSelectedMusicPlayerProviderId();
+        YouTubeMusicSettingsPanel.Visibility =
+            string.Equals(providerId, MusicProviderIds.YouTubeMusic, StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+    }
+
+    private void ApplyMusicProviderUiState()
+    {
+        var providerId = MusicProviderIds.Normalize(_settings.MusicPlayer?.ProviderId);
+        var displayName = MusicProviderIds.DisplayName(providerId);
+        var isSpotify = string.Equals(providerId, MusicProviderIds.Spotify, StringComparison.OrdinalIgnoreCase);
+
+        DashboardMusicModuleProvider.Text = displayName;
+        DashboardQuickMusicTitle.Text = displayName;
+        DashboardQuickMusicDetail.Text = isSpotify
+            ? "Player & Playlists"
+            : "Bookmarklet-Bridge";
+        DashboardQuickStartSpotifyButton.Visibility = isSpotify
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ServicesSpotifyInactiveBanner.Visibility = isSpotify
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        ServicesSpotifyButton.Content = isSpotify ? "●   Spotify" : "●   Spotify (inaktiv)";
+        MusicPlayerSubtitleText.Text = "Aktiver Provider: " + displayName;
+        MusicPlayerYouTubePanel.Visibility = isSpotify
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        MusicPlayerSpotifyHintPanel.Visibility = isSpotify
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        MusicPlayerVolumePanel.Visibility = isSpotify
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        MusicPlayerProgressBar.IsEnabled = isSpotify;
+    }
+
+    private async Task ExecuteMusicCommandAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            await Task.Delay(350);
+            if (IsSpotifyMusicProvider() && _spotifyModule.GetSnapshot().Authenticated)
+                await _spotifyModule.RefreshPlaybackAsync();
+            await RefreshMusicPlayerUiAsync();
+            if (IsSpotifyMusicProvider())
+                RefreshSpotifyUi();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Music Player", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private bool _updatingMusicPlayerUi;
+
+    private async Task RefreshMusicPlayerUiAsync()
+    {
+        ApplyMusicProviderUiState();
+        var snapshot = await _musicPlayerRouter.GetSnapshotAsync();
+        var trackLabel = string.IsNullOrWhiteSpace(snapshot.Title)
+            ? "Kein Titel"
+            : string.IsNullOrWhiteSpace(snapshot.Artist)
+                ? snapshot.Title
+                : $"{snapshot.Artist} – {snapshot.Title}";
+
+        _updatingMusicPlayerUi = true;
+        try
+        {
+            TitleBarMusicTrackText.Text = trackLabel;
+            TitleBarMusicPlayPauseButton.Content = snapshot.IsPlaying ? "Ⅱ" : "▶";
+            MusicPlayerTitleText.Text = string.IsNullOrWhiteSpace(snapshot.Title) ? "Kein Titel" : snapshot.Title;
+            MusicPlayerArtistText.Text = string.IsNullOrWhiteSpace(snapshot.Artist) ? "-" : snapshot.Artist;
+            MusicPlayerAlbumText.Text = string.IsNullOrWhiteSpace(snapshot.Album) ? "Album: -" : "Album: " + snapshot.Album;
+            MusicPlayerStatusText.Text = snapshot.StatusText;
+            MusicPlayerPlayPauseButton.Content = snapshot.IsPlaying ? "Pause" : "Play";
+            DashboardMusicNowPlayingText.Text = trackLabel;
+            DashboardMusicStatusText.Text = snapshot.StatusText;
+
+            if (!IsSpotifyMusicProvider())
+            {
+                SpotifyDashboardStatus.Text = snapshot.Connected || _youTubeMusicModule.IsBridgeRunning
+                    ? "VERBUNDEN"
+                    : "NICHT VERBUNDEN";
+                SpotifyDashboardLamp.Fill = snapshot.Connected || _youTubeMusicModule.IsBridgeRunning
+                    ? System.Windows.Media.Brushes.LimeGreen
+                    : System.Windows.Media.Brushes.IndianRed;
+            }
+
+            var duration = Math.Max(1, snapshot.DurationMs);
+            var progress = Math.Clamp(snapshot.ProgressMs, 0, duration);
+            MusicPlayerProgressBar.Value = snapshot.DurationMs <= 0 ? 0 : (double)progress / duration;
+            MusicPlayerProgressText.Text = TimeSpan.FromMilliseconds(progress).ToString(@"mm\:ss");
+            MusicPlayerDurationText.Text = TimeSpan.FromMilliseconds(Math.Max(0, snapshot.DurationMs)).ToString(@"mm\:ss");
+            if (snapshot.VolumePercent is int volume)
+            {
+                MusicPlayerVolumeSlider.Value = volume;
+                MusicPlayerVolumeText.Text = $"{volume} %";
+            }
+        }
+        finally
+        {
+            _updatingMusicPlayerUi = false;
+        }
+
+        await LoadMusicCoverAsync(snapshot.CoverUrl);
+
+        if (IsYouTubeMusicProvider())
+        {
+            try
+            {
+                MusicPlayerBookmarkletBox.Text = await _youTubeMusicModule.GetBookmarkletAsync();
+            }
+            catch
+            {
+                MusicPlayerBookmarkletBox.Text = "";
+            }
+
+            MusicPlayerBridgeStatusText.Text = _youTubeMusicModule.IsBridgeRunning
+                ? snapshot.StatusText
+                : "Bridge gestoppt";
+            await WriteMusicOverlayRuntimeDataAsync(snapshot);
+        }
+
+        RefreshDashboardServiceActionButtons();
+    }
+
+    private async Task LoadMusicCoverAsync(string? coverUrl)
+    {
+        if (string.IsNullOrWhiteSpace(coverUrl))
+        {
+            TitleBarMusicCoverImage.Source = null;
+            MusicPlayerCoverImage.Source = null;
+            return;
+        }
+
+        try
+        {
+            using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var bytes = await client.GetByteArrayAsync(coverUrl);
+            var image = new System.Windows.Media.Imaging.BitmapImage();
+            using var stream = new MemoryStream(bytes);
+            image.BeginInit();
+            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            image.EndInit();
+            image.Freeze();
+            TitleBarMusicCoverImage.Source = image;
+            MusicPlayerCoverImage.Source = image;
+        }
+        catch
+        {
+            // Cover optional
+        }
+    }
+
+    private async Task WriteMusicOverlayRuntimeDataAsync(NowPlayingSnapshot snapshot)
+    {
+        if (!_settings.Spotify.OverlayEnabled)
+            return;
+
+        await OverlayDataWriteCoordinator.Lock.WaitAsync();
+        try
+        {
+            var targetPath = ResolveActiveOverlayDataPath();
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+
+            JsonObject rootObject;
+            if (File.Exists(targetPath))
+            {
+                try
+                {
+                    var existingJson = await File.ReadAllTextAsync(targetPath);
+                    rootObject = JsonNode.Parse(existingJson) as JsonObject ?? new JsonObject();
+                }
+                catch (JsonException)
+                {
+                    rootObject = new JsonObject();
+                }
+            }
+            else
+            {
+                rootObject = new JsonObject();
+            }
+
+            var spotify = rootObject["spotify"] as JsonObject ?? new JsonObject();
+            var connected = snapshot.Connected;
+            if (connected)
+                _spotifyOverlayConnectionLatched = true;
+
+            spotify["provider"] = snapshot.ProviderId;
+            spotify["connected"] = connected;
+            spotify["isPlaying"] = snapshot.IsPlaying;
+            spotify["title"] = snapshot.Title;
+            spotify["artist"] = snapshot.Artist;
+            spotify["album"] = snapshot.Album;
+            spotify["coverUrl"] = snapshot.CoverUrl;
+            spotify["cover"] = snapshot.CoverUrl;
+            spotify["showInOverlay"] = connected;
+            spotify["visible"] = connected;
+            spotify["showTitle"] = true;
+            spotify["showArtist"] = true;
+            spotify["showAlbumCover"] = true;
+            spotify["showProgress"] = true;
+            spotify["hideWhenPaused"] = _settings.Spotify.OverlayHideWhenPaused;
+            spotify["hideWhenMuted"] = _settings.Spotify.OverlayHideWhenMuted;
+            spotify["progressMs"] = Math.Max(0, snapshot.ProgressMs);
+            spotify["durationMs"] = Math.Max(0, snapshot.DurationMs);
+            spotify["statusText"] = snapshot.StatusText;
+            rootObject["spotify"] = spotify;
+
+            var json = rootObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(targetPath, json);
+        }
+        finally
+        {
+            OverlayDataWriteCoordinator.Lock.Release();
+        }
+    }
+
     private void RefreshSpotifyAutomationLogUi()
     {
         ServicesSpotifyAutomationLogList.ItemsSource = _spotifyAutomationLog.GetRecent().Select(e => e.DisplayText).ToList();
@@ -9411,18 +10120,23 @@ private Task ApplyCombinedAlertDuckingAsync()
     private void RefreshSpotifyUi()
     {
         var snapshot = _spotifyModule.GetSnapshot();
-        _spotifyListeningStatistics.Observe(snapshot.Playback);
+        if (IsSpotifyMusicProvider())
+            _spotifyListeningStatistics.Observe(snapshot.Playback);
         RefreshSpotifyStatisticsUi();
         RefreshSpotifyAutomationUi(snapshot);
-        _ = RunSpotifyHealthMonitorAsync(snapshot);
+        if (IsSpotifyMusicProvider())
+            _ = RunSpotifyHealthMonitorAsync(snapshot);
 
-        SpotifyDashboardStatus.Text = snapshot.Authenticated
-            ? "VERBUNDEN"
-            : "NICHT VERBUNDEN";
+        if (IsSpotifyMusicProvider())
+        {
+            SpotifyDashboardStatus.Text = snapshot.Authenticated
+                ? "VERBUNDEN"
+                : "NICHT VERBUNDEN";
 
-        SpotifyDashboardLamp.Fill = snapshot.Authenticated
-            ? System.Windows.Media.Brushes.LimeGreen
-            : System.Windows.Media.Brushes.IndianRed;
+            SpotifyDashboardLamp.Fill = snapshot.Authenticated
+                ? System.Windows.Media.Brushes.LimeGreen
+                : System.Windows.Media.Brushes.IndianRed;
+        }
 
         SpotifyConnectionStatusText.Text = snapshot.Authenticated
             ? "Verbunden als " + snapshot.UserDisplayName
@@ -9672,11 +10386,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             _lastSpotifyPlayingAt = DateTimeOffset.UtcNow;
 
         var overlayPlayback = StabilizeSpotifyOverlayPlayback(playback);
-        _ = WriteSpotifyOverlayRuntimeDataAsync(snapshot, overlayPlayback);
-        // Die OBS-Quelle bei jedem Playback-Update synchronisieren. Zuvor wurde
-        // dies nur beim Import eines Overlays ausgeführt, wodurch eine einmal
-        // ausgeblendete Spotify-Quelle beim nächsten Titel nicht wieder erschien.
-        _ = SynchronizeSpotifyOverlayVisibilityAsync(overlayPlayback);
+        if (IsSpotifyMusicProvider())
+        {
+            _ = WriteSpotifyOverlayRuntimeDataAsync(snapshot, overlayPlayback);
+            _ = SynchronizeSpotifyOverlayVisibilityAsync(overlayPlayback);
+        }
+        RefreshDashboardServiceActionButtons();
     }
 
     private SpotifyPlaybackState StabilizeSpotifyOverlayPlayback(SpotifyPlaybackState playback)
@@ -9778,6 +10493,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             if (overlayConnected)
                 _spotifyOverlayConnectionLatched = true;
             spotify["connected"] = overlayConnected;
+            spotify["provider"] = MusicProviderIds.Spotify;
             spotify["isPlaying"] = playback.IsPlaying;
             spotify["title"] = playback.Track?.Name ?? "";
             spotify["artist"] = playback.Track?.Artist ?? "";
@@ -10751,6 +11467,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         DashboardTwitchCategorySearchBox.Text = snapshot.CategoryName;
         ServicesTwitchTitleBox.Text = snapshot.ChannelTitle;
         ServicesTwitchCategorySearchBox.Text = snapshot.CategoryName;
+        RefreshDashboardServiceActionButtons();
     }
 
     private static string GetTwitchRoleLabel(
@@ -10980,6 +11697,23 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ToggleSpotifyFromDashboardAsync()
     {
+        if (!IsSpotifyMusicProvider())
+        {
+            var snapshot = await _musicPlayerRouter.GetSnapshotAsync();
+            if (snapshot.Connected || _youTubeMusicModule.IsBridgeRunning)
+            {
+                await _musicPlayerRouter.DisconnectActiveAsync();
+                await RefreshMusicPlayerUiAsync();
+                RefreshDashboardServiceActionButtons();
+                AddDashboardNotification("YouTube Music wurde getrennt.", "Info");
+                return;
+            }
+
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.ConnectActiveAsync());
+            RefreshDashboardServiceActionButtons();
+            return;
+        }
+
         if (_spotifyModule.GetSnapshot().Authenticated)
         {
             await DisconnectSpotifyAsync();
@@ -11013,24 +11747,25 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshDashboardServiceActionButtons()
     {
+        var obsConnected = _obsClient.IsConnected;
+        var twitchConnected = _twitchModule.GetSnapshot().Authenticated;
+        var musicConnected = GetActiveMusicConnected();
+        var streamerBotConnected =
+            _streamerBotSocket?.State ==
+            System.Net.WebSockets.WebSocketState.Open;
+        var musicName = _musicPlayerRouter.ActiveDisplayName;
+
         DashboardServiceConnectObsButton.Content =
-            _obsClient.IsConnected ? "TRENNEN" : "VERBINDEN";
+            obsConnected ? "TRENNEN" : "VERBINDEN";
 
         DashboardServiceConnectTwitchButton.Content =
-            _twitchModule.GetSnapshot().Authenticated
-                ? "TRENNEN"
-                : "VERBINDEN";
+            twitchConnected ? "TRENNEN" : "VERBINDEN";
 
         DashboardServiceConnectSpotifyButton.Content =
-            _spotifyModule.GetSnapshot().Authenticated
-                ? "TRENNEN"
-                : "VERBINDEN";
+            musicConnected ? "TRENNEN" : "VERBINDEN";
 
         DashboardServiceConnectStreamerBotButton.Content =
-            _streamerBotSocket?.State ==
-            System.Net.WebSockets.WebSocketState.Open
-                ? "TRENNEN"
-                : "VERBINDEN";
+            streamerBotConnected ? "TRENNEN" : "VERBINDEN";
 
         DashboardTopConnectObsButton.Content = DashboardServiceConnectObsButton.Content;
         DashboardTopConnectTwitchButton.Content = DashboardServiceConnectTwitchButton.Content;
@@ -11038,23 +11773,22 @@ private Task ApplyCombinedAlertDuckingAsync()
         DashboardTopConnectStreamerBotButton.Content = DashboardServiceConnectStreamerBotButton.Content;
 
         DashboardServiceConnectObsButton.ToolTip =
-            _obsClient.IsConnected
+            obsConnected
                 ? "OBS-Verbindung trennen"
                 : "OBS verbinden";
 
         DashboardServiceConnectTwitchButton.ToolTip =
-            _twitchModule.GetSnapshot().Authenticated
+            twitchConnected
                 ? "Twitch-Verbindung trennen"
                 : "Twitch verbinden";
 
         DashboardServiceConnectSpotifyButton.ToolTip =
-            _spotifyModule.GetSnapshot().Authenticated
-                ? "Spotify-Verbindung trennen"
-                : "Spotify verbinden";
+            musicConnected
+                ? $"{musicName}-Verbindung trennen"
+                : $"{musicName} verbinden";
 
         DashboardServiceConnectStreamerBotButton.ToolTip =
-            _streamerBotSocket?.State ==
-            System.Net.WebSockets.WebSocketState.Open
+            streamerBotConnected
                 ? "Streamer.bot-Verbindung trennen"
                 : "Streamer.bot verbinden";
 
@@ -11062,6 +11796,112 @@ private Task ApplyCombinedAlertDuckingAsync()
         DashboardTopConnectTwitchButton.ToolTip = DashboardServiceConnectTwitchButton.ToolTip;
         DashboardTopConnectSpotifyButton.ToolTip = DashboardServiceConnectSpotifyButton.ToolTip;
         DashboardTopConnectStreamerBotButton.ToolTip = DashboardServiceConnectStreamerBotButton.ToolTip;
+
+        RefreshDashboardConnectionSummary(
+            obsConnected,
+            twitchConnected,
+            musicConnected,
+            streamerBotConnected);
+    }
+
+    private void RefreshDashboardConnectionSummary(
+        bool obsConnected,
+        bool twitchConnected,
+        bool musicConnected,
+        bool streamerBotConnected)
+    {
+        const int total = 4;
+        var connectedCount =
+            (obsConnected ? 1 : 0) +
+            (twitchConnected ? 1 : 0) +
+            (musicConnected ? 1 : 0) +
+            (streamerBotConnected ? 1 : 0);
+        var brokenCount = total - connectedCount;
+        var allOk = brokenCount == 0;
+        var musicName = _musicPlayerRouter.ActiveDisplayName;
+
+        DashboardConnectionSummaryCount.Text = $"{connectedCount}/{total}";
+        DashboardConnectionSummaryDetail.Text = allOk
+            ? "alle online"
+            : brokenCount == 1
+                ? "1 offline"
+                : $"{brokenCount} offline";
+        DashboardConnectionSummaryDetail.Foreground = allOk
+            ? (_themeService.GetBrush("SuccessBrush")
+               ?? new SolidColorBrush(Color.FromRgb(0x4C, 0xD9, 0x64)))
+            : (_themeService.GetBrush("WarningBrush")
+               ?? new SolidColorBrush(Color.FromRgb(0xE8, 0xA2, 0x3A)));
+        DashboardConnectionSummaryLamp.Fill = allOk
+            ? (_themeService.GetBrush("SuccessBrush") ?? Brushes.LimeGreen)
+            : (_themeService.GetBrush("DangerBrush") ?? Brushes.IndianRed);
+        DashboardConnectionSummaryChip.BorderBrush = allOk
+            ? (_themeService.GetBrush("SuccessBrush")
+               ?? new SolidColorBrush(Color.FromRgb(0x2A, 0x3C, 0x32)))
+            : (_themeService.GetBrush("WarningBrush")
+               ?? new SolidColorBrush(Color.FromRgb(0x4A, 0x32, 0x2A)));
+        DashboardConnectionSummaryChip.Background =
+            _themeService.GetBrush("CardBackgroundBrush")
+            ?? DashboardConnectionSummaryChip.Background;
+
+        DashboardConnectionTooltipTitle.Text = allOk
+            ? "Verbindungen"
+            : brokenCount == 1
+                ? "1 Verbindung offline"
+                : $"{brokenCount} Verbindungen offline";
+        DashboardConnectionTooltipOkText.Visibility = allOk
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
+        DashboardConnectionTooltipBrokenPanel.Visibility = allOk
+            ? System.Windows.Visibility.Collapsed
+            : System.Windows.Visibility.Visible;
+
+        DashboardConnectionTooltipBrokenPanel.Children.Clear();
+        if (!obsConnected)
+            DashboardConnectionTooltipBrokenPanel.Children.Add(
+                CreateBrokenConnectionTooltipRow("OBS", "Nicht verbunden"));
+        if (!twitchConnected)
+            DashboardConnectionTooltipBrokenPanel.Children.Add(
+                CreateBrokenConnectionTooltipRow("Twitch", "Nicht verbunden"));
+        if (!musicConnected)
+            DashboardConnectionTooltipBrokenPanel.Children.Add(
+                CreateBrokenConnectionTooltipRow(musicName, "Nicht verbunden"));
+        if (!streamerBotConnected)
+            DashboardConnectionTooltipBrokenPanel.Children.Add(
+                CreateBrokenConnectionTooltipRow("Streamer.bot", "Nicht verbunden"));
+    }
+
+    private static System.Windows.FrameworkElement CreateBrokenConnectionTooltipRow(
+        string name,
+        string detail)
+    {
+        var row = new System.Windows.Controls.StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+        row.Children.Add(new System.Windows.Shapes.Ellipse
+        {
+            Width = 7,
+            Height = 7,
+            Fill = System.Windows.Media.Brushes.IndianRed,
+            Margin = new Thickness(0, 5, 8, 0)
+        });
+        row.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = name,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Application.Current.TryFindResource("TextPrimaryBrush") as Brush
+                ?? new SolidColorBrush(Color.FromRgb(0xF4, 0xF7, 0xF9)),
+            Width = 100
+        });
+        row.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = detail,
+            Foreground = Application.Current.TryFindResource("WarningBrush") as Brush
+                ?? new SolidColorBrush(Color.FromRgb(0xE8, 0xA2, 0x3A)),
+            FontSize = 12
+        });
+        return row;
     }
 
     private async Task ConnectObsFromDashboardAsync()
@@ -12306,7 +13146,8 @@ private Task ApplyCombinedAlertDuckingAsync()
             }
 
             _currentLiveViewerCount = 0;
-            DashboardHeroViewerText.Text = "0 Zuschauer";
+            DashboardHeroViewerText.Text = "0";
+            RefreshCommunityUi();
             if (_settings.Dashboard.AutoExitFocusModeOnStreamEnd &&
                 _dashboardFocusModeActive)
             {
@@ -12430,12 +13271,10 @@ private Task ApplyCombinedAlertDuckingAsync()
                 }
             }
 
-            var spotifyConnected =
-                _spotifyModule.GetSnapshot().Authenticated;
-
-            if (_settings.General.ReconnectSpotify &&
+            if (IsSpotifyMusicProvider() &&
+                _settings.General.ReconnectSpotify &&
                 (_settings.Spotify.AutoConnect || _settings.Spotify.ConnectOnPrepare) &&
-                !spotifyConnected &&
+                !_spotifyModule.GetSnapshot().Authenticated &&
                 !string.IsNullOrWhiteSpace(_settings.Spotify.ClientId) &&
                 CanAttemptReconnect("Spotify"))
             {
@@ -12451,6 +13290,32 @@ private Task ApplyCombinedAlertDuckingAsync()
                     AddDashboardNotification(
                         "Spotify wurde automatisch wieder verbunden.",
                         "Info");
+                }
+            }
+            else if (IsYouTubeMusicProvider() &&
+                     _settings.General.ReconnectYouTubeMusic &&
+                     (_settings.YouTubeMusic.AutoConnect || _settings.YouTubeMusic.ConnectOnPrepare) &&
+                     !_youTubeMusicModule.IsBridgeRunning &&
+                     CanAttemptReconnect("YouTube Music"))
+            {
+                MarkReconnectAttempt("YouTube Music");
+                AddDashboardNotification(
+                    "YouTube-Music-Bridge unterbrochen. Automatischer Neustart wird versucht.",
+                    "Warnung");
+                try
+                {
+                    await _musicPlayerRouter.ApplyProviderAsync(MusicProviderIds.YouTubeMusic);
+                    await _musicPlayerRouter.ConnectActiveAsync();
+                    if (_youTubeMusicModule.IsBridgeRunning)
+                    {
+                        AddDashboardNotification(
+                            "YouTube-Music-Bridge wurde automatisch neu gestartet.",
+                            "Info");
+                    }
+                }
+                catch
+                {
+                    // Watchdog bleibt resilient.
                 }
             }
 
@@ -14269,6 +15134,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                     $"TWITCH · USER ({_twitchUserItems.Count})";
                 ServicesTwitchUsersHeaderText.Text =
                     $"User ({_twitchUserItems.Count})";
+                RefreshCommunityUi();
             });
         }
         catch (Exception exception)
@@ -14977,9 +15843,12 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void SetWorkflowVisualStage(string stage, string summary)
     {
-        var inactive = new SolidColorBrush(Color.FromRgb(51, 55, 59));
-        var complete = new SolidColorBrush(Color.FromRgb(45, 125, 70));
-        var active = new SolidColorBrush(Color.FromRgb(112, 70, 190));
+        var inactive = _themeService.GetBrush("BorderBrush")
+            ?? new SolidColorBrush(Color.FromRgb(51, 55, 59));
+        var complete = _themeService.GetBrush("SuccessBrush")
+            ?? new SolidColorBrush(Color.FromRgb(45, 125, 70));
+        var active = _themeService.GetBrush("AccentBrush")
+            ?? new SolidColorBrush(Color.FromRgb(112, 70, 190));
 
         WorkflowPrepareNode.Background = inactive;
         WorkflowReadyNode.Background = inactive;

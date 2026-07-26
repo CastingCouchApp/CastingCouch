@@ -3,7 +3,7 @@
 | Ordner | Inhalt |
 |--------|--------|
 | [`architecture/`](architecture/) | Architektur, Migration, Roadmap, Editions |
-| [`modules/`](modules/) | Module (OBS, Twitch, Spotify, Overlay, Alerts, …) |
+| [`modules/`](modules/) | Module (OBS, Twitch, Spotify, Music Player, Overlay, Alerts, …) |
 | [`build/`](build/) | Build-/Installer-Härtung, Alpha-Build-Notizen |
 | [`releases/`](releases/) | Release-Notes und Checklisten |
 | [`changelogs/`](changelogs/) | Versions-Changelogs (`CHANGELOG-*`) |
@@ -12,3 +12,5 @@
 | [`guides/`](guides/) | First-Run, Testversion |
 
 Einstieg Architektur: [`architecture/ARCHITECTURE.md`](architecture/ARCHITECTURE.md)
+
+UI-Themes: [`architecture/UI-THEMES.md`](architecture/UI-THEMES.md)

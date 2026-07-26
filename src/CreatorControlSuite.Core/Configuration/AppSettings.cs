@@ -12,6 +12,8 @@ public sealed class AppSettings
     public ObsSettings Obs { get; set; } = new();
     public TwitchSettings Twitch { get; set; } = new();
     public SpotifySettings Spotify { get; set; } = new();
+    public MusicPlayerSettings MusicPlayer { get; set; } = new();
+    public YouTubeMusicSettings YouTubeMusic { get; set; } = new();
     public StreamerBotSettings StreamerBot { get; set; } = new();
     public AlertSettings Alerts { get; set; } = new();
     public OverlaySettings Overlay { get; set; } = new();
@@ -31,6 +33,7 @@ public sealed class ProductSettings
 public sealed class GeneralSettings
 {
     public string Language { get; set; } = "de-DE";
+    public string ThemeId { get; set; } = "classic";
     public string DataRoot { get; set; } = "";
     public string BackupRoot { get; set; } = "";
     public string OverlayManifestPath { get; set; } = "";
@@ -41,6 +44,7 @@ public sealed class GeneralSettings
     public bool ReconnectObs { get; set; } = true;
     public bool ReconnectTwitch { get; set; } = true;
     public bool ReconnectSpotify { get; set; } = true;
+    public bool ReconnectYouTubeMusic { get; set; } = true;
     public bool ReconnectStreamerBot { get; set; } = true;
 }
 
@@ -218,6 +222,20 @@ public sealed class SpotifySettings
     ];
 }
 
+public sealed class MusicPlayerSettings
+{
+    /// <summary>Aktiver Music-Provider: spotify | ytmusic. Immer nur einer aktiv.</summary>
+    public string ProviderId { get; set; } = "spotify";
+}
+
+public sealed class YouTubeMusicSettings
+{
+    public int BridgePort { get; set; } = 43831;
+    public bool AutoConnect { get; set; } = true;
+    public bool ConnectOnPrepare { get; set; } = true;
+    /// <summary>Sekunden ohne State vom Bookmarklet, bevor die Verbindung als inaktiv gilt.</summary>
+    public int StateTimeoutSeconds { get; set; } = 12;
+}
 
 public sealed class SpotifyAutomationRuleSettings
 {
@@ -510,7 +528,7 @@ public sealed class DashboardSettings
     public List<string> ModuleOrder { get; set; } =
     [
         "ConnectionStatus",
-        "StreamStatistics",
+        "Community",
         "ObsSceneControl",
         "StreamControl",
         "QuickServices",
@@ -556,7 +574,7 @@ public sealed class DashboardSettings
             ["QuickStreamerBot"] = "Left",
             ["QuickAlerts"] = "Left",
             ["QuickOverlay"] = "Left",
-            ["StreamStatistics"] = "Center",
+            ["Community"] = "Center",
             ["SystemResources"] = "Left",
             ["Workflow"] = "Center",
             ["WorkflowStatus"] = "Center",
@@ -597,7 +615,7 @@ public sealed class DashboardSettings
             ["QuickStreamerBot"] = "Standard",
             ["QuickAlerts"] = "Standard",
             ["QuickOverlay"] = "Standard",
-            ["StreamStatistics"] = "Standard",
+            ["Community"] = "Standard",
             ["SystemResources"] = "Standard",
             ["Workflow"] = "Standard",
             ["WorkflowStatus"] = "Standard",
@@ -617,7 +635,7 @@ public sealed class DashboardSettings
             ["LiveEvents"] = 400,
             ["Automation"] = 400,
             ["ConnectionStatus"] = 1220,
-            ["StreamStatistics"] = 470,
+            ["Community"] = 470,
             ["ObsSceneControl"] = 360,
             ["StreamControl"] = 360,
             ["QuickServices"] = 550,
@@ -643,7 +661,7 @@ public sealed class DashboardSettings
         new(StringComparer.Ordinal)
         {
             ["ConnectionStatus"] = 86,
-            ["StreamStatistics"] = 350,
+            ["Community"] = 130,
             ["ObsSceneControl"] = 350,
             ["StreamControl"] = 350,
             ["QuickServices"] = 330,

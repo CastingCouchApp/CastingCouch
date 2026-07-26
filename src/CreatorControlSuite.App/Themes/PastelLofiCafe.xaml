@@ -1,0 +1,60 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <FontFamily x:Key="AppFontFamily">Trebuchet MS, Segoe UI</FontFamily>
+    <FontFamily x:Key="AppHeadingFontFamily">Trebuchet MS, Segoe UI</FontFamily>
+
+    <Color x:Key="AccentColor">#E07A5F</Color>
+    <SolidColorBrush x:Key="AccentBrush" Color="#E07A5F"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#81B29A"/>
+    <SolidColorBrush x:Key="AccentMutedBrush" Color="#F2CC8F"/>
+    <SolidColorBrush x:Key="AccentSelectedBrush" Color="#B85A40"/>
+    <SolidColorBrush x:Key="AccentSelectedDeepBrush" Color="#E8DCC8"/>
+    <SolidColorBrush x:Key="AccentSelectedForegroundBrush" Color="#3D405B"/>
+    <SolidColorBrush x:Key="AccentTabBrush" Color="#E07A5F"/>
+    <SolidColorBrush x:Key="AccentTabBorderBrush" Color="#81B29A"/>
+
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F4F1DE"/>
+    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#EDE6D4"/>
+    <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#E8DFC8"/>
+    <SolidColorBrush x:Key="SidebarBackgroundEndBrush" Color="#D8E2D0"/>
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFBF0"/>
+    <SolidColorBrush x:Key="ElevatedBackgroundBrush" Color="#FAF6EB"/>
+    <SolidColorBrush x:Key="InputBackgroundBrush" Color="#FFFBF0"/>
+    <SolidColorBrush x:Key="InputAltBackgroundBrush" Color="#F4F1DE"/>
+    <SolidColorBrush x:Key="ComboBackgroundBrush" Color="#FFFBF0"/>
+    <SolidColorBrush x:Key="ComboGlyphBackgroundBrush" Color="#E8DFC8"/>
+    <SolidColorBrush x:Key="ListBackgroundBrush" Color="#FAF6EB"/>
+    <SolidColorBrush x:Key="RowBackgroundBrush" Color="#FFFBF0"/>
+    <SolidColorBrush x:Key="AlternatingRowBackgroundBrush" Color="#F4F1DE"/>
+    <SolidColorBrush x:Key="TabBackgroundBrush" Color="#E8DFC8"/>
+    <SolidColorBrush x:Key="TabHoverBackgroundBrush" Color="#D8E2D0"/>
+    <SolidColorBrush x:Key="SettingsTabBackgroundBrush" Color="#EDE6D4"/>
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#3D405B"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5C6B6B"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#7A8585"/>
+    <SolidColorBrush x:Key="TextOnAccentBrush" Color="#FFFBF0"/>
+    <SolidColorBrush x:Key="ComboGlyphBrush" Color="#E07A5F"/>
+
+    <SolidColorBrush x:Key="BorderBrush" Color="#D4C8B0"/>
+    <SolidColorBrush x:Key="SubtleBorderBrush" Color="#E0D6C0"/>
+    <SolidColorBrush x:Key="StrongBorderBrush" Color="#E07A5F"/>
+    <SolidColorBrush x:Key="SidebarBorderBrush" Color="#D4C8B0"/>
+    <SolidColorBrush x:Key="HoverBorderBrush" Color="#81B29A"/>
+    <SolidColorBrush x:Key="GridLineBrush" Color="#E0D6C0"/>
+    <SolidColorBrush x:Key="ScrollBarBackgroundBrush" Color="#E8DFC8"/>
+    <SolidColorBrush x:Key="ScrollBarForegroundBrush" Color="#E07A5F"/>
+
+    <SolidColorBrush x:Key="NavHoverBackgroundBrush" Color="#D8E2D0"/>
+    <SolidColorBrush x:Key="NavActiveBackgroundBrush" Color="#C8D8C0"/>
+    <SolidColorBrush x:Key="NavActiveForegroundBrush" Color="#3D405B"/>
+
+    <SolidColorBrush x:Key="SuccessBrush" Color="#81B29A"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="#F2CC8F"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="#E07A5F"/>
+    <SolidColorBrush x:Key="HighlightItemBrush" Color="#D8E2D0"/>
+
+    <SolidColorBrush x:Key="PanelBrush" Color="#EDE6D4"/>
+    <SolidColorBrush x:Key="CardBrush" Color="#FFFBF0"/>
+    <SolidColorBrush x:Key="MutedBrush" Color="#7A8585"/>
+</ResourceDictionary>

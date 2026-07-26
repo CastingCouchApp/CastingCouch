@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using CreatorControlSuite.Core.Music;
 
 namespace CreatorControlSuite.Core.Configuration;
 
@@ -29,17 +30,18 @@ public sealed class JsonSettingsStore : ISettingsStore
 
         await using var stream = File.OpenRead(_path);
 
-        return await JsonSerializer.DeserializeAsync<AppSettings>(
+        return EnsureDefaults(await JsonSerializer.DeserializeAsync<AppSettings>(
                    stream,
                    SerializerOptions,
                    cancellationToken)
-               ?? new AppSettings();
+               ?? new AppSettings());
     }
 
     public async Task SaveAsync(
         AppSettings settings,
         CancellationToken cancellationToken = default)
     {
+        EnsureDefaults(settings);
         await _saveLock.WaitAsync(cancellationToken);
         string? tempPath = null;
 
@@ -134,5 +136,36 @@ public sealed class JsonSettingsStore : ISettingsStore
 
             _saveLock.Release();
         }
+    }
+
+    private static AppSettings EnsureDefaults(AppSettings settings)
+    {
+        settings.Product ??= new ProductSettings();
+        settings.General ??= new GeneralSettings();
+        settings.Branding ??= new BrandingSettings();
+        settings.Obs ??= new ObsSettings();
+        settings.Twitch ??= new TwitchSettings();
+        settings.Spotify ??= new SpotifySettings();
+        settings.MusicPlayer ??= new MusicPlayerSettings();
+        settings.YouTubeMusic ??= new YouTubeMusicSettings();
+        settings.StreamerBot ??= new StreamerBotSettings();
+        settings.Alerts ??= new AlertSettings();
+        settings.Overlay ??= new OverlaySettings();
+        settings.Workflow ??= new WorkflowSettings();
+        settings.StreamDeck ??= new StreamDeckSettings();
+        settings.Dashboard ??= new DashboardSettings();
+        settings.Updates ??= new UpdateSettings();
+
+        if (string.IsNullOrWhiteSpace(settings.MusicPlayer.ProviderId))
+            settings.MusicPlayer.ProviderId = MusicProviderIds.Spotify;
+        else
+            settings.MusicPlayer.ProviderId = MusicProviderIds.Normalize(settings.MusicPlayer.ProviderId);
+
+        if (settings.YouTubeMusic.BridgePort is <= 0 or > 65535)
+            settings.YouTubeMusic.BridgePort = 43831;
+        if (settings.YouTubeMusic.StateTimeoutSeconds is <= 0)
+            settings.YouTubeMusic.StateTimeoutSeconds = 12;
+
+        return settings;
     }
 }

@@ -9,6 +9,7 @@ using CreatorControlSuite.Core.Ipc;
 using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Legal;
 using CreatorControlSuite.App.Services;
+using CreatorControlSuite.App.Themes;
 using System.Threading;
 using System.Windows.Threading;
 using CreatorControlSuite.Core.Modules;
@@ -23,6 +24,8 @@ using CreatorControlSuite.Modules.Overlay;
 using CreatorControlSuite.Modules.Spotify;
 using CreatorControlSuite.Modules.Twitch;
 using CreatorControlSuite.Modules.Workflow;
+using CreatorControlSuite.Modules.YouTubeMusic;
+using CreatorControlSuite.Core.Music;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Net.Http;
@@ -198,6 +201,12 @@ public partial class App : Application
                 services.AddSingleton<OBSModule>();
                 services.AddSingleton<TwitchModule>();
                 services.AddSingleton<SpotifyModule>();
+                services.AddSingleton<SpotifyMusicPlayer>();
+                services.AddSingleton<YouTubeMusicBridge>();
+                services.AddSingleton<YouTubeMusicModule>();
+                services.AddSingleton<IMusicPlayer>(provider => provider.GetRequiredService<SpotifyMusicPlayer>());
+                services.AddSingleton<IMusicPlayer>(provider => provider.GetRequiredService<YouTubeMusicModule>());
+                services.AddSingleton<IMusicPlayerRouter, MusicPlayerRouter>();
 
                 services.AddSingleton<AlertDefinitionProvider>();
                 services.AddSingleton<ObsAlertRenderer>();
@@ -215,17 +224,38 @@ public partial class App : Application
                 services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<OBSModule>());
                 services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<TwitchModule>());
                 services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<SpotifyModule>());
+                services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<YouTubeMusicModule>());
                 services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<AlertsModule>());
                 services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<OverlayModule>());
                 services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<WorkflowModule>());
                 services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<StreamDeckModule>());
 
+                services.AddSingleton<IThemeService, ThemeService>();
                 services.AddSingleton<DiagnosticService>();
                 services.AddSingleton<MainWindow>();
             })
             .Build();
 
         await _host.StartAsync();
+
+        try
+        {
+            var startupSettings = await _host.Services.GetRequiredService<ISettingsStore>().LoadAsync();
+            var themeId = startupSettings.General.ThemeId;
+            var featureGate = _host.Services.GetRequiredService<IFeatureGate>();
+            var theme = ThemeCatalog.Resolve(themeId);
+            if (theme.IsPremium && !await featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes))
+            {
+                themeId = ThemeCatalog.ClassicId;
+            }
+
+            _host.Services.GetRequiredService<IThemeService>().Apply(themeId);
+        }
+        catch (Exception themeException)
+        {
+            WriteBootstrapLog("Theme apply failed: " + themeException);
+            _host.Services.GetRequiredService<IThemeService>().Apply(ThemeCatalog.ClassicId);
+        }
 
         _crashReporter = _host.Services.GetRequiredService<ICrashReporter>();
         _appLogger = _host.Services.GetRequiredService<IAppLogger>();
