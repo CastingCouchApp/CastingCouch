@@ -259,7 +259,8 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*" MinWidth="360"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <!-- Stream-Widget: Live-Status -->
@@ -309,8 +310,44 @@
                                                 <TextBlock x:Name="DashboardStreamQualityDetailText" Text="Stream ist offline" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,8,0,0"/>
                                             </StackPanel>
                                         </Border>
+                                        <!-- Music Player in der Dashboard-Titelleiste -->
+                                        <Border x:Name="DashboardTopMusicWidget"
+                                                Grid.Column="2"
+                                                Margin="5"
+                                                Padding="12,10"
+                                                Background="{DynamicResource CardBackgroundBrush}"
+                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="9"
+                                                MinWidth="360"
+                                                VerticalAlignment="Stretch"
+                                                Cursor="Hand"
+                                                ToolTip="Music Player öffnen">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="92"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="84" Height="84" CornerRadius="6" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" ClipToBounds="True" VerticalAlignment="Center">
+                                                    <Image x:Name="DashboardTopMusicCoverImage" Stretch="UniformToFill"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="DashboardTopMusicProviderText" Text="MUSIC PLAYER" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
+                                                    <TextBlock x:Name="DashboardTopMusicTitleText" Text="Kein Titel" FontSize="18" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                                                    <TextBlock x:Name="DashboardTopMusicArtistText" Text="-" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                                    <TextBlock x:Name="DashboardTopMusicAlbumText" Text="Album: -" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                                    <TextBlock x:Name="DashboardTopMusicStatusText" Text="Nicht verbunden" Foreground="{DynamicResource AccentBrush}" FontSize="11" Margin="0,6,0,0"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button x:Name="DashboardTopMusicPreviousButton" Content="⏮" Width="42" Height="42" FontSize="16" Margin="0,0,6,0" ToolTip="Zurück"/>
+                                                    <Button x:Name="DashboardTopMusicPlayPauseButton" Content="▶" Width="48" Height="42" FontSize="16" FontWeight="Bold" Margin="0,0,6,0" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" ToolTip="Play/Pause"/>
+                                                    <Button x:Name="DashboardTopMusicNextButton" Content="⏭" Width="42" Height="42" FontSize="16" ToolTip="Weiter"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
                                         <!-- Community-Widgets in der Titelzeile -->
-                                        <WrapPanel x:Name="DashboardCommunityModule" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <WrapPanel x:Name="DashboardCommunityModule" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                                             <Border Margin="5" Padding="12,10" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" MinWidth="280">
                                                 <StackPanel>
                                                     <TextBlock Text="COMMUNITY" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8"/>
@@ -372,7 +409,7 @@
                                         </WrapPanel>
                                         <!-- Verbindungen als Zahl rechts; Details im Mouseover -->
                                         <Border x:Name="DashboardConnectionSummaryChip"
-                                                Grid.Column="3"
+                                                Grid.Column="4"
                                                 Margin="5"
                                                 Padding="14,10"
                                                 Background="{DynamicResource CardBackgroundBrush}"

@@ -643,6 +643,20 @@ public partial class MainWindow : Window
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PlayPauseAsync());
         TitleBarMusicNextButton.Click += async (_, _) =>
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.NextAsync());
+        DashboardTopMusicPreviousButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PreviousAsync());
+        DashboardTopMusicPlayPauseButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PlayPauseAsync());
+        DashboardTopMusicNextButton.Click += async (_, _) =>
+            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.NextAsync());
+        DashboardTopMusicWidget.MouseLeftButtonUp += (_, e) =>
+        {
+            if (e.OriginalSource is System.Windows.Controls.Primitives.ButtonBase)
+                return;
+            ServicesNavigationPanel.Visibility = Visibility.Collapsed;
+            ShowPage(MusicPlayerPage);
+            _ = RefreshMusicPlayerUiAsync();
+        };
         MusicPlayerPreviousButton.Click += async (_, _) =>
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PreviousAsync());
         MusicPlayerPlayPauseButton.Click += async (_, _) =>
@@ -9904,6 +9918,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         var isSpotify = string.Equals(providerId, MusicProviderIds.Spotify, StringComparison.OrdinalIgnoreCase);
 
         DashboardMusicModuleProvider.Text = displayName;
+        DashboardTopMusicProviderText.Text = displayName.ToUpperInvariant();
         DashboardQuickMusicTitle.Text = displayName;
         DashboardQuickMusicDetail.Text = isSpotify
             ? "Player & Playlists"
@@ -9963,6 +9978,11 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             TitleBarMusicTrackText.Text = trackLabel;
             TitleBarMusicPlayPauseButton.Content = snapshot.IsPlaying ? "Ⅱ" : "▶";
+            DashboardTopMusicTitleText.Text = string.IsNullOrWhiteSpace(snapshot.Title) ? "Kein Titel" : snapshot.Title;
+            DashboardTopMusicArtistText.Text = string.IsNullOrWhiteSpace(snapshot.Artist) ? "-" : snapshot.Artist;
+            DashboardTopMusicAlbumText.Text = string.IsNullOrWhiteSpace(snapshot.Album) ? "Album: -" : "Album: " + snapshot.Album;
+            DashboardTopMusicStatusText.Text = snapshot.StatusText;
+            DashboardTopMusicPlayPauseButton.Content = snapshot.IsPlaying ? "Ⅱ" : "▶";
             MusicPlayerTitleText.Text = string.IsNullOrWhiteSpace(snapshot.Title) ? "Kein Titel" : snapshot.Title;
             MusicPlayerArtistText.Text = string.IsNullOrWhiteSpace(snapshot.Artist) ? "-" : snapshot.Artist;
             MusicPlayerAlbumText.Text = string.IsNullOrWhiteSpace(snapshot.Album) ? "Album: -" : "Album: " + snapshot.Album;
@@ -10024,6 +10044,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         if (string.IsNullOrWhiteSpace(coverUrl))
         {
             TitleBarMusicCoverImage.Source = null;
+            DashboardTopMusicCoverImage.Source = null;
             MusicPlayerCoverImage.Source = null;
             return;
         }
@@ -10040,6 +10061,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             image.EndInit();
             image.Freeze();
             TitleBarMusicCoverImage.Source = image;
+            DashboardTopMusicCoverImage.Source = image;
             MusicPlayerCoverImage.Source = image;
         }
         catch
