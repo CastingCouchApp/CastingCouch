@@ -21,6 +21,7 @@ $Logs = Join-Path $Artifacts "build-logs"
 
 . (Join-Path $PSScriptRoot "Invoke-NativeChecked.ps1")
 . (Join-Path $PSScriptRoot "VersionHelpers.ps1")
+$DotNet = & (Join-Path $PSScriptRoot "Test-DotNetSdk.ps1") -RequiredMajor 10
 & (Join-Path $PSScriptRoot "Preflight.ps1")
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
@@ -37,7 +38,7 @@ if (-not (Test-Path -LiteralPath $Publish -PathType Container)) {
     throw "Publish-Ausgabe fehlt: $Publish"
 }
 
-Invoke-NativeChecked -FilePath "dotnet" -Step "CommandClient Publish" -Arguments @(
+Invoke-NativeChecked -FilePath $DotNet -Step "CommandClient Publish" -Arguments @(
     "publish",
     (Join-Path $Root "src\CreatorControlSuite.CommandClient\CreatorControlSuite.CommandClient.csproj"),
     "-c", $Configuration,
@@ -47,7 +48,7 @@ Invoke-NativeChecked -FilePath "dotnet" -Step "CommandClient Publish" -Arguments
     "-o", $Publish
 )
 
-Invoke-NativeChecked -FilePath "dotnet" -Step "Updater Publish" -Arguments @(
+Invoke-NativeChecked -FilePath $DotNet -Step "Updater Publish" -Arguments @(
     "publish",
     (Join-Path $Root "src\CreatorControlSuite.Updater\CreatorControlSuite.Updater.csproj"),
     "-c", $Configuration,
@@ -104,7 +105,7 @@ $PublishForMsBuild = $Publish.TrimEnd('\') + '\'
 
 Write-Host "WiX PublishDir: $PublishForMsBuild"
 
-Invoke-NativeChecked -FilePath "dotnet" -Step "Installer Build" -Arguments @(
+Invoke-NativeChecked -FilePath $DotNet -Step "Installer Build" -Arguments @(
     "build",
     (Join-Path $Root "installer\CreatorControlSuite.Installer\CreatorControlSuite.Installer.wixproj"),
     "-c", $Configuration,
