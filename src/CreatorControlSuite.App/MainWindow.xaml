@@ -77,14 +77,24 @@
                             <Border Width="22" Height="22" CornerRadius="3" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" Margin="0,0,8,0">
                                 <Image x:Name="TitleBarMusicCoverImage" Stretch="UniformToFill"/>
                             </Border>
-                            <TextBlock x:Name="TitleBarMusicTrackText"
-                                       Text="Kein Titel"
-                                       MaxWidth="180"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       FontSize="12"
-                                       Margin="0,0,8,0"/>
+                            <Border x:Name="TitleBarMusicTrackViewport"
+                                    Width="160"
+                                    MaxWidth="160"
+                                    ClipToBounds="True"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,0">
+                                <TextBlock x:Name="TitleBarMusicTrackText"
+                                           Text="Kein Titel"
+                                           TextWrapping="NoWrap"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Left"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontSize="12">
+                                    <TextBlock.RenderTransform>
+                                        <TranslateTransform x:Name="TitleBarMusicTrackTranslate"/>
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                            </Border>
                             <Button x:Name="TitleBarMusicPreviousButton"
                                     Style="{StaticResource TitleBarCaptionButtonStyle}"
                                     Width="28"
@@ -259,8 +269,8 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*" MinWidth="360"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <!-- Stream-Widget: Live-Status -->
@@ -319,7 +329,8 @@
                                                 BorderBrush="{DynamicResource BorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="9"
-                                                MinWidth="360"
+                                                Width="380"
+                                                MaxWidth="380"
                                                 VerticalAlignment="Stretch"
                                                 Cursor="Hand"
                                                 ToolTip="Music Player öffnen">
@@ -334,7 +345,21 @@
                                                 </Border>
                                                 <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
                                                     <TextBlock x:Name="DashboardTopMusicProviderText" Text="MUSIC PLAYER" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
-                                                    <TextBlock x:Name="DashboardTopMusicTitleText" Text="Kein Titel" FontSize="18" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                                                    <Border x:Name="DashboardTopMusicTitleViewport"
+                                                            ClipToBounds="True"
+                                                            Margin="0,4,0,0"
+                                                            Height="24">
+                                                        <TextBlock x:Name="DashboardTopMusicTitleText"
+                                                                   Text="Kein Titel"
+                                                                   FontSize="18"
+                                                                   FontWeight="SemiBold"
+                                                                   TextWrapping="NoWrap"
+                                                                   HorizontalAlignment="Left">
+                                                            <TextBlock.RenderTransform>
+                                                                <TranslateTransform x:Name="DashboardTopMusicTitleTranslate"/>
+                                                            </TextBlock.RenderTransform>
+                                                        </TextBlock>
+                                                    </Border>
                                                     <TextBlock x:Name="DashboardTopMusicArtistText" Text="-" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                                                     <TextBlock x:Name="DashboardTopMusicAlbumText" Text="Album: -" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                                                     <TextBlock x:Name="DashboardTopMusicStatusText" Text="Nicht verbunden" Foreground="{DynamicResource AccentBrush}" FontSize="11" Margin="0,6,0,0"/>
@@ -488,10 +513,7 @@
                                                     <RowDefinition Height="*" MinHeight="180"/>
                                                     <RowDefinition Height="Auto"/>
                                                 </Grid.RowDefinitions>
-                                                <StackPanel>
-                                                    <TextBlock Text="AKTUELLE SZENE (OBS)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                                                    <TextBlock Text="Aktuelle oder vorbereitete Szene auswählen" Foreground="{DynamicResource TextMutedBrush}" Margin="0,4,0,12"/>
-                                                </StackPanel>
+                                                <TextBlock Text="AKTUELLE SZENE (OBS)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,12"/>
                                                 <Border Grid.Row="1" MinHeight="180" Background="{DynamicResource WindowBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,10" ClipToBounds="True" VerticalAlignment="Stretch">
                                                     <Grid>
                                                         <Rectangle Fill="{DynamicResource PanelBackgroundBrush}"/>
@@ -508,16 +530,8 @@
                                                     </Grid>
                                                 </Border>
                                                 <StackPanel Grid.Row="2">
-                                                <TextBlock Text="Szene direkt wechseln" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                                                <ComboBox x:Name="DashboardSceneBox" MinWidth="220" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                <Button x:Name="DashboardSwitchSceneButton" ToolTip="Zur ausgewählten OBS-Szene wechseln" Content="↔  SZENE WECHSELN" HorizontalAlignment="Stretch" Margin="0,8,0,0"/>
-                                                <Separator Margin="0,12,0,10" Background="{DynamicResource SubtleBorderBrush}"/>
-                                                <TextBlock Text="Nächste Szene vorbereiten" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                                                <ComboBox x:Name="DashboardNextSceneBox" MinWidth="220" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                <WrapPanel Margin="0,8,0,0">
-                                                    <Button x:Name="DashboardSwitchNextSceneButton" ToolTip="Zur vorbereiteten nächsten OBS-Szene wechseln" Content="▶  NÄCHSTE SZENE" Margin="0,0,8,0"/>
-                                                    <Button x:Name="DashboardRefreshScenesButton" ToolTip="OBS-Szenenliste sofort neu laden" Content="↻  LISTE AKTUALISIEREN"/>
-                                                </WrapPanel>
+                                                    <WrapPanel x:Name="DashboardSceneButtonsPanel"/>
+                                                    <Button x:Name="DashboardAddSceneButton" Content="+ Button hinzufügen" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,6"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -644,49 +658,11 @@
                             </Grid>
                             <Grid x:Name="DashboardStreamingServicesRow" Grid.Row="2" Margin="0,0,0,10" MinHeight="400">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="2.15*" MinWidth="240"/>
                                     <ColumnDefinition Width="1.27*" MinWidth="180"/>
                                     <ColumnDefinition Width="2*" MinWidth="220"/>
                                     <ColumnDefinition Width="1*" MinWidth="160"/>
                                 </Grid.ColumnDefinitions>
-                                    <Grid Grid.Column="0" Margin="0,0,4,0">
-                                        <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardSpotifyPlayerModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                            <StackPanel>
-                                                <DockPanel>
-                                                    <TextBlock x:Name="DashboardMusicModuleTitle" Text="MUSIC PLAYER" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                                                    <TextBlock x:Name="DashboardMusicModuleProvider" Text="Spotify" Foreground="{DynamicResource SuccessBrush}" HorizontalAlignment="Right"/>
-                                                </DockPanel>
-                                                <TextBlock Text="Wiedergabe und Steuerung liegen auf der Player-Seite." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,10,0,12"/>
-                                                <TextBlock x:Name="DashboardMusicNowPlayingText" Text="Kein Titel" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                <TextBlock x:Name="DashboardMusicStatusText" Text="Nicht verbunden" Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,14"/>
-                                                <Button x:Name="DashboardOpenMusicPlayerButton" Content="ZUM PLAYER" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold" HorizontalAlignment="Left" Padding="16,8"/>
-                                                <!-- Kompatibilität: alte Spotify-Dashboard-Controls bleiben für Code-behind erhalten -->
-                                                <StackPanel Visibility="Collapsed">
-                                                    <Image x:Name="DashboardSpotifyAlbumCoverImage"/>
-                                                    <TextBlock x:Name="DashboardSpotifyTrackText"/>
-                                                    <TextBlock x:Name="DashboardSpotifyAlbumText"/>
-                                                    <TextBlock x:Name="DashboardSpotifyPlaybackStateText"/>
-                                                    <TextBlock x:Name="DashboardSpotifyDeviceText"/>
-                                                    <Button x:Name="DashboardSpotifyShuffleButton"/>
-                                                    <Button x:Name="DashboardSpotifyPreviousButton"/>
-                                                    <Button x:Name="DashboardSpotifyPlayButton"/>
-                                                    <Button x:Name="DashboardSpotifyPauseButton"/>
-                                                    <Button x:Name="DashboardSpotifyNextButton"/>
-                                                    <Button x:Name="DashboardSpotifyRepeatButton"/>
-                                                    <ComboBox x:Name="DashboardSpotifyPlaylistBox" DisplayMemberPath="Name"/>
-                                                    <Button x:Name="DashboardSpotifyStartPlaylistButton"/>
-                                                    <ComboBox x:Name="DashboardSpotifyQuickPlaylistBox" DisplayMemberPath="Name"/>
-                                                    <Button x:Name="DashboardSpotifyStartQuickPlaylistButton"/>
-                                                    <Slider x:Name="DashboardSpotifyProgressBar"/>
-                                                    <TextBlock x:Name="DashboardSpotifyProgressText"/>
-                                                    <TextBlock x:Name="DashboardSpotifyDurationText"/>
-                                                    <TextBlock x:Name="DashboardSpotifyVolumeText"/>
-                                                    <Slider x:Name="DashboardSpotifyVolumeSlider"/>
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-                                    <Grid Grid.Column="1" Margin="0,0,6,0">
+                                    <Grid Grid.Column="0" Margin="0,0,6,0">
                                         <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardTwitchEventsModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                             <Grid>
                                                 <Grid.RowDefinitions>
@@ -698,7 +674,7 @@
                                             </Grid>
                                         </Border>
                                     </Grid>
-                                    <Grid Grid.Column="2" Margin="0,0,6,0">
+                                    <Grid Grid.Column="1" Margin="0,0,6,0">
                                         <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardTwitchChatModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                             <Grid>
                                                 <Grid.RowDefinitions>
@@ -731,7 +707,7 @@
                                             </Grid>
                                         </Border>
                                     </Grid>
-                                    <Grid Grid.Column="3">
+                                    <Grid Grid.Column="2">
                                         <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardTwitchUsersModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                             <Grid>
                                                 <Grid.RowDefinitions>
@@ -747,7 +723,6 @@
                             <Grid x:Name="DashboardRemainingWidgetsRow" Grid.Row="3" Margin="0" MinHeight="260">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="1.15*" MinWidth="240"/>
-                                    <ColumnDefinition Width="1*" MinWidth="220"/>
                                     <ColumnDefinition Width="*" MinWidth="200"/>
                                 </Grid.ColumnDefinitions>
                                     <Grid Grid.Column="0" Margin="0,0,4,0">
@@ -764,27 +739,7 @@
                                             </Grid>
                                         </Border>
                                     </Grid>
-                                    <Grid Grid.Column="1" Margin="0,0,4,0">
-                                        <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardLiveEventsModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="*"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
-                                                <TextBlock Text="STREAMSTATISTIK · AKTUELLE SESSION" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                                                <Border Grid.Row="1" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,12,0,8">
-                                                    <StackPanel VerticalAlignment="Center">
-                                                        <TextBlock x:Name="DashboardSelectedStatisticLabel" Text="ZUSCHAUERZAHL" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" HorizontalAlignment="Center"/>
-                                                        <TextBlock x:Name="DashboardSelectedStatisticValue" Text="0" FontSize="38" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                                                    </StackPanel>
-                                                </Border>
-                                                <Button x:Name="DashboardOpenEventsButton" Grid.Row="2" Content="DETAILLIERTE STATISTIK ÖFFNEN"/>
-                                                <ListBox x:Name="DashboardEventCenterList" Visibility="Collapsed"/>
-                                            </Grid>
-                                        </Border>
-                                    </Grid>
-                                    <Grid Grid.Column="2">
+                                    <Grid Grid.Column="1">
                                         <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardSystemResourcesModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                             <StackPanel>
                                                 <TextBlock Text="SYSTEM RESSOURCEN" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
@@ -799,6 +754,45 @@
                             </Grid>
                                 <!-- Unsichtbarer Kompatibilitätsbereich für bestehende Eventhandler -->
                                 <Grid Grid.Row="4" Visibility="Collapsed">
+                                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardLiveEventsModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Visibility="Collapsed">
+                                        <StackPanel>
+                                            <TextBlock x:Name="DashboardSelectedStatisticLabel" Text="ZUSCHAUERZAHL"/>
+                                            <TextBlock x:Name="DashboardSelectedStatisticValue" Text="0"/>
+                                            <Button x:Name="DashboardOpenEventsButton" Content="DETAILLIERTE STATISTIK ÖFFNEN"/>
+                                            <ListBox x:Name="DashboardEventCenterList" Visibility="Collapsed"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardSpotifyPlayerModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Visibility="Collapsed">
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <TextBlock x:Name="DashboardMusicModuleTitle" Text="MUSIC PLAYER" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                                <TextBlock x:Name="DashboardMusicModuleProvider" Text="Spotify" Foreground="{DynamicResource SuccessBrush}" HorizontalAlignment="Right"/>
+                                            </DockPanel>
+                                            <TextBlock x:Name="DashboardMusicNowPlayingText" Text="Kein Titel"/>
+                                            <TextBlock x:Name="DashboardMusicStatusText" Text="Nicht verbunden"/>
+                                            <Button x:Name="DashboardOpenMusicPlayerButton" Content="ZUM PLAYER"/>
+                                            <Image x:Name="DashboardSpotifyAlbumCoverImage"/>
+                                            <TextBlock x:Name="DashboardSpotifyTrackText"/>
+                                            <TextBlock x:Name="DashboardSpotifyAlbumText"/>
+                                            <TextBlock x:Name="DashboardSpotifyPlaybackStateText"/>
+                                            <TextBlock x:Name="DashboardSpotifyDeviceText"/>
+                                            <Button x:Name="DashboardSpotifyShuffleButton"/>
+                                            <Button x:Name="DashboardSpotifyPreviousButton"/>
+                                            <Button x:Name="DashboardSpotifyPlayButton"/>
+                                            <Button x:Name="DashboardSpotifyPauseButton"/>
+                                            <Button x:Name="DashboardSpotifyNextButton"/>
+                                            <Button x:Name="DashboardSpotifyRepeatButton"/>
+                                            <ComboBox x:Name="DashboardSpotifyPlaylistBox" DisplayMemberPath="Name"/>
+                                            <Button x:Name="DashboardSpotifyStartPlaylistButton"/>
+                                            <ComboBox x:Name="DashboardSpotifyQuickPlaylistBox" DisplayMemberPath="Name"/>
+                                            <Button x:Name="DashboardSpotifyStartQuickPlaylistButton"/>
+                                            <Slider x:Name="DashboardSpotifyProgressBar"/>
+                                            <TextBlock x:Name="DashboardSpotifyProgressText"/>
+                                            <TextBlock x:Name="DashboardSpotifyDurationText"/>
+                                            <TextBlock x:Name="DashboardSpotifyVolumeText"/>
+                                            <Slider x:Name="DashboardSpotifyVolumeSlider"/>
+                                        </StackPanel>
+                                    </Border>
                                     <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardAutomationModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Visibility="Collapsed">
                                         <StackPanel>
                                             <TextBlock Text="DIENSTE" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>

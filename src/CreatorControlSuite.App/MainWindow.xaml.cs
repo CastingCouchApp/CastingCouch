@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
@@ -344,6 +345,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, ObsInputVolumeMeter> _obsLiveMeters = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (double PeakDb, DateTimeOffset At)> _obsPeakHold = new(StringComparer.OrdinalIgnoreCase);
     private string _servicesObsCurrentScene = string.Empty;
+    private IReadOnlyList<string> _dashboardObsSceneNames = Array.Empty<string>();
     private readonly ObservableCollection<string> _multiPcDeviceItems = [];
     private readonly ObservableCollection<string> _multiPcHistoryItems = [];
     private readonly ObservableCollection<string> _multiPcRolloutItems = [];
@@ -670,6 +672,8 @@ public partial class MainWindow : Window
             ShowPage(MusicPlayerPage);
             _ = RefreshMusicPlayerUiAsync();
         };
+        DashboardTopMusicTitleViewport.SizeChanged += (_, _) => UpdateMusicTitleMarquees();
+        TitleBarMusicTrackViewport.SizeChanged += (_, _) => UpdateMusicTitleMarquees();
         MusicPlayerPreviousButton.Click += async (_, _) =>
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PreviousAsync());
         MusicPlayerPlayPauseButton.Click += async (_, _) =>
@@ -1082,21 +1086,7 @@ public partial class MainWindow : Window
                 DashboardHeaderStreamActionButton,
                 "Stream umschalten",
                 ToggleDashboardHeaderStreamAsync);
-        DashboardSwitchSceneButton.Click += async (_, _) =>
-            await ExecuteDashboardActionAsync(
-                DashboardSwitchSceneButton,
-                "OBS-Szene wechseln",
-                SwitchDashboardSceneAsync);
-        DashboardSwitchNextSceneButton.Click += async (_, _) =>
-            await ExecuteDashboardActionAsync(
-                DashboardSwitchNextSceneButton,
-                "Nächste OBS-Szene wechseln",
-                SwitchDashboardNextSceneAsync);
-        DashboardRefreshScenesButton.Click += async (_, _) =>
-            await ExecuteDashboardActionAsync(
-                DashboardRefreshScenesButton,
-                "OBS-Szenen aktualisieren",
-                RefreshObsAsync);
+        DashboardAddSceneButton.Click += async (_, _) => await AddDashboardSceneButtonAsync();
         DashboardRaidEnabledBox.Checked += async (_, _) =>
         {
             if (!_settingsUiLoaded)
@@ -1404,6 +1394,7 @@ public partial class MainWindow : Window
                 ServicesObsCurrentSceneText.Text = "Aktuelle Szene: " + sceneName;
                 _automationCurrentScene = sceneName;
                 _automationSceneActivatedAt = DateTimeOffset.UtcNow;
+                HighlightDashboardSceneButtons(sceneName);
                 foreach (var sceneRule in _settings.Workflow.TimedAutomations
                              .Where(rule => string.Equals(rule.TriggerType, "SceneElapsed", StringComparison.OrdinalIgnoreCase)
                                             && !rule.OncePerStream
@@ -3431,6 +3422,8 @@ public partial class MainWindow : Window
         _settings.Workflow.RunOfShowPlans ??= [];
         _settings.MusicPlayer ??= new MusicPlayerSettings();
         _settings.YouTubeMusic ??= new YouTubeMusicSettings();
+        _settings.Dashboard ??= new DashboardSettings();
+        _settings.Dashboard.SceneButtons ??= [];
         if (string.IsNullOrWhiteSpace(_settings.MusicPlayer.ProviderId))
             _settings.MusicPlayer.ProviderId = MusicProviderIds.Spotify;
         var migratedSceneAutomation = MigrateLegacyStartToGameAutomation();
@@ -3574,7 +3567,11 @@ public partial class MainWindow : Window
         ServicesTwitchEndFollowerGoalTargetBox.Text = _settings.Twitch.FollowerGoal.Target.ToString("0");
         DashboardRaidEnabledBox.IsChecked = _settings.Twitch.RaidOnStreamEnd;
         DashboardPlannedStreamEndMinutesBox.Text = Math.Max(1, _settings.Twitch.PlannedStreamEndMinutes).ToString();
-        RefreshConfiguredDashboardScenes();
+        if (EnsureDefaultDashboardSceneButtons())
+        {
+            await _settingsStore.SaveAsync(_settings);
+        }
+        RebuildDashboardSceneButtons();
         RefreshRaidChannelSelectors();
         UpdateDashboardRaidControlsVisibility();
         UpdateDashboardStreamEndModuleVisibility();
@@ -3921,7 +3918,7 @@ public partial class MainWindow : Window
                     firstError.SuggestedFix);
             }
 
-            RefreshConfiguredDashboardScenes();
+            RebuildDashboardSceneButtons();
             RefreshRaidChannelSelectors();
 
             await _settingsStore.SaveAsync(_settings);
@@ -6633,23 +6630,320 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RefreshConfiguredDashboardScenes()
+    private bool EnsureDefaultDashboardSceneButtons()
     {
-        var scenes = new[]
+        if (_settings.Dashboard.SceneButtons.Count > 0)
         {
-            _settings.Obs.StartScene,
-            _settings.Obs.LiveScene,
-            _settings.Obs.PauseScene,
-            _settings.Obs.EndScene
+            return false;
         }
-        .Concat(_settings.AdditionalScenes)
-        .Where(scene => !string.IsNullOrWhiteSpace(scene))
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToList();
 
-        DashboardSceneBox.ItemsSource = scenes;
-        DashboardSceneBox.SelectedItem = scenes.FirstOrDefault(scene =>
-            string.Equals(scene, _settings.Obs.LiveScene, StringComparison.OrdinalIgnoreCase));
+        var defaults = new (string Scene, string Emoji)[]
+        {
+            (_settings.Obs.StartScene, "🚀"),
+            (_settings.Obs.LiveScene, "🎮"),
+            (_settings.Obs.PauseScene, "☕"),
+            (_settings.Obs.EndScene, "🏁"),
+        };
+
+        foreach (var (scene, emoji) in defaults)
+        {
+            if (string.IsNullOrWhiteSpace(scene))
+            {
+                continue;
+            }
+
+            if (_settings.Dashboard.SceneButtons.Any(button =>
+                    string.Equals(button.SceneName, scene, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            _settings.Dashboard.SceneButtons.Add(new DashboardSceneButtonSettings
+            {
+                Title = scene,
+                SceneName = scene,
+                IconKind = "Emoji",
+                IconValue = emoji
+            });
+        }
+
+        return _settings.Dashboard.SceneButtons.Count > 0;
+    }
+
+    private void RebuildDashboardSceneButtons()
+    {
+        DashboardSceneButtonsPanel.Children.Clear();
+
+        foreach (var settings in _settings.Dashboard.SceneButtons.ToList())
+        {
+            var button = CreateDashboardSceneButton(settings);
+            DashboardSceneButtonsPanel.Children.Add(button);
+        }
+
+        HighlightDashboardSceneButtons(_servicesObsCurrentScene);
+    }
+
+    private Button CreateDashboardSceneButton(DashboardSceneButtonSettings settings)
+    {
+        var content = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+
+        var iconElement = CreateDashboardSceneButtonIcon(settings);
+        if (iconElement is not null)
+        {
+            content.Children.Add(iconElement);
+        }
+
+        content.Children.Add(new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(settings.Title) ? settings.SceneName : settings.Title,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = iconElement is null ? new Thickness(0) : new Thickness(8, 0, 0, 0)
+        });
+
+        var button = new Button
+        {
+            Content = content,
+            Margin = new Thickness(0, 0, 8, 8),
+            Padding = new Thickness(12, 8, 12, 8),
+            MinWidth = 96,
+            Tag = settings,
+            ToolTip = $"Zur OBS-Szene wechseln: {settings.SceneName}"
+        };
+
+        button.Click += async (_, _) =>
+            await ExecuteDashboardActionAsync(
+                button,
+                $"OBS-Szene: {settings.Title}",
+                () => SwitchDashboardSceneByNameAsync(settings.SceneName));
+
+        var contextMenu = new ContextMenu();
+        var editItem = new MenuItem { Header = "Bearbeiten" };
+        editItem.Click += async (_, _) => await EditDashboardSceneButtonAsync(settings);
+        var deleteItem = new MenuItem { Header = "Löschen" };
+        deleteItem.Click += async (_, _) => await DeleteDashboardSceneButtonAsync(settings);
+        contextMenu.Items.Add(editItem);
+        contextMenu.Items.Add(deleteItem);
+        button.ContextMenu = contextMenu;
+
+        return button;
+    }
+
+    private static FrameworkElement? CreateDashboardSceneButtonIcon(DashboardSceneButtonSettings settings)
+    {
+        var kind = settings.IconKind?.Trim() ?? "Emoji";
+        if (string.Equals(kind, "Image", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(settings.IconValue) || !File.Exists(settings.IconValue))
+                {
+                    return null;
+                }
+
+                var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bitmap.UriSource = new Uri(settings.IconValue, UriKind.Absolute);
+                bitmap.DecodePixelWidth = 20;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                return new Image
+                {
+                    Source = bitmap,
+                    Width = 18,
+                    Height = 18,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        if (string.Equals(kind, "Glyph", StringComparison.OrdinalIgnoreCase))
+        {
+            return new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(settings.IconValue) ? "\uE714" : settings.IconValue,
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        return new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(settings.IconValue) ? "🎬" : settings.IconValue,
+            FontSize = 16,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+    }
+
+    private void HighlightDashboardSceneButtons(string? currentScene)
+    {
+        var accent = _themeService.GetBrush("AccentBrush")
+            ?? new SolidColorBrush(Color.FromRgb(255, 140, 0));
+        var transparent = Brushes.Transparent;
+
+        foreach (var child in DashboardSceneButtonsPanel.Children)
+        {
+            if (child is not Button button || button.Tag is not DashboardSceneButtonSettings settings)
+            {
+                continue;
+            }
+
+            var isActive = !string.IsNullOrWhiteSpace(currentScene) &&
+                string.Equals(settings.SceneName, currentScene, StringComparison.OrdinalIgnoreCase);
+            button.BorderBrush = isActive ? accent : transparent;
+            button.BorderThickness = new Thickness(isActive ? 2 : 1);
+            button.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+    }
+
+    private async Task AddDashboardSceneButtonAsync()
+    {
+        var scenes = await GetDashboardSceneChoicesAsync();
+        if (scenes.Count == 0)
+        {
+            AddDashboardNotification(
+                "Keine OBS-Szenen verfügbar. Bitte zuerst OBS verbinden.",
+                "Warnung");
+            return;
+        }
+
+        var editor = new DashboardSceneButtonEditorWindow(scenes)
+        {
+            Owner = this
+        };
+        if (editor.ShowDialog() != true)
+        {
+            return;
+        }
+
+        _settings.Dashboard.SceneButtons.Add(editor.Result);
+        await _settingsStore.SaveAsync(_settings);
+        RebuildDashboardSceneButtons();
+    }
+
+    private async Task EditDashboardSceneButtonAsync(DashboardSceneButtonSettings settings)
+    {
+        var scenes = (await GetDashboardSceneChoicesAsync()).ToList();
+        if (scenes.Count == 0)
+        {
+            AddDashboardNotification(
+                "Keine OBS-Szenen verfügbar. Bitte zuerst OBS verbinden.",
+                "Warnung");
+            return;
+        }
+
+        if (!scenes.Any(scene => string.Equals(scene, settings.SceneName, StringComparison.OrdinalIgnoreCase)) &&
+            !string.IsNullOrWhiteSpace(settings.SceneName))
+        {
+            scenes.Add(settings.SceneName);
+        }
+
+        var editor = new DashboardSceneButtonEditorWindow(scenes, settings)
+        {
+            Owner = this
+        };
+        if (editor.ShowDialog() != true)
+        {
+            return;
+        }
+
+        settings.Title = editor.Result.Title;
+        settings.SceneName = editor.Result.SceneName;
+        settings.IconKind = editor.Result.IconKind;
+        settings.IconValue = editor.Result.IconValue;
+        await _settingsStore.SaveAsync(_settings);
+        RebuildDashboardSceneButtons();
+    }
+
+    private async Task DeleteDashboardSceneButtonAsync(DashboardSceneButtonSettings settings)
+    {
+        var result = MessageBox.Show(
+            $"Button „{settings.Title}“ wirklich löschen?",
+            "Szenen-Button",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _settings.Dashboard.SceneButtons.RemoveAll(button =>
+            string.Equals(button.Id, settings.Id, StringComparison.Ordinal));
+        await _settingsStore.SaveAsync(_settings);
+        RebuildDashboardSceneButtons();
+    }
+
+    private async Task<IReadOnlyList<string>> GetDashboardSceneChoicesAsync()
+    {
+        if (_obsClient.IsConnected)
+        {
+            try
+            {
+                var scenes = await _obsClient.GetSceneListAsync();
+                var names = scenes
+                    .Select(scene => scene.Name)
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (names.Count > 0)
+                {
+                    _dashboardObsSceneNames = names;
+                    return names;
+                }
+            }
+            catch (Exception exception)
+            {
+                _appLogger.Write(
+                    AppLogLevel.Warning,
+                    "OBS",
+                    "OBS-Szenenliste für Button-Editor konnte nicht geladen werden.",
+                    exception);
+            }
+        }
+
+        if (_dashboardObsSceneNames.Count > 0)
+        {
+            return _dashboardObsSceneNames;
+        }
+
+        return new[]
+            {
+                _settings.Obs.StartScene,
+                _settings.Obs.LiveScene,
+                _settings.Obs.PauseScene,
+                _settings.Obs.EndScene
+            }
+            .Concat(_settings.AdditionalScenes)
+            .Where(scene => !string.IsNullOrWhiteSpace(scene))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private async Task SwitchDashboardSceneByNameAsync(string sceneName)
+    {
+        if (string.IsNullOrWhiteSpace(sceneName) || !_obsClient.IsConnected)
+        {
+            AddDashboardNotification(
+                "OBS ist nicht verbunden oder es wurde keine Szene ausgewählt.",
+                "Warnung");
+            return;
+        }
+
+        await _obsClient.SetCurrentProgramSceneAsync(sceneName);
+        DashboardCurrentSceneText.Text = sceneName;
+        _servicesObsCurrentScene = sceneName;
+        HighlightDashboardSceneButtons(sceneName);
+        await RefreshDashboardObsScenePreviewAsync(sceneName);
+        AddDashboardNotification($"OBS-Szene gewechselt: {sceneName}", "Info");
     }
 
     private void AddDashboardViewerTrendSample(int viewers)
@@ -6706,55 +7000,6 @@ public partial class MainWindow : Window
         OpenConfiguredTarget(
             $"https://www.twitch.tv/popout/{channel}/chat?popout=",
             "Twitch Chat");
-    }
-
-    private async Task SwitchDashboardSceneAsync()
-    {
-        if (DashboardSceneBox.SelectedItem is not string sceneName ||
-            !_obsClient.IsConnected)
-        {
-            AddDashboardNotification(
-                "OBS ist nicht verbunden oder es wurde keine Szene ausgewählt.",
-                "Warnung");
-            return;
-        }
-
-        await _obsClient.SetCurrentProgramSceneAsync(sceneName);
-        await RefreshObsAsync();
-
-        AddDashboardNotification(
-            $"OBS-Szene gewechselt: {sceneName}",
-            "Info");
-    }
-
-    private async Task SwitchDashboardNextSceneAsync()
-    {
-        var sceneName = DashboardNextSceneBox.SelectedItem as string;
-        if (string.IsNullOrWhiteSpace(sceneName))
-        {
-            sceneName = DashboardNextSceneBox.Text?.Trim();
-        }
-        if (string.IsNullOrWhiteSpace(sceneName))
-        {
-            throw new InvalidOperationException("Keine nächste OBS-Szene ausgewählt.");
-        }
-        if (!_obsClient.IsConnected)
-        {
-            throw new InvalidOperationException("OBS ist nicht verbunden.");
-        }
-
-        await _obsClient.SetCurrentProgramSceneAsync(sceneName);
-        DashboardSceneBox.SelectedItem = sceneName;
-        DashboardCurrentSceneText.Text = sceneName;
-
-        var scenes = (DashboardNextSceneBox.ItemsSource as IEnumerable<string>)?.ToList() ?? [];
-        var followingScene = scenes.FirstOrDefault(scene =>
-            !string.Equals(scene, sceneName, StringComparison.OrdinalIgnoreCase));
-        if (followingScene is not null)
-        {
-            DashboardNextSceneBox.SelectedItem = followingScene;
-        }
-        await RefreshDashboardObsScenePreviewAsync(sceneName);
     }
 
 
@@ -10049,6 +10294,50 @@ private Task ApplyCombinedAlertDuckingAsync()
     private System.Windows.Point _musicBookmarkletDragStart;
     private bool _musicBookmarkletDragPending;
 
+    private void UpdateMusicTitleMarquees()
+    {
+        UpdateTextMarquee(
+            DashboardTopMusicTitleText,
+            DashboardTopMusicTitleViewport,
+            DashboardTopMusicTitleTranslate);
+        UpdateTextMarquee(
+            TitleBarMusicTrackText,
+            TitleBarMusicTrackViewport,
+            TitleBarMusicTrackTranslate);
+    }
+
+    private static void UpdateTextMarquee(
+        TextBlock textBlock,
+        FrameworkElement viewport,
+        TranslateTransform translate)
+    {
+        translate.BeginAnimation(TranslateTransform.XProperty, null);
+        translate.X = 0;
+
+        if (viewport.ActualWidth <= 0 || string.IsNullOrWhiteSpace(textBlock.Text))
+            return;
+
+        textBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var overflow = textBlock.DesiredSize.Width - viewport.ActualWidth;
+        if (overflow <= 2)
+            return;
+
+        var pixelsPerSecond = 28.0;
+        var scrollSeconds = Math.Max(3.0, overflow / pixelsPerSecond);
+        var animation = new DoubleAnimation
+        {
+            From = 0,
+            To = -overflow,
+            Duration = TimeSpan.FromSeconds(scrollSeconds),
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            BeginTime = TimeSpan.FromSeconds(1.25),
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+        };
+
+        translate.BeginAnimation(TranslateTransform.XProperty, animation);
+    }
+
     private void MusicPlayerBookmarkletDragChip_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _musicBookmarkletDragStart = e.GetPosition(null);
@@ -10195,6 +10484,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             MusicPlayerPlayPauseButton.Content = snapshot.IsPlaying ? "Pause" : "Play";
             DashboardMusicNowPlayingText.Text = trackLabel;
             DashboardMusicStatusText.Text = snapshot.StatusText;
+            _ = Dispatcher.BeginInvoke(UpdateMusicTitleMarquees, System.Windows.Threading.DispatcherPriority.Loaded);
 
             if (!IsSpotifyMusicProvider())
             {
@@ -12646,54 +12936,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         await RefreshSpotifyOverlayBrowserSourcesAsync();
 
-        // Do not overwrite a scene the user is currently choosing. The dashboard
-        // refresh runs periodically and previously reset the ComboBox to the active
-        // OBS scene before the user could press “Szene wechseln”.
-        var requestedDashboardScene = DashboardSceneBox.SelectedItem as string;
-        if (string.IsNullOrWhiteSpace(requestedDashboardScene))
-        {
-            requestedDashboardScene = DashboardSceneBox.Text?.Trim();
-        }
-
-        var existingDashboardScenes = DashboardSceneBox.ItemsSource as IEnumerable<string>;
-        var sceneListChanged = existingDashboardScenes is null ||
-            !existingDashboardScenes.SequenceEqual(dashboardScenes, StringComparer.OrdinalIgnoreCase);
-
-        if (!DashboardSceneBox.IsDropDownOpen && sceneListChanged)
-        {
-            DashboardSceneBox.ItemsSource = dashboardScenes;
-        }
-
-        var sceneToKeep = dashboardScenes.FirstOrDefault(scene =>
-            string.Equals(scene, requestedDashboardScene, StringComparison.OrdinalIgnoreCase));
-        sceneToKeep ??= dashboardScenes.FirstOrDefault(scene =>
-            string.Equals(scene, snapshot.CurrentProgramScene, StringComparison.OrdinalIgnoreCase));
-
-        if (!DashboardSceneBox.IsDropDownOpen && DashboardSceneBox.SelectedItem is null && sceneToKeep is not null)
-        {
-            DashboardSceneBox.SelectedItem = sceneToKeep;
-        }
-
-        var requestedNextScene = DashboardNextSceneBox.SelectedItem as string;
-        if (string.IsNullOrWhiteSpace(requestedNextScene))
-        {
-            requestedNextScene = DashboardNextSceneBox.Text?.Trim();
-        }
-        var existingNextScenes = DashboardNextSceneBox.ItemsSource as IEnumerable<string>;
-        var nextSceneListChanged = existingNextScenes is null ||
-            !existingNextScenes.SequenceEqual(dashboardScenes, StringComparer.OrdinalIgnoreCase);
-        if (!DashboardNextSceneBox.IsDropDownOpen && nextSceneListChanged)
-        {
-            DashboardNextSceneBox.ItemsSource = dashboardScenes;
-        }
-        var nextSceneToKeep = dashboardScenes.FirstOrDefault(scene =>
-            string.Equals(scene, requestedNextScene, StringComparison.OrdinalIgnoreCase));
-        nextSceneToKeep ??= dashboardScenes.FirstOrDefault(scene =>
-            !string.Equals(scene, snapshot.CurrentProgramScene, StringComparison.OrdinalIgnoreCase));
-        if (!DashboardNextSceneBox.IsDropDownOpen && DashboardNextSceneBox.SelectedItem is null && nextSceneToKeep is not null)
-        {
-            DashboardNextSceneBox.SelectedItem = nextSceneToKeep;
-        }
+        _dashboardObsSceneNames = dashboardScenes;
+        HighlightDashboardSceneButtons(snapshot.CurrentProgramScene);
         await RefreshDashboardObsScenePreviewAsync(snapshot.CurrentProgramScene);
 
         ObsStreamStatusText.Text = snapshot.Stream?.OutputActive == true
@@ -16511,14 +16755,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        DashboardSceneBox.SelectedItem = sceneName;
-        if (DashboardSceneBox.SelectedItem is null)
-        {
-            DashboardSceneBox.Text = sceneName;
-        }
-
-        await SwitchDashboardSceneAsync();
-        AddDashboardNotification($"Szenenwechsel angefordert: {sceneName}", "Info");
+        await SwitchDashboardSceneByNameAsync(sceneName);
     }
 
 

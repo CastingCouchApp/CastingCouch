@@ -540,6 +540,7 @@ public sealed class DashboardSettings
     public bool ShowNotifications { get; set; } = true;
     public bool ShowStreamHistory { get; set; } = true;
     public string DashboardStatistic { get; set; } = "ViewerCount";
+    public List<DashboardSceneButtonSettings> SceneButtons { get; set; } = [];
 
     public List<string> ModuleOrder { get; set; } =
     [
@@ -699,6 +700,17 @@ public sealed class DashboardSettings
             ["AdvancedShortcuts"] = 240,
             ["WorkflowStatus"] = 280,
         };
+}
+
+public sealed class DashboardSceneButtonSettings
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Title { get; set; } = "";
+    public string SceneName { get; set; } = "";
+    /// <summary>Emoji | Glyph | Image</summary>
+    public string IconKind { get; set; } = "Emoji";
+    /// <summary>Emoji-Zeichen, Segoe-MDL2-Glyph oder Bildpfad.</summary>
+    public string IconValue { get; set; } = "🎬";
 }
 
 public sealed class UpdateSettings
