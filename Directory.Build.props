@@ -11,6 +11,6 @@
     <BaseOutputPath>$(MSBuildThisFileDirectory)artifacts\bin\$(MSBuildProjectName)\</BaseOutputPath>
     <Company>Creator Control Suite</Company>
     <Product>Creator Control Suite</Product>
-    <Version>8.0.0-alpha101</Version>
+    <Version>8.0.0-alpha102</Version>
   </PropertyGroup>
 </Project>

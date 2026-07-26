@@ -1,15 +1,13 @@
 # Creator Control Suite 8.0.0-alpha102
 
-## Creator Intelligence – Phase 7
+## Signierte Updates
 
-- Experimentmodus für messbare Creator-Maßnahmen
-- Teststart direkt aus einer ausgewählten Maßnahme
-- automatische Zuordnung der nächsten drei vollständigen Streams
-- Vergleich mit bis zu drei vorherigen Sessions als Baseline
-- Auswertung von Retention, Chataktivität, Creator Score und Follower-Rate
-- Status Aktiv/Ausgewertet, Stichprobenzähler und vorsichtige Konfidenzangabe
-- positive, negative oder noch unklare beobachtete Veränderung
-- persistente Speicherung in experiments.json
-- neuer Dashboardbereich „Creator-Experimente“
+- Release erzeugt MSI/ZIP und `update-manifest.json` mit RSA-Signatur.
+- In-App-Auto-Updates gegen GitHub Releases inkl. Signaturprüfung.
+- CI stellt RID-Assets beim win-x64-Publish wieder korrekt bereit.
 
-Hinweis: Die Auswertung beschreibt beobachtete Unterschiede und behauptet keine Kausalität.
+## Runtime & Stabilität
+
+- Robustere Crash-/Exception-Behandlung beim Start und zur Laufzeit.
+- Verbesserungen am App-Startpfad und Modul-Lebenszyklus (u. a. Spotify).
+- Hilfsskripte und Dev-Tasks für zuverlässigeres lokales Starten.
