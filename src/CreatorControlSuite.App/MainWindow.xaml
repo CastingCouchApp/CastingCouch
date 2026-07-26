@@ -3020,7 +3020,9 @@
                         <TextBlock Text="Zwischenpause (ms)" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
                         <TextBox x:Name="AlertInterDelayBox" Grid.Column="3"/>
                     </Grid>
-                    <TextBlock Text="Die Alert-Engine verwendet native OBS-Medien- und Textquellen. Es werden keine Browser-Videos verwendet." Foreground="#5CE06E" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                    <Button x:Name="InstallObsAlertSceneButton" Content="IN OBS ALS SZENE HINZUFÜGEN" Background="#416B3C" HorizontalAlignment="Left" Margin="0,14,0,0"/>
+                    <TextBlock x:Name="InstallObsAlertSceneStatusText" Text="Die Alert-Szene wird nicht automatisch angelegt. Bitte nach dem Alert-Setup manuell in OBS hinzufügen." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                    <TextBlock Text="Die Alert-Engine verwendet native OBS-Medien- und Textquellen. Es werden keine Browser-Videos verwendet." Foreground="#5CE06E" TextWrapping="Wrap" Margin="0,8,0,0"/>
                 </StackPanel>
             </Border>
         </StackPanel>

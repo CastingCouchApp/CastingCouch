@@ -205,6 +205,29 @@ public sealed class AlertEngine : IAlertEngine
             definition.FontColor);
     }
 
+    public async Task InstallObsSourcesAsync(
+        string type,
+        string user,
+        IReadOnlyDictionary<string, string>? variables = null,
+        CancellationToken cancellationToken = default)
+    {
+        var definition = await _definitions.GetAsync(
+            type,
+            cancellationToken);
+
+        var rendered = AlertTemplateRenderer.Render(
+            definition.TextTemplate,
+            user,
+            variables ??
+                new Dictionary<string, string>(
+                    StringComparer.OrdinalIgnoreCase));
+
+        await _renderer.InstallSourcesAsync(
+            definition,
+            rendered,
+            cancellationToken);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await StopAsync();

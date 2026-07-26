@@ -74,6 +74,19 @@ public sealed class AlertsModule : IConnectableModule
             cancellationToken);
     }
 
+    public Task InstallObsSourcesAsync(
+        string type,
+        string user,
+        IReadOnlyDictionary<string, string>? variables = null,
+        CancellationToken cancellationToken = default)
+    {
+        return _engine.InstallObsSourcesAsync(
+            type,
+            user,
+            variables,
+            cancellationToken);
+    }
+
     public Task StopCurrentAsync(
         CancellationToken cancellationToken = default)
     {

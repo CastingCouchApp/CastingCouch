@@ -263,7 +263,7 @@ public sealed class AlertSettings
     public int QueueCapacity { get; set; } = 250;
     public int InterAlertDelayMilliseconds { get; set; } = 350;
     public bool StopPreviousMediaBeforeNext { get; set; } = true;
-    public bool AutoCreateObsSources { get; set; } = true;
+    public bool AutoCreateObsSources { get; set; } = false;
     public Dictionary<string, AlertDefinitionSettings> Definitions { get; set; } =
         AlertDefinitionSettings.CreateDefaults();
 }

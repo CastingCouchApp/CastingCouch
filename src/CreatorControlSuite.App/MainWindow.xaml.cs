@@ -2189,6 +2189,9 @@ public partial class MainWindow : Window
         TestAlertInObsButton.Click += async (_, _) =>
             await TestAlertInObsAsync();
 
+        InstallObsAlertSceneButton.Click += async (_, _) =>
+            await InstallObsAlertSceneAsync();
+
         StopCurrentAlertButton.Click += async (_, _) =>
             await _alertsModule.StopCurrentAsync();
 
@@ -9071,6 +9074,69 @@ public partial class MainWindow : Window
             MessageBox.Show(
                 exception.Message,
                 "Alert-Test fehlgeschlagen",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private async Task InstallObsAlertSceneAsync()
+    {
+        var type = AlertTypeBox.SelectedItem as string
+                   ?? _settings.Alerts.Definitions.Keys.FirstOrDefault();
+
+        if (string.IsNullOrWhiteSpace(type))
+        {
+            MessageBox.Show(
+                "Bitte zuerst einen Alert anlegen oder auswählen.",
+                "OBS Alert-Szene",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            SaveAlertDefinitionToSettings();
+            _settings.Alerts.ObsSceneName =
+                AlertObsSceneBox.Text.Trim();
+            _settings.Alerts.ObsMediaSourceName =
+                AlertObsMediaSourceBox.Text.Trim();
+            _settings.Alerts.ObsTextSourceName =
+                AlertObsTextSourceBox.Text.Trim();
+            await _settingsStore.SaveAsync(_settings);
+
+            var variables = CreateAlertTestVariables(type);
+            var user = string.IsNullOrWhiteSpace(AlertTestUserBox.Text)
+                ? "TestUser"
+                : AlertTestUserBox.Text.Trim();
+
+            await _alertsModule.InstallObsSourcesAsync(
+                type,
+                user,
+                variables);
+
+            InstallObsAlertSceneStatusText.Text =
+                $"OBS-Szene '{_settings.Alerts.ObsSceneName}' mit Text- und Medienquelle angelegt.";
+            InstallObsAlertSceneStatusText.Foreground =
+                System.Windows.Media.Brushes.LightGreen;
+
+            MessageBox.Show(
+                $"Die Szene '{_settings.Alerts.ObsSceneName}' wurde in OBS angelegt " +
+                $"(Quellen: {_settings.Alerts.ObsTextSourceName}, {_settings.Alerts.ObsMediaSourceName}).",
+                "OBS Alert-Szene",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+        {
+            InstallObsAlertSceneStatusText.Text =
+                exception.Message;
+            InstallObsAlertSceneStatusText.Foreground =
+                System.Windows.Media.Brushes.IndianRed;
+
+            MessageBox.Show(
+                exception.Message,
+                "OBS Alert-Szene fehlgeschlagen",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }

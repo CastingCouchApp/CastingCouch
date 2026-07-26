@@ -26,4 +26,10 @@ public interface IAlertEngine : IAsyncDisposable
         string user,
         IReadOnlyDictionary<string, string>? variables = null,
         CancellationToken cancellationToken = default);
+
+    Task InstallObsSourcesAsync(
+        string type,
+        string user,
+        IReadOnlyDictionary<string, string>? variables = null,
+        CancellationToken cancellationToken = default);
 }

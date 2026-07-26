@@ -11,6 +11,8 @@ OBS erhält zwei native Quellen:
 
 Beide Quellen liegen in der konfigurierbaren Szene `_alerts`.
 
+Die Szene und Quellen werden **nicht** automatisch beim Suite-Start oder beim Alert-Playback angelegt. Unter Alerts → OBS Alert Quellen muss **IN OBS ALS SZENE HINZUFÜGEN** einmalig ausgeführt werden.
+
 ## Queue
 
 - bounded Channel
@@ -59,6 +61,15 @@ Konfigurierbar:
 - OBS-Medienquelle
 - OBS-Textquelle
 - Zwischenpause
+
+## OBS-Setup
+
+1. Alert im Designer anlegen/speichern
+2. Optional Szene-/Quellennamen unter „OBS Alert Quellen“ anpassen
+3. **IN OBS ALS SZENE HINZUFÜGEN** klicken (OBS muss verbunden sein)
+4. Danach können „In OBS testen“ und Live-Events die vorhandenen Quellen nutzen
+
+Fehlen Szene oder Quellen, erscheint ein klarer Hinweis statt automatischer Neuanlage.
 
 ## Vorschau
 
