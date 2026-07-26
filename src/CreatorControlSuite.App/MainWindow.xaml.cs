@@ -9941,6 +9941,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             ? Visibility.Visible
             : Visibility.Collapsed;
         MusicPlayerProgressBar.IsEnabled = isSpotify;
+        // YouTube Music liefert praktisch kein Album – Zeile ausblenden.
+        var albumVisibility = isSpotify ? Visibility.Visible : Visibility.Collapsed;
+        DashboardTopMusicAlbumText.Visibility = albumVisibility;
+        MusicPlayerAlbumText.Visibility = albumVisibility;
     }
 
     private async Task ExecuteMusicCommandAsync(Func<Task> action)
@@ -10095,12 +10099,18 @@ private Task ApplyCombinedAlertDuckingAsync()
             TitleBarMusicPlayPauseButton.Content = snapshot.IsPlaying ? "Ⅱ" : "▶";
             DashboardTopMusicTitleText.Text = string.IsNullOrWhiteSpace(snapshot.Title) ? "Kein Titel" : snapshot.Title;
             DashboardTopMusicArtistText.Text = string.IsNullOrWhiteSpace(snapshot.Artist) ? "-" : snapshot.Artist;
-            DashboardTopMusicAlbumText.Text = string.IsNullOrWhiteSpace(snapshot.Album) ? "Album: -" : "Album: " + snapshot.Album;
+            var showAlbum = !IsYouTubeMusicProvider();
+            DashboardTopMusicAlbumText.Visibility = showAlbum ? Visibility.Visible : Visibility.Collapsed;
+            MusicPlayerAlbumText.Visibility = showAlbum ? Visibility.Visible : Visibility.Collapsed;
+            if (showAlbum)
+            {
+                DashboardTopMusicAlbumText.Text = string.IsNullOrWhiteSpace(snapshot.Album) ? "Album: -" : "Album: " + snapshot.Album;
+                MusicPlayerAlbumText.Text = string.IsNullOrWhiteSpace(snapshot.Album) ? "Album: -" : "Album: " + snapshot.Album;
+            }
             DashboardTopMusicStatusText.Text = snapshot.StatusText;
             DashboardTopMusicPlayPauseButton.Content = snapshot.IsPlaying ? "Ⅱ" : "▶";
             MusicPlayerTitleText.Text = string.IsNullOrWhiteSpace(snapshot.Title) ? "Kein Titel" : snapshot.Title;
             MusicPlayerArtistText.Text = string.IsNullOrWhiteSpace(snapshot.Artist) ? "-" : snapshot.Artist;
-            MusicPlayerAlbumText.Text = string.IsNullOrWhiteSpace(snapshot.Album) ? "Album: -" : "Album: " + snapshot.Album;
             MusicPlayerStatusText.Text = snapshot.StatusText;
             MusicPlayerPlayPauseButton.Content = snapshot.IsPlaying ? "Pause" : "Play";
             DashboardMusicNowPlayingText.Text = trackLabel;
