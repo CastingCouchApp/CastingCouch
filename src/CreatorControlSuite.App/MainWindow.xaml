@@ -255,11 +255,12 @@
                 <Grid Grid.Row="1" ClipToBounds="True">
                     <Grid x:Name="DashboardScrollRoot" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <Grid x:Name="DashboardContentStack" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
+                             <Grid.RowDefinitions>
+                                 <RowDefinition Height="Auto"/>
+                                 <RowDefinition Height="Auto"/>
+                                 <RowDefinition Height="*"/>
+                                 <RowDefinition Height="Auto"/>
+                             </Grid.RowDefinitions>
                             <Grid x:Name="DashboardTopStatusRow" Grid.Row="0" Margin="0,0,0,12" HorizontalAlignment="Stretch">
                                 <Border x:Name="DashboardServiceStatusSection" Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" BorderThickness="1" CornerRadius="10" Padding="8">
                                     <Grid>
@@ -492,7 +493,38 @@
                                     </Grid>
                                 </Border>
                             </Grid>
-                            <Grid x:Name="DashboardPrimaryRow" Grid.Row="1" Margin="0" VerticalAlignment="Stretch">
+                            <Border x:Name="DashboardTwitchChannelWidget"
+                                    Grid.Row="1"
+                                    Margin="0,0,0,12"
+                                    Padding="14,10"
+                                    Background="{DynamicResource ElevatedBackgroundBrush}"
+                                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Cursor="Hand"
+                                    ToolTip="Streamtitel, Kategorie und Live-Benachrichtigung bearbeiten">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="1.5*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="38" Height="38" CornerRadius="8" Background="#9146FF" Margin="0,0,12,0">
+                                        <TextBlock Text="T" Foreground="White" FontWeight="Bold" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="TWITCH-KANAL" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
+                                        <TextBlock x:Name="DashboardTwitchChannelTitleText" Text="Kein Streamtitel gesetzt" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="18,0">
+                                        <TextBlock Text="KATEGORIE · LIVE-BENACHRICHTIGUNG" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                        <TextBlock x:Name="DashboardTwitchChannelDetailsText" Text="- · nicht gesetzt" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="3" Text="BEARBEITEN  ›" Foreground="{DynamicResource AccentHoverBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <Grid x:Name="DashboardPrimaryRow" Grid.Row="2" Margin="0" VerticalAlignment="Stretch">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" MinWidth="0"/>
                                     <ColumnDefinition Width="*" MinWidth="280"/>
@@ -532,13 +564,16 @@
                                             </StackPanel>
                                         </Border>
                                     </Grid>
-                                    <Grid Grid.Column="1" VerticalAlignment="Stretch">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*" MinHeight="160"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <Border x:Name="DashboardStreamEndModule" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource AccentMutedBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,10" Visibility="Collapsed" HorizontalAlignment="Stretch">
+                                     <Grid Grid.Column="1" VerticalAlignment="Stretch">
+                                         <Grid.RowDefinitions>
+                                             <RowDefinition Height="Auto"/>
+                                             <RowDefinition Height="*" MinHeight="160"/>
+                                         </Grid.RowDefinitions>
+                                         <Grid.ColumnDefinitions>
+                                             <ColumnDefinition Width="1.15*"/>
+                                             <ColumnDefinition Width="*"/>
+                                         </Grid.ColumnDefinitions>
+                                         <Border x:Name="DashboardStreamEndModule" Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource AccentMutedBrush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="5,0,0,10" HorizontalAlignment="Stretch">
                                             <StackPanel>
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
@@ -548,7 +583,27 @@
                                                     <TextBlock Text="STREAMENDE &amp; RAID" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
                                                     <TextBlock x:Name="DashboardStreamEndStatusText" Grid.Column="1" Text="Bereit" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="280"/>
                                                 </Grid>
-                                                <TextBlock x:Name="DashboardStreamEndTargetText" Text="Kein Raid-Ziel ausgewählt" Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock x:Name="DashboardStreamEndTargetText" Text="Kein Raid-Ziel ausgewählt" Foreground="{DynamicResource TextMutedBrush}" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
+                                                <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7" Margin="0,7,0,0">
+                                                    <StackPanel>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <CheckBox x:Name="DashboardRaidEnabledBox" Content="MIT RAID BEENDEN" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                            <TextBlock Grid.Column="1" x:Name="DashboardRaidTargetStatusText" Text="Kein Ziel ausgewählt" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                        </Grid>
+                                                        <Grid x:Name="DashboardRaidSelectionPanel" Margin="0,6,0,0">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <ComboBox x:Name="DashboardRaidChannelBox" Foreground="{DynamicResource TextPrimaryBrush}" MinWidth="170"/>
+                                                            <Button x:Name="DashboardOpenRaidChannelButton" Grid.Column="1" Content="ÖFFNEN" Margin="6,0,0,0" Padding="8,5"/>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Border>
                                                 <Grid Margin="0,10,0,0">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
@@ -557,8 +612,8 @@
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="Noch" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0"/>
-                                                    <TextBox x:Name="DashboardPlannedStreamEndMinutesBox" Grid.Column="1" ToolTip="Geplante Minuten bis zum Streamende"/>
-                                                    <TextBlock Grid.Column="2" Text="Minuten" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="6,0,8,0"/>
+                                                    <TextBox x:Name="DashboardPlannedStreamEndSecondsBox" Grid.Column="1" ToolTip="Sekunden bis zum Streamende"/>
+                                                    <TextBlock Grid.Column="2" Text="Sekunden" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="6,0,8,0"/>
                                                     <StackPanel Grid.Column="3" Orientation="Horizontal">
                                                         <Button x:Name="DashboardPlanStreamEndButton" Content="STREAMENDE PLANEN" Padding="12,6" Margin="0,0,6,0"/>
                                                         <Button x:Name="DashboardCancelPlannedStreamEndButton" Content="PLANUNG ABBRECHEN" Padding="12,6" Visibility="Collapsed"/>
@@ -583,7 +638,7 @@
                                                 </WrapPanel>
                                             </StackPanel>
                                         </Border>
-                                        <Grid Grid.Row="1" Margin="0,0,0,10" VerticalAlignment="Stretch">
+                                         <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,10" VerticalAlignment="Stretch">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
@@ -630,7 +685,7 @@
                                                 </Grid>
                                             </Border>
                                         </Grid>
-                                        <Border Grid.Row="2" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardStreamControlModule" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                         <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardStreamControlModule" Margin="0,0,5,10" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                             <StackPanel>
                                                 <TextBlock Text="SCHNELLZUGRIFF" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
                                                 <UniformGrid Columns="3" Margin="0,12,0,8">
@@ -657,8 +712,8 @@
                                                         <TextBlock x:Name="DashboardPrepareProgressText" Text="Programme werden gestartet …" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                                     </StackPanel>
                                                 </Border>
-                                                <TextBlock Text="Streamtitel" Foreground="{DynamicResource TextMutedBrush}" Margin="3,8,0,4"/>
-                                                <Grid>
+                                                <TextBlock Text="Streamtitel" Visibility="Collapsed"/>
+                                                <Grid Visibility="Collapsed">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
@@ -666,7 +721,7 @@
                                                     <TextBox x:Name="DashboardTwitchTitleBox"/>
                                                     <Button x:Name="DashboardSaveTwitchChannelButton" Grid.Column="1" Content="Titel/Kategorie ändern" Margin="8,0,0,0"/>
                                                 </Grid>
-                                                <Grid Margin="0,8,0,0">
+                                                <Grid Margin="0,8,0,0" Visibility="Collapsed">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="1.2*"/>
                                                         <ColumnDefinition Width="Auto"/>
@@ -676,32 +731,13 @@
                                                     <Button x:Name="DashboardSearchTwitchCategoryButton" Grid.Column="1" Content="Suchen" Margin="8,0"/>
                                                     <ComboBox x:Name="DashboardTwitchCategoryResultsBox" Grid.Column="2" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                                 </Grid>
-                                                <Border x:Name="DashboardRaidControlModule" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10" Margin="3,10,3,0">
-                                                    <StackPanel>
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <CheckBox x:Name="DashboardRaidEnabledBox" Content="STREAM MIT RAID BEENDEN" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                            <TextBlock Grid.Column="1" x:Name="DashboardRaidTargetStatusText" Text="Kein Ziel ausgewählt" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                        </Grid>
-                                                        <Grid x:Name="DashboardRaidSelectionPanel" Margin="0,8,0,0">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <ComboBox x:Name="DashboardRaidChannelBox" Foreground="{DynamicResource TextPrimaryBrush}" MinWidth="250"/>
-                                                            <Button x:Name="DashboardOpenRaidChannelButton" Grid.Column="1" Content="CHANNEL ÖFFNEN" Margin="8,0,0,0" Padding="12,6"/>
-                                                        </Grid>
-                                                    </StackPanel>
-                                                </Border>
+                                                <Border x:Name="DashboardRaidControlModule" Visibility="Collapsed"/>
                                             </StackPanel>
                                         </Border>
                                     </Grid>
                             </Grid>
                             <!-- Entfernte Dashboard-Widgets (Kompatibilität für Code-Behind) -->
-                            <Grid Grid.Row="2" Visibility="Collapsed">
+                            <Grid Grid.Row="3" Visibility="Collapsed">
                                 <Grid x:Name="DashboardStreamingServicesRow">
                                     <Border x:Name="DashboardTwitchUsersModule">
                                         <StackPanel>

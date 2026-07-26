@@ -120,7 +120,9 @@ public sealed class TwitchSettings
     public int RaidCountdownSeconds { get; set; } = 90;
     public bool StopStreamAfterRaid { get; set; } = true;
     public bool StopSpotifyAfterRaid { get; set; } = true;
+    public int PlannedStreamEndSeconds { get; set; }
     public int PlannedStreamEndMinutes { get; set; } = 30;
+    public string LiveNotificationText { get; set; } = "";
     public string SelectedRaidChannel { get; set; } = "";
     public List<string> RaidChannels { get; set; } = [];
 

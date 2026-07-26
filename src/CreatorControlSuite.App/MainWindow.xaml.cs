@@ -1431,6 +1431,7 @@ public partial class MainWindow : Window
             await SaveTwitchChannelAsync();
         DashboardSearchTwitchCategoryButton.Click += async (_, _) => await SearchTwitchCategoriesAsync(DashboardTwitchCategorySearchBox, DashboardTwitchCategoryResultsBox);
         DashboardSaveTwitchChannelButton.Click += async (_, _) => await SaveTwitchChannelAsync(DashboardTwitchTitleBox, DashboardTwitchCategoryResultsBox);
+        DashboardTwitchChannelWidget.MouseLeftButtonUp += async (_, _) => await OpenTwitchChannelEditorAsync();
         ServicesSearchTwitchCategoryButton.Click += async (_, _) => await SearchTwitchCategoriesAsync(ServicesTwitchCategorySearchBox, ServicesTwitchCategoryResultsBox);
         ServicesSaveTwitchChannelButton.Click += async (_, _) => await SaveTwitchChannelAsync(ServicesTwitchTitleBox, ServicesTwitchCategoryResultsBox);
         ServicesCreateRewardButton.Click += async (_, _) => await CreateTwitchRewardAsync();
@@ -3564,7 +3565,14 @@ public partial class MainWindow : Window
         ServicesTwitchEndSceneSecondsBox.Text = endSceneSeconds.ToString();
         ServicesTwitchEndFollowerGoalTargetBox.Text = _settings.Twitch.FollowerGoal.Target.ToString("0");
         DashboardRaidEnabledBox.IsChecked = _settings.Twitch.RaidOnStreamEnd;
-        DashboardPlannedStreamEndMinutesBox.Text = Math.Max(1, _settings.Twitch.PlannedStreamEndMinutes).ToString();
+        if (_settings.Twitch.PlannedStreamEndSeconds < 1)
+        {
+            _settings.Twitch.PlannedStreamEndSeconds =
+                Math.Max(1, _settings.Twitch.PlannedStreamEndMinutes) * 60;
+            await _settingsStore.SaveAsync(_settings);
+        }
+        DashboardPlannedStreamEndSecondsBox.Text =
+            _settings.Twitch.PlannedStreamEndSeconds.ToString();
         if (EnsureDefaultDashboardSceneButtons())
         {
             await _settingsStore.SaveAsync(_settings);
@@ -7485,11 +7493,7 @@ public partial class MainWindow : Window
 
     private void UpdateDashboardStreamEndModuleVisibility()
     {
-        var show = _settings.Twitch.RaidOnStreamEnd
-            || _plannedStreamEndActive
-            || _streamEndFlowActive
-            || _raidCountdownActive;
-        DashboardStreamEndModule.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        DashboardStreamEndModule.Visibility = Visibility.Visible;
         DashboardPlanStreamEndButton.Visibility = _plannedStreamEndActive ? Visibility.Collapsed : Visibility.Visible;
         DashboardCancelPlannedStreamEndButton.Visibility = _plannedStreamEndActive ? Visibility.Visible : Visibility.Collapsed;
         DashboardSkipRaidAndStopButton.Visibility = _awaitingManualRaid || _streamEndFlowActive
@@ -11721,6 +11725,34 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
     }
 
+    private async Task OpenTwitchChannelEditorAsync()
+    {
+        var snapshot = _twitchModule.GetSnapshot();
+        var editor = new TwitchChannelEditorWindow(
+            snapshot.ChannelTitle,
+            snapshot.CategoryName,
+            _settings.Twitch.LiveNotificationText,
+            query => _twitchModule.SearchCategoriesAsync(query),
+            async (title, categoryId, liveNotification) =>
+            {
+                await _twitchModule.UpdateChannelAsync(title, categoryId);
+                _settings.Twitch.LiveNotificationText = liveNotification;
+                await _settingsStore.SaveAsync(_settings);
+            })
+        {
+            Owner = this
+        };
+
+        if (editor.ShowDialog() == true)
+        {
+            var updated = _twitchModule.GetSnapshot();
+            DashboardTwitchTitleBox.Text = updated.ChannelTitle;
+            DashboardTwitchCategorySearchBox.Text = updated.CategoryName;
+            RefreshTwitchUi();
+            AddDashboardNotification("Twitch-Kanaldaten wurden aktualisiert.", "Info");
+        }
+    }
+
     private async Task SearchTwitchCategoriesAsync()
     {
         try
@@ -12164,6 +12196,14 @@ private Task ApplyCombinedAlertDuckingAsync()
         TwitchCategorySearchBox.Text = snapshot.CategoryName;
         DashboardTwitchTitleBox.Text = snapshot.ChannelTitle;
         DashboardTwitchCategorySearchBox.Text = snapshot.CategoryName;
+        DashboardTwitchChannelTitleText.Text = string.IsNullOrWhiteSpace(snapshot.ChannelTitle)
+            ? "Kein Streamtitel gesetzt"
+            : snapshot.ChannelTitle;
+        var notification = string.IsNullOrWhiteSpace(_settings.Twitch.LiveNotificationText)
+            ? "Live-Benachrichtigung nicht gesetzt"
+            : _settings.Twitch.LiveNotificationText;
+        DashboardTwitchChannelDetailsText.Text =
+            $"{(string.IsNullOrWhiteSpace(snapshot.CategoryName) ? "Keine Kategorie" : snapshot.CategoryName)} · {notification}";
         ServicesTwitchTitleBox.Text = snapshot.ChannelTitle;
         ServicesTwitchCategorySearchBox.Text = snapshot.CategoryName;
         RefreshDashboardServiceActionButtons();
@@ -13686,14 +13726,14 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        if (!int.TryParse(DashboardPlannedStreamEndMinutesBox.Text.Trim(), out var minutes) || minutes < 1)
+        if (!int.TryParse(DashboardPlannedStreamEndSecondsBox.Text.Trim(), out var seconds) || seconds < 1)
         {
-            AddDashboardNotification("Bitte eine gültige Minutenanzahl für das geplante Streamende eingeben.", "Warnung");
+            AddDashboardNotification("Bitte eine gültige Sekundenanzahl für das geplante Streamende eingeben.", "Warnung");
             return;
         }
 
         var confirm = MessageBox.Show(
-            $"Streamende in {minutes} Minute(n) planen? Danach startet der Endszene-/Raid-Ablauf automatisch.",
+            $"Streamende in {seconds} Sekunden planen? Danach startet der Endszene-/Raid-Ablauf automatisch.",
             "Streamende planen",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
@@ -13702,7 +13742,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        _settings.Twitch.PlannedStreamEndMinutes = minutes;
+        _settings.Twitch.PlannedStreamEndSeconds = seconds;
         await _settingsStore.SaveAsync(_settings);
 
         _plannedStreamEndCts?.Cancel();
@@ -13712,12 +13752,12 @@ private Task ApplyCombinedAlertDuckingAsync()
         _plannedStreamEndActive = true;
         UpdateDashboardStreamEndModuleVisibility();
 
-        var totalSeconds = minutes * 60;
+        var totalSeconds = seconds;
         DashboardStreamEndCountdownLabel.Text = "Zeit bis Streamende (geplant)";
         DashboardStreamEndCountdownProgress.Minimum = 0;
         DashboardStreamEndCountdownProgress.Maximum = Math.Max(1, totalSeconds);
         DashboardStreamEndStatusText.Text = "Geplantes Streamende aktiv";
-        AddDashboardNotification($"Streamende in {minutes} Minute(n) geplant.", "Info");
+        AddDashboardNotification($"Streamende in {seconds} Sekunden geplant.", "Info");
 
         try
         {
