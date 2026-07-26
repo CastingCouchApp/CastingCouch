@@ -27,6 +27,7 @@ using CreatorControlSuite.Modules.Workflow.Models;
 using CreatorControlSuite.Modules.StreamDeck;
 using CreatorControlSuite.App.Services;
 using CreatorControlSuite.App.Themes;
+using CreatorControlSuite.App.Hud;
 using CreatorControlSuite.Core.Ipc;
 using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Legal;
@@ -82,6 +83,7 @@ public partial class MainWindow : Window
     private readonly ICrashReporter _crashReporter;
     private readonly ObsBrowserSourceInstaller _obsBrowserSourceInstaller;
     private readonly OverlayProjectService _overlayProjectService;
+    private readonly StreamerHudService _streamerHudService = new();
     private readonly ObservableCollection<OverlayProjectDefinition> _overlayProjects = [];
     private readonly ObservableCollection<OverlayProjectItem> _overlayProjectItems = [];
     private readonly ILocalIpcServer _ipcServer;
@@ -419,6 +421,7 @@ public partial class MainWindow : Window
         _crashReporter = crashReporter;
         _obsBrowserSourceInstaller = obsBrowserSourceInstaller;
         _overlayProjectService = new OverlayProjectService(_obsClient, _appLogger, _overlayModule.Service);
+        _streamerHudService.BindSources(_twitchChatItems, _twitchEventItems);
         _ipcServer = ipcServer;
         _licenseService = licenseService;
         _legalConsentService = legalConsentService;
@@ -565,6 +568,7 @@ public partial class MainWindow : Window
                     RefreshDashboardResourceUsage();
                     return Task.CompletedTask;
                 });
+                ApplyStreamerHudFromSettings();
             }
             finally
             {
@@ -574,6 +578,8 @@ public partial class MainWindow : Window
                 _settingsUiLoaded = true;
             }
         };
+
+        Closed += (_, _) => _streamerHudService.Close();
 
         ObsDashboardStatus.MouseLeftButtonUp += (_, _) =>
             NavigateToServicesTab(2, ServicesObsButton);
@@ -1264,6 +1270,14 @@ public partial class MainWindow : Window
         CreateOverlayManifestButton.Click += async (_, _) => await CreateOverlayManifestAsync();
         OpenOverlayManifestButton.Click += (_, _) => OpenOverlayManifestFolder();
         SaveOverlayPageButton.Click += async (_, _) => await SaveSettingsAsync();
+        StreamerHudPreviewButton.Click += (_, _) => PreviewStreamerHud();
+        StreamerHudHideButton.Click += (_, _) =>
+        {
+            _streamerHudService.Hide();
+            StreamerHudStatusText.Text = "HUD ausgeblendet.";
+        };
+        StreamerHudOpacitySlider.ValueChanged += (_, _) =>
+            StreamerHudOpacityValueText.Text = $"{StreamerHudOpacitySlider.Value:0%}";
         SaveSettingsButton.Click += async (_, _) => await SaveSettingsAsync();
         SaveAlertsPageButton.Click += async (_, _) => await SaveSettingsAsync();
         RunDiagnosticsButton.Click += async (_, _) => await RunDiagnosticsAsync();
@@ -3625,6 +3639,7 @@ public partial class MainWindow : Window
         SelectComboBoxTag(OverlayFrameStyleBox, _settings.Overlay.FrameStyle);
         OverlayFrameColorBox.Text = _settings.Overlay.FrameColor;
         SelectComboBoxTag(OverlayFrameEffectBox, _settings.Overlay.FrameEffect);
+        LoadStreamerHudSettingsIntoUi();
         OverlayObsSceneTargetBox.ItemsSource = new[] { _settings.Obs.StartScene, _settings.Obs.LiveScene, _settings.Obs.PauseScene, "Metaschutz", _settings.Obs.EndScene }.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
         OverlayObsSceneTargetBox.SelectedIndex = 0;
         OverlayContentTypeBox.SelectedIndex = 0;
@@ -3873,7 +3888,9 @@ public partial class MainWindow : Window
             _settings.Overlay.FrameStyle = (OverlayFrameStyleBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Solid";
             _settings.Overlay.FrameColor = OverlayFrameColorBox.Text.Trim();
             _settings.Overlay.FrameEffect = (OverlayFrameEffectBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Glow";
+            ReadStreamerHudSettingsFromUi();
             await WriteOverlayConfigurationAsync();
+            ApplyStreamerHudFromSettings();
 
             _settings.Workflow.EndSceneSeconds = int.Parse(EndSceneSecondsBox.Text.Trim());
             _settings.Twitch.EndSceneDurationSeconds = _settings.Workflow.EndSceneSeconds;
@@ -8021,6 +8038,7 @@ public partial class MainWindow : Window
         RefreshCommunityUi();
         RefreshTwitchProfessionalUi();
         UpdateDashboardSelectedStatistic();
+        UpdateStreamerHudLiveStatus(isLive, liveDetail);
     }
 
     private void RefreshCommunityUi()
@@ -8047,6 +8065,9 @@ public partial class MainWindow : Window
         DashboardTwitchGoalsText.Text =
             $"Follower-Ziel: {_currentFollowerCount:0} / {_settings.Twitch.FollowerGoal.Target:0} · " +
             $"Sub-Ziel: {_currentActiveSubscriptionCount:0} / {_settings.Twitch.SubGoal.Target:0}";
+        UpdateStreamerHudLiveStatus(
+            StreamDashboardStatus.Text.Equals("LIVE", StringComparison.OrdinalIgnoreCase),
+            DashboardStreamDetailText.Text);
     }
 
     private async Task RefreshObsPreviewTickAsync()
@@ -17272,6 +17293,102 @@ private Task ApplyCombinedAlertDuckingAsync()
             }
         }
         if (box.Items.Count > 0) box.SelectedIndex = 0;
+    }
+
+    private void LoadStreamerHudSettingsIntoUi()
+    {
+        var hud = _settings.StreamerHud;
+        StreamerHudEnabledBox.IsChecked = hud.Enabled;
+        StreamerHudShowChatBox.IsChecked = hud.ShowChat;
+        StreamerHudShowEventsBox.IsChecked = hud.ShowEvents;
+        StreamerHudShowLiveStatusBox.IsChecked = hud.ShowLiveStatus;
+        StreamerHudClickThroughBox.IsChecked = hud.ClickThrough;
+        StreamerHudOpacitySlider.Value = Math.Clamp(hud.Opacity, 0.3, 1.0);
+        StreamerHudOpacityValueText.Text = $"{StreamerHudOpacitySlider.Value:0%}";
+        StreamerHudPanelWidthBox.Text = hud.PanelWidth.ToString();
+        StreamerHudMarginBox.Text = hud.Margin.ToString();
+        SelectComboBoxTag(StreamerHudAnchorBox, string.IsNullOrWhiteSpace(hud.Anchor) ? "TopRight" : hud.Anchor);
+        PopulateStreamerHudMonitorBox(hud.MonitorIndex);
+        StreamerHudStatusText.Text = hud.Enabled ? "HUD wird nach dem Start angezeigt." : "HUD deaktiviert.";
+    }
+
+    private void PopulateStreamerHudMonitorBox(int selectedIndex)
+    {
+        StreamerHudMonitorBox.Items.Clear();
+        var monitors = NativeWindowHelper.GetMonitors();
+        foreach (var monitor in monitors)
+        {
+            var label = monitor.IsPrimary
+                ? $"{monitor.Index}: Primär ({(int)monitor.BoundsDip.Width}×{(int)monitor.BoundsDip.Height})"
+                : $"{monitor.Index}: {monitor.Name} ({(int)monitor.BoundsDip.Width}×{(int)monitor.BoundsDip.Height})";
+            StreamerHudMonitorBox.Items.Add(new ComboBoxItem { Content = label, Tag = monitor.Index });
+        }
+
+        if (StreamerHudMonitorBox.Items.Count == 0)
+            StreamerHudMonitorBox.Items.Add(new ComboBoxItem { Content = "0: Primär", Tag = 0 });
+
+        SelectComboBoxTag(StreamerHudMonitorBox, selectedIndex.ToString());
+        if (StreamerHudMonitorBox.SelectedIndex < 0)
+            StreamerHudMonitorBox.SelectedIndex = 0;
+    }
+
+    private void ReadStreamerHudSettingsFromUi()
+    {
+        _settings.StreamerHud.Enabled = StreamerHudEnabledBox.IsChecked == true;
+        _settings.StreamerHud.ShowChat = StreamerHudShowChatBox.IsChecked == true;
+        _settings.StreamerHud.ShowEvents = StreamerHudShowEventsBox.IsChecked == true;
+        _settings.StreamerHud.ShowLiveStatus = StreamerHudShowLiveStatusBox.IsChecked == true;
+        _settings.StreamerHud.ClickThrough = StreamerHudClickThroughBox.IsChecked == true;
+        _settings.StreamerHud.Opacity = Math.Clamp(StreamerHudOpacitySlider.Value, 0.3, 1.0);
+        _settings.StreamerHud.Anchor = (StreamerHudAnchorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "TopRight";
+        _settings.StreamerHud.MonitorIndex = int.TryParse((StreamerHudMonitorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var monitor)
+            ? monitor
+            : 0;
+        _settings.StreamerHud.PanelWidth = int.TryParse(StreamerHudPanelWidthBox.Text.Trim(), out var width)
+            ? Math.Clamp(width, 280, 800)
+            : 420;
+        _settings.StreamerHud.Margin = int.TryParse(StreamerHudMarginBox.Text.Trim(), out var margin)
+            ? Math.Max(0, margin)
+            : 24;
+    }
+
+    private void ApplyStreamerHudFromSettings()
+    {
+        try
+        {
+            _streamerHudService.Apply(_settings.StreamerHud);
+            StreamerHudStatusText.Text = _settings.StreamerHud.Enabled
+                ? "HUD aktiv (vom Capture ausgeschlossen)."
+                : "HUD deaktiviert.";
+        }
+        catch (Exception ex)
+        {
+            StreamerHudStatusText.Text = "HUD konnte nicht geöffnet werden: " + ex.Message;
+            _appLogger.Write(AppLogLevel.Warning, "StreamerHud", StreamerHudStatusText.Text, ex);
+        }
+    }
+
+    private void PreviewStreamerHud()
+    {
+        try
+        {
+            ReadStreamerHudSettingsFromUi();
+            _streamerHudService.ShowPreview(_settings.StreamerHud);
+            StreamerHudStatusText.Text = "Vorschau aktiv (vom Capture ausgeschlossen).";
+        }
+        catch (Exception ex)
+        {
+            StreamerHudStatusText.Text = "Vorschau fehlgeschlagen: " + ex.Message;
+            _appLogger.Write(AppLogLevel.Warning, "StreamerHud", StreamerHudStatusText.Text, ex);
+        }
+    }
+
+    private void UpdateStreamerHudLiveStatus(bool isLive, string detail)
+    {
+        var text = isLive
+            ? $"LIVE · {_currentLiveViewerCount} Zuschauer · {detail}"
+            : "OFFLINE";
+        _streamerHudService.UpdateLiveStatus(text);
     }
 
     private async Task WriteOverlayConfigurationAsync()

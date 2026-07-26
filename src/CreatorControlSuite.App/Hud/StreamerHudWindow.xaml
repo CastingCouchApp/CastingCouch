@@ -1,0 +1,62 @@
+<Window x:Class="CreatorControlSuite.App.Hud.StreamerHudWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Streamer HUD"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        ShowActivated="False"
+        SizeToContent="Height"
+        Width="420">
+    <Border x:Name="RootBorder" Background="#CC141A1F" BorderBrush="#66FF8C00" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0">
+        <StackPanel>
+            <Border x:Name="LiveStatusPanel" Background="#331C2329" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="LIVE-STATUS" Foreground="#FF8C00" FontWeight="Bold" FontSize="11"/>
+                    <TextBlock x:Name="LiveStatusText" Text="OFFLINE" Foreground="#F2F5F7" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+            <Border x:Name="ChatPanel" Background="#331C2329" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="CHAT" Foreground="#FF8C00" FontWeight="Bold" FontSize="11"/>
+                    <ListBox x:Name="ChatList"
+                             Height="220"
+                             Margin="0,6,0,0"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Foreground="#E8EEF2"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,4" FontSize="12"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+            <Border x:Name="EventsPanel" Background="#331C2329" CornerRadius="6" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="EVENTS" Foreground="#FF8C00" FontWeight="Bold" FontSize="11"/>
+                    <ListBox x:Name="EventsList"
+                             Height="160"
+                             Margin="0,6,0,0"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Foreground="#E8EEF2"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,4" FontSize="12"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</Window>
