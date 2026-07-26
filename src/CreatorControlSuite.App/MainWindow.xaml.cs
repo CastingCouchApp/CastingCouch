@@ -9994,9 +9994,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             await _creatorIntelligence.StartSessionAsync(_streamSessionStartedAt.Value, DashboardTwitchTitleBox.Text, DashboardTwitchCategorySearchBox.Text);
             await _workflowModule.Service.ResetSessionStatsAsync(_streamSessionStartedAt);
             await RefreshTwitchFollowerCountAsync(initializeStreamBaseline: true);
+            // Keinen erzwungenen Szenenwechsel: die aktuelle OBS-Szene bleibt bestehen.
+            // Legacy steuert nur noch die Intro-Quelle "Start_Testbild" in der konfigurierten Startszene.
             if (_obsClient.IsConnected)
             {
-                await _obsClient.SetCurrentProgramSceneAsync(startScene, token);
                 await _obsClient.SetSceneItemEnabledAsync(startScene, "Start_Testbild", true, token);
             }
 
@@ -10007,7 +10008,6 @@ private Task ApplyCombinedAlertDuckingAsync()
                 stream["phase"] = "Starting";
                 stream["startedAt"] = _streamSessionStartedAt;
                 stream["elapsedSeconds"] = 0;
-                stream["currentScene"] = startScene;
                 stream["startTimerSeconds"] = 600;
                 root["stream"] = stream;
             });
@@ -11732,6 +11732,30 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task HandleObservedStreamStartAsync()
     {
+        // Spotify muss sofort beim erkannten LIVE-Übergang starten und darf
+        // nicht hinter der Legacy-Intro-Automation (5-Minuten-Delay) warten.
+        if (!_spotifyStartPlaylistTriggeredForCurrentStream)
+        {
+            try
+            {
+                await StartConfiguredSpotifyPlaylistAtStreamStartAsync();
+            }
+            catch (Exception exception)
+            {
+                _appLogger.Write(AppLogLevel.Warning, "Spotify.StartPlaylist",
+                    "Ausgewählte Startplaylist konnte beim erkannten Streamstart nicht gestartet werden: " + exception.Message, exception);
+                AddDashboardNotification(
+                    "Spotify-Startplaylist konnte nicht gestartet werden: " + exception.Message,
+                    "Warnung");
+            }
+        }
+
+        // Legacy-Intro (Startszene/Testbild + Delay) parallel weiterlaufen lassen.
+        _ = StartLegacyStreamAutomationSafeAsync();
+    }
+
+    private async Task StartLegacyStreamAutomationSafeAsync()
+    {
         try
         {
             await StartLegacyStreamAutomationAsync();
@@ -11740,24 +11764,6 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             _appLogger.Write(AppLogLevel.Warning, "StreamStart",
                 "Streamstart-Automation konnte nicht vollständig gestartet werden: " + exception.Message, exception);
-        }
-
-        if (_spotifyStartPlaylistTriggeredForCurrentStream)
-        {
-            return;
-        }
-
-        try
-        {
-            await StartConfiguredSpotifyPlaylistAtStreamStartAsync();
-        }
-        catch (Exception exception)
-        {
-            _appLogger.Write(AppLogLevel.Warning, "Spotify.StartPlaylist",
-                "Ausgewählte Startplaylist konnte beim erkannten Streamstart nicht gestartet werden: " + exception.Message, exception);
-            AddDashboardNotification(
-                "Spotify-Startplaylist konnte nicht gestartet werden: " + exception.Message,
-                "Warnung");
         }
     }
 
@@ -11942,7 +11948,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 await _spotifyModule.StartPlaylistAsync(
                     playlistUri,
-                    startVolumePercent: 100,
+                    startVolumePercent: persisted.Spotify.StartVolumePercent,
                     CancellationToken.None);
 
                 _spotifyStartPlaylistTriggeredForCurrentStream = true;

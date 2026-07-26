@@ -472,7 +472,7 @@ public sealed class SpotifyModule : IConnectableModule
 
         await StartPlaylistAsync(
             settings.Spotify.StartPlaylistUri,
-            startVolumePercent: 100,
+            startVolumePercent: settings.Spotify.StartVolumePercent,
             cancellationToken);
     }
 

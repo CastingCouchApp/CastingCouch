@@ -76,17 +76,8 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
                         cancellationToken);
                 }
 
-                if (settings.Workflow.AutoStartSpotifyPlaylist)
-                {
-                    try
-                    {
-                        await _spotify.StartConfiguredPlaylistAsync(
-                            cancellationToken);
-                    }
-                    catch
-                    {
-                    }
-                }
+                // Spotify-Startplaylist startet ausschließlich beim OBS-Übergang
+                // OFFLINE -> LIVE (HandleObservedStreamStartAsync), nicht beim Vorbereiten.
 
                 await _overlay.UpdateAsync(
                     data =>
