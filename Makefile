@@ -14,7 +14,7 @@ PUBLISH_DIR := $(ARTIFACTS)/publish/$(RID)
 LOG_DIR     := $(ARTIFACTS)/build-logs
 TEST_DIR    := $(ARTIFACTS)/test-results
 
-.PHONY: help restore build test publish app clean ci release
+.PHONY: help restore build test publish app clean ci release watch
 
 help:
 	@echo "Targets:"
@@ -25,6 +25,7 @@ help:
 	@echo "  make app       - restore + test + publish"
 	@echo "  make ci        - restore + build + test"
 	@echo "  make release   - voller Release-Build (App+Client+Updater+MSI, Windows/pwsh)"
+	@echo "  make watch     - App mit Hot Reload starten (dotnet watch)"
 	@echo "  make clean     - Build-Artefakte löschen"
 	@echo ""
 	@echo "Variablen: CONFIG=$(CONFIG) RID=$(RID) DOTNET=$(DOTNET)"
@@ -66,6 +67,9 @@ ci: restore build test
 release:
 	@command -v pwsh >/dev/null 2>&1 || { echo "pwsh nicht gefunden"; exit 1; }
 	pwsh -NoProfile -ExecutionPolicy Bypass -File ./build/Build-Release.ps1 -Configuration $(CONFIG)
+
+watch:
+	pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-app-hotreload.ps1 -Configuration $(CONFIG)
 
 clean:
 	rm -rf $(ARTIFACTS)
