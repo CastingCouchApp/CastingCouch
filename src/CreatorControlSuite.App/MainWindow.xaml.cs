@@ -673,6 +673,8 @@ public partial class MainWindow : Window
             {
                 var bookmarklet = await _youTubeMusicModule.GetBookmarkletAsync();
                 Clipboard.SetText(bookmarklet);
+                MusicPlayerBookmarkletBox.Text = bookmarklet;
+                MusicPlayerBookmarkletBox.Visibility = Visibility.Visible;
                 MusicPlayerBridgeStatusText.Text = "Bookmarklet in die Zwischenablage kopiert.";
             }
             catch (Exception ex)
@@ -680,17 +682,28 @@ public partial class MainWindow : Window
                 MessageBox.Show(ex.Message, "Bookmarklet", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         };
+        MusicPlayerOpenBookmarkletInstallButton.Click += async (_, _) =>
+            await OpenYouTubeMusicBookmarkletInstallPageAsync();
+        MusicPlayerBookmarkletDragChip.PreviewMouseLeftButtonDown += MusicPlayerBookmarkletDragChip_PreviewMouseLeftButtonDown;
+        MusicPlayerBookmarkletDragChip.PreviewMouseMove += MusicPlayerBookmarkletDragChip_PreviewMouseMove;
         MusicPlayerOpenSpotifyServiceButton.Click += (_, _) =>
             NavigateToServicesTab(0, ServicesSpotifyButton);
         ServicesSpotifyOpenMusicSettingsButton.Click += (_, _) =>
-            NavigateToSettingsTab(0, SettingsButton);
+            NavigateToSettingsTab(4, SettingsButton);
         ServicesSpotifyOpenPlayerButton.Click += (_, _) =>
         {
             ServicesNavigationPanel.Visibility = Visibility.Collapsed;
             ShowPage(MusicPlayerPage);
             _ = RefreshMusicPlayerUiAsync();
         };
-        MusicPlayerProviderBox.SelectionChanged += (_, _) => UpdateMusicPlayerSettingsVisibility();
+        MusicProviderSpotifyRadio.Checked += (_, _) => UpdateMusicPlayerSettingsVisibility();
+        MusicProviderYouTubeMusicRadio.Checked += (_, _) => UpdateMusicPlayerSettingsVisibility();
+        OpenMusicPlayerFromSettingsButton.Click += (_, _) =>
+        {
+            ServicesNavigationPanel.Visibility = Visibility.Collapsed;
+            ShowPage(MusicPlayerPage);
+            _ = RefreshMusicPlayerUiAsync();
+        };
         MusicPlayerProgressBar.PreviewMouseLeftButtonUp += async (_, _) =>
         {
             if (!_musicPlayerRouter.ActivePlayer.SupportsSeek)
@@ -3465,7 +3478,7 @@ public partial class MainWindow : Window
         SpotifyAutoConnectBox.IsChecked = _settings.Spotify.AutoConnect;
         SpotifyConnectOnPrepareBox.IsChecked = _settings.Spotify.ConnectOnPrepare;
         SpotifyExecutablePathBox.Text = _settings.Spotify.ExecutablePath;
-        SelectMusicPlayerProviderBox(_settings.MusicPlayer.ProviderId);
+        SelectMusicPlayerProviderRadio(_settings.MusicPlayer.ProviderId);
         YouTubeMusicBridgePortBox.Text = _settings.YouTubeMusic.BridgePort.ToString();
         YouTubeMusicAutoConnectBox.IsChecked = _settings.YouTubeMusic.AutoConnect;
         YouTubeMusicConnectOnPrepareBox.IsChecked = _settings.YouTubeMusic.ConnectOnPrepare;
@@ -9876,39 +9889,26 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private string GetSelectedMusicPlayerProviderId()
     {
-        if (MusicPlayerProviderBox.SelectedItem is ComboBoxItem item &&
-            item.Tag is string tag &&
-            !string.IsNullOrWhiteSpace(tag))
-        {
-            return MusicProviderIds.Normalize(tag);
-        }
+        if (MusicProviderYouTubeMusicRadio.IsChecked == true)
+            return MusicProviderIds.YouTubeMusic;
 
         return MusicProviderIds.Spotify;
     }
 
-    private void SelectMusicPlayerProviderBox(string? providerId)
+    private void SelectMusicPlayerProviderRadio(string? providerId)
     {
         var normalized = MusicProviderIds.Normalize(providerId);
-        foreach (var item in MusicPlayerProviderBox.Items.OfType<ComboBoxItem>())
-        {
-            if (string.Equals(item.Tag?.ToString(), normalized, StringComparison.OrdinalIgnoreCase))
-            {
-                MusicPlayerProviderBox.SelectedItem = item;
-                return;
-            }
-        }
-
-        if (MusicPlayerProviderBox.Items.Count > 0)
-            MusicPlayerProviderBox.SelectedIndex = 0;
+        var isYouTube = string.Equals(normalized, MusicProviderIds.YouTubeMusic, StringComparison.OrdinalIgnoreCase);
+        MusicProviderYouTubeMusicRadio.IsChecked = isYouTube;
+        MusicProviderSpotifyRadio.IsChecked = !isYouTube;
     }
 
     private void UpdateMusicPlayerSettingsVisibility()
     {
         var providerId = GetSelectedMusicPlayerProviderId();
-        YouTubeMusicSettingsPanel.Visibility =
-            string.Equals(providerId, MusicProviderIds.YouTubeMusic, StringComparison.OrdinalIgnoreCase)
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+        var isYouTube = string.Equals(providerId, MusicProviderIds.YouTubeMusic, StringComparison.OrdinalIgnoreCase);
+        SpotifyMusicSettingsPanel.Visibility = isYouTube ? Visibility.Collapsed : Visibility.Visible;
+        YouTubeMusicSettingsPanel.Visibility = isYouTube ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ApplyMusicProviderUiState()
@@ -9962,6 +9962,121 @@ private Task ApplyCombinedAlertDuckingAsync()
     }
 
     private bool _updatingMusicPlayerUi;
+    private System.Windows.Point _musicBookmarkletDragStart;
+    private bool _musicBookmarkletDragPending;
+
+    private void MusicPlayerBookmarkletDragChip_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _musicBookmarkletDragStart = e.GetPosition(null);
+        _musicBookmarkletDragPending = true;
+    }
+
+    private async void MusicPlayerBookmarkletDragChip_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_musicBookmarkletDragPending || e.LeftButton != MouseButtonState.Pressed)
+            return;
+
+        var position = e.GetPosition(null);
+        if (Math.Abs(position.X - _musicBookmarkletDragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(position.Y - _musicBookmarkletDragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        _musicBookmarkletDragPending = false;
+        try
+        {
+            if (!_youTubeMusicModule.IsBridgeRunning)
+            {
+                await _musicPlayerRouter.ConnectActiveAsync();
+                await RefreshMusicPlayerUiAsync();
+            }
+
+            var bookmarklet = await _youTubeMusicModule.GetBookmarkletAsync();
+            var title = _youTubeMusicModule.GetBookmarkletDisplayName();
+            MusicPlayerBookmarkletDragLabel.Text = title;
+            StartYouTubeMusicBookmarkletDrag(bookmarklet, title);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                "Bookmarklet-Drag nicht möglich: " + ex.Message +
+                "\n\nBitte zuerst verbinden und ggf. „Install-Seite öffnen“ nutzen.",
+                "YouTube Music",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private static void StartYouTubeMusicBookmarkletDrag(string bookmarklet, string title)
+    {
+        var data = new DataObject();
+        data.SetData(DataFormats.UnicodeText, bookmarklet);
+        data.SetData(DataFormats.Text, bookmarklet);
+        data.SetData("text/uri-list", bookmarklet + "\r\n");
+        data.SetData("text/x-moz-url", bookmarklet + "\n" + title);
+
+        // HTML-Format, damit Browser den Link inkl. Titel besser als Lesezeichen übernehmen.
+        var href = System.Net.WebUtility.HtmlEncode(bookmarklet);
+        var label = System.Net.WebUtility.HtmlEncode(title);
+        var fragment = $"<a href=\"{href}\">{label}</a>";
+        var html =
+            "Version:0.9\r\n" +
+            "StartHTML:00000097\r\n" +
+            "EndHTML:00000100\r\n" +
+            "StartFragment:00000097\r\n" +
+            "EndFragment:00000100\r\n" +
+            fragment;
+        // Korrekte Offsets für das CF_HTML-Format berechnen.
+        const string prefixTemplate =
+            "Version:0.9\r\nStartHTML:{0:D8}\r\nEndHTML:{1:D8}\r\nStartFragment:{2:D8}\r\nEndFragment:{3:D8}\r\n";
+        var headerLength = string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            prefixTemplate,
+            0, 0, 0, 0).Length;
+        var startHtml = headerLength;
+        var startFragment = headerLength;
+        var endFragment = startFragment + Encoding.UTF8.GetByteCount(fragment);
+        var endHtml = endFragment;
+        html = string.Format(
+                  System.Globalization.CultureInfo.InvariantCulture,
+                  prefixTemplate,
+                  startHtml,
+                  endHtml,
+                  startFragment,
+                  endFragment)
+              + fragment;
+        data.SetData(DataFormats.Html, html);
+
+        DragDrop.DoDragDrop(
+            Application.Current.MainWindow ?? throw new InvalidOperationException("MainWindow fehlt."),
+            data,
+            DragDropEffects.Copy);
+    }
+
+    private async Task OpenYouTubeMusicBookmarkletInstallPageAsync()
+    {
+        try
+        {
+            if (!_youTubeMusicModule.IsBridgeRunning)
+            {
+                await _musicPlayerRouter.ConnectActiveAsync();
+                await RefreshMusicPlayerUiAsync();
+            }
+
+            var url = await _youTubeMusicModule.GetBookmarkletInstallPageUrlAsync();
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+            MusicPlayerBridgeStatusText.Text = "Install-Seite geöffnet – Link in die Lesezeichenleiste ziehen.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "YouTube Music", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 
     private async Task RefreshMusicPlayerUiAsync()
     {
@@ -10024,6 +10139,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             try
             {
                 MusicPlayerBookmarkletBox.Text = await _youTubeMusicModule.GetBookmarkletAsync();
+                MusicPlayerBookmarkletDragLabel.Text = _youTubeMusicModule.GetBookmarkletDisplayName();
             }
             catch
             {
@@ -10075,11 +10191,23 @@ private Task ApplyCombinedAlertDuckingAsync()
         if (!_settings.Spotify.OverlayEnabled)
             return;
 
+        string targetPath;
+        try
+        {
+            targetPath = ResolveActiveOverlayDataPath();
+        }
+        catch (InvalidOperationException)
+        {
+            // Ohne konfigurierten Overlay-Ordner darf der Live-Refresh nicht crashen.
+            return;
+        }
+
         await OverlayDataWriteCoordinator.Lock.WaitAsync();
         try
         {
-            var targetPath = ResolveActiveOverlayDataPath();
-            Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+            var directory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
 
             JsonObject rootObject;
             if (File.Exists(targetPath))
@@ -10127,6 +10255,14 @@ private Task ApplyCombinedAlertDuckingAsync()
 
             var json = rootObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(targetPath, json);
+        }
+        catch (Exception exception)
+        {
+            _appLogger.Write(
+                AppLogLevel.Warning,
+                "Music",
+                "Music-Overlay-Daten konnten nicht geschrieben werden: " + exception.Message,
+                exception);
         }
         finally
         {

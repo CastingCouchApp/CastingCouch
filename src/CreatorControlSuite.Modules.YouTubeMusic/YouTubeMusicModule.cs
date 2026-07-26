@@ -116,6 +116,15 @@ public sealed class YouTubeMusicModule : IConnectableModule, IMusicPlayer
         return _bridge.GetBookmarklet(settings.YouTubeMusic.BridgePort);
     }
 
+    public async Task<string> GetBookmarkletInstallPageUrlAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        return _bridge.GetBookmarkletInstallPageUrl(settings.YouTubeMusic.BridgePort);
+    }
+
+    public string GetBookmarkletDisplayName()
+        => _bridge.GetBookmarkletDisplayName();
+
     public bool IsBridgeRunning => _bridge.IsRunning;
 
     private void EnsureConnected()

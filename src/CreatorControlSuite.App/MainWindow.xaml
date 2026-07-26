@@ -340,9 +340,9 @@
                                                     <TextBlock x:Name="DashboardTopMusicStatusText" Text="Nicht verbunden" Foreground="{DynamicResource AccentBrush}" FontSize="11" Margin="0,6,0,0"/>
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Button x:Name="DashboardTopMusicPreviousButton" Content="⏮" Width="42" Height="42" FontSize="16" Margin="0,0,6,0" ToolTip="Zurück"/>
-                                                    <Button x:Name="DashboardTopMusicPlayPauseButton" Content="▶" Width="48" Height="42" FontSize="16" FontWeight="Bold" Margin="0,0,6,0" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" ToolTip="Play/Pause"/>
-                                                    <Button x:Name="DashboardTopMusicNextButton" Content="⏭" Width="42" Height="42" FontSize="16" ToolTip="Weiter"/>
+                                                    <Button x:Name="DashboardTopMusicPreviousButton" Content="⏮" Width="28" Height="28" FontSize="12" Padding="0" Margin="0,0,4,0" MinWidth="28" MinHeight="28" ToolTip="Zurück"/>
+                                                    <Button x:Name="DashboardTopMusicPlayPauseButton" Content="▶" Width="32" Height="28" FontSize="12" FontWeight="Bold" Padding="0" Margin="0,0,4,0" MinWidth="32" MinHeight="28" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" ToolTip="Play/Pause"/>
+                                                    <Button x:Name="DashboardTopMusicNextButton" Content="⏭" Width="28" Height="28" FontSize="12" Padding="0" Margin="0" MinWidth="28" MinHeight="28" ToolTip="Weiter"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -2990,12 +2990,33 @@
                         <Border x:Name="MusicPlayerYouTubePanel" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,14,0,0" Visibility="Collapsed">
                             <StackPanel>
                                 <TextBlock Text="YouTube Music Bookmarklet" FontSize="18" FontWeight="Bold"/>
-                                <TextBlock Text="1. music.youtube.com im Browser öffnen&#10;2. Bookmarklet in die Lesezeichenleiste ziehen oder kopieren und als Lesezeichen speichern&#10;3. Bookmarklet auf dem YouTube-Music-Tab einmal ausführen und den Tab offen lassen" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,12"/>
-                                <TextBox x:Name="MusicPlayerBookmarkletBox" IsReadOnly="True" TextWrapping="Wrap" MinHeight="72" AcceptsReturn="True"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <TextBlock Text="1. Bridge verbinden&#10;2. Orangen Link in die Browser-Lesezeichenleiste ziehen (oder Install-Seite im Browser öffnen)&#10;3. Auf music.youtube.com das Lesezeichen einmal ausführen und den Tab offen lassen" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,12"/>
+                                <Border x:Name="MusicPlayerBookmarkletDragChip"
+                                        Background="{DynamicResource AccentBrush}"
+                                        BorderBrush="{DynamicResource AccentBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="20"
+                                        Padding="18,12"
+                                        HorizontalAlignment="Left"
+                                        Cursor="Hand"
+                                        ToolTip="Ziehen und in die Lesezeichenleiste des Browsers ablegen">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="⋮⋮" Foreground="{DynamicResource TextOnAccentBrush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.8"/>
+                                        <TextBlock x:Name="MusicPlayerBookmarkletDragLabel"
+                                                   Text="CCS · YouTube Music"
+                                                   Foreground="{DynamicResource TextOnAccentBrush}"
+                                                   FontWeight="Bold"
+                                                   FontSize="14"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Text="Falls Ziehen aus der App nicht greift: Install-Seite im Browser öffnen und den Link dort ziehen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button x:Name="MusicPlayerOpenBookmarkletInstallButton" Content="Install-Seite öffnen" Margin="0,0,8,0"/>
                                     <Button x:Name="MusicPlayerCopyBookmarkletButton" Content="Bookmarklet kopieren" Margin="0,0,8,0"/>
                                     <TextBlock x:Name="MusicPlayerBridgeStatusText" Text="Bridge gestoppt" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}"/>
                                 </StackPanel>
+                                <TextBox x:Name="MusicPlayerBookmarkletBox" IsReadOnly="True" TextWrapping="Wrap" MinHeight="56" AcceptsReturn="True" Margin="0,12,0,0" Visibility="Collapsed"/>
                             </StackPanel>
                         </Border>
                         <Border x:Name="MusicPlayerSpotifyHintPanel" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,14,0,0">
@@ -3034,20 +3055,6 @@
                                 <ComboBox x:Name="ThemeBox" DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
                                 <TextBlock x:Name="ThemeDescriptionText" Text="" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                 <TextBlock x:Name="ThemeLicenseHintText" Text="" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
-                                <Separator Margin="0,18,0,14"/>
-                                <TextBlock Text="Music Player" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
-                                <TextBlock Text="Es ist immer nur ein Music-Player aktiv. Die Wahl gilt für Title-Bar, Player-Seite, Overlay und Connection-Widget." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,6,0,8"/>
-                                <TextBlock Text="Aktiver Player" Foreground="{DynamicResource AccentBrush}" Margin="0,4,0,6"/>
-                                <ComboBox x:Name="MusicPlayerProviderBox">
-                                    <ComboBoxItem Tag="spotify" Content="Spotify" IsSelected="True"/>
-                                    <ComboBoxItem Tag="ytmusic" Content="YouTube Music"/>
-                                </ComboBox>
-                                <StackPanel x:Name="YouTubeMusicSettingsPanel" Margin="0,12,0,0" Visibility="Collapsed">
-                                    <TextBlock Text="YouTube-Music-Bridge-Port" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
-                                    <TextBox x:Name="YouTubeMusicBridgePortBox" Text="43831"/>
-                                    <CheckBox x:Name="YouTubeMusicAutoConnectBox" Content="YouTube Music Bridge automatisch starten" Margin="0,10,0,0"/>
-                                    <CheckBox x:Name="YouTubeMusicConnectOnPrepareBox" Content="Bei Stream vorbereiten Bridge starten" Margin="0,8,0,0"/>
-                                </StackPanel>
                                 <Separator Margin="0,18,0,14"/>
                                 <TextBlock Text="Overlay-Projektdatei (overlay.json)" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
                                 <TextBlock Text="Beim Erstellen oder Importieren eines Overlay-Projekts legt die Suite automatisch eine overlay.json an. Hier kannst du die aktive JSON-Datei sehen, den Pfad ändern oder eine eigene overlay.json auswählen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,6,0,8"/>
@@ -3275,9 +3282,18 @@
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
-                    <TabItem Header="Spotify">
+                    <TabItem Header="Music Player">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
                             <StackPanel Margin="18" Style="{StaticResource CCSDarkSettingsContentStyle}">
+                                <TextBlock Text="Aktiver Music Player" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+                                <TextBlock Text="Es ist immer nur ein Music-Player aktiv. Die Wahl gilt für Title-Bar, Player-Seite, Overlay und Connection-Widget." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,6,0,12"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                    <RadioButton x:Name="MusicProviderSpotifyRadio" GroupName="MusicPlayerProvider" Content="Spotify" IsChecked="True" Margin="0,0,24,0" VerticalAlignment="Center"/>
+                                    <RadioButton x:Name="MusicProviderYouTubeMusicRadio" GroupName="MusicPlayerProvider" Content="YouTube Music" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="SpotifyMusicSettingsPanel">
+                                <TextBlock Text="Spotify" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,10"/>
                                 <TextBlock Text="Client-ID" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
                                 <TextBox x:Name="SpotifyClientIdBox"/>
                                 <TextBlock Text="Client-ID: Im Spotify Developer Dashboard eine App anlegen. Entwicklerportal: https://developer.spotify.com/dashboard" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"/>
@@ -3313,7 +3329,7 @@
                                 <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
                                     <StackPanel>
                                         <TextBlock Text="Spotify öffnen" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                        <TextBlock Text="Hier wird nur die Verbindung eingerichtet. Die laufende Wiedergabe, Titelinformationen und Player-Steuerung befinden sich unter Dienste → Spotify." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        <TextBlock Text="Hier wird nur die Verbindung eingerichtet. Die laufende Wiedergabe, Titelinformationen und Player-Steuerung befinden sich unter Player bzw. Dienste → Spotify." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                         <Button x:Name="OpenSpotifyFromSettingsButton" Content="Spotify öffnen" HorizontalAlignment="Left" Margin="0,12,0,0"/>
                                     </StackPanel>
                                 </Border>
@@ -3357,6 +3373,17 @@
                                     </StackPanel>
                                 </Border>
                                 <TextBlock Text="Hinweis: Spotify-Playersteuerung erfordert in der Regel Spotify Premium. Spotify-Inhalte dürfen nicht über den Stream ausgestrahlt werden." Foreground="#FFB347" TextWrapping="Wrap" Margin="0,14,0,0"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="YouTubeMusicSettingsPanel" Visibility="Collapsed">
+                                    <TextBlock Text="YouTube Music" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,10"/>
+                                    <TextBlock Text="YouTube Music wird über ein Bookmarklet und eine lokale Bridge angebunden. Setup und Steuern findest du auch auf der Player-Seite." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Bridge-Port" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
+                                    <TextBox x:Name="YouTubeMusicBridgePortBox" Text="43831"/>
+                                    <CheckBox x:Name="YouTubeMusicAutoConnectBox" Content="YouTube Music Bridge automatisch starten" Margin="0,12,0,0"/>
+                                    <CheckBox x:Name="YouTubeMusicConnectOnPrepareBox" Content="Bei Stream vorbereiten Bridge starten" Margin="0,8,0,0"/>
+                                    <Button x:Name="OpenMusicPlayerFromSettingsButton" Content="Player-Seite öffnen" HorizontalAlignment="Left" Margin="0,16,0,0"/>
+                                </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

@@ -4,10 +4,10 @@ Die Suite unterstützt genau **einen** aktiven Music-Player gleichzeitig.
 
 ## Provider-Wahl
 
-Unter **Einstellungen → Allgemein → Music Player**:
+Unter **Einstellungen → Music Player**:
 
-- Spotify
-- YouTube Music
+- Radio-Auswahl: **Spotify** | **YouTube Music**
+- Je nach Auswahl erscheinen die passenden Verbindungsoptionen
 
 Die Auswahl steuert Title-Bar-Widget, Player-Seite, Overlay-Schreiben und das Connection-Widget.
 
@@ -25,14 +25,20 @@ Sidebar **Player**:
 
 1. Provider auf YouTube Music stellen und speichern
 2. Bridge starten (Verbinden auf der Player-Seite oder Auto-Connect)
-3. [music.youtube.com](https://music.youtube.com) öffnen
-4. Bookmarklet ausführen und den Tab offen lassen
+3. Bookmarklet per Drag-and-Drop in die Lesezeichenleiste ziehen:
+   - orangene Kachel in der App ziehen, oder
+   - **Install-Seite öffnen** (`http://127.0.0.1:{port}/ytmusic/install`) und den Link dort ziehen
+4. [music.youtube.com](https://music.youtube.com) öffnen, Lesezeichen einmal ausführen und Tab offen lassen
+
+Das Bookmarklet reconnectet automatisch (Health-Check, Backoff, erneuter Klick = Restart, Tab-Focus/`online`).
 
 Die Bridge lauscht auf `http://127.0.0.1:{BridgePort}/ytmusic/`:
 
 - `POST /state` – Titel, Artist, Cover, Playing, Progress
 - `GET /commands` – pending Controls
 - `GET /bookmarklet.js` – Bridge-Script
+- `GET /install` – HTML-Seite mit ziehbarem Bookmarklet-Link
+- `GET /health` – Alive-Check für Auto-Reconnect
 
 ## Overlay
 

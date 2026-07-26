@@ -151,6 +151,46 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
         return $"javascript:(function(){{var s=document.createElement('script');s.src='{scriptUrl}?t='+Date.now();document.documentElement.appendChild(s);}})();";
     }
 
+    public string GetBookmarkletInstallPageUrl(int port)
+        => $"http://127.0.0.1:{port}/ytmusic/install";
+
+    public string GetBookmarkletDisplayName()
+        => "CCS · YouTube Music";
+
+    public string GetBookmarkletInstallHtml(int port)
+    {
+        var bookmarklet = GetBookmarklet(port);
+        var title = GetBookmarkletDisplayName();
+        var href = System.Net.WebUtility.HtmlEncode(bookmarklet);
+        var text = System.Net.WebUtility.HtmlEncode(title);
+        return $$"""
+            <!DOCTYPE html>
+            <html lang="de">
+            <head>
+              <meta charset="utf-8"/>
+              <title>{{text}} – Bookmarklet</title>
+              <style>
+                body{font-family:Segoe UI,sans-serif;background:#0b1014;color:#e8eef2;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+                .card{background:#151c22;border:1px solid #2a343c;border-radius:14px;padding:28px;max-width:520px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+                h1{font-size:22px;margin:0 0 10px}
+                p{color:#9aa6ae;line-height:1.45;margin:0 0 22px}
+                a.drag{display:inline-block;padding:14px 22px;border-radius:999px;background:#ff6a00;color:#fff;font-weight:700;text-decoration:none;cursor:grab;user-select:none;border:1px solid #ff8a33}
+                a.drag:active{cursor:grabbing}
+                .hint{margin-top:18px;font-size:13px;color:#7f8991}
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <h1>YouTube Music Bookmarklet</h1>
+                <p>Ziehe den orangenen Link in die Lesezeichenleiste deines Browsers. Danach auf <strong>music.youtube.com</strong> einmal anklicken und den Tab offen lassen.</p>
+                <a class="drag" href="{{href}}">{{text}}</a>
+                <div class="hint">Tipp: Lesezeichenleiste mit Strg+Shift+B einblenden.</div>
+              </div>
+            </body>
+            </html>
+            """;
+    }
+
     public string GetBridgeScript(int port)
     {
         var raw = LoadEmbeddedBridgeScript();
@@ -233,6 +273,20 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
                 var bytes = Encoding.UTF8.GetBytes(script);
                 context.Response.StatusCode = 200;
                 context.Response.ContentType = "application/javascript; charset=utf-8";
+                context.Response.ContentLength64 = bytes.Length;
+                await context.Response.OutputStream.WriteAsync(bytes);
+                context.Response.Close();
+                return;
+            }
+
+            if (path is "/ytmusic/install" &&
+                string.Equals(context.Request.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase))
+            {
+                var settings = await _settingsStore.LoadAsync();
+                var html = GetBookmarkletInstallHtml(settings.YouTubeMusic.BridgePort);
+                var bytes = Encoding.UTF8.GetBytes(html);
+                context.Response.StatusCode = 200;
+                context.Response.ContentType = "text/html; charset=utf-8";
                 context.Response.ContentLength64 = bytes.Length;
                 await context.Response.OutputStream.WriteAsync(bytes);
                 context.Response.Close();
