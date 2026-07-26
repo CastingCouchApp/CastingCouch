@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Twitch-Kanal bearbeiten"
         Width="620"
-        Height="520"
+        Height="480"
         MinWidth="520"
-        MinHeight="460"
+        MinHeight="420"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}">
@@ -27,23 +27,36 @@
             <TextBlock Text="Streamtitel" Margin="0,0,0,5"/>
             <TextBox x:Name="TitleBox" MinHeight="34"/>
 
-            <TextBlock Text="Kategorie suchen" Margin="0,14,0,5"/>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBox x:Name="CategorySearchBox" MinHeight="34"/>
-                <Button x:Name="SearchCategoryButton"
-                        Grid.Column="1"
-                        Content="SUCHEN"
-                        Margin="8,0,0,0"
-                        Padding="16,6"/>
+            <TextBlock Text="Kategorie" Margin="0,14,0,5"/>
+            <Grid x:Name="CategoryTypeaheadHost">
+                <TextBox x:Name="CategorySearchBox"
+                         MinHeight="34"
+                         ToolTip="Tippe, um Kategorien zu suchen"/>
+                <Popup x:Name="CategorySuggestionsPopup"
+                       PlacementTarget="{Binding ElementName=CategorySearchBox}"
+                       Placement="Bottom"
+                       StaysOpen="True"
+                       AllowsTransparency="True"
+                       PopupAnimation="Fade">
+                    <Border Background="{DynamicResource ElevatedBackgroundBrush}"
+                            BorderBrush="{DynamicResource StrongBorderBrush}"
+                            BorderThickness="1"
+                            MinWidth="{Binding ActualWidth, ElementName=CategorySearchBox}"
+                            MaxHeight="220">
+                        <ListBox x:Name="CategorySuggestionsBox"
+                                 DisplayMemberPath="Name"
+                                 BorderThickness="0"
+                                 MaxHeight="218"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 PreviewMouseLeftButtonUp="CategorySuggestionsBox_OnPreviewMouseLeftButtonUp"/>
+                    </Border>
+                </Popup>
             </Grid>
-            <ComboBox x:Name="CategoryResultsBox"
-                      DisplayMemberPath="Name"
-                      Margin="0,8,0,0"
-                      MinHeight="34"/>
+            <TextBlock x:Name="CategoryHintText"
+                       Foreground="{DynamicResource TextMutedBrush}"
+                       FontSize="11"
+                       Margin="0,4,0,0"
+                       Text="Tippe einen Namen – Vorschläge erscheinen automatisch."/>
 
             <TextBlock Text="Live-Benachrichtigung" Margin="0,14,0,5"/>
             <TextBox x:Name="LiveNotificationBox"

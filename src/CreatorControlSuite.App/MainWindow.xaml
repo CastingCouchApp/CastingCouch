@@ -5,6 +5,7 @@
         xmlns:local="clr-namespace:CreatorControlSuite.App"
         x:Class="CreatorControlSuite.App.MainWindow"
         Title="Creator Control Suite"
+        Icon="pack://application:,,,/Assets/Brand/app.ico"
         Width="1600"
         Height="900"
         MinWidth="900"
@@ -45,15 +46,12 @@
                 BorderThickness="0,0,0,1">
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" IsHitTestVisible="False">
-                    <Border Width="18" Height="18" CornerRadius="4" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1.5" Margin="0,0,10,0">
-                        <TextBlock Text="N"
-                                   Foreground="{DynamicResource AccentBrush}"
-                                   FontSize="11"
-                                   FontWeight="Black"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontFamily="{DynamicResource AppHeadingFontFamily}"/>
-                    </Border>
+                    <Image Source="Assets/Brand/app.png"
+                           Width="18"
+                           Height="18"
+                           Margin="0,0,10,0"
+                           Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock Text="NEXORA"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                FontSize="13"
@@ -194,8 +192,10 @@
                                 <ColumnDefinition Width="56"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2">
-                                <TextBlock Text="N" Foreground="{DynamicResource AccentBrush}" FontSize="30" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="{DynamicResource AppHeadingFontFamily}"/>
+                            <Border Width="48" Height="48" CornerRadius="8" ClipToBounds="True">
+                                <Image Source="Assets/Brand/app.png"
+                                       Stretch="UniformToFill"
+                                       RenderOptions.BitmapScalingMode="HighQuality"/>
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
                                 <TextBlock Text="NEXORA" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="28" FontWeight="Light" FontFamily="{DynamicResource AppHeadingFontFamily}"/>

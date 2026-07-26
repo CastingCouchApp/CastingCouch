@@ -5,6 +5,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>CreatorControlSuite</AssemblyName>
     <RootNamespace>CreatorControlSuite.App</RootNamespace>
+    <ApplicationIcon>Assets\Brand\app.ico</ApplicationIcon>
     <PublishSingleFile>false</PublishSingleFile>
     <PublishReadyToRun>false</PublishReadyToRun>
     <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
@@ -40,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\Brand\*.png" />
+    <Resource Include="Assets\Brand\app.ico" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CreatorControlSuite.Modules.YouTubeMusic\CreatorControlSuite.Modules.YouTubeMusic.csproj" />
