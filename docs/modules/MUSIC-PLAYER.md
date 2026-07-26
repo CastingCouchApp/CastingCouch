@@ -30,11 +30,12 @@ Sidebar **Player**:
    - **Install-Seite öffnen** (`http://127.0.0.1:{port}/ytmusic/install`) und den Link dort ziehen
 4. [music.youtube.com](https://music.youtube.com) öffnen, Lesezeichen einmal ausführen und Tab offen lassen
 
-Das Bookmarklet reconnectet automatisch (Health-Check, Backoff, erneuter Klick = Restart, Tab-Focus/`online`).
+Das Bookmarklet enthält den Bridge-Code **inline** (kein externes `script.src`), weil YouTube Music Trusted Types (`require-trusted-types-for 'script'`) Script-Injection blockiert. Auto-Reconnect (Health-Check, Backoff, erneuter Klick = Restart, Tab-Focus/`online`) ist eingebaut. Nach Bridge-Updates das Lesezeichen neu ziehen.
 
 Die Bridge lauscht auf `http://127.0.0.1:{BridgePort}/ytmusic/`:
 
-- `POST /state` – Titel, Artist, Cover, Playing, Progress
+- `POST /state` – Titel, Artist, Album, Cover, Playing, Progress
+- Cover: Media Session + Player-Bar/Player-Page/Video-Poster; Album aus Byline (`Artist • Album`) / Album-Link / Media Session
 - `GET /commands` – pending Controls
 - `GET /bookmarklet.js` – Bridge-Script
 - `GET /install` – HTML-Seite mit ziehbarem Bookmarklet-Link

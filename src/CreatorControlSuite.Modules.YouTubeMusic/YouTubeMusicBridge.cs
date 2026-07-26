@@ -147,8 +147,11 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
 
     public string GetBookmarklet(int port)
     {
-        var scriptUrl = $"http://127.0.0.1:{port}/ytmusic/bookmarklet.js";
-        return $"javascript:(function(){{var s=document.createElement('script');s.src='{scriptUrl}?t='+Date.now();document.documentElement.appendChild(s);}})();";
+        // music.youtube.com erzwingt Trusted Types (require-trusted-types-for 'script').
+        // Script-Tags mit .src/.text sind blockiert – daher Bridge-Code inline im Bookmarklet.
+        // Newlines müssen erhalten bleiben (als %0A): sonst kommentiert das erste // den Rest der Zeile weg.
+        var script = GetBridgeScript(port).Trim();
+        return "javascript:" + Uri.EscapeDataString(script);
     }
 
     public string GetBookmarkletInstallPageUrl(int port)
@@ -184,7 +187,7 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
                 <h1>YouTube Music Bookmarklet</h1>
                 <p>Ziehe den orangenen Link in die Lesezeichenleiste deines Browsers. Danach auf <strong>music.youtube.com</strong> einmal anklicken und den Tab offen lassen.</p>
                 <a class="drag" href="{{href}}">{{text}}</a>
-                <div class="hint">Tipp: Lesezeichenleiste mit Strg+Shift+B einblenden.</div>
+                <div class="hint">Tipp: Lesezeichenleiste mit Strg+Shift+B einblenden. Nach App-Updates Bookmarklet neu ziehen (läuft inline wegen YouTube Trusted Types).</div>
               </div>
             </body>
             </html>

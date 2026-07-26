@@ -10,6 +10,35 @@ namespace CreatorControlSuite.Tests;
 public sealed class YouTubeMusicBridgeTests
 {
     [Fact]
+    public void GetBookmarklet_IsInline_WithoutScriptSrcInjection()
+    {
+        var store = new InMemorySettingsStore
+        {
+            Settings = new AppSettings
+            {
+                YouTubeMusic = new YouTubeMusicSettings { BridgePort = 43831 }
+            }
+        };
+
+        var bridge = new YouTubeMusicBridge(store);
+        var bookmarklet = bridge.GetBookmarklet(43831);
+
+        Assert.StartsWith("javascript:", bookmarklet, StringComparison.Ordinal);
+        Assert.DoesNotContain("createElement('script')", bookmarklet, StringComparison.Ordinal);
+        Assert.DoesNotContain("s.src=", bookmarklet, StringComparison.Ordinal);
+
+        var decoded = Uri.UnescapeDataString(bookmarklet["javascript:".Length..]);
+        Assert.Contains('\n', decoded);
+        Assert.Contains("43831", decoded, StringComparison.Ordinal);
+        Assert.Contains("__ccsYtMusicBridge", decoded, StringComparison.Ordinal);
+        Assert.Contains("/health", decoded, StringComparison.Ordinal);
+        Assert.EndsWith("})();", decoded.TrimEnd());
+        // // -Kommentare dürfen den Rest nicht „auffressen“ (passiert bei Einzeilen-Kompaktierung).
+        Assert.Contains("tick();", decoded, StringComparison.Ordinal);
+        Assert.Contains("heartbeatTimer", decoded, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StateEndpoint_UpdatesSnapshot_AndCommandsAreDequeued()
     {
         var store = new InMemorySettingsStore
