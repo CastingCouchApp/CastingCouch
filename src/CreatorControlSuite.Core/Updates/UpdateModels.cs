@@ -7,7 +7,8 @@ public sealed record UpdatePackage(
     string Sha256,
     long SizeBytes,
     string ReleaseNotes,
-    bool Mandatory);
+    bool Mandatory,
+    SignedUpdateManifest? Manifest = null);
 
 public sealed record UpdateCheckResult(
     bool UpdateAvailable,

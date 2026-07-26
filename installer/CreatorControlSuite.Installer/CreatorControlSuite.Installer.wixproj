@@ -4,9 +4,10 @@
     <OutputName>CreatorControlSuite-x64</OutputName>
     <Platform>x64</Platform>
     <OutputPath>../../artifacts/installer/</OutputPath>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.0.0</ProductVersion>
   </PropertyGroup>
   <PropertyGroup>
-    <DefineConstants>$(DefineConstants);PublishDir=$(PublishDir)</DefineConstants>
+    <DefineConstants>$(DefineConstants);PublishDir=$(PublishDir);ProductVersion=$(ProductVersion)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="WixToolset.UI.wixext" />

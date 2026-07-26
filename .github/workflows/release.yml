@@ -46,21 +46,23 @@ jobs:
         id: version
         shell: pwsh
         run: |
+          . ./build/VersionHelpers.ps1
           $version = "${{ inputs.version }}".Trim()
           if ([string]::IsNullOrWhiteSpace($version) -and $env:GITHUB_REF_TYPE -eq "tag") {
             $version = $env:GITHUB_REF_NAME.TrimStart("v")
           }
           if ([string]::IsNullOrWhiteSpace($version)) {
-            $props = Get-Content -LiteralPath "Directory.Build.props" -Raw
-            if ($props -match "<Version>(?<v>[^<]+)</Version>") {
-              $version = $Matches["v"]
-            }
+            $version = Get-DirectoryBuildVersion -RepoRoot (Get-Location).Path
           }
           if ([string]::IsNullOrWhiteSpace($version)) {
             throw "Keine Versionsnummer ermittelbar."
           }
+          $channel = Get-UpdateChannelFromVersion -Version $version
+          $msi = ConvertTo-MsiProductVersion -Version $version
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          Write-Host "Release-Version: $version"
+          "channel=$channel" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "msi=$msi" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Release-Version: $version (Kanal: $channel, MSI: $msi)"
 
       - name: Cache NuGet
         uses: actions/cache@v4
@@ -73,7 +75,7 @@ jobs:
       - name: Build release
         shell: pwsh
         run: |
-          ./build/Build-Release.ps1 -Configuration $env:CONFIGURATION
+          ./build/Build-Release.ps1 -Configuration $env:CONFIGURATION -Version "${{ steps.version.outputs.version }}"
 
       - name: Package portable zip
         shell: pwsh
@@ -87,6 +89,26 @@ jobs:
           Compress-Archive -Path (Join-Path $publish "*") -DestinationPath $zip -CompressionLevel Optimal
           Write-Host "Portable: $zip"
 
+      - name: Create signed update manifest
+        shell: pwsh
+        env:
+          UPDATE_SIGNING_KEY_PEM: ${{ secrets.UPDATE_SIGNING_KEY_PEM }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $channel = "${{ steps.version.outputs.channel }}"
+          $zip = "artifacts/release/CreatorControlSuite-$version-win-x64.zip"
+          $changelog = "docs/changelogs/CHANGELOG-$version.md"
+          $notes = ""
+          if (Test-Path -LiteralPath $changelog) {
+            $notes = Get-Content -LiteralPath $changelog -Raw
+          }
+          ./build/New-UpdateArtifacts.ps1 `
+            -PackageZipPath $zip `
+            -Version $version `
+            -Channel $channel `
+            -OutputDirectory "artifacts/release" `
+            -ReleaseNotes $notes
+
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -94,7 +116,7 @@ jobs:
           path: |
             artifacts/publish/win-x64/**
             artifacts/installer/**
-            artifacts/release/*.zip
+            artifacts/release/*
           if-no-files-found: error
           retention-days: 30
 
@@ -110,6 +132,7 @@ jobs:
           draft: ${{ github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v') }}
           files: |
             artifacts/release/*.zip
-            artifacts/installer/*.msi
+            artifacts/release/update-manifest.json
+            artifacts/installer/CreatorControlSuite-${{ steps.version.outputs.version }}-x64.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

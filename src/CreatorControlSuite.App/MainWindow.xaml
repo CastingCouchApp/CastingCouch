@@ -3228,6 +3228,7 @@
                                 </ComboBox>
                                 <WrapPanel Margin="0,14,0,0">
                                     <Button x:Name="CheckUpdatesButton" Content="Nach Updates suchen" Background="{StaticResource AccentBrush}" Foreground="White" FontWeight="Bold"/>
+                                    <Button x:Name="InstallUpdateButton" Content="Update installieren" IsEnabled="False" Margin="8,0,0,0" Background="#315A3A" Foreground="White" FontWeight="Bold"/>
                                     <Button x:Name="CreateBackupButton" Content="Backup jetzt erstellen"/>
                                     <Button x:Name="RestoreBackupButton" Content="Ausgewähltes Backup wiederherstellen"/>
                                 </WrapPanel>

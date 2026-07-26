@@ -1,13 +1,16 @@
-# Release-Checkliste – 2.0.81
+# Release-Checkliste
 
 ## Build
 - [ ] Release-Build und Tests erfolgreich
 - [ ] Haupt-EXE, CommandClient und Updater vorhanden
+- [ ] MSI mit Version aus Directory.Build.props
+- [ ] `update-manifest.json` signiert erzeugt
 - [ ] Installer-Binlog geprüft
 
 ## Sicherheit
 - [ ] keine Private Keys im Projekt/Installer
-- [ ] produktive Public Keys vorhanden
+- [ ] `update-public.pem` vorhanden
+- [ ] GitHub Secret `UPDATE_SIGNING_KEY_PEM` gesetzt
 - [ ] Update-Manifest und Paket geprüft
 
 ## Recht
@@ -20,7 +23,8 @@
 - [ ] Chat und Events getestet
 - [ ] Alerts und Workflow komplett getestet
 - [ ] Stream Deck, Backup/Restore und Update/Rollback getestet
+- [ ] In-App-Update gegen GitHub Release getestet
 
 ## Release
-- [ ] EXE, Updater, CommandClient und MSI signiert
+- [ ] GitHub Release enthält ZIP, MSI und `update-manifest.json`
 - [ ] Installation, Upgrade und Deinstallation auf sauberem Windows getestet

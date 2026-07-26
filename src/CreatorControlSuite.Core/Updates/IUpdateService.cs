@@ -10,6 +10,10 @@ public interface IUpdateService
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default);
 
+    Task ApplyAsync(
+        string packageZipPath,
+        CancellationToken cancellationToken = default);
+
     Task<UpdateBackup> CreateBackupAsync(
         string currentVersion,
         CancellationToken cancellationToken = default);

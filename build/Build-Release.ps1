@@ -2,6 +2,8 @@ param(
     [ValidateSet("Debug","Release")]
     [string]$Configuration = "Release",
 
+    [string]$Version = "",
+
     [switch]$SkipAppBuild
 )
 
@@ -18,7 +20,14 @@ $Logs = Join-Path $Artifacts "build-logs"
 [void](New-Item -ItemType Directory -Path $Logs -Force)
 
 . (Join-Path $PSScriptRoot "Invoke-NativeChecked.ps1")
+. (Join-Path $PSScriptRoot "VersionHelpers.ps1")
 & (Join-Path $PSScriptRoot "Preflight.ps1")
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = Get-DirectoryBuildVersion -RepoRoot $Root
+}
+$MsiProductVersion = ConvertTo-MsiProductVersion -Version $Version
+Write-Host "Release-Version: $Version (MSI: $MsiProductVersion)"
 
 if (-not $SkipAppBuild) {
     & (Join-Path $PSScriptRoot "Build-App.ps1") -Configuration $Configuration
@@ -100,9 +109,20 @@ Invoke-NativeChecked -FilePath "dotnet" -Step "Installer Build" -Arguments @(
     (Join-Path $Root "installer\CreatorControlSuite.Installer\CreatorControlSuite.Installer.wixproj"),
     "-c", $Configuration,
     "-p:PublishDir=$PublishForMsBuild",
+    "-p:ProductVersion=$MsiProductVersion",
     "-bl:$([IO.Path]::Combine($Logs,'installer.binlog'))"
 )
 
+$builtMsi = Join-Path $InstallerOut "CreatorControlSuite-x64.msi"
+$versionedMsi = Join-Path $InstallerOut ("CreatorControlSuite-" + $Version + "-x64.msi")
+if (-not (Test-Path -LiteralPath $builtMsi)) {
+    throw "MSI fehlt: $builtMsi"
+}
+if (Test-Path -LiteralPath $versionedMsi) {
+    Remove-Item -LiteralPath $versionedMsi -Force
+}
+Copy-Item -LiteralPath $builtMsi -Destination $versionedMsi -Force
+
 Write-Host "Release-Build abgeschlossen." -ForegroundColor Green
 Write-Host "Publish: $Publish"
-Write-Host "Installer: $InstallerOut"
+Write-Host "Installer: $versionedMsi"

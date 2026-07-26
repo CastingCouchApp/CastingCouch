@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="Creator Control Suite" Manufacturer="Creator Control Suite" Version="2.0.44" UpgradeCode="{EA074C62-3DDF-4149-ADA2-AECD7C6C485B}" Scope="perMachine">
+  <Package Name="Creator Control Suite" Manufacturer="Creator Control Suite" Version="$(var.ProductVersion)" UpgradeCode="{EA074C62-3DDF-4149-ADA2-AECD7C6C485B}" Scope="perMachine">
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
     <Property Id="ARPNOREPAIR" Value="1" />
     <MajorUpgrade DowngradeErrorMessage="Eine neuere Version der Creator Control Suite ist bereits installiert." />

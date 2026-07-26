@@ -175,7 +175,9 @@ public partial class App : Application
                     return new LocalUpdateService(
                         httpClient,
                         provider.GetRequiredService<ISettingsStore>(),
-                        localAppData);
+                        provider.GetRequiredService<IUpdateSignatureVerifier>(),
+                        localAppData,
+                        currentVersionProvider: GetCurrentProductVersion);
                 });
 
                 services.AddSingleton(

@@ -1,21 +1,19 @@
-# Update und Rollback – 2.0.81
+# Update und Rollback
 
-Vorbereitet:
+## In-App
 
-- Updatekanäle Stable, Beta und Alpha
-- signiertes Release-Manifest als nächster Schritt
-- Download mit Fortschritt
-- SHA-256-Prüfung
-- Backup vor Update
-- Backup-Liste
-- Wiederherstellung
+- Kanäle: Stable, Beta, Alpha (GitHub Releases dieses Repos)
+- Automatische Prüfung beim Start (optional)
+- Manuelle Suche und Installation unter Einstellungen → Updates
+- Download mit Fortschritt, SHA-256- und Signaturprüfung
+- Optional Backup der Nutzerdaten vor dem Apply
+- Apply über `CreatorControlSuite.Updater.exe` (transaktional)
 
-Backups enthalten:
+## Backups
 
-- settings.json
-- Profile
-- Overlay
-- Secrets
+Enthalten `settings.json`, Profile, Overlay und Secrets unter dem lokalen Datenordner.
 
-Vor der Beta werden zusätzlich digitale Signaturen und ein externer
-Updater-Prozess ergänzt.
+## Installer vs. Update
+
+- Erstinstallation / Upgrade-Pfad: MSI
+- Laufende Installation: signiertes ZIP + Updater

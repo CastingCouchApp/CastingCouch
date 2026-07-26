@@ -15,5 +15,8 @@ if ($Content -notmatch 'CreateClient\(\s*"CreatorControlSuite\.UpdateClient"\s*\
 if ($Content -notmatch 'GetRequiredService<ISettingsStore>') {
     throw "ISettingsStore-Auflösung für LocalUpdateService fehlt."
 }
+if ($Content -notmatch 'GetRequiredService<IUpdateSignatureVerifier>') {
+    throw "IUpdateSignatureVerifier-Auflösung für LocalUpdateService fehlt."
+}
 
 Write-Host "DI-Registrierungsprüfung bestanden." -ForegroundColor Green

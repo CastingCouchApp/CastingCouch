@@ -107,10 +107,11 @@ Aktuelles Schema: `8.0.0-alphaN` (Beispiel: `8.0.0-alpha101`).
    gh run list --workflow release.yml --limit 3
    gh run watch
    ```
-3. Prüfen, dass GitHub Release inkl. Zip/MSI existiert:
+3. Prüfen, dass GitHub Release inkl. Zip/MSI/`update-manifest.json` existiert:
    ```bash
    gh release view "v<version>"
    ```
+   Erforderliches Secret für signierte Updates: `UPDATE_SIGNING_KEY_PEM` (PEM-Inhalt des Private Keys).
 4. Falls Tag-Workflow keinen Release erzeugt hat: mit `gh release create` nachziehen und Artifacts aus dem Run anhängen — nur wenn klar fehlt.
 
 ## Abbruchbedingungen

@@ -145,6 +145,7 @@ public partial class MainWindow : Window
     private System.Windows.Point _dashboardDirectDragStart;
     private FrameworkElement? _dashboardSelectedSection;
     private AppSettings _settings = new();
+    private UpdatePackage? _pendingUpdatePackage;
     private bool _settingsUiLoaded;
     private bool _updatingSpotifyUi;
     private string? _lastSpotifyAlbumCoverUrl;
@@ -2349,6 +2350,9 @@ public partial class MainWindow : Window
         CheckUpdatesButton.Click += async (_, _) =>
             await CheckUpdatesAsync();
 
+        InstallUpdateButton.Click += async (_, _) =>
+            await InstallUpdateAsync();
+
         CreateBackupButton.Click += async (_, _) =>
             await CreateBackupAsync();
 
@@ -3066,6 +3070,11 @@ public partial class MainWindow : Window
         _settings.Workflow.RunOfShowSteps ??= [];
         _settings.Workflow.RunOfShowPlans ??= [];
         _settings.Obs.AudioProfiles ??= [];
+        _settings.Product.Version = GetCurrentProductVersion();
+        if (string.IsNullOrWhiteSpace(_settings.Updates.Channel))
+        {
+            _settings.Updates.Channel = _settings.Product.UpdateChannel;
+        }
         RefreshObsAudioProfilesUi();
         // Spotify-Laufzeitdaten werden grundsätzlich in die konfigurierte JSON geschrieben.
         _settings.Spotify.OverlayEnabled = true;
@@ -3263,9 +3272,17 @@ public partial class MainWindow : Window
 
         AutoUpdateBox.IsChecked = _settings.Updates.AutoCheck;
         BackupBeforeUpdateBox.IsChecked = _settings.Updates.BackupBeforeUpdate;
+        SelectUpdateChannelBox(_settings.Updates.Channel);
+        InstallUpdateButton.IsEnabled = false;
+        _pendingUpdatePackage = null;
 
         BackupsList.ItemsSource = await _updateService.ListBackupsAsync();
         await RefreshLicenseAsync();
+
+        if (_settings.Updates.AutoCheck)
+        {
+            await CheckUpdatesAsync(silent: true);
+        }
 
         if (_settings.Obs.AutoConnect)
         {
@@ -3425,6 +3442,9 @@ public partial class MainWindow : Window
 
             _settings.Updates.AutoCheck = AutoUpdateBox.IsChecked == true;
             _settings.Updates.BackupBeforeUpdate = BackupBeforeUpdateBox.IsChecked == true;
+            _settings.Updates.Channel = GetSelectedUpdateChannel();
+            _settings.Product.UpdateChannel = _settings.Updates.Channel;
+            _settings.Product.Version = GetCurrentProductVersion();
 
             var validation = _settingsValidator.Validate(_settings);
 
@@ -5926,22 +5946,168 @@ public partial class MainWindow : Window
             });
     }
 
-    private async Task CheckUpdatesAsync()
+    private async Task CheckUpdatesAsync(bool silent = false)
     {
         try
         {
+            InstallUpdateButton.IsEnabled = false;
+            _pendingUpdatePackage = null;
+
+            if (!silent)
+            {
+                UpdateStatusText.Text = "Suche nach Updates …";
+                UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
+            }
+
             var result = await _updateService.CheckAsync();
+            _pendingUpdatePackage = result.Package;
+            InstallUpdateButton.IsEnabled = result.UpdateAvailable && result.Package is not null;
+
+            if (result.UpdateAvailable && result.Package is not null)
+            {
+                var notes = string.IsNullOrWhiteSpace(result.Package.ReleaseNotes)
+                    ? string.Empty
+                    : " — " + Truncate(result.Package.ReleaseNotes, 160);
+                UpdateStatusText.Text =
+                    $"Update verfügbar: {result.Package.Version} (aktuell {result.CurrentVersion}){notes}";
+                UpdateStatusText.Foreground = System.Windows.Media.Brushes.LightGreen;
+            }
+            else
+            {
+                UpdateStatusText.Text = result.Detail;
+                UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
+            }
+        }
+        catch (Exception exception)
+        {
+            UpdateStatusText.Text = exception.Message;
+            UpdateStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
+            InstallUpdateButton.IsEnabled = false;
+            _pendingUpdatePackage = null;
+        }
+    }
+
+    private async Task InstallUpdateAsync()
+    {
+        if (_pendingUpdatePackage is null)
+        {
+            UpdateStatusText.Text = "Kein Update ausgewählt. Bitte zuerst suchen.";
+            UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
+            return;
+        }
+
+        try
+        {
+            InstallUpdateButton.IsEnabled = false;
+            CheckUpdatesButton.IsEnabled = false;
+            UpdateStatusText.Text = "Update wird heruntergeladen …";
+            UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
+
+            var progress = new Progress<double>(value =>
+            {
+                UpdateStatusText.Text =
+                    $"Update wird heruntergeladen … {value:P0}";
+            });
+
+            var packagePath = await _updateService.DownloadAsync(
+                _pendingUpdatePackage,
+                progress);
+
+            if (_settings.Updates.BackupBeforeUpdate)
+            {
+                UpdateStatusText.Text = "Backup vor Update …";
+                await _updateService.CreateBackupAsync(GetCurrentProductVersion());
+                BackupsList.ItemsSource = await _updateService.ListBackupsAsync();
+            }
+
+            UpdateStatusText.Text = "Updater wird gestartet. Die App wird beendet …";
+            await _updateService.ApplyAsync(packagePath);
+
+            Application.Current.Shutdown(0);
+        }
+        catch (Exception exception)
+        {
+            UpdateStatusText.Text = exception.Message;
+            UpdateStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
+            InstallUpdateButton.IsEnabled = _pendingUpdatePackage is not null;
+            CheckUpdatesButton.IsEnabled = true;
+        }
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        var normalized = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (normalized.Length <= maxLength)
+        {
+            return normalized;
+        }
+
+        return normalized[..maxLength].TrimEnd() + "…";
+    }
+
+    private void SelectUpdateChannelBox(string channel)
+    {
+        var normalized = string.IsNullOrWhiteSpace(channel) ? "Alpha" : channel.Trim();
+        foreach (var item in UpdateChannelBox.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(
+                    item.Content?.ToString(),
+                    normalized,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateChannelBox.SelectedItem = item;
+                return;
+            }
+        }
+
+        UpdateChannelBox.SelectedIndex = 2;
+    }
+
+    private string GetSelectedUpdateChannel()
+    {
+        if (UpdateChannelBox.SelectedItem is ComboBoxItem item &&
+            item.Content is string content &&
+            !string.IsNullOrWhiteSpace(content))
+        {
+            return content.Trim();
+        }
+
+        return "Alpha";
+    }
+
+    private static string GetCurrentProductVersion()
+    {
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        var informationalVersion = assembly
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            var metadataSeparator = informationalVersion.IndexOf('+');
+            return metadataSeparator >= 0
+                ? informationalVersion[..metadataSeparator]
+                : informationalVersion;
+        }
+
+        return assembly.GetName().Version?.ToString() ?? "0.0.0";
+    }
+
+    private async Task CreateBackupAsync()
+    {
+        try
+        {
+            var backup = await _updateService.CreateBackupAsync(
+                GetCurrentProductVersion());
+
+            BackupsList.ItemsSource =
+                await _updateService.ListBackupsAsync();
 
             UpdateStatusText.Text =
-                result.UpdateAvailable
-                    ? "Update verfügbar: " +
-                      result.Package?.Version
-                    : result.Detail;
+                "Backup erstellt: " + backup.Path;
 
             UpdateStatusText.Foreground =
-                result.UpdateAvailable
-                    ? System.Windows.Media.Brushes.LightGreen
-                    : System.Windows.Media.Brushes.Gray;
+                System.Windows.Media.Brushes.LightGreen;
         }
         catch (Exception exception)
         {
@@ -6684,30 +6850,6 @@ public partial class MainWindow : Window
 
         // Speichert das Follower-Ziel und schreibt es zugleich in die aktive overlay-data.json.
         await SaveTwitchGoalsAsync();
-    }
-
-    private async Task CreateBackupAsync()
-    {
-        try
-        {
-            var backup = await _updateService.CreateBackupAsync(
-                _settings.Product.Version);
-
-            BackupsList.ItemsSource =
-                await _updateService.ListBackupsAsync();
-
-            UpdateStatusText.Text =
-                "Backup erstellt: " + backup.Path;
-
-            UpdateStatusText.Foreground =
-                System.Windows.Media.Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            UpdateStatusText.Text = exception.Message;
-            UpdateStatusText.Foreground =
-                System.Windows.Media.Brushes.IndianRed;
-        }
     }
 
     private async Task RestoreSelectedBackupAsync()

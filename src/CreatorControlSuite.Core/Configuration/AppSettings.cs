@@ -24,7 +24,7 @@ public sealed class AppSettings
 public sealed class ProductSettings
 {
     public string ProductName { get; set; } = "Creator Control Suite";
-    public string Version { get; set; } = "3.4.0";
+    public string Version { get; set; } = "0.0.0";
     public string UpdateChannel { get; set; } = "Alpha";
 }
 

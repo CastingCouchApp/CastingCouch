@@ -2,8 +2,18 @@ Set-StrictMode -Version 1.0
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $Failures = New-Object System.Collections.Generic.List[string]
-$RequiredFiles = @("artifacts\publish\win-x64\CreatorControlSuite.App.exe","artifacts\publish\win-x64\CreatorControlSuite.CommandClient.exe","artifacts\publish\win-x64\CreatorControlSuite.Updater.exe","src\CreatorControlSuite.App\Keys\license-public.pem","src\CreatorControlSuite.App\Keys\update-public.pem")
+$RequiredFiles = @(
+    "artifacts\publish\win-x64\CreatorControlSuite.exe",
+    "artifacts\publish\win-x64\CreatorControlSuite.CommandClient.exe",
+    "artifacts\publish\win-x64\CreatorControlSuite.Updater.exe",
+    "src\CreatorControlSuite.App\Keys\update-public.pem"
+)
+$OptionalButRecommended = @(
+    "src\CreatorControlSuite.App\Keys\license-public.pem",
+    "artifacts\release\update-manifest.json"
+)
 foreach($Relative in $RequiredFiles){if(-not(Test-Path -LiteralPath (Join-Path $Root $Relative))){$Failures.Add("Fehlt: $Relative")}}
+foreach($Relative in $OptionalButRecommended){if(-not(Test-Path -LiteralPath (Join-Path $Root $Relative))){Write-Host "Hinweis: $Relative fehlt noch." -ForegroundColor Yellow}}
 $DraftFiles=Get-ChildItem -LiteralPath (Join-Path $Root "src\CreatorControlSuite.App\Legal") -Filter "*DRAFT*" -ErrorAction SilentlyContinue
 if($DraftFiles){$Failures.Add("Es sind noch DRAFT-Rechtstexte enthalten.")}
 $PrivateKeys=Get-ChildItem -LiteralPath $Root -Recurse -Include "*private*.pem","*.pfx","*.p12" -ErrorAction SilentlyContinue | Where-Object {$_.FullName -notlike "*\tools\dev-keys\*"}
