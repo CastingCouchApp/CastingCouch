@@ -671,7 +671,14 @@ public partial class MainWindow : Window
             DashboardTopMusicVolumeText.Text = $"{volume} %";
             if (!_updatingMusicPlayerUi)
             {
-                await ExecuteMusicCommandAsync(() => _musicPlayerRouter.SetVolumeAsync(volume));
+                if (IsSpotifyMusicProvider())
+                {
+                    await QueueSpotifyVolumeUpdateAsync(volume);
+                }
+                else
+                {
+                    await ExecuteMusicCommandAsync(() => _musicPlayerRouter.SetVolumeAsync(volume));
+                }
             }
         };
         DashboardTopMusicWidget.MouseLeftButtonUp += (_, e) =>
@@ -9608,8 +9615,8 @@ private Task ApplyCombinedAlertDuckingAsync()
             _lastRequestedSpotifyVolumePercent = volume;
             _lastRequestedSpotifyVolumeAt = DateTimeOffset.UtcNow;
 
-            // SpotifyModule debounced Seek/Volume um 1s; hier nur den letzten Wert merken.
-            await _spotifyModule.SetVolumeAsync(
+            // Sliderbewegungen sollen ohne zusätzliche Verzögerung hörbar werden.
+            await _spotifyModule.SetVolumeImmediateAsync(
                 volume,
                 cancellationToken);
 
