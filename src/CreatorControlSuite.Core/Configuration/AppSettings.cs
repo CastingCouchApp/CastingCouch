@@ -117,6 +117,10 @@ public sealed class TwitchSettings
     public TwitchGoalSettings DonationGoal { get; set; } = new() { Title = "Donation-Ziel", Target = 100, Currency = "EUR" };
     public int EndSceneDurationSeconds { get; set; } = 60;
     public bool RaidOnStreamEnd { get; set; }
+
+    /// <summary>Zuletzt gewählter Ablauf im Streamende-Dialog.</summary>
+    public StreamEndMode StreamEndMode { get; set; } = StreamEndMode.EndSceneThenStop;
+
     public int RaidCountdownSeconds { get; set; } = 90;
     public bool StopStreamAfterRaid { get; set; } = true;
     public bool StopSpotifyAfterRaid { get; set; } = true;
@@ -614,6 +618,9 @@ public sealed class DashboardSettings
     public bool AutoFocusModeOnStreamStart { get; set; }
     public bool AutoExitFocusModeOnStreamEnd { get; set; } = true;
     public string ObsScenePreviewSize { get; set; } = "Standard";
+
+    /// <summary>Ob der Bereich „Streamende &amp; Raid“ unter Schnellzugriff ausgeklappt ist.</summary>
+    public bool StreamEndExpanded { get; set; }
 
     public Dictionary<string, string> ModuleSizes { get; set; } =
         new(StringComparer.Ordinal)

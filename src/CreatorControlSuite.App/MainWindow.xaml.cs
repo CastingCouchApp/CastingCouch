@@ -289,8 +289,10 @@ public partial class MainWindow : Window
     private bool _raidCountdownActive;
     private bool _plannedStreamEndActive;
     private bool _streamEndFlowActive;
+    private bool _streamEndAbortRequested;
     private bool _raidTargetIsOnline;
     private bool _awaitingManualRaid;
+    private StreamEndDialogWindow? _activeStreamEndDialog;
     private TaskCompletionSource<bool>? _streamEndRaidDecisionTcs;
     private System.Net.WebSockets.ClientWebSocket? _streamerBotSocket;
     private System.Net.WebSockets.ClientWebSocket? _streamerBotEventSocket;
@@ -4942,6 +4944,16 @@ public partial class MainWindow : Window
                 continue;
             }
 
+            if (string.Equals(key, "TwitchUsers", StringComparison.Ordinal))
+            {
+                element.Width = double.NaN;
+                element.MinWidth = 0;
+                element.MaxWidth = double.PositiveInfinity;
+                element.HorizontalAlignment = HorizontalAlignment.Stretch;
+                element.VerticalAlignment = VerticalAlignment.Stretch;
+                continue;
+            }
+
             element.Width = double.NaN;
             element.MinWidth = 0;
             element.MaxWidth = double.PositiveInfinity;
@@ -4990,6 +5002,13 @@ public partial class MainWindow : Window
         DashboardSceneButtonsPanel.MaxWidth = width;
 
         var useWidePreviewLayout = string.Equals(size, "Groß", StringComparison.Ordinal);
+        // Events/User/Chat brauchen eine *-Zeile mit definierter Höhe, sonst bleiben sie auf MinHeight.
+        DashboardPrimaryRow.RowDefinitions[0].Height = useWidePreviewLayout
+            ? GridLength.Auto
+            : new GridLength(1, GridUnitType.Star);
+        DashboardPrimaryRow.RowDefinitions[1].Height = useWidePreviewLayout
+            ? new GridLength(1, GridUnitType.Star)
+            : GridLength.Auto;
         Grid.SetRow(DashboardObsSceneColumn, 0);
         Grid.SetColumn(DashboardObsSceneColumn, 0);
         Grid.SetColumnSpan(DashboardObsSceneColumn, useWidePreviewLayout ? 2 : 1);
@@ -7521,6 +7540,7 @@ public partial class MainWindow : Window
         DashboardRaidTargetStatusText.Text = text;
         ServicesTwitchRaidTargetStatusText.Text = text;
         DashboardStreamEndTargetText.Text = text;
+        _activeStreamEndDialog?.SetRaidTargetStatus(text);
     }
 
     private void OpenSelectedRaidChannel()
@@ -7570,19 +7590,31 @@ public partial class MainWindow : Window
 
     private void UpdateDashboardStreamEndModuleVisibility()
     {
-        DashboardStreamEndModule.Visibility = Visibility.Visible;
+        DashboardStreamEndModule.Visibility = Visibility.Collapsed;
         DashboardPlanStreamEndButton.Visibility = _plannedStreamEndActive ? Visibility.Collapsed : Visibility.Visible;
         DashboardCancelPlannedStreamEndButton.Visibility = _plannedStreamEndActive ? Visibility.Visible : Visibility.Collapsed;
         DashboardSkipRaidAndStopButton.Visibility = _awaitingManualRaid || _streamEndFlowActive
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        _activeStreamEndDialog?.ShowRaidActions(_awaitingManualRaid && !_raidCountdownActive);
     }
 
     private void UpdateDashboardRaidActionButtons()
     {
         var hasTarget = !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel);
-        DashboardStartRaidButton.IsEnabled = hasTarget && _raidTargetIsOnline && !_raidCountdownActive;
+        var raidReady = hasTarget && _raidTargetIsOnline && !_raidCountdownActive
+            && (_awaitingManualRaid || _streamEndFlowActive);
+        DashboardStartRaidButton.IsEnabled = raidReady;
+        DashboardStartRaidButton.Visibility = raidReady ? Visibility.Visible : Visibility.Collapsed;
         DashboardCancelRaidButton.IsEnabled = _raidCountdownActive;
+
+        _activeStreamEndDialog?.SetRaidReady(raidReady);
+        _activeStreamEndDialog?.SetCancelRaidEnabled(_raidCountdownActive);
+        if (_awaitingManualRaid && !_raidCountdownActive)
+        {
+            _activeStreamEndDialog?.ShowRaidActions(true);
+        }
     }
 
     private async Task AddRaidChannelAsync()
@@ -13735,16 +13767,25 @@ private Task ApplyCombinedAlertDuckingAsync()
         DashboardRaidViewerText.Text = $"Aktuelle Zuschauer: {_currentLiveViewerCount}";
         DashboardRaidCountdownProgress.Minimum = 0;
         DashboardRaidCountdownProgress.Maximum = Math.Max(1, seconds);
-        DashboardStreamEndStatusText.Text = "Raid läuft";
+        SetStreamEndStatus("Raid läuft");
+        _activeStreamEndDialog?.ShowRaidActions(false);
+        _activeStreamEndDialog?.SetCancelRaidEnabled(true);
 
         try
         {
             for (var remaining = seconds; remaining >= 0; remaining--)
             {
                 token.ThrowIfCancellationRequested();
-                DashboardRaidCountdownText.Text = $"Raid in: {TimeSpan.FromSeconds(remaining):mm\\:ss}";
+                var clock = TimeSpan.FromSeconds(remaining).ToString(@"mm\:ss");
+                DashboardRaidCountdownText.Text = $"Raid in: {clock}";
                 DashboardRaidCountdownProgress.Value = seconds - remaining;
                 DashboardWorkflowStageText.Text = $"RAID → {displayName} · noch {remaining}s";
+                _activeStreamEndDialog?.UpdateCountdown(
+                    "Raid",
+                    clock,
+                    seconds - remaining,
+                    seconds);
+                _activeStreamEndDialog?.SetRaidTargetStatus($"Ziel: {displayName} · Zuschauer: {_currentLiveViewerCount}");
                 if (remaining > 0)
                 {
                     await Task.Delay(1000, token);
@@ -13754,7 +13795,8 @@ private Task ApplyCombinedAlertDuckingAsync()
             DashboardRaidCountdownTitleText.Text = "RAID AUSGEFÜHRT";
             DashboardRaidCountdownText.Text = "Stream wird beendet …";
             DashboardRaidCountdownProgress.Value = seconds;
-            DashboardStreamEndStatusText.Text = "Raid ausgeführt";
+            SetStreamEndStatus("Raid ausgeführt");
+            _activeStreamEndDialog?.UpdateCountdown("Raid ausgeführt", "00:00", seconds, seconds);
             return true;
         }
         catch (OperationCanceledException)
@@ -13762,7 +13804,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             DashboardRaidCountdownTitleText.Text = "RAID ABGEBROCHEN";
             DashboardRaidCountdownText.Text = "Stream bleibt aktiv";
             DashboardWorkflowStageText.Text = "RAID ABGEBROCHEN · STREAM LÄUFT WEITER";
-            DashboardStreamEndStatusText.Text = "Raid abgebrochen";
+            SetStreamEndStatus("Raid abgebrochen");
             return false;
         }
         finally
@@ -13835,7 +13877,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         DashboardStreamEndCountdownLabel.Text = "Zeit bis Streamende (geplant)";
         DashboardStreamEndCountdownProgress.Minimum = 0;
         DashboardStreamEndCountdownProgress.Maximum = Math.Max(1, totalSeconds);
-        DashboardStreamEndStatusText.Text = "Geplantes Streamende aktiv";
+        SetStreamEndStatus("Geplantes Streamende aktiv");
         AddDashboardNotification($"Streamende in {seconds} Sekunden geplant.", "Info");
 
         try
@@ -13860,7 +13902,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             DashboardStreamEndCountdownText.Text = "—";
             DashboardStreamEndCountdownProgress.Value = 0;
-            DashboardStreamEndStatusText.Text = "Planung abgebrochen";
+            SetStreamEndStatus("Planung abgebrochen");
             DashboardWorkflowStageText.Text = "GEPLANTES STREAMENDE ABGEBROCHEN";
             AddDashboardNotification("Geplantes Streamende wurde abgebrochen.", "Info");
         }
@@ -13898,7 +13940,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         _awaitingManualRaid = false;
         _streamEndRaidDecisionTcs.TrySetResult(false);
-        DashboardStreamEndStatusText.Text = "Beenden ohne Raid";
+        SetStreamEndStatus("Beenden ohne Raid");
         UpdateDashboardStreamEndModuleVisibility();
     }
 
@@ -13918,7 +13960,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
 
         DashboardStartRaidButton.IsEnabled = false;
-        DashboardStreamEndStatusText.Text = "Raid wird gestartet …";
+        SetStreamEndStatus("Raid wird gestartet …");
 
         try
         {
@@ -13926,7 +13968,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             if (raidStatus is null)
             {
                 AddDashboardNotification("Raid abgebrochen: Kanal nicht gefunden.", "Fehler");
-                DashboardStreamEndStatusText.Text = "Kanal nicht gefunden";
+                SetStreamEndStatus("Kanal nicht gefunden");
                 UpdateDashboardRaidActionButtons();
                 return;
             }
@@ -13941,7 +13983,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             if (!raidStatus.IsOnline)
             {
                 AddDashboardNotification($"Raid nicht möglich: {raidStatus.DisplayName} ist offline.", "Warnung");
-                DashboardStreamEndStatusText.Text = "Ziel offline";
+                SetStreamEndStatus("Ziel offline");
                 UpdateDashboardRaidActionButtons();
                 return;
             }
@@ -13958,7 +14000,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 AddDashboardNotification(
                     $"Twitch erlaubt den Raid noch nicht: {startException.Message}",
                     "Warnung");
-                DashboardStreamEndStatusText.Text = "Twitch erlaubt Raid noch nicht";
+                SetStreamEndStatus("Twitch erlaubt Raid noch nicht");
                 UpdateDashboardRaidActionButtons();
                 return;
             }
@@ -14021,7 +14063,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         catch (Exception exception)
         {
             AddDashboardNotification($"Raid fehlgeschlagen: {exception.Message}", "Fehler");
-            DashboardStreamEndStatusText.Text = "Raid fehlgeschlagen";
+            SetStreamEndStatus("Raid fehlgeschlagen");
             UpdateDashboardRaidActionButtons();
         }
     }
@@ -14054,21 +14096,28 @@ private Task ApplyCombinedAlertDuckingAsync()
         DashboardStreamEndCountdownLabel.Text = "Zeit bis Streamende (Endszene)";
         DashboardStreamEndCountdownProgress.Minimum = 0;
         DashboardStreamEndCountdownProgress.Maximum = Math.Max(1, endSeconds);
-        DashboardStreamEndStatusText.Text = "Endszene läuft";
+        SetStreamEndStatus("Endszene läuft");
 
         try
         {
             for (var remaining = endSeconds; remaining > 0; remaining--)
             {
                 token.ThrowIfCancellationRequested();
-                DashboardStreamEndCountdownText.Text = FormatCountdownClock(remaining);
+                var clock = FormatCountdownClock(remaining);
+                DashboardStreamEndCountdownText.Text = clock;
                 DashboardStreamEndCountdownProgress.Value = endSeconds - remaining;
                 DashboardWorkflowStageText.Text = $"ENDSZENE · Streamende in {remaining}s";
+                _activeStreamEndDialog?.UpdateCountdown(
+                    "Endszene",
+                    clock,
+                    endSeconds - remaining,
+                    endSeconds);
                 await Task.Delay(1000, token);
             }
 
             DashboardStreamEndCountdownText.Text = "00:00";
             DashboardStreamEndCountdownProgress.Value = endSeconds;
+            _activeStreamEndDialog?.UpdateCountdown("Endszene", "00:00", endSeconds, endSeconds);
         }
         catch (OperationCanceledException)
         {
@@ -14113,13 +14162,19 @@ private Task ApplyCombinedAlertDuckingAsync()
         DashboardWorkflowStageText.Text = _settings.Twitch.RaidOnStreamEnd
             ? "STREAM BEENDET"
             : "STREAM BEENDET";
-        DashboardStreamEndStatusText.Text = "Stream beendet";
+        SetStreamEndStatus("Stream beendet");
         AddDashboardNotification("OBS-Stream wurde beendet.", "Info");
         ResetStreamEndFlowState();
         await Task.Delay(500);
         await RefreshObsAsync();
         await LoadStreamHistoryAsync();
         await RefreshStatisticsAsync();
+    }
+
+    private void SetStreamEndStatus(string text)
+    {
+        DashboardStreamEndStatusText.Text = text;
+        _activeStreamEndDialog?.SetStatus(text);
     }
 
     private async Task StopObsStreamAsync(bool skipConfirmation = false, bool skipRaidPhase = false)
@@ -14131,35 +14186,188 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         if (!skipConfirmation)
         {
-            var result = MessageBox.Show(
-                "Streamende starten? Die konfigurierte Endszene wird vor dem tatsächlichen Stop angezeigt.",
-                "Stream beenden",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes)
-            {
-                return;
-            }
+            await ShowStreamEndDialogAndRunAsync();
+            return;
         }
 
+        var mode = skipRaidPhase
+            ? StreamEndMode.EndSceneThenStop
+            : (_settings.Twitch.RaidOnStreamEnd
+                ? StreamEndMode.EndSceneRaidThenStop
+                : StreamEndMode.EndSceneThenStop);
+        await ExecuteStreamEndFlowAsync(mode);
+    }
+
+    private async Task ShowStreamEndDialogAndRunAsync()
+    {
+        if (_activeStreamEndDialog is not null)
+        {
+            _activeStreamEndDialog.Activate();
+            return;
+        }
+
+        var endSeconds = Math.Max(
+            0,
+            _settings.Twitch.EndSceneDurationSeconds > 0
+                ? _settings.Twitch.EndSceneDurationSeconds
+                : _settings.Workflow.EndSceneSeconds);
+        var channels = _settings.Twitch.RaidChannels
+            .Select(channel => channel.Trim().TrimStart('@'))
+            .Where(channel => !string.IsNullOrWhiteSpace(channel))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var dialog = new StreamEndDialogWindow(
+            _settings.Twitch.StreamEndMode,
+            channels,
+            _settings.Twitch.SelectedRaidChannel,
+            endSeconds,
+            OpenRaidChannelByName);
+        dialog.Owner = this;
+        _activeStreamEndDialog = dialog;
+
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void Cleanup()
+        {
+            if (ReferenceEquals(_activeStreamEndDialog, dialog))
+            {
+                _activeStreamEndDialog = null;
+            }
+
+            finished.TrySetResult();
+        }
+
+        dialog.Closed += (_, _) => Cleanup();
+        dialog.StartRaidRequested += () => _ = ExecuteRaidFromDashboardAsync();
+        dialog.SkipRaidRequested += SkipRaidAndFinishStreamEnd;
+        dialog.CancelRaidRequested += () => _ = CancelActiveRaidAsync();
+        dialog.CancelFlowRequested += () =>
+        {
+            if (!_streamEndFlowActive)
+            {
+                dialog.Close();
+            }
+            else
+            {
+                AbortStreamEndFlowFromDialog();
+            }
+        };
+        dialog.SelectionConfirmed += (mode, channel, endSceneSeconds) =>
+        {
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    _settings.Twitch.StreamEndMode = mode;
+                    if (mode is StreamEndMode.EndSceneThenStop or StreamEndMode.EndSceneRaidThenStop)
+                    {
+                        _settings.Twitch.EndSceneDurationSeconds = endSceneSeconds;
+                        _settings.Workflow.EndSceneSeconds = endSceneSeconds;
+                        ServicesTwitchEndSceneSecondsBox.Text = endSceneSeconds.ToString();
+                        EndSceneSecondsBox.Text = endSceneSeconds.ToString();
+                    }
+
+                    if (mode == StreamEndMode.EndSceneRaidThenStop)
+                    {
+                        if (!string.IsNullOrWhiteSpace(channel))
+                        {
+                            _settings.Twitch.SelectedRaidChannel = channel!;
+                            DashboardRaidChannelBox.SelectedItem = channel;
+                            ServicesTwitchRaidTargetBox.SelectedItem = channel;
+                        }
+
+                        _settings.Twitch.RaidOnStreamEnd = true;
+                        DashboardRaidEnabledBox.IsChecked = true;
+                        ServicesTwitchRaidEnabledBox.IsChecked = true;
+                    }
+
+                    await _settingsStore.SaveAsync(_settings);
+
+                    dialog.EnterRunningPhase(
+                        mode == StreamEndMode.Immediate ? "Stream wird beendet" : "Endszene",
+                        mode == StreamEndMode.Immediate
+                            ? "Stream wird sofort gestoppt …"
+                            : $"Ablauf gestartet … ({endSceneSeconds}s Endszene)");
+
+                    await ExecuteStreamEndFlowAsync(mode);
+                    if (_streamEndAbortRequested)
+                    {
+                        dialog.MarkCompleted("Streamende abgebrochen. Stream läuft weiter.");
+                    }
+                    else
+                    {
+                        dialog.MarkCompleted("Stream beendet.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    ResetStreamEndFlowState();
+                    dialog.MarkCompleted($"Streamende fehlgeschlagen: {exception.Message}");
+                    AddDashboardNotification($"Streamende fehlgeschlagen: {exception.Message}", "Fehler");
+                }
+            });
+        };
+
+        dialog.Show();
+        await finished.Task;
+    }
+
+    private void OpenRaidChannelByName(string channel)
+    {
+        if (string.IsNullOrWhiteSpace(channel))
+        {
+            return;
+        }
+
+        var url = "https://www.twitch.tv/" + Uri.EscapeDataString(channel.Trim().TrimStart('@'));
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+    }
+
+    private void AbortStreamEndFlowFromDialog()
+    {
+        _streamEndAbortRequested = true;
+        _endSceneCountdownCts?.Cancel();
+        _raidCountdownCts?.Cancel();
+        if (_streamEndRaidDecisionTcs is { Task.IsCompleted: false })
+        {
+            _streamEndRaidDecisionTcs.TrySetResult(false);
+        }
+
+        ResetStreamEndFlowState();
+        _activeStreamEndDialog?.MarkCompleted("Streamende abgebrochen. Stream läuft weiter.");
+    }
+
+    private async Task ExecuteStreamEndFlowAsync(StreamEndMode mode)
+    {
         CancelPlannedStreamEnd();
+        _streamEndAbortRequested = false;
 
         try
         {
-            // Eine eventuell noch laufende Startautomatik darf während der
-            // Endszene und nach dem Streamende nicht mehr auf Game wechseln.
             _streamStartAutomationCts?.Cancel();
-
             _streamEndFlowActive = true;
             UpdateDashboardStreamEndModuleVisibility();
+
+            if (mode == StreamEndMode.Immediate)
+            {
+                SetStreamEndStatus("Stream wird sofort beendet …");
+                _activeStreamEndDialog?.UpdateCountdown("Sofort beenden", "—", 1, 1);
+                await FinalizeObsStreamStopAsync();
+                return;
+            }
 
             DashboardWorkflowStageText.Text = "STATISTIKEN ABSCHLIESSEN";
             SetWorkflowVisualStage("End", "Letzte Twitch- und Zuschauerwerte werden gespeichert.");
             await UpdateCurrentStreamStatsForEndSceneAsync(finalize: false);
+            if (_streamEndAbortRequested || !_streamEndFlowActive)
+            {
+                return;
+            }
 
             DashboardWorkflowStageText.Text = "ENDSZENE";
             SetWorkflowVisualStage("End", "Endszene läuft. Streamende wird vorbereitet.");
+            SetStreamEndStatus("Endszene läuft");
 
             if (!string.IsNullOrWhiteSpace(_settings.Obs.EndScene))
             {
@@ -14192,8 +14400,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                     ? _settings.Twitch.EndSceneDurationSeconds
                     : _settings.Workflow.EndSceneSeconds);
 
-            var wantsRaid = !skipRaidPhase
-                && _settings.Twitch.RaidOnStreamEnd
+            var wantsRaid = mode == StreamEndMode.EndSceneRaidThenStop
                 && !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel);
 
             if (wantsRaid)
@@ -14201,13 +14408,10 @@ private Task ApplyCombinedAlertDuckingAsync()
                 _awaitingManualRaid = true;
                 EnsureStreamEndRaidDecisionTcs();
                 UpdateDashboardStreamEndModuleVisibility();
-                UpdateDashboardRaidActionButtons();
-                DashboardStreamEndStatusText.Text = "Endszene · Raid manuell starten";
+                SetStreamEndStatus("Endszene · Raid manuell starten");
                 AddDashboardNotification(
                     "Endszene läuft. Raid starten, sobald Twitch das Ziel anzeigt – oder ohne Raid beenden.",
                     "Info");
-
-                // Raid-Zielstatus frisch laden, damit „Jetzt raiden“ enabled wird.
                 _ = RefreshRaidTargetStatusAsync(_settings.Twitch.SelectedRaidChannel);
             }
 
@@ -14216,8 +14420,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 await RunEndSceneCountdownAsync(endSeconds);
             }
 
-            // Wenn während der Endszene bereits geraidet wurde, ist der Flow dort fertig.
-            if (!_streamEndFlowActive)
+            if (_streamEndAbortRequested || !_streamEndFlowActive)
             {
                 return;
             }
@@ -14234,13 +14437,13 @@ private Task ApplyCombinedAlertDuckingAsync()
                     _awaitingManualRaid = true;
                     EnsureStreamEndRaidDecisionTcs();
                     UpdateDashboardStreamEndModuleVisibility();
-                    DashboardStreamEndStatusText.Text = "Bereit zum Raid";
+                    SetStreamEndStatus("Bereit zum Raid");
                     DashboardWorkflowStageText.Text = "ENDSZENE FERTIG · WARTE AUF RAID";
                     UpdateDashboardRaidActionButtons();
                     raided = await _streamEndRaidDecisionTcs!.Task;
                 }
 
-                if (!_streamEndFlowActive)
+                if (_streamEndAbortRequested || !_streamEndFlowActive)
                 {
                     return;
                 }
@@ -14268,11 +14471,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             ResetStreamEndFlowState();
             AddDashboardNotification($"Streamende fehlgeschlagen: {exception.Message}", "Fehler");
-            MessageBox.Show(
-                exception.Message,
-                "Streamende fehlgeschlagen",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            throw;
         }
     }
 

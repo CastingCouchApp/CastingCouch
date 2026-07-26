@@ -260,6 +260,7 @@
                              <Grid.RowDefinitions>
                                  <RowDefinition Height="Auto"/>
                                  <RowDefinition Height="Auto"/>
+                                 <RowDefinition Height="Auto"/>
                                  <RowDefinition Height="*"/>
                                  <RowDefinition Height="Auto"/>
                              </Grid.RowDefinitions>
@@ -535,16 +536,97 @@
                                     <TextBlock Grid.Column="3" Text="BEARBEITEN  ›" Foreground="{DynamicResource AccentHoverBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 </Grid>
                             </Border>
-                            <Grid x:Name="DashboardPrimaryRow" Grid.Row="2" Margin="0" VerticalAlignment="Stretch">
+                            <Border Grid.Row="2" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardStreamControlModule" Margin="0,0,0,12" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+                                             <StackPanel>
+                                                <TextBlock Text="SCHNELLZUGRIFF" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                                <UniformGrid Columns="6" Rows="1" Margin="0,12,0,8">
+                                                    <Button x:Name="DashboardPrepareStreamButton" ToolTip="Konfigurierte Streaming-Dienste starten und den Stream vorbereiten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="🚀  STREAM VORBEREITEN" Style="{StaticResource OrangeActionButtonStyle}" FontWeight="Bold" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardObsStartStreamButton" ToolTip="OBS-Stream starten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="▷  STREAM STARTEN" FontWeight="Bold" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardObsStopStreamButton" Content="■  STREAM BEENDEN" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardQuickAccessAlertButton" ToolTip="Einen Test-Alert auslösen" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="♧  TEST-ALERT" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardQuickAccessOverlayButton" ToolTip="Overlay-Einstellungen öffnen" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="▱  OVERLAY EIN/AUS" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardShortStreamTestButton" ToolTip="Automatisierung öffnen und einen kurzen Testlauf ohne Stream starten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="⚙  STREAM-KURZTEST" Margin="3" Padding="8,4"/>
+                                                </UniformGrid>
+                                                <Border x:Name="DashboardPrepareProgressPanel" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10" Margin="3,2,3,10" Visibility="Collapsed">
+                                                    <StackPanel>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="STREAM WIRD VORBEREITET" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                            <TextBlock x:Name="DashboardPrepareProgressPercentText" Grid.Column="1" Text="0 %" Foreground="{DynamicResource AccentHoverBrush}" FontWeight="Bold"/>
+                                                        </Grid>
+                                                        <ProgressBar x:Name="DashboardPrepareProgressBar" Minimum="0" Maximum="100" Value="0" Height="12" Margin="0,8,0,0"/>
+                                                        <TextBlock x:Name="DashboardPrepareProgressText" Text="Programme werden gestartet …" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <TextBlock Text="Streamtitel" Visibility="Collapsed"/>
+                                                <Grid Visibility="Collapsed">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="DashboardTwitchTitleBox"/>
+                                                    <Button x:Name="DashboardSaveTwitchChannelButton" Grid.Column="1" Content="Titel/Kategorie ändern" Margin="8,0,0,0"/>
+                                                </Grid>
+                                                <Grid Margin="0,8,0,0" Visibility="Collapsed">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="1.2*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="1.2*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="DashboardTwitchCategorySearchBox" ToolTip="Kategorie suchen"/>
+                                                    <Button x:Name="DashboardSearchTwitchCategoryButton" Grid.Column="1" Content="Suchen" Margin="8,0"/>
+                                                    <ComboBox x:Name="DashboardTwitchCategoryResultsBox" Grid.Column="2" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                </Grid>
+                                                <Border x:Name="DashboardRaidControlModule" Visibility="Collapsed"/>
+                                                <!-- Kompatibilität: Streamende-Controls (UI läuft über StreamEndDialogWindow) -->
+                                                <StackPanel Visibility="Collapsed" IsHitTestVisible="False">
+                                                    <Border x:Name="DashboardStreamEndModule"/>
+                                                    <Button x:Name="DashboardStreamEndToggleButton"/>
+                                                    <TextBlock x:Name="DashboardStreamEndExpandGlyph"/>
+                                                    <TextBlock x:Name="DashboardStreamEndStatusText" Text="Bereit"/>
+                                                    <StackPanel x:Name="DashboardStreamEndContentPanel"/>
+                                                    <TextBlock x:Name="DashboardStreamEndTargetText"/>
+                                                    <CheckBox x:Name="DashboardRaidEnabledBox"/>
+                                                    <TextBlock x:Name="DashboardRaidTargetStatusText"/>
+                                                    <Grid x:Name="DashboardRaidSelectionPanel"/>
+                                                    <ComboBox x:Name="DashboardRaidChannelBox"/>
+                                                    <Button x:Name="DashboardOpenRaidChannelButton"/>
+                                                    <TextBox x:Name="DashboardPlannedStreamEndSecondsBox"/>
+                                                    <Button x:Name="DashboardPlanStreamEndButton"/>
+                                                    <Button x:Name="DashboardCancelPlannedStreamEndButton"/>
+                                                    <TextBlock x:Name="DashboardStreamEndCountdownLabel"/>
+                                                    <TextBlock x:Name="DashboardStreamEndCountdownText" Text="—"/>
+                                                    <ProgressBar x:Name="DashboardStreamEndCountdownProgress" Minimum="0" Maximum="1" Value="0"/>
+                                                    <Border x:Name="DashboardRaidStatusPanel"/>
+                                                    <TextBlock x:Name="DashboardRaidCountdownTitleText"/>
+                                                    <TextBlock x:Name="DashboardRaidCountdownTargetText"/>
+                                                    <TextBlock x:Name="DashboardRaidCountdownText"/>
+                                                    <TextBlock x:Name="DashboardRaidViewerText"/>
+                                                    <ProgressBar x:Name="DashboardRaidCountdownProgress" Minimum="0" Maximum="90" Value="0"/>
+                                                    <Button x:Name="DashboardStartRaidButton"/>
+                                                    <Button x:Name="DashboardCancelRaidButton"/>
+                                                    <Button x:Name="DashboardSkipRaidAndStopButton"/>
+                                                </StackPanel>
+                                             </StackPanel>
+                            </Border>
+                            <Grid x:Name="DashboardPrimaryRow" Grid.Row="3" Margin="0" VerticalAlignment="Stretch">
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
+                                    <!-- Normal: Content in Zeile 0 (*); Groß-Vorschau: Content in Zeile 1 (*), gesetzt per Code -->
+                                    <RowDefinition Height="*"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" MinWidth="0"/>
                                     <ColumnDefinition Width="*" MinWidth="280"/>
                                 </Grid.ColumnDefinitions>
-                                    <Grid x:Name="DashboardObsSceneColumn" Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Top" HorizontalAlignment="Left">
+                                    <Grid x:Name="DashboardObsSceneColumn" Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Stretch" HorizontalAlignment="Left">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*" MinHeight="120"/>
+                                        </Grid.RowDefinitions>
                                         <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardObsSceneControlModule" Margin="0" HorizontalAlignment="Left" VerticalAlignment="Top">
                                             <StackPanel x:Name="DashboardObsSceneControlContent" MaxWidth="400">
                                                 <Grid Margin="0,0,0,8">
@@ -578,86 +660,35 @@
                                                 <Button x:Name="DashboardAddSceneButton" Content="+ Button hinzufügen" HorizontalAlignment="Left" Margin="0,6,0,0" Padding="12,6"/>
                                             </StackPanel>
                                         </Border>
+                                        <Border x:Name="DashboardTwitchUsersModule" Grid.Row="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,8,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="Auto" MinWidth="0">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="*"/>
+                                                </Grid.RowDefinitions>
+                                                <TextBlock x:Name="DashboardTwitchUsersHeaderText" Text="TWITCH · USER (0)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                <ListBox x:Name="DashboardTwitchUsersList" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Stretch">
+                                                    <ListBox.ItemContainerStyle>
+                                                        <Style TargetType="ListBoxItem">
+                                                            <Setter Property="Background" Value="Transparent"/>
+                                                            <Setter Property="BorderThickness" Value="0"/>
+                                                            <Setter Property="Padding" Value="0"/>
+                                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                            <Setter Property="Focusable" Value="False"/>
+                                                        </Style>
+                                                    </ListBox.ItemContainerStyle>
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding}" Foreground="{Binding Converter={StaticResource TwitchRoleToBrushConverter}}" TextWrapping="Wrap" Margin="4,2"/>
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </Grid>
+                                        </Border>
                                     </Grid>
                                      <Grid x:Name="DashboardPrimaryContentColumn" Grid.Column="1" VerticalAlignment="Stretch">
-                                         <Grid.RowDefinitions>
-                                             <RowDefinition Height="Auto"/>
-                                             <RowDefinition Height="*" MinHeight="160"/>
-                                         </Grid.RowDefinitions>
-                                         <Grid.ColumnDefinitions>
-                                             <ColumnDefinition Width="1.15*"/>
-                                             <ColumnDefinition Width="*"/>
-                                         </Grid.ColumnDefinitions>
-                                         <Border x:Name="DashboardStreamEndModule" Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource AccentMutedBrush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="5,0,0,10" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" MinHeight="250">
-                                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                            <StackPanel>
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="STREAMENDE &amp; RAID" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                                                    <TextBlock x:Name="DashboardStreamEndStatusText" Grid.Column="1" Text="Bereit" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="280"/>
-                                                </Grid>
-                                                <TextBlock x:Name="DashboardStreamEndTargetText" Text="Kein Raid-Ziel ausgewählt" Foreground="{DynamicResource TextMutedBrush}" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
-                                                <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7" Margin="0,7,0,0">
-                                                    <StackPanel>
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <CheckBox x:Name="DashboardRaidEnabledBox" Content="MIT RAID BEENDEN" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                            <TextBlock Grid.Column="1" x:Name="DashboardRaidTargetStatusText" Text="Kein Ziel ausgewählt" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                        </Grid>
-                                                        <Grid x:Name="DashboardRaidSelectionPanel" Margin="0,6,0,0">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <ComboBox x:Name="DashboardRaidChannelBox" Foreground="{DynamicResource TextPrimaryBrush}" MinWidth="170"/>
-                                                            <Button x:Name="DashboardOpenRaidChannelButton" Grid.Column="1" Content="ÖFFNEN" Margin="6,0,0,0" Padding="8,5"/>
-                                                        </Grid>
-                                                    </StackPanel>
-                                                </Border>
-                                                <Grid Margin="0,10,0,0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="70"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="Noch" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0"/>
-                                                    <TextBox x:Name="DashboardPlannedStreamEndSecondsBox" Grid.Column="1" ToolTip="Sekunden bis zum Streamende"/>
-                                                    <TextBlock Grid.Column="2" Text="Sekunden" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="6,0,8,0"/>
-                                                    <StackPanel Grid.Column="3" Orientation="Horizontal">
-                                                        <Button x:Name="DashboardPlanStreamEndButton" Content="STREAMENDE PLANEN" Padding="12,6" Margin="0,0,6,0"/>
-                                                        <Button x:Name="DashboardCancelPlannedStreamEndButton" Content="PLANUNG ABBRECHEN" Padding="12,6" Visibility="Collapsed"/>
-                                                    </StackPanel>
-                                                </Grid>
-                                                <TextBlock x:Name="DashboardStreamEndCountdownLabel" Text="Zeit bis Streamende" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,4"/>
-                                                <TextBlock x:Name="DashboardStreamEndCountdownText" Text="—" Foreground="{DynamicResource AccentHoverBrush}" FontSize="20" FontWeight="Bold"/>
-                                                <ProgressBar x:Name="DashboardStreamEndCountdownProgress" Height="10" Minimum="0" Maximum="1" Value="0" Margin="0,6,0,0"/>
-                                                <Border x:Name="DashboardRaidStatusPanel" Background="{DynamicResource RowBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10" Margin="0,12,0,0">
-                                                    <StackPanel>
-                                                        <TextBlock x:Name="DashboardRaidCountdownTitleText" Text="RAID" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold"/>
-                                                        <TextBlock x:Name="DashboardRaidCountdownTargetText" Text="Ziel: -" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,5,0,0"/>
-                                                        <TextBlock x:Name="DashboardRaidCountdownText" Text="Raid: —" Foreground="{DynamicResource AccentHoverBrush}" FontSize="20" FontWeight="Bold" Margin="0,4,0,0"/>
-                                                        <TextBlock x:Name="DashboardRaidViewerText" Text="Aktuelle Zuschauer: 0" Foreground="{DynamicResource TextMutedBrush}" Margin="0,3,0,0"/>
-                                                        <ProgressBar x:Name="DashboardRaidCountdownProgress" Height="10" Minimum="0" Maximum="90" Value="0" Margin="0,8,0,0"/>
-                                                    </StackPanel>
-                                                </Border>
-                                                <WrapPanel Margin="0,10,0,0">
-                                                    <Button x:Name="DashboardStartRaidButton" Content="JETZT RAIDEN" Padding="12,8" Margin="0,0,8,6" FontWeight="Bold" IsEnabled="False"/>
-                                                    <Button x:Name="DashboardCancelRaidButton" Content="RAID ABBRECHEN" Padding="12,8" Margin="0,0,8,6" IsEnabled="False"/>
-                                                    <Button x:Name="DashboardSkipRaidAndStopButton" Content="OHNE RAID BEENDEN" Padding="12,8" Margin="0,0,0,6" Visibility="Collapsed"/>
-                                                </WrapPanel>
-                                            </StackPanel>
-                                            </ScrollViewer>
-                                        </Border>
-                                         <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,10" VerticalAlignment="Stretch">
+                                         <Grid Margin="0,0,0,0" VerticalAlignment="Stretch">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
@@ -678,32 +709,7 @@
                                                     <ListBox x:Name="DashboardTwitchEventsList" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Stretch"/>
                                                 </Grid>
                                             </Border>
-                                            <Border x:Name="DashboardTwitchUsersModule" Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="4,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                                <Grid>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="*"/>
-                                                    </Grid.RowDefinitions>
-                                                    <TextBlock x:Name="DashboardTwitchUsersHeaderText" Text="TWITCH · USER (0)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                                                    <ListBox x:Name="DashboardTwitchUsersList" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}">
-                                                        <ListBox.ItemContainerStyle>
-                                                            <Style TargetType="ListBoxItem">
-                                                                <Setter Property="Background" Value="Transparent"/>
-                                                                <Setter Property="BorderThickness" Value="0"/>
-                                                                <Setter Property="Padding" Value="0"/>
-                                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                                                <Setter Property="Focusable" Value="False"/>
-                                                            </Style>
-                                                        </ListBox.ItemContainerStyle>
-                                                        <ListBox.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <TextBlock Text="{Binding}" Foreground="{Binding Converter={StaticResource TwitchRoleToBrushConverter}}" TextWrapping="Wrap" Margin="4,2"/>
-                                                            </DataTemplate>
-                                                        </ListBox.ItemTemplate>
-                                                    </ListBox>
-                                                </Grid>
-                                            </Border>
-                                            <Border Grid.Column="2" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardTwitchChatModule" Margin="4,0,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                            <Border Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardTwitchChatModule" Margin="4,0,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                                 <Grid>
                                                     <Grid.RowDefinitions>
                                                         <RowDefinition Height="Auto"/>
@@ -741,61 +747,10 @@
                                                 </Grid>
                                             </Border>
                                         </Grid>
-                                         <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardStreamControlModule" Margin="0,0,5,10" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" MinHeight="250">
-                                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                             <StackPanel>
-                                                <TextBlock Text="SCHNELLZUGRIFF" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                                                <UniformGrid Columns="3" Margin="0,12,0,8">
-                                                    <Button x:Name="DashboardPrepareStreamButton" ToolTip="Konfigurierte Streaming-Dienste starten und den Stream vorbereiten" MinHeight="48" HorizontalContentAlignment="Left" Content="🚀  STREAM VORBEREITEN" Style="{StaticResource OrangeActionButtonStyle}" FontWeight="Bold" Margin="3"/>
-                                                    <Button x:Name="DashboardObsStartStreamButton" ToolTip="OBS-Stream starten" MinHeight="48" HorizontalContentAlignment="Left" Content="▷  STREAM STARTEN" FontWeight="Bold" Margin="3"/>
-                                                    <Button x:Name="DashboardObsStopStreamButton" Content="■  STREAM BEENDEN" Margin="3"/>
-                                                </UniformGrid>
-                                                <UniformGrid Columns="3" Margin="0,0,0,8">
-                                                    <Button x:Name="DashboardQuickAccessAlertButton" ToolTip="Einen Test-Alert auslösen" MinHeight="48" HorizontalContentAlignment="Left" Content="♧  TEST-ALERT" Margin="3"/>
-                                                    <Button x:Name="DashboardQuickAccessOverlayButton" ToolTip="Overlay-Einstellungen öffnen" MinHeight="48" HorizontalContentAlignment="Left" Content="▱  OVERLAY EIN/AUS" Margin="3"/>
-                                                    <Button x:Name="DashboardShortStreamTestButton" ToolTip="Automatisierung öffnen und einen kurzen Testlauf ohne Stream starten" MinHeight="48" HorizontalContentAlignment="Left" Content="⚙  STREAM-KURZTEST" Margin="3"/>
-                                                </UniformGrid>
-                                                <Border x:Name="DashboardPrepareProgressPanel" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10" Margin="3,2,3,10" Visibility="Collapsed">
-                                                    <StackPanel>
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="STREAM WIRD VORBEREITET" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                                                            <TextBlock x:Name="DashboardPrepareProgressPercentText" Grid.Column="1" Text="0 %" Foreground="{DynamicResource AccentHoverBrush}" FontWeight="Bold"/>
-                                                        </Grid>
-                                                        <ProgressBar x:Name="DashboardPrepareProgressBar" Minimum="0" Maximum="100" Value="0" Height="12" Margin="0,8,0,0"/>
-                                                        <TextBlock x:Name="DashboardPrepareProgressText" Text="Programme werden gestartet …" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"/>
-                                                    </StackPanel>
-                                                </Border>
-                                                <TextBlock Text="Streamtitel" Visibility="Collapsed"/>
-                                                <Grid Visibility="Collapsed">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBox x:Name="DashboardTwitchTitleBox"/>
-                                                    <Button x:Name="DashboardSaveTwitchChannelButton" Grid.Column="1" Content="Titel/Kategorie ändern" Margin="8,0,0,0"/>
-                                                </Grid>
-                                                <Grid Margin="0,8,0,0" Visibility="Collapsed">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="1.2*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="1.2*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBox x:Name="DashboardTwitchCategorySearchBox" ToolTip="Kategorie suchen"/>
-                                                    <Button x:Name="DashboardSearchTwitchCategoryButton" Grid.Column="1" Content="Suchen" Margin="8,0"/>
-                                                    <ComboBox x:Name="DashboardTwitchCategoryResultsBox" Grid.Column="2" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                </Grid>
-                                                <Border x:Name="DashboardRaidControlModule" Visibility="Collapsed"/>
-                                             </StackPanel>
-                                             </ScrollViewer>
-                                         </Border>
                                     </Grid>
                             </Grid>
                             <!-- Entfernte Dashboard-Widgets (Kompatibilität für Code-Behind) -->
-                            <Grid Grid.Row="3" Visibility="Collapsed">
+                            <Grid Grid.Row="4" Visibility="Collapsed">
                                 <Grid x:Name="DashboardStreamingServicesRow"/>
                                 <Grid x:Name="DashboardRemainingWidgetsRow">
                                     <Border x:Name="DashboardNextAutomationModule">

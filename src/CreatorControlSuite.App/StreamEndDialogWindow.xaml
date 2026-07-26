@@ -1,0 +1,196 @@
+<Window x:Class="CreatorControlSuite.App.StreamEndDialogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Stream beenden"
+        Width="640"
+        Height="600"
+        MinWidth="520"
+        MinHeight="460"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="Stream beenden" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock x:Name="SubtitleText"
+                       Text="Wähle, wie der Stream beendet werden soll."
+                       Foreground="{DynamicResource TextMutedBrush}"
+                       Margin="0,6,0,0"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Auswahl -->
+        <StackPanel x:Name="SelectionPanel" Grid.Row="1" Margin="0,18,0,0">
+            <RadioButton x:Name="ImmediateRadio"
+                         GroupName="StreamEndMode"
+                         Content="Stream sofort beenden"
+                         FontSize="15"
+                         Margin="0,0,0,10"/>
+            <RadioButton x:Name="EndSceneRadio"
+                         GroupName="StreamEndMode"
+                         Content="Stream Endszene-Zeit ablaufen lassen und Ende"
+                         FontSize="15"
+                         Margin="0,0,0,10"
+                         IsChecked="True"/>
+            <RadioButton x:Name="EndSceneRaidRadio"
+                         GroupName="StreamEndMode"
+                         Content="Stream Endszene-Zeit ablaufen lassen, Raid und Ende"
+                         FontSize="15"
+                         Margin="0,0,0,14"/>
+
+            <Border x:Name="EndSceneDurationPanel"
+                    Background="{DynamicResource ElevatedBackgroundBrush}"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12"
+                    Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Endszene-Dauer"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                    <TextBox x:Name="EndSceneSecondsBox"
+                             Grid.Column="1"
+                             MinHeight="34"
+                             ToolTip="Sekunden, die die Endszene läuft"/>
+                    <TextBlock Grid.Column="2"
+                               Text="Sekunden"
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </Grid>
+            </Border>
+
+            <Border x:Name="RaidTargetPanel"
+                    Background="{DynamicResource ElevatedBackgroundBrush}"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12"
+                    Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Raid-Ziel" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="RaidChannelBox"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  MinHeight="34"/>
+                        <Button x:Name="OpenRaidChannelButton"
+                                Grid.Column="1"
+                                Content="ÖFFNEN"
+                                Margin="8,0,0,0"
+                                Padding="12,6"/>
+                    </Grid>
+                    <TextBlock x:Name="RaidTargetStatusText"
+                               Text="Kein Ziel ausgewählt"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+
+        <!-- Ablauf -->
+        <Grid x:Name="RunningPanel" Grid.Row="1" Margin="0,18,0,0" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Name="PhaseTitleText"
+                       Text="Endszene"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center"/>
+
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                <TextBlock x:Name="CountdownText"
+                           Text="—"
+                           FontSize="64"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource AccentHoverBrush}"
+                           HorizontalAlignment="Center"/>
+                <ProgressBar x:Name="CountdownProgress"
+                             Height="16"
+                             Minimum="0"
+                             Maximum="1"
+                             Value="0"
+                             Margin="24,18,24,0"/>
+                <TextBlock x:Name="RunningStatusText"
+                           Text=""
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="12,16,12,0"/>
+                <TextBlock x:Name="RaidTargetRunningText"
+                           Text=""
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="12,8,12,0"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Margin="0,12,0,0">
+                <Button x:Name="StartRaidButton"
+                        Content="JETZT RAIDEN"
+                        FontWeight="Bold"
+                        FontSize="16"
+                        MinHeight="48"
+                        Padding="18,10"
+                        Visibility="Collapsed"
+                        HorizontalAlignment="Stretch"/>
+                <Button x:Name="SkipRaidButton"
+                        Content="OHNE RAID BEENDEN"
+                        Margin="0,8,0,0"
+                        Padding="14,8"
+                        Visibility="Collapsed"
+                        HorizontalAlignment="Stretch"/>
+                <Button x:Name="CancelRaidButton"
+                        Content="RAID ABBRECHEN"
+                        Margin="0,8,0,0"
+                        Padding="14,8"
+                        Visibility="Collapsed"
+                        IsEnabled="False"
+                        HorizontalAlignment="Stretch"/>
+            </StackPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,18,0,0">
+            <Button x:Name="CancelButton" Content="ABBRECHEN" Padding="16,8"/>
+            <Button x:Name="ConfirmButton"
+                    Content="STARTEN"
+                    Padding="18,8"
+                    Margin="8,0,0,0"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="{DynamicResource TextOnAccentBrush}"
+                    FontWeight="SemiBold"/>
+            <Button x:Name="CloseWhenDoneButton"
+                    Content="SCHLIESSEN"
+                    Padding="18,8"
+                    Margin="8,0,0,0"
+                    Visibility="Collapsed"/>
+        </StackPanel>
+    </Grid>
+</Window>
