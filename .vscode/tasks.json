@@ -18,11 +18,13 @@
     {
       "label": "run Creator Control Suite",
       "type": "process",
-      "command": "dotnet",
+      "command": "powershell",
       "args": [
-        "run",
-        "--project",
-        "${workspaceFolder}/src/CreatorControlSuite.App/CreatorControlSuite.App.csproj"
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/run-app.ps1"
       ],
       "problemMatcher": "$msCompile",
       "group": "none"

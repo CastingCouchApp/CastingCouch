@@ -92,4 +92,6 @@ $RECYCLE.BIN/
 .codex/*
 !.codex/skills/
 !.codex/skills/**
+!.codex/environments/
+!.codex/environments/environment.toml
 .cursor/hooks/state/

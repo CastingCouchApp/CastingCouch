@@ -41,6 +41,7 @@ public partial class App : Application
     private bool _ownsSingleInstanceMutex;
     private ICrashReporter? _crashReporter;
     private IAppLogger? _appLogger;
+    private string? _sessionMarkerPath;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -228,6 +229,11 @@ public partial class App : Application
 
         _crashReporter = _host.Services.GetRequiredService<ICrashReporter>();
         _appLogger = _host.Services.GetRequiredService<IAppLogger>();
+        _sessionMarkerPath = Path.Combine(
+            localAppData,
+            "active-session.json");
+        await RecoverUnexpectedPreviousTerminationAsync();
+        await WriteSessionMarkerAsync();
 
         _appLogger.Write(
             AppLogLevel.Information,
@@ -526,6 +532,8 @@ public partial class App : Application
         }
         finally
         {
+            DeleteSessionMarker();
+
             if (_ownsSingleInstanceMutex)
             {
                 try
@@ -549,6 +557,12 @@ public partial class App : Application
         object sender,
         DispatcherUnhandledExceptionEventArgs e)
     {
+        // Mark the exception as handled before the first await. An async event
+        // handler returns to WPF at that point; leaving Handled=false until the
+        // continuation runs allows WPF to terminate the process before the
+        // crash report has reached disk.
+        e.Handled = true;
+
         var path = await ReportCrashAsync(
             e.Exception,
             "WPF Dispatcher");
@@ -559,8 +573,6 @@ public partial class App : Application
             "Creator Control Suite",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
-
-        e.Handled = true;
     }
 
     private void OnDomainUnhandledException(
@@ -569,9 +581,9 @@ public partial class App : Application
     {
         if (e.ExceptionObject is Exception exception)
         {
-            _ = ReportCrashAsync(
-                exception,
-                "AppDomain");
+            // AppDomain is raised immediately before process termination.
+            // Block briefly so the report cannot be abandoned mid-write.
+            ReportCrashSynchronously(exception, "AppDomain");
         }
     }
 
@@ -579,11 +591,8 @@ public partial class App : Application
         object? sender,
         UnobservedTaskExceptionEventArgs e)
     {
-        _ = ReportCrashAsync(
-            e.Exception,
-            "TaskScheduler");
-
         e.SetObserved();
+        ReportCrashSynchronously(e.Exception, "TaskScheduler");
     }
 
     private async Task<string> ReportCrashAsync(
@@ -597,22 +606,145 @@ public partial class App : Application
                 source,
                 exception.Message,
                 exception);
-
-            if (_crashReporter is not null)
-            {
-                return await _crashReporter.WriteAsync(
-                    exception,
-                    new Dictionary<string, string>
-                    {
-                        ["source"] = source
-                    });
-            }
         }
         catch
         {
+            // A broken or locked log must not prevent the independent crash
+            // report from being written.
+        }
+
+        try
+        {
+            var reporter = _crashReporter ?? CreateEmergencyCrashReporter();
+            return await reporter.WriteAsync(
+                exception,
+                new Dictionary<string, string>
+                {
+                    ["source"] = source,
+                    ["emergencyReporter"] = (_crashReporter is null).ToString()
+                });
+        }
+        catch (Exception reportException)
+        {
+            WriteBootstrapLog(
+                "Crash report could not be written.",
+                reportException);
         }
 
         return "Crashbericht konnte nicht geschrieben werden.";
+    }
+
+    private void ReportCrashSynchronously(
+        Exception exception,
+        string source)
+    {
+        try
+        {
+            ReportCrashAsync(exception, source)
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch (Exception reportException)
+        {
+            WriteBootstrapLog(
+                "Synchronous crash reporting failed.",
+                reportException);
+        }
+    }
+
+    private static ICrashReporter CreateEmergencyCrashReporter()
+    {
+        var crashRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "CreatorControlSuite",
+            "CrashReports");
+
+        return new FileCrashReporter(crashRoot);
+    }
+
+    private async Task RecoverUnexpectedPreviousTerminationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_sessionMarkerPath) ||
+            !File.Exists(_sessionMarkerPath))
+        {
+            return;
+        }
+
+        string previousSession;
+        try
+        {
+            previousSession = await File.ReadAllTextAsync(_sessionMarkerPath);
+        }
+        catch (Exception exception)
+        {
+            previousSession = "Sitzungsmarkierung konnte nicht gelesen werden: " +
+                exception.Message;
+        }
+
+        var exceptionToReport = new InvalidOperationException(
+            "Die vorherige Creator-Control-Suite-Sitzung wurde unerwartet beendet.");
+
+        try
+        {
+            var reporter = _crashReporter ?? CreateEmergencyCrashReporter();
+            await reporter.WriteAsync(
+                exceptionToReport,
+                new Dictionary<string, string>
+                {
+                    ["source"] = "Previous session recovery",
+                    ["previousSession"] = previousSession
+                });
+        }
+        catch (Exception exception)
+        {
+            WriteBootstrapLog(
+                "Previous unexpected termination could not be reported.",
+                exception);
+        }
+    }
+
+    private async Task WriteSessionMarkerAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_sessionMarkerPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var marker = JsonSerializer.Serialize(
+                new
+                {
+                    processId = Environment.ProcessId,
+                    startedAt = DateTimeOffset.Now,
+                    version = GetCurrentProductVersion()
+                });
+            await File.WriteAllTextAsync(_sessionMarkerPath, marker);
+        }
+        catch (Exception exception)
+        {
+            WriteBootstrapLog("Session marker could not be written.", exception);
+        }
+    }
+
+    private void DeleteSessionMarker()
+    {
+        if (string.IsNullOrWhiteSpace(_sessionMarkerPath))
+        {
+            return;
+        }
+
+        try
+        {
+            if (File.Exists(_sessionMarkerPath))
+            {
+                File.Delete(_sessionMarkerPath);
+            }
+        }
+        catch (Exception exception)
+        {
+            WriteBootstrapLog("Session marker could not be deleted.", exception);
+        }
     }
 
     private static string GetBootstrapLogPath()

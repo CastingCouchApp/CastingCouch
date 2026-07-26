@@ -11959,7 +11959,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 await _spotifyModule.StartPlaylistAsync(
                     playlistUri,
-                    applyConfiguredStartVolume: true,
+                    startVolumePercent: 100,
                     CancellationToken.None);
 
                 _spotifyStartPlaylistTriggeredForCurrentStream = true;
@@ -12073,14 +12073,17 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
     }
 
-    private async Task FinalizeCurrentStreamStatsAsync()
+    private async Task UpdateCurrentStreamStatsForEndSceneAsync(bool finalize)
     {
-        var endedAt = DateTimeOffset.Now;
+        var endedAt = finalize ? DateTimeOffset.Now : (DateTimeOffset?)null;
 
         // Letzte Live-Werte unmittelbar vor der Endszene abrufen.
         await RefreshLiveViewerSampleAsync();
         await RefreshTwitchFollowerCountAsync();
-        await _workflowModule.Service.FinalizeSessionStatsAsync(endedAt);
+        if (endedAt.HasValue)
+        {
+            await _workflowModule.Service.FinalizeSessionStatsAsync(endedAt);
+        }
 
         var sessionStats = _workflowModule.Service.SessionStats;
         await UpdateActiveOverlayJsonAsync(root =>
@@ -12190,9 +12193,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
+            // Eine eventuell noch laufende Startautomatik darf während der
+            // Endszene und nach dem Streamende nicht mehr auf Game wechseln.
+            _streamStartAutomationCts?.Cancel();
+
             DashboardWorkflowStageText.Text = "STATISTIKEN ABSCHLIESSEN";
             SetWorkflowVisualStage("End", "Letzte Twitch- und Zuschauerwerte werden gespeichert.");
-            await FinalizeCurrentStreamStatsAsync();
+            await UpdateCurrentStreamStatsForEndSceneAsync(finalize: false);
 
             DashboardWorkflowStageText.Text = "ENDSZENE";
             SetWorkflowVisualStage("End", "Endszene läuft. Streamende wird vorbereitet.");
@@ -12286,7 +12293,15 @@ private Task ApplyCombinedAlertDuckingAsync()
                 }
             }
 
+            // Erst unmittelbar vor dem tatsächlichen OBS-Stopp wird die
+            // Streamdauer eingefroren. So zählt die komplette Endszene mit.
+            await UpdateCurrentStreamStatsForEndSceneAsync(finalize: true);
             await _obsClient.StopStreamAsync();
+
+            if (!string.IsNullOrWhiteSpace(_settings.Obs.StartScene))
+            {
+                await _obsClient.SetCurrentProgramSceneAsync(_settings.Obs.StartScene);
+            }
 
             if (_settings.Workflow.PauseSpotifyOnStreamEnd)
             {

@@ -43,7 +43,7 @@
     subs.textContent=stats.newSubscriptions||0;
     giftSubs.textContent=stats.giftSubscriptions||0;
     peak.textContent=stats.peakViewers||0;
-    average.textContent=(Number(stats.averageViewers)||0).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
+    average.textContent=Math.round(Number(stats.averageViewers)||0).toLocaleString('de-DE');
     chatMessages.textContent=Number(stats.chatMessages)||0;
     alertsPlayed.textContent=Number(stats.alertsPlayed)||0;
     bitsCheered.textContent=(Number(stats.bitsCheered)||0).toLocaleString('de-DE');

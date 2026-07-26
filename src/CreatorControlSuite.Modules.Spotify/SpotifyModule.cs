@@ -472,13 +472,29 @@ public sealed class SpotifyModule : IConnectableModule
 
         await StartPlaylistAsync(
             settings.Spotify.StartPlaylistUri,
-            applyConfiguredStartVolume: true,
+            startVolumePercent: 100,
             cancellationToken);
     }
 
     public async Task StartPlaylistAsync(
         string playlistUri,
         bool applyConfiguredStartVolume = false,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        var startVolumePercent = applyConfiguredStartVolume
+            ? settings.Spotify.StartVolumePercent
+            : (int?)null;
+
+        await StartPlaylistAsync(
+            playlistUri,
+            startVolumePercent,
+            cancellationToken);
+    }
+
+    public async Task StartPlaylistAsync(
+        string playlistUri,
+        int? startVolumePercent,
         CancellationToken cancellationToken = default)
     {
         EnsureConnected();
@@ -494,18 +510,18 @@ public sealed class SpotifyModule : IConnectableModule
         await EnsureApiTokenAsync(forceRefresh: false, cancellationToken: cancellationToken);
         try
         {
-            await StartPlaylistCoreAsync(playlistUri, applyConfiguredStartVolume, cancellationToken);
+            await StartPlaylistCoreAsync(playlistUri, startVolumePercent, cancellationToken);
         }
         catch (InvalidOperationException exception) when (IsUnauthorized(exception))
         {
             await EnsureApiTokenAsync(forceRefresh: true, cancellationToken: cancellationToken);
-            await StartPlaylistCoreAsync(playlistUri, applyConfiguredStartVolume, cancellationToken);
+            await StartPlaylistCoreAsync(playlistUri, startVolumePercent, cancellationToken);
         }
     }
 
     private async Task StartPlaylistCoreAsync(
         string playlistUri,
-        bool applyConfiguredStartVolume,
+        int? startVolumePercent,
         CancellationToken cancellationToken)
     {
         var settings = await _settingsStore.LoadAsync(cancellationToken);
@@ -523,19 +539,23 @@ public sealed class SpotifyModule : IConnectableModule
             await _apiClient.TransferPlaybackAsync(deviceId, play: false, cancellationToken);
         }
 
+        // StartPlayback activates the player reliably. Shuffle used to run first
+        // and Spotify rejects that request for an inactive device, so the actual
+        // playlist start was never reached.
+        await _apiClient.StartPlaybackAsync(deviceId, playlistUri, cancellationToken);
+
+        if (startVolumePercent.HasValue)
+        {
+            await _apiClient.SetVolumeAsync(
+                Math.Clamp(startVolumePercent.Value, 0, 100),
+                deviceId,
+                cancellationToken);
+        }
+
         await _apiClient.SetShuffleAsync(
             settings.Spotify.ShuffleSelectedPlaylist,
             deviceId,
             cancellationToken);
-        await _apiClient.StartPlaybackAsync(deviceId, playlistUri, cancellationToken);
-
-        if (applyConfiguredStartVolume)
-        {
-            await _apiClient.SetVolumeAsync(
-                settings.Spotify.StartVolumePercent,
-                deviceId,
-                cancellationToken);
-        }
     }
 
     private async Task EnsureApiTokenAsync(bool forceRefresh, CancellationToken cancellationToken)
