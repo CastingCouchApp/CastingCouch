@@ -285,7 +285,7 @@ public sealed class SpotifyModule : IConnectableModule
         CancellationToken cancellationToken = default)
     {
         EnsureConnected();
-        return await _apiClient.SearchTracksAsync(query, 20, cancellationToken);
+        return await _apiClient.SearchTracksAsync(query, 10, cancellationToken);
     }
 
     public async Task<IReadOnlyList<SpotifyTrack>> GetPlaylistTracksAsync(

@@ -179,7 +179,9 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
             return [];
         }
 
-        var safeLimit = Math.Clamp(limit, 1, 50);
+        // Spotify reduced the Search endpoint maximum to 10 for Development
+        // Mode apps in February 2026. Higher values return HTTP 400 "Invalid limit".
+        var safeLimit = Math.Clamp(limit, 1, 10);
         var url = "search?type=track&limit=" + safeLimit +
                   "&q=" + Uri.EscapeDataString(query.Trim());
 
