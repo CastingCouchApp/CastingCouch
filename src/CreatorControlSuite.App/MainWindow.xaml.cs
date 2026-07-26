@@ -281,7 +281,14 @@ public partial class MainWindow : Window
     private bool _lastObsStreamActive;
     private CancellationTokenSource? _streamStartAutomationCts;
     private CancellationTokenSource? _raidCountdownCts;
+    private CancellationTokenSource? _plannedStreamEndCts;
+    private CancellationTokenSource? _endSceneCountdownCts;
     private bool _raidCountdownActive;
+    private bool _plannedStreamEndActive;
+    private bool _streamEndFlowActive;
+    private bool _raidTargetIsOnline;
+    private bool _awaitingManualRaid;
+    private TaskCompletionSource<bool>? _streamEndRaidDecisionTcs;
     private System.Net.WebSockets.ClientWebSocket? _streamerBotSocket;
     private System.Net.WebSockets.ClientWebSocket? _streamerBotEventSocket;
     private CancellationTokenSource? _streamerBotEventCts;
@@ -1063,7 +1070,7 @@ public partial class MainWindow : Window
             await ExecuteDashboardActionAsync(
                 DashboardObsStopStreamButton,
                 "Stream beenden",
-                StopObsStreamAsync);
+                () => StopObsStreamAsync());
         DashboardHeaderStreamActionButton.Click += async (_, _) =>
             await ExecuteDashboardActionAsync(
                 DashboardHeaderStreamActionButton,
@@ -1135,6 +1142,10 @@ public partial class MainWindow : Window
         DashboardOpenRaidChannelButton.Click += (_, _) => OpenSelectedRaidChannel();
         ServicesTwitchOpenRaidChannelButton.Click += (_, _) => OpenSelectedRaidChannel();
         DashboardCancelRaidButton.Click += async (_, _) => await CancelActiveRaidAsync();
+        DashboardStartRaidButton.Click += async (_, _) => await ExecuteRaidFromDashboardAsync();
+        DashboardPlanStreamEndButton.Click += async (_, _) => await StartPlannedStreamEndAsync();
+        DashboardCancelPlannedStreamEndButton.Click += (_, _) => CancelPlannedStreamEnd();
+        DashboardSkipRaidAndStopButton.Click += (_, _) => SkipRaidAndFinishStreamEnd();
         ServicesTwitchAddRaidChannelButton.Click += async (_, _) => await AddRaidChannelAsync();
         ServicesTwitchRemoveRaidChannelButton.Click += async (_, _) => await RemoveSelectedRaidChannelAsync();
         DashboardSpotifyVolumeSlider.ValueChanged += async (_, _) =>
@@ -3540,12 +3551,19 @@ public partial class MainWindow : Window
         ServicesTwitchStopStreamAfterRaidBox.IsChecked = _settings.Twitch.StopStreamAfterRaid;
         ServicesTwitchStopSpotifyAfterRaidBox.IsChecked = _settings.Twitch.StopSpotifyAfterRaid;
         ServicesTwitchRaidChannelsBox.Text = string.Join(Environment.NewLine, _settings.Twitch.RaidChannels);
-        ServicesTwitchEndSceneSecondsBox.Text = _settings.Workflow.EndSceneSeconds.ToString();
+        var endSceneSeconds = Math.Max(0, _settings.Twitch.EndSceneDurationSeconds > 0
+            ? _settings.Twitch.EndSceneDurationSeconds
+            : _settings.Workflow.EndSceneSeconds);
+        _settings.Twitch.EndSceneDurationSeconds = endSceneSeconds;
+        _settings.Workflow.EndSceneSeconds = endSceneSeconds;
+        ServicesTwitchEndSceneSecondsBox.Text = endSceneSeconds.ToString();
         ServicesTwitchEndFollowerGoalTargetBox.Text = _settings.Twitch.FollowerGoal.Target.ToString("0");
         DashboardRaidEnabledBox.IsChecked = _settings.Twitch.RaidOnStreamEnd;
+        DashboardPlannedStreamEndMinutesBox.Text = Math.Max(1, _settings.Twitch.PlannedStreamEndMinutes).ToString();
         RefreshConfiguredDashboardScenes();
         RefreshRaidChannelSelectors();
         UpdateDashboardRaidControlsVisibility();
+        UpdateDashboardStreamEndModuleVisibility();
 
         GoalOverlaySceneBox.Text = _settings.Obs.GoalOverlayScene;
         FollowerGoalTitleBox.Text = _settings.Twitch.FollowerGoal.Title;
@@ -3615,7 +3633,11 @@ public partial class MainWindow : Window
         LiveSceneBox.Text = _settings.Obs.LiveScene;
         PauseSceneBox.Text = _settings.Obs.PauseScene;
         EndSceneBox.Text = _settings.Obs.EndScene;
-        EndSceneSecondsBox.Text = _settings.Workflow.EndSceneSeconds.ToString();
+        EndSceneSecondsBox.Text = Math.Max(
+            0,
+            _settings.Twitch.EndSceneDurationSeconds > 0
+                ? _settings.Twitch.EndSceneDurationSeconds
+                : _settings.Workflow.EndSceneSeconds).ToString();
         _liveViewerSampleTimer.Interval = TimeSpan.FromSeconds(
             Math.Clamp(_settings.Workflow.ViewerSampleSeconds, 5, 300));
 
@@ -3854,6 +3876,7 @@ public partial class MainWindow : Window
             await WriteOverlayConfigurationAsync();
 
             _settings.Workflow.EndSceneSeconds = int.Parse(EndSceneSecondsBox.Text.Trim());
+            _settings.Twitch.EndSceneDurationSeconds = _settings.Workflow.EndSceneSeconds;
 
             _settings.StreamDeck.Enabled = StreamDeckEnabledBox.IsChecked == true;
             _settings.StreamDeck.AutoInstallProfile = StreamDeckProfileBox.IsChecked == true;
@@ -3911,6 +3934,7 @@ public partial class MainWindow : Window
         "ConnectionStatus",
         "Community",
         "ObsSceneControl",
+        "StreamEnd",
         "StreamControl",
         "QuickServices",
         "SpotifyPlayer",
@@ -3937,6 +3961,7 @@ public partial class MainWindow : Window
     {
         "ConnectionStatus" => "Verbindungsstatus",
         "StreamControl" => "Streamsteuerung",
+        "StreamEnd" => "Streamende & Raid",
         "WorkflowStatus" => "Workflow-Status",
         "ObsSceneControl" => "OBS · Szene",
         "Notifications" => "Notification Center",
@@ -4088,6 +4113,7 @@ public partial class MainWindow : Window
     {
         "ConnectionStatus" => DashboardServiceStatusSection,
         "StreamControl" => DashboardStreamControlModule,
+        "StreamEnd" => DashboardStreamEndModule,
         "WorkflowStatus" => DashboardWorkflowStatusModule,
         "ObsSceneControl" => DashboardObsSceneControlModule,
         "Notifications" => DashboardNotificationCenterModule,
@@ -6948,12 +6974,14 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(channel))
         {
+            _raidTargetIsOnline = false;
             SetRaidTargetStatusText("Kein Ziel ausgewählt");
             DashboardRaidAssistantText.Text = "Kein Raid-Ziel ausgewählt.";
             DashboardRaidLiveDurationText.Text = "Live-Dauer: -";
             ServicesTwitchRaidLiveDurationText.Text = "Live-Dauer: -";
             DashboardRaidProfileImage.Source = null;
             ServicesTwitchRaidProfileImage.Source = null;
+            UpdateDashboardRaidActionButtons();
             return;
         }
 
@@ -6962,10 +6990,13 @@ public partial class MainWindow : Window
             var status = await _twitchModule.GetRaidTargetStatusAsync(channel.Trim());
             if (status is null)
             {
+                _raidTargetIsOnline = false;
                 SetRaidTargetStatusText($"{channel}: Kanal nicht gefunden");
+                UpdateDashboardRaidActionButtons();
                 return;
             }
 
+            _raidTargetIsOnline = status.IsOnline;
             var liveDuration = status.IsOnline && status.StartedAt is not null
                 ? DateTimeOffset.Now - status.StartedAt.Value
                 : TimeSpan.Zero;
@@ -6982,10 +7013,13 @@ public partial class MainWindow : Window
                 : "Live-Dauer: -";
             ServicesTwitchRaidLiveDurationText.Text = DashboardRaidLiveDurationText.Text;
             await LoadRaidProfileImageAsync(status.ProfileImageUrl);
+            UpdateDashboardRaidActionButtons();
         }
         catch (Exception ex)
         {
+            _raidTargetIsOnline = false;
             SetRaidTargetStatusText($"Status nicht verfügbar: {ex.Message}");
+            UpdateDashboardRaidActionButtons();
         }
     }
 
@@ -7035,6 +7069,7 @@ public partial class MainWindow : Window
     {
         DashboardRaidTargetStatusText.Text = text;
         ServicesTwitchRaidTargetStatusText.Text = text;
+        DashboardStreamEndTargetText.Text = text;
     }
 
     private void OpenSelectedRaidChannel()
@@ -7077,8 +7112,30 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         DashboardRaidSelectionPanel.Visibility = visibility;
-        DashboardRaidStatusPanel.Visibility = visibility;
         DashboardOpenRaidChannelButton.Visibility = visibility;
+        UpdateDashboardStreamEndModuleVisibility();
+        UpdateDashboardRaidActionButtons();
+    }
+
+    private void UpdateDashboardStreamEndModuleVisibility()
+    {
+        var show = _settings.Twitch.RaidOnStreamEnd
+            || _plannedStreamEndActive
+            || _streamEndFlowActive
+            || _raidCountdownActive;
+        DashboardStreamEndModule.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        DashboardPlanStreamEndButton.Visibility = _plannedStreamEndActive ? Visibility.Collapsed : Visibility.Visible;
+        DashboardCancelPlannedStreamEndButton.Visibility = _plannedStreamEndActive ? Visibility.Visible : Visibility.Collapsed;
+        DashboardSkipRaidAndStopButton.Visibility = _awaitingManualRaid || _streamEndFlowActive
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void UpdateDashboardRaidActionButtons()
+    {
+        var hasTarget = !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel);
+        DashboardStartRaidButton.IsEnabled = hasTarget && _raidTargetIsOnline && !_raidCountdownActive;
+        DashboardCancelRaidButton.IsEnabled = _raidCountdownActive;
     }
 
     private async Task AddRaidChannelAsync()
@@ -7177,6 +7234,7 @@ public partial class MainWindow : Window
             _settings.Twitch.SelectedRaidChannel = _settings.Twitch.RaidChannels.FirstOrDefault() ?? "";
         }
         _settings.Workflow.EndSceneSeconds = int.TryParse(ServicesTwitchEndSceneSecondsBox.Text, out var seconds) ? Math.Max(0, seconds) : 60;
+        _settings.Twitch.EndSceneDurationSeconds = _settings.Workflow.EndSceneSeconds;
 
         if (double.TryParse(ServicesTwitchEndFollowerGoalTargetBox.Text.Replace(',', '.'),
                 System.Globalization.NumberStyles.Float,
@@ -7324,6 +7382,7 @@ public partial class MainWindow : Window
         ApplyTwitchEndFieldsToSettings();
         RefreshRaidChannelSelectors();
         DashboardRaidEnabledBox.IsChecked = _settings.Twitch.RaidOnStreamEnd;
+        UpdateDashboardRaidControlsVisibility();
 
         // Speichert das Follower-Ziel und schreibt es zugleich in die aktive overlay-data.json.
         await SaveTwitchGoalsAsync();
@@ -13117,12 +13176,14 @@ private Task ApplyCombinedAlertDuckingAsync()
         _raidCountdownCts = new CancellationTokenSource();
         var token = _raidCountdownCts.Token;
         _raidCountdownActive = true;
-        DashboardRaidStatusPanel.Visibility = Visibility.Visible;
+        UpdateDashboardStreamEndModuleVisibility();
+        UpdateDashboardRaidActionButtons();
         DashboardRaidCountdownTitleText.Text = "RAID LÄUFT";
         DashboardRaidCountdownTargetText.Text = $"Ziel: {displayName}";
         DashboardRaidViewerText.Text = $"Aktuelle Zuschauer: {_currentLiveViewerCount}";
         DashboardRaidCountdownProgress.Minimum = 0;
         DashboardRaidCountdownProgress.Maximum = Math.Max(1, seconds);
+        DashboardStreamEndStatusText.Text = "Raid läuft";
 
         try
         {
@@ -13141,6 +13202,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             DashboardRaidCountdownTitleText.Text = "RAID AUSGEFÜHRT";
             DashboardRaidCountdownText.Text = "Stream wird beendet …";
             DashboardRaidCountdownProgress.Value = seconds;
+            DashboardStreamEndStatusText.Text = "Raid ausgeführt";
             return true;
         }
         catch (OperationCanceledException)
@@ -13148,11 +13210,14 @@ private Task ApplyCombinedAlertDuckingAsync()
             DashboardRaidCountdownTitleText.Text = "RAID ABGEBROCHEN";
             DashboardRaidCountdownText.Text = "Stream bleibt aktiv";
             DashboardWorkflowStageText.Text = "RAID ABGEBROCHEN · STREAM LÄUFT WEITER";
+            DashboardStreamEndStatusText.Text = "Raid abgebrochen";
             return false;
         }
         finally
         {
             _raidCountdownActive = false;
+            UpdateDashboardStreamEndModuleVisibility();
+            UpdateDashboardRaidActionButtons();
         }
     }
 
@@ -13168,6 +13233,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             await _twitchModule.CancelRaidAsync();
             _raidCountdownCts?.Cancel();
             AddDashboardNotification("Twitch-Raid wurde abgebrochen. Der Stream bleibt aktiv.", "Info");
+            if (_streamEndFlowActive)
+            {
+                _awaitingManualRaid = true;
+                UpdateDashboardStreamEndModuleVisibility();
+                UpdateDashboardRaidActionButtons();
+            }
         }
         catch (Exception exception)
         {
@@ -13175,24 +13246,361 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
     }
 
-    private async Task StopObsStreamAsync()
+    private async Task StartPlannedStreamEndAsync()
     {
-        var result = MessageBox.Show(
-            "Streamende starten? Die konfigurierte Endszene wird vor dem tatsächlichen Stop angezeigt.",
-            "Stream beenden",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (result != MessageBoxResult.Yes)
+        if (_plannedStreamEndActive || _streamEndFlowActive)
         {
             return;
         }
+
+        if (!int.TryParse(DashboardPlannedStreamEndMinutesBox.Text.Trim(), out var minutes) || minutes < 1)
+        {
+            AddDashboardNotification("Bitte eine gültige Minutenanzahl für das geplante Streamende eingeben.", "Warnung");
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Streamende in {minutes} Minute(n) planen? Danach startet der Endszene-/Raid-Ablauf automatisch.",
+            "Streamende planen",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _settings.Twitch.PlannedStreamEndMinutes = minutes;
+        await _settingsStore.SaveAsync(_settings);
+
+        _plannedStreamEndCts?.Cancel();
+        _plannedStreamEndCts?.Dispose();
+        _plannedStreamEndCts = new CancellationTokenSource();
+        var token = _plannedStreamEndCts.Token;
+        _plannedStreamEndActive = true;
+        UpdateDashboardStreamEndModuleVisibility();
+
+        var totalSeconds = minutes * 60;
+        DashboardStreamEndCountdownLabel.Text = "Zeit bis Streamende (geplant)";
+        DashboardStreamEndCountdownProgress.Minimum = 0;
+        DashboardStreamEndCountdownProgress.Maximum = Math.Max(1, totalSeconds);
+        DashboardStreamEndStatusText.Text = "Geplantes Streamende aktiv";
+        AddDashboardNotification($"Streamende in {minutes} Minute(n) geplant.", "Info");
+
+        try
+        {
+            for (var remaining = totalSeconds; remaining >= 0; remaining--)
+            {
+                token.ThrowIfCancellationRequested();
+                DashboardStreamEndCountdownText.Text = FormatCountdownClock(remaining);
+                DashboardStreamEndCountdownProgress.Value = totalSeconds - remaining;
+                DashboardWorkflowStageText.Text = $"GEPLANTES STREAMENDE · noch {FormatCountdownClock(remaining)}";
+                if (remaining > 0)
+                {
+                    await Task.Delay(1000, token);
+                }
+            }
+
+            _plannedStreamEndActive = false;
+            UpdateDashboardStreamEndModuleVisibility();
+            await StopObsStreamAsync(skipConfirmation: true);
+        }
+        catch (OperationCanceledException)
+        {
+            DashboardStreamEndCountdownText.Text = "—";
+            DashboardStreamEndCountdownProgress.Value = 0;
+            DashboardStreamEndStatusText.Text = "Planung abgebrochen";
+            DashboardWorkflowStageText.Text = "GEPLANTES STREAMENDE ABGEBROCHEN";
+            AddDashboardNotification("Geplantes Streamende wurde abgebrochen.", "Info");
+        }
+        finally
+        {
+            _plannedStreamEndActive = false;
+            UpdateDashboardStreamEndModuleVisibility();
+        }
+    }
+
+    private void CancelPlannedStreamEnd()
+    {
+        if (!_plannedStreamEndActive)
+        {
+            return;
+        }
+
+        _plannedStreamEndCts?.Cancel();
+    }
+
+    private static string FormatCountdownClock(int totalSeconds)
+    {
+        var ts = TimeSpan.FromSeconds(Math.Max(0, totalSeconds));
+        return ts.TotalHours >= 1
+            ? $"{(int)ts.TotalHours}:{ts.Minutes:00}:{ts.Seconds:00}"
+            : $"{ts.Minutes:00}:{ts.Seconds:00}";
+    }
+
+    private void SkipRaidAndFinishStreamEnd()
+    {
+        if (_streamEndRaidDecisionTcs is null || _streamEndRaidDecisionTcs.Task.IsCompleted)
+        {
+            return;
+        }
+
+        _awaitingManualRaid = false;
+        _streamEndRaidDecisionTcs.TrySetResult(false);
+        DashboardStreamEndStatusText.Text = "Beenden ohne Raid";
+        UpdateDashboardStreamEndModuleVisibility();
+    }
+
+    private async Task ExecuteRaidFromDashboardAsync()
+    {
+        if (_raidCountdownActive)
+        {
+            return;
+        }
+
+        var raidChannel = (DashboardRaidChannelBox.SelectedItem as string
+            ?? _settings.Twitch.SelectedRaidChannel)?.Trim();
+        if (string.IsNullOrWhiteSpace(raidChannel))
+        {
+            AddDashboardNotification("Kein Raid-Ziel ausgewählt.", "Warnung");
+            return;
+        }
+
+        DashboardStartRaidButton.IsEnabled = false;
+        DashboardStreamEndStatusText.Text = "Raid wird gestartet …";
+
+        try
+        {
+            var raidStatus = await _twitchModule.GetRaidTargetStatusAsync(raidChannel);
+            if (raidStatus is null)
+            {
+                AddDashboardNotification("Raid abgebrochen: Kanal nicht gefunden.", "Fehler");
+                DashboardStreamEndStatusText.Text = "Kanal nicht gefunden";
+                UpdateDashboardRaidActionButtons();
+                return;
+            }
+
+            _raidTargetIsOnline = raidStatus.IsOnline;
+            SetRaidTargetStatusText(
+                raidStatus.IsOnline
+                    ? $"{raidStatus.DisplayName} ist ONLINE · {raidStatus.ViewerCount} Zuschauer · {raidStatus.GameName}" +
+                      (string.IsNullOrWhiteSpace(raidStatus.StreamTitle) ? "" : $" · {raidStatus.StreamTitle}")
+                    : $"{raidStatus.DisplayName} ist OFFLINE");
+
+            if (!raidStatus.IsOnline)
+            {
+                AddDashboardNotification($"Raid nicht möglich: {raidStatus.DisplayName} ist offline.", "Warnung");
+                DashboardStreamEndStatusText.Text = "Ziel offline";
+                UpdateDashboardRaidActionButtons();
+                return;
+            }
+
+            // Früher Raid während Endszene: Countdown der Endszene abbrechen.
+            _endSceneCountdownCts?.Cancel();
+
+            try
+            {
+                await _twitchModule.StartRaidAsync(raidChannel);
+            }
+            catch (Exception startException)
+            {
+                AddDashboardNotification(
+                    $"Twitch erlaubt den Raid noch nicht: {startException.Message}",
+                    "Warnung");
+                DashboardStreamEndStatusText.Text = "Twitch erlaubt Raid noch nicht";
+                UpdateDashboardRaidActionButtons();
+                return;
+            }
+
+            AddDashboardNotification($"Twitch-Raid zu {raidStatus.DisplayName} wurde gestartet.", "Info");
+            SetWorkflowVisualStage("Raid", $"Raid zu {raidStatus.DisplayName} wird gestartet.");
+
+            var raidCompleted = await RunRaidCountdownAsync(
+                raidStatus.DisplayName,
+                Math.Clamp(_settings.Twitch.RaidCountdownSeconds, 5, 300));
+
+            if (!raidCompleted)
+            {
+                if (_streamEndFlowActive)
+                {
+                    _awaitingManualRaid = true;
+                    EnsureStreamEndRaidDecisionTcs();
+                    UpdateDashboardStreamEndModuleVisibility();
+                    UpdateDashboardRaidActionButtons();
+                }
+
+                return;
+            }
+
+            if (_settings.Twitch.StopSpotifyAfterRaid)
+            {
+                try
+                {
+                    await _spotifyModule.PauseAsync();
+                }
+                catch (Exception spotifyException)
+                {
+                    AddDashboardNotification($"Spotify konnte nach dem Raid nicht pausiert werden: {spotifyException.Message}", "Warnung");
+                }
+            }
+
+            if (_streamEndFlowActive)
+            {
+                _awaitingManualRaid = false;
+                EnsureStreamEndRaidDecisionTcs();
+                _streamEndRaidDecisionTcs!.TrySetResult(true);
+                return;
+            }
+
+            // Raid außerhalb des End-Flows: optional Stream beenden (ohne erneute Endszene).
+            if (_settings.Twitch.StopStreamAfterRaid)
+            {
+                var confirm = MessageBox.Show(
+                    "Raid ist durch. OBS-Stream jetzt beenden?",
+                    "Stream nach Raid beenden",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+                if (confirm == MessageBoxResult.Yes)
+                {
+                    _streamEndFlowActive = true;
+                    await FinalizeObsStreamStopAsync();
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            AddDashboardNotification($"Raid fehlgeschlagen: {exception.Message}", "Fehler");
+            DashboardStreamEndStatusText.Text = "Raid fehlgeschlagen";
+            UpdateDashboardRaidActionButtons();
+        }
+    }
+
+    private void EnsureStreamEndRaidDecisionTcs()
+    {
+        if (_streamEndRaidDecisionTcs is null || _streamEndRaidDecisionTcs.Task.IsCompleted)
+        {
+            _streamEndRaidDecisionTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+    }
+
+    private void ResetStreamEndFlowState()
+    {
+        _streamEndFlowActive = false;
+        _awaitingManualRaid = false;
+        _streamEndRaidDecisionTcs = null;
+        _endSceneCountdownCts?.Cancel();
+        UpdateDashboardStreamEndModuleVisibility();
+        UpdateDashboardRaidActionButtons();
+    }
+
+    private async Task RunEndSceneCountdownAsync(int endSeconds)
+    {
+        _endSceneCountdownCts?.Cancel();
+        _endSceneCountdownCts?.Dispose();
+        _endSceneCountdownCts = new CancellationTokenSource();
+        var token = _endSceneCountdownCts.Token;
+
+        DashboardStreamEndCountdownLabel.Text = "Zeit bis Streamende (Endszene)";
+        DashboardStreamEndCountdownProgress.Minimum = 0;
+        DashboardStreamEndCountdownProgress.Maximum = Math.Max(1, endSeconds);
+        DashboardStreamEndStatusText.Text = "Endszene läuft";
+
+        try
+        {
+            for (var remaining = endSeconds; remaining > 0; remaining--)
+            {
+                token.ThrowIfCancellationRequested();
+                DashboardStreamEndCountdownText.Text = FormatCountdownClock(remaining);
+                DashboardStreamEndCountdownProgress.Value = endSeconds - remaining;
+                DashboardWorkflowStageText.Text = $"ENDSZENE · Streamende in {remaining}s";
+                await Task.Delay(1000, token);
+            }
+
+            DashboardStreamEndCountdownText.Text = "00:00";
+            DashboardStreamEndCountdownProgress.Value = endSeconds;
+        }
+        catch (OperationCanceledException)
+        {
+            // Früher Raid oder Abbruch – UI bleibt im aktuellen Zustand.
+        }
+    }
+
+    private async Task FinalizeObsStreamStopAsync()
+    {
+        // Erst unmittelbar vor dem tatsächlichen OBS-Stopp wird die
+        // Streamdauer eingefroren. So zählt die komplette Endszene mit.
+        await UpdateCurrentStreamStatsForEndSceneAsync(finalize: true);
+        await _obsClient.StopStreamAsync();
+
+        if (!string.IsNullOrWhiteSpace(_settings.Obs.StartScene))
+        {
+            await _obsClient.SetCurrentProgramSceneAsync(_settings.Obs.StartScene);
+        }
+
+        if (_settings.Workflow.PauseSpotifyOnStreamEnd)
+        {
+            try
+            {
+                await _spotifyModule.PauseAsync();
+                AddDashboardNotification("Spotify wurde nach dem Streamende pausiert.", "Info");
+            }
+            catch (Exception spotifyException)
+            {
+                AddDashboardNotification($"Spotify konnte nach dem Streamende nicht pausiert werden: {spotifyException.Message}", "Warnung");
+            }
+        }
+
+        _currentLiveViewerCount = 0;
+        DashboardHeroViewerText.Text = "0";
+        RefreshCommunityUi();
+        if (_settings.Dashboard.AutoExitFocusModeOnStreamEnd &&
+            _dashboardFocusModeActive)
+        {
+            ExitDashboardFocusMode();
+        }
+        await SaveCurrentStreamHistoryAsync();
+        DashboardWorkflowStageText.Text = _settings.Twitch.RaidOnStreamEnd
+            ? "STREAM BEENDET"
+            : "STREAM BEENDET";
+        DashboardStreamEndStatusText.Text = "Stream beendet";
+        AddDashboardNotification("OBS-Stream wurde beendet.", "Info");
+        ResetStreamEndFlowState();
+        await Task.Delay(500);
+        await RefreshObsAsync();
+        await LoadStreamHistoryAsync();
+        await RefreshStatisticsAsync();
+    }
+
+    private async Task StopObsStreamAsync(bool skipConfirmation = false, bool skipRaidPhase = false)
+    {
+        if (_streamEndFlowActive && !skipRaidPhase)
+        {
+            return;
+        }
+
+        if (!skipConfirmation)
+        {
+            var result = MessageBox.Show(
+                "Streamende starten? Die konfigurierte Endszene wird vor dem tatsächlichen Stop angezeigt.",
+                "Stream beenden",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes)
+            {
+                return;
+            }
+        }
+
+        CancelPlannedStreamEnd();
 
         try
         {
             // Eine eventuell noch laufende Startautomatik darf während der
             // Endszene und nach dem Streamende nicht mehr auf Game wechseln.
             _streamStartAutomationCts?.Cancel();
+
+            _streamEndFlowActive = true;
+            UpdateDashboardStreamEndModuleVisibility();
 
             DashboardWorkflowStageText.Text = "STATISTIKEN ABSCHLIESSEN";
             SetWorkflowVisualStage("End", "Letzte Twitch- und Zuschauerwerte werden gespeichert.");
@@ -13226,113 +13634,87 @@ private Task ApplyCombinedAlertDuckingAsync()
                 }
             }
 
-            var endSeconds = Math.Max(0, _settings.Twitch.EndSceneDurationSeconds);
-            for (var remaining = endSeconds; remaining > 0; remaining--)
+            var endSeconds = Math.Max(
+                0,
+                _settings.Twitch.EndSceneDurationSeconds > 0
+                    ? _settings.Twitch.EndSceneDurationSeconds
+                    : _settings.Workflow.EndSceneSeconds);
+
+            var wantsRaid = !skipRaidPhase
+                && _settings.Twitch.RaidOnStreamEnd
+                && !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel);
+
+            if (wantsRaid)
             {
-                DashboardWorkflowStageText.Text = $"ENDSZENE · Streamende in {remaining}s";
-                await Task.Delay(1000);
+                _awaitingManualRaid = true;
+                EnsureStreamEndRaidDecisionTcs();
+                UpdateDashboardStreamEndModuleVisibility();
+                UpdateDashboardRaidActionButtons();
+                DashboardStreamEndStatusText.Text = "Endszene · Raid manuell starten";
+                AddDashboardNotification(
+                    "Endszene läuft. Raid starten, sobald Twitch das Ziel anzeigt – oder ohne Raid beenden.",
+                    "Info");
+
+                // Raid-Zielstatus frisch laden, damit „Jetzt raiden“ enabled wird.
+                _ = RefreshRaidTargetStatusAsync(_settings.Twitch.SelectedRaidChannel);
             }
 
-            if (_settings.Twitch.RaidOnStreamEnd &&
-                !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel))
+            if (endSeconds > 0)
             {
-                var raidChannel = _settings.Twitch.SelectedRaidChannel.Trim();
-                DashboardWorkflowStageText.Text = $"RAID-ZIEL PRÜFEN · {raidChannel}";
-                AddDashboardNotification($"Automatischer Raid wird vorbereitet: {raidChannel}", "Info");
+                await RunEndSceneCountdownAsync(endSeconds);
+            }
 
-                var raidStatus = await _twitchModule.GetRaidTargetStatusAsync(raidChannel);
-                if (raidStatus is null)
+            // Wenn während der Endszene bereits geraidet wurde, ist der Flow dort fertig.
+            if (!_streamEndFlowActive)
+            {
+                return;
+            }
+
+            if (wantsRaid)
+            {
+                bool raided;
+                if (_streamEndRaidDecisionTcs is { Task.IsCompleted: true })
                 {
-                    AddDashboardNotification($"Raid abgebrochen: Kanal nicht gefunden.", "Fehler");
-                }
-                else if (!raidStatus.IsOnline)
-                {
-                    AddDashboardNotification($"Raid nicht ausgeführt: {raidStatus.DisplayName} ist offline.", "Warnung");
-                    DashboardWorkflowStageText.Text = "RAID-ZIEL OFFLINE · STREAM WIRD BEENDET";
+                    raided = await _streamEndRaidDecisionTcs.Task;
                 }
                 else
                 {
-                    SetWorkflowVisualStage("Raid", $"Raid zu {raidStatus.DisplayName} wird gestartet.");
-                    DashboardWorkflowStageText.Text =
-                        $"RAID → {raidStatus.DisplayName} · {raidStatus.ViewerCount} Zuschauer · {raidStatus.GameName}";
-                    SetRaidTargetStatusText(
-                        $"{raidStatus.DisplayName} ist ONLINE · {raidStatus.ViewerCount} Zuschauer · {raidStatus.GameName}" +
-                        (string.IsNullOrWhiteSpace(raidStatus.StreamTitle) ? "" : $" · {raidStatus.StreamTitle}"));
+                    _awaitingManualRaid = true;
+                    EnsureStreamEndRaidDecisionTcs();
+                    UpdateDashboardStreamEndModuleVisibility();
+                    DashboardStreamEndStatusText.Text = "Bereit zum Raid";
+                    DashboardWorkflowStageText.Text = "ENDSZENE FERTIG · WARTE AUF RAID";
+                    UpdateDashboardRaidActionButtons();
+                    raided = await _streamEndRaidDecisionTcs!.Task;
+                }
 
-                    await _twitchModule.StartRaidAsync(raidChannel);
-                    AddDashboardNotification($"Twitch-Raid zu {raidStatus.DisplayName} wurde gestartet.", "Info");
-                    var raidCompleted = await RunRaidCountdownAsync(
-                        raidStatus.DisplayName,
-                        Math.Clamp(_settings.Twitch.RaidCountdownSeconds, 5, 300));
-                    if (!raidCompleted)
+                if (!_streamEndFlowActive)
+                {
+                    return;
+                }
+
+                if (raided)
+                {
+                    if (_settings.Twitch.StopStreamAfterRaid)
                     {
-                        return;
+                        await FinalizeObsStreamStopAsync();
                     }
-
-                    if (_settings.Twitch.StopSpotifyAfterRaid)
-                    {
-                        try
-                        {
-                            await _spotifyModule.PauseAsync();
-                        }
-                        catch (Exception spotifyException)
-                        {
-                            AddDashboardNotification($"Spotify konnte nach dem Raid nicht pausiert werden: {spotifyException.Message}", "Warnung");
-                        }
-                    }
-
-                    if (!_settings.Twitch.StopStreamAfterRaid)
+                    else
                     {
                         DashboardWorkflowStageText.Text = "RAID AUSGEFÜHRT · STREAM LÄUFT WEITER";
                         AddDashboardNotification("Raid wurde ausgeführt. Automatisches Streamende ist deaktiviert.", "Info");
-                        return;
+                        ResetStreamEndFlowState();
                     }
+
+                    return;
                 }
             }
 
-            // Erst unmittelbar vor dem tatsächlichen OBS-Stopp wird die
-            // Streamdauer eingefroren. So zählt die komplette Endszene mit.
-            await UpdateCurrentStreamStatsForEndSceneAsync(finalize: true);
-            await _obsClient.StopStreamAsync();
-
-            if (!string.IsNullOrWhiteSpace(_settings.Obs.StartScene))
-            {
-                await _obsClient.SetCurrentProgramSceneAsync(_settings.Obs.StartScene);
-            }
-
-            if (_settings.Workflow.PauseSpotifyOnStreamEnd)
-            {
-                try
-                {
-                    await _spotifyModule.PauseAsync();
-                    AddDashboardNotification("Spotify wurde nach dem Streamende pausiert.", "Info");
-                }
-                catch (Exception spotifyException)
-                {
-                    AddDashboardNotification($"Spotify konnte nach dem Streamende nicht pausiert werden: {spotifyException.Message}", "Warnung");
-                }
-            }
-
-            _currentLiveViewerCount = 0;
-            DashboardHeroViewerText.Text = "0";
-            RefreshCommunityUi();
-            if (_settings.Dashboard.AutoExitFocusModeOnStreamEnd &&
-                _dashboardFocusModeActive)
-            {
-                ExitDashboardFocusMode();
-            }
-            await SaveCurrentStreamHistoryAsync();
-            DashboardWorkflowStageText.Text = _settings.Twitch.RaidOnStreamEnd
-                ? "STREAM BEENDET · RAID-ZIEL PRÜFEN"
-                : "STREAM BEENDET";
-            AddDashboardNotification($"OBS-Stream wurde beendet.", "Info");
-            await Task.Delay(500);
-            await RefreshObsAsync();
-            await LoadStreamHistoryAsync();
-            await RefreshStatisticsAsync();
+            await FinalizeObsStreamStopAsync();
         }
         catch (Exception exception)
         {
+            ResetStreamEndFlowState();
             AddDashboardNotification($"Streamende fehlgeschlagen: {exception.Message}", "Fehler");
             MessageBox.Show(
                 exception.Message,

@@ -17,6 +17,7 @@ public sealed class AppSettings
     public StreamerBotSettings StreamerBot { get; set; } = new();
     public AlertSettings Alerts { get; set; } = new();
     public OverlaySettings Overlay { get; set; } = new();
+    public StreamerHudSettings StreamerHud { get; set; } = new();
     public WorkflowSettings Workflow { get; set; } = new();
     public StreamDeckSettings StreamDeck { get; set; } = new();
     public DashboardSettings Dashboard { get; set; } = new();
@@ -119,6 +120,7 @@ public sealed class TwitchSettings
     public int RaidCountdownSeconds { get; set; } = 90;
     public bool StopStreamAfterRaid { get; set; } = true;
     public bool StopSpotifyAfterRaid { get; set; } = true;
+    public int PlannedStreamEndMinutes { get; set; } = 30;
     public string SelectedRaidChannel { get; set; } = "";
     public List<string> RaidChannels { get; set; } = [];
 
@@ -375,6 +377,20 @@ public sealed class OverlaySettings
     public string FrameEffect { get; set; } = "Glow";
 }
 
+public sealed class StreamerHudSettings
+{
+    public bool Enabled { get; set; }
+    public int MonitorIndex { get; set; }
+    public double Opacity { get; set; } = 0.85;
+    public bool ClickThrough { get; set; } = true;
+    public bool ShowChat { get; set; } = true;
+    public bool ShowEvents { get; set; } = true;
+    public bool ShowLiveStatus { get; set; } = true;
+    public string Anchor { get; set; } = "TopRight";
+    public int Margin { get; set; } = 24;
+    public int PanelWidth { get; set; } = 420;
+}
+
 public sealed class WorkflowSettings
 {
     public List<TimedAutomationRuleSettings> TimedAutomations { get; set; } = [];
@@ -530,6 +546,7 @@ public sealed class DashboardSettings
         "ConnectionStatus",
         "Community",
         "ObsSceneControl",
+        "StreamEnd",
         "StreamControl",
         "QuickServices",
         "SpotifyPlayer",
