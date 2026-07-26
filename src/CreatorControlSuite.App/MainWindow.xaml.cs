@@ -9946,7 +9946,6 @@ private Task ApplyCombinedAlertDuckingAsync()
         _streamStartAutomationCts = new CancellationTokenSource();
         var token = _streamStartAutomationCts.Token;
         var startScene = string.IsNullOrWhiteSpace(_settings.Obs.StartScene) ? "Start" : _settings.Obs.StartScene.Trim();
-        var gameScene = string.IsNullOrWhiteSpace(_settings.Obs.LiveScene) ? "Game" : _settings.Obs.LiveScene.Trim();
 
         try
         {
@@ -9975,10 +9974,6 @@ private Task ApplyCombinedAlertDuckingAsync()
             await Task.Delay(TimeSpan.FromMinutes(5), token);
             if (_obsClient.IsConnected)
                 await _obsClient.SetSceneItemEnabledAsync(startScene, "Start_Testbild", false, token);
-
-            await Task.Delay(TimeSpan.FromMinutes(5), token);
-            if (_obsClient.IsConnected)
-                await _obsClient.SetCurrentProgramSceneAsync(gameScene, token);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
