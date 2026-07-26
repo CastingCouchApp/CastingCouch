@@ -48,7 +48,6 @@ public partial class MainWindow : Window
     private readonly SpotifyAutomationLogService _spotifyAutomationLog = new();
     private readonly SemaphoreSlim _spotifyAutomationLock = new(1, 1);
     private DateTimeOffset _lastSpotifyHealthRecoveryAt = DateTimeOffset.MinValue;
-    private string? _lastObservedObsProgramScene;
     private bool? _lastSpotifyOverlayMuted;
     private bool _spotifyOverlayConnectionLatched;
     private bool _spotifyExplicitDisconnectInProgress;
@@ -59,7 +58,6 @@ public partial class MainWindow : Window
     private readonly SemaphoreSlim _spotifyOverlayVisibilityLock = new(1, 1);
     private int? _lastRequestedSpotifyVolumePercent;
     private DateTimeOffset? _lastRequestedSpotifyVolumeAt;
-    private bool _spotifyStartToGameVolumeChangeRunning;
     private readonly ISettingsStore _settingsStore;
     private readonly ISecretStore _secretStore;
     private readonly DiagnosticService _diagnostics;
@@ -1236,6 +1234,7 @@ public partial class MainWindow : Window
                 _automationSceneActivatedAt = DateTimeOffset.UtcNow;
                 foreach (var sceneRule in _settings.Workflow.TimedAutomations
                              .Where(rule => string.Equals(rule.TriggerType, "SceneElapsed", StringComparison.OrdinalIgnoreCase)
+                                            && !rule.OncePerStream
                                             && string.Equals(rule.TriggerScene, sceneName, StringComparison.OrdinalIgnoreCase)))
                 {
                     _executedTimedAutomationRuleIds.Remove(sceneRule.Id);
@@ -1245,7 +1244,6 @@ public partial class MainWindow : Window
             _ = _creatorIntelligence.RecordAsync("obs.scene.changed", new { scene = sceneName, viewers = _currentLiveViewerCount });
             _ = Dispatcher.InvokeAsync(async () =>
             {
-                await HandleStartToGameSpotifyVolumeAsync(sceneName);
                 await ExecuteSpotifySceneAutomationAsync(sceneName);
                 await RefreshDashboardObsScenePreviewAsync(sceneName);
             });
@@ -3070,6 +3068,11 @@ public partial class MainWindow : Window
         _settings.Workflow.TimedAutomations ??= [];
         _settings.Workflow.RunOfShowSteps ??= [];
         _settings.Workflow.RunOfShowPlans ??= [];
+        var migratedSceneAutomation = MigrateLegacyStartToGameAutomation();
+        if (migratedSceneAutomation)
+        {
+            await _settingsStore.SaveAsync(_settings);
+        }
         _settings.Obs.AudioProfiles ??= [];
         _settings.Product.Version = GetCurrentProductVersion();
         if (string.IsNullOrWhiteSpace(_settings.Updates.Channel))
@@ -3307,6 +3310,38 @@ public partial class MainWindow : Window
         }
 
         _loadingSettingsIntoUi = false;
+    }
+
+    private bool MigrateLegacyStartToGameAutomation()
+    {
+        var changed = false;
+        foreach (var rule in _settings.Workflow.TimedAutomations.Where(rule =>
+                     (rule.Name.StartsWith("Streamstart – Initialisierung", StringComparison.OrdinalIgnoreCase) ||
+                      rule.Name.StartsWith("Streamstart – Intro ausblenden", StringComparison.OrdinalIgnoreCase)) &&
+                     !string.IsNullOrWhiteSpace(rule.NextRuleId)))
+        {
+            // Diese Vorlagen besitzen eigene Zeittrigger. Eine zusätzliche
+            // Verkettung führt die Folgeregeln sofort und damit zu früh aus.
+            rule.NextRuleId = "";
+            changed = true;
+        }
+
+        foreach (var rule in _settings.Workflow.TimedAutomations.Where(rule =>
+                     rule.Name.StartsWith("Streamstart – Game wechseln", StringComparison.OrdinalIgnoreCase) &&
+                     string.Equals(rule.TriggerType, "StreamElapsed", StringComparison.OrdinalIgnoreCase) &&
+                     string.Equals(rule.ActionType, "SwitchScene", StringComparison.OrdinalIgnoreCase) &&
+                     rule.DelaySeconds == 600))
+        {
+            rule.TriggerType = "SceneElapsed";
+            rule.TriggerScene = string.IsNullOrWhiteSpace(_settings.Obs.StartScene)
+                ? "Start"
+                : _settings.Obs.StartScene;
+            rule.Name = "Startszene – nach 10 Minuten zu " +
+                        (string.IsNullOrWhiteSpace(rule.TargetScene) ? "Zielszene" : rule.TargetScene);
+            changed = true;
+        }
+
+        return changed;
     }
 
     private async Task SaveSettingsAsync()
@@ -6170,11 +6205,14 @@ public partial class MainWindow : Window
 
     private void OpenDashboardTwitchChat()
     {
-        var channel = _twitchModule.GetSnapshot().ChannelName;
+        var twitchSnapshot = _twitchModule.GetSnapshot();
+        var channel = twitchSnapshot.ChannelLogin;
 
         if (string.IsNullOrWhiteSpace(channel))
         {
-            channel = _settings.Twitch.ChannelName;
+            channel = !string.IsNullOrWhiteSpace(twitchSnapshot.ChannelName)
+                ? twitchSnapshot.ChannelName
+                : _settings.Twitch.ChannelName;
         }
 
         if (string.IsNullOrWhiteSpace(channel))
@@ -6404,8 +6442,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        var channel = !string.IsNullOrWhiteSpace(twitchSnapshot.ChannelName)
-            ? twitchSnapshot.ChannelName
+        // Helix' `login` parameter expects the canonical login, not the
+        // user-facing display name (which may contain different casing or
+        // localized characters).
+        var channel = !string.IsNullOrWhiteSpace(twitchSnapshot.ChannelLogin)
+            ? twitchSnapshot.ChannelLogin
             : twitchSnapshot.Login;
 
         if (string.IsNullOrWhiteSpace(channel))
@@ -10129,59 +10170,6 @@ private Task ApplyCombinedAlertDuckingAsync()
             isMuted ? "Spotify-Overlay wegen Mute/Pause ausgeblendet." : "Spotify-Overlay wieder eingeblendet.");
     }
 
-    private async Task HandleStartToGameSpotifyVolumeAsync(string? currentScene)
-    {
-        var previousScene = _lastObservedObsProgramScene;
-        _lastObservedObsProgramScene = currentScene;
-
-        if (string.IsNullOrWhiteSpace(previousScene) || string.IsNullOrWhiteSpace(currentScene)) return;
-
-        var startScene = string.IsNullOrWhiteSpace(_settings.Obs.StartScene) ? "Start" : _settings.Obs.StartScene.Trim();
-        var gameScene = string.IsNullOrWhiteSpace(_settings.Obs.LiveScene) ? "Game" : _settings.Obs.LiveScene.Trim();
-
-        if (!string.Equals(previousScene, startScene, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(currentScene, gameScene, StringComparison.OrdinalIgnoreCase) ||
-            _spotifyStartToGameVolumeChangeRunning ||
-            !_spotifyModule.GetSnapshot().Authenticated)
-        {
-            return;
-        }
-
-        _spotifyStartToGameVolumeChangeRunning = true;
-        var wasPlayingBeforeTransition = _spotifyModule.GetSnapshot().Playback.IsPlaying;
-        try
-        {
-            if (!_settings.Spotify.SetVolumeOnLiveTransition)
-            {
-                return;
-            }
-
-            var liveVolume = Math.Clamp(_settings.Spotify.LiveVolumePercent, 0, 100);
-            await _spotifyModule.SetVolumeAsync(liveVolume);
-            if (wasPlayingBeforeTransition && !_spotifyModule.GetSnapshot().Playback.IsPlaying)
-            {
-                await _spotifyModule.ResumeAsync();
-            }
-            _appLogger.Write(
-                AppLogLevel.Information,
-                "Spotify",
-                $"Szenenwechsel {startScene} → {gameScene}: Spotify-Lautstärke auf {liveVolume} % gesetzt.");
-            AddDashboardNotification($"Start → Game: Spotify auf {liveVolume} % gesetzt.", "Spotify");
-        }
-        catch (Exception exception)
-        {
-            _appLogger.Write(
-                AppLogLevel.Warning,
-                "Spotify",
-                $"Spotify-Lautstärke beim Wechsel {startScene} → {gameScene} konnte nicht gesetzt werden: {exception.Message}",
-                exception);
-        }
-        finally
-        {
-            _spotifyStartToGameVolumeChangeRunning = false;
-        }
-    }
-
     private async Task AuthorizeTwitchAsync()
     {
         try
@@ -11527,7 +11515,6 @@ private Task ApplyCombinedAlertDuckingAsync()
             $"WebSocket {snapshot.Server?.WebSocketVersion} · " +
             $"Aktuelle Szene: {snapshot.CurrentProgramScene}";
 
-        await HandleStartToGameSpotifyVolumeAsync(snapshot.CurrentProgramScene);
         DashboardCurrentSceneText.Text = snapshot.CurrentProgramScene;
         var dashboardScenes = snapshot.Scenes
             .Select(scene => scene.Name)
@@ -16701,9 +16688,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         if (result != MessageBoxResult.Yes) return;
         var start = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Streamstart – Initialisierung"), TriggerType = "StreamStarted", DelaySeconds = 0, ActionType = "SpotifyOnly", SpotifyAction = "Resume", OncePerStream = true };
         var intro = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Streamstart – Intro ausblenden"), TriggerType = "StreamElapsed", DelaySeconds = 300, ActionType = "SetSourceVisibility", ObsScene = "Start", ObsSource = "Intro", SourceVisible = false, OncePerStream = true };
-        var game = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Streamstart – Game wechseln"), TriggerType = "StreamElapsed", DelaySeconds = 600, ActionType = "SwitchScene", TargetScene = "Game", OncePerStream = true };
-        start.NextRuleId = intro.Id;
-        intro.NextRuleId = game.Id;
+        var game = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Startszene – nach 10 Minuten zu Game"), TriggerType = "SceneElapsed", TriggerScene = string.IsNullOrWhiteSpace(_settings.Obs.StartScene) ? "Start" : _settings.Obs.StartScene, DelaySeconds = 600, ActionType = "SwitchScene", TargetScene = string.IsNullOrWhiteSpace(_settings.Obs.LiveScene) ? "Game" : _settings.Obs.LiveScene, OncePerStream = true };
         _settings.Workflow.TimedAutomations.Add(start);
         _settings.Workflow.TimedAutomations.Add(intro);
         _settings.Workflow.TimedAutomations.Add(game);

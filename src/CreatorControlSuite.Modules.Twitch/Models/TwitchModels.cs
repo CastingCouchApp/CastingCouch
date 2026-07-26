@@ -78,6 +78,7 @@ public sealed record TwitchConnectionSnapshot(
     bool EventSubConnected,
     string Login,
     string UserId,
+    string ChannelLogin,
     string ChannelName,
     string ChannelTitle,
     string CategoryName,

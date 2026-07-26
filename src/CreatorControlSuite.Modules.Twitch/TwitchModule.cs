@@ -388,6 +388,7 @@ public sealed class TwitchModule : IConnectableModule
             EventSubConnected: _eventSubClient.IsConnected,
             Login: _validation?.Login ?? "",
             UserId: _validation?.UserId ?? "",
+            ChannelLogin: _channel?.BroadcasterLogin ?? "",
             ChannelName: _channel?.BroadcasterName ?? "",
             ChannelTitle: _channel?.Title ?? "",
             CategoryName: _channel?.GameName ?? "",

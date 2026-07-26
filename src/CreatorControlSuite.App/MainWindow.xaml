@@ -1946,7 +1946,8 @@
                         </ScrollViewer>
                     </TabItem>
                     <TabItem Header="Streamer.bot">
-                        <Grid Margin="18" TextElement.Foreground="#F4F7F9">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <Grid Margin="18" MinWidth="900" TextElement.Foreground="#F4F7F9">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="12"/>
@@ -2046,9 +2047,11 @@
                                 </Border>
                             </Grid>
                         </Grid>
+                        </ScrollViewer>
                     </TabItem>
                     <TabItem Header="Stream Deck">
-                        <Grid Margin="18" TextElement.Foreground="#F4F7F9">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <Grid Margin="18" MinWidth="1000" TextElement.Foreground="#F4F7F9">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="420"/>
                                 <ColumnDefinition Width="16"/>
@@ -2295,6 +2298,7 @@
                                 </Grid>
                             </Border>
                         </Grid>
+                        </ScrollViewer>
                     </TabItem>
                 </TabControl>
             </Grid>
@@ -3394,12 +3398,12 @@
                                     <CheckBox x:Name="TimedAutomationEnabledBox" Content="Regel aktiv" IsChecked="True" Margin="0,10,0,0"/>
                                     <TextBlock Text="Name" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationNameBox" Text="Neue Automatisierung"/>
                                     <TextBlock Text="Auslöser" Margin="0,10,0,4"/>
-                                    <ComboBox x:Name="TimedAutomationTriggerTypeBox" SelectedIndex="0"><ComboBoxItem Content="Nach Streamstart" Tag="StreamElapsed"/><ComboBoxItem Content="Nach Aktivierung einer Szene" Tag="SceneElapsed"/><ComboBoxItem Content="Direkt beim Streamstart" Tag="StreamStarted"/><ComboBoxItem Content="Direkt beim Szenenwechsel" Tag="SceneActivated"/><ComboBoxItem Content="Täglich zu einer Uhrzeit" Tag="DailySchedule"/><ComboBoxItem Content="An ausgewählten Wochentagen" Tag="WeeklySchedule"/><ComboBoxItem Content="Einmaliger Termin" Tag="OneTimeSchedule"/></ComboBox>
-                                    <TextBlock Text="Ausgangsszene (bei Szenen-Timer)" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationTriggerSceneBox" IsEditable="True"/>
+                                    <ComboBox x:Name="TimedAutomationTriggerTypeBox" SelectedIndex="1"><ComboBoxItem Content="Nach Streamstart (unabhängig von aktueller Szene)" Tag="StreamElapsed"/><ComboBoxItem Content="Nach Zeit in einer bestimmten Szene" Tag="SceneElapsed"/><ComboBoxItem Content="Direkt beim Streamstart" Tag="StreamStarted"/><ComboBoxItem Content="Direkt beim Szenenwechsel" Tag="SceneActivated"/><ComboBoxItem Content="Täglich zu einer Uhrzeit" Tag="DailySchedule"/><ComboBoxItem Content="An ausgewählten Wochentagen" Tag="WeeklySchedule"/><ComboBoxItem Content="Einmaliger Termin" Tag="OneTimeSchedule"/></ComboBox>
+                                    <TextBlock Text="Von Szene" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationTriggerSceneBox" IsEditable="True" ToolTip="Der Timer läuft nur, solange diese Szene aktiv ist."/>
                                     <TextBlock Text="Zeit in Sekunden" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationDelayBox" Text="10"/><TextBlock Text="Geplante Uhrzeit (HH:mm)" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationScheduleTimeBox" Text="20:00"/><TextBlock Text="Wochentage (z. B. Monday,Wednesday,Friday)" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationScheduleDaysBox" Text="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday"/><TextBlock Text="Einmaliges Datum (JJJJ-MM-TT)" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationScheduleDateBox"/><WrapPanel Margin="0,8,0,0"><TextBlock Text="Aktiv von" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationActiveFromBox" Width="110" Margin="8,0,18,0"/><TextBlock Text="bis" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationActiveUntilBox" Width="110" Margin="8,0,0,0"/></WrapPanel><TextBlock Text="Ausnahmetage (JJJJ-MM-TT, kommagetrennt)" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationExcludedDatesBox"/><TextBlock Text="Sperrzeiträume (z. B. 2026-07-20..2026-07-31;2026-12-24..2026-12-26)" Margin="0,10,0,4" TextWrapping="Wrap"/><TextBox x:Name="TimedAutomationBlackoutRangesBox"/><TextBlock Text="Nachholverhalten bei verpasster Uhrzeit" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationMissedRunBehaviorBox" SelectedIndex="2"><ComboBoxItem Content="Nicht nachholen" Tag="Skip"/><ComboBoxItem Content="Nur innerhalb der Nachholfrist" Tag="WithinGrace"/><ComboBoxItem Content="Am selben Tag nachholen" Tag="SameDay"/></ComboBox><WrapPanel Margin="0,8,0,0"><TextBlock Text="Nachholfrist" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationCatchUpGraceBox" Width="70" Text="30" Margin="8,0"/><TextBlock Text="Minuten" VerticalAlignment="Center"/></WrapPanel><TextBlock x:Name="TimedAutomationNextRunText" Text="Nächster geplanter Lauf: –" Foreground="#7EC8F5" Margin="0,8,0,0"/>
                                     <TextBlock Text="Aktion" Margin="0,10,0,4"/>
                                     <ComboBox x:Name="TimedAutomationActionTypeBox" SelectedIndex="0"><ComboBoxItem Content="OBS-Szene wechseln" Tag="SwitchScene"/><ComboBoxItem Content="OBS-Quelle ein-/ausblenden" Tag="SetSourceVisibility"/><ComboBoxItem Content="OBS-Audioquelle muten/aktivieren" Tag="SetInputMute"/><ComboBoxItem Content="OBS-Stream starten" Tag="StartObsStream"/><ComboBoxItem Content="OBS-Stream stoppen" Tag="StopObsStream"/><ComboBoxItem Content="Streamer.bot-Aktion ausführen" Tag="StreamerBotAction"/><ComboBoxItem Content="Nur Spotify steuern" Tag="SpotifyOnly"/></ComboBox>
-                                    <TextBlock Text="Zielszene" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationTargetSceneBox" IsEditable="True"/>
+                                    <TextBlock Text="Zu Szene" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationTargetSceneBox" IsEditable="True"/>
                                     <TextBlock Text="OBS-Übergang (leer = aktueller Standard)" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationTransitionBox" IsEditable="True"/>
                                     <WrapPanel Margin="0,8,0,0"><TextBlock Text="Übergangsdauer" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationTransitionDurationBox" Width="80" Text="1000" Margin="8,0"/><TextBlock Text="ms" VerticalAlignment="Center"/></WrapPanel>
                                     <TextBlock Text="Szene der Quelle" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationSourceSceneBox" IsEditable="True"/>

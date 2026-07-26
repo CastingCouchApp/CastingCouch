@@ -371,7 +371,7 @@ public sealed class WorkflowSettings
     public bool AutoFadeSpotifyOnLive { get; set; } = true;
     public bool AutoPlayEndMusic { get; set; } = false;
     public bool PauseSpotifyOnStreamEnd { get; set; } = true;
-    public bool AutoSwitchScenes { get; set; } = true;
+    public bool AutoSwitchScenes { get; set; } = false;
     public bool AutoStartObsStream { get; set; } = false;
     public bool AutoStopObsStream { get; set; } = true;
     public int ViewerSampleSeconds { get; set; } = 15;
@@ -418,7 +418,7 @@ public sealed class TimedAutomationRuleSettings
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "Neue Automatisierung";
     public bool Enabled { get; set; } = true;
-    public string TriggerType { get; set; } = "StreamElapsed";
+    public string TriggerType { get; set; } = "SceneElapsed";
     public string TriggerScene { get; set; } = "";
     public int DelaySeconds { get; set; } = 10;
     public string ActionType { get; set; } = "SwitchScene";
