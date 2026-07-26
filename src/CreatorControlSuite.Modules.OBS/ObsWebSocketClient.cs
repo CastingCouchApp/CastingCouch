@@ -1025,19 +1025,29 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
     public async Task<byte[]> GetSourceScreenshotAsync(
         string sourceName,
         int imageWidth = 640,
-        int imageHeight = 360,
+        int? imageHeight = 360,
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
-            "GetSourceScreenshot",
-            new
+        object requestData = imageHeight is int height
+            ? new
             {
                 sourceName,
                 imageFormat = "png",
                 imageWidth,
-                imageHeight,
+                imageHeight = height,
                 imageCompressionQuality = -1
-            },
+            }
+            : new
+            {
+                sourceName,
+                imageFormat = "png",
+                imageWidth,
+                imageCompressionQuality = -1
+            };
+
+        var data = await SendRequestAsync(
+            "GetSourceScreenshot",
+            requestData,
             cancellationToken);
 
         if (!data.TryGetProperty("imageData", out var imageDataElement))

@@ -396,6 +396,7 @@ public partial class MainWindow : Window
         IThemeService themeService)
     {
         InitializeComponent();
+        WindowState = WindowState.Maximized;
         StateChanged += (_, _) => UpdateTitleBarMaximizeButton();
         UpdateTitleBarMaximizeButton();
 
@@ -1087,6 +1088,8 @@ public partial class MainWindow : Window
                 "Stream umschalten",
                 ToggleDashboardHeaderStreamAsync);
         DashboardAddSceneButton.Click += async (_, _) => await AddDashboardSceneButtonAsync();
+        DashboardObsScenePreviewSizeBox.SelectionChanged += async (_, _) =>
+            await ApplyDashboardObsScenePreviewSizeFromUiAsync();
         DashboardRaidEnabledBox.Checked += async (_, _) =>
         {
             if (!_settingsUiLoaded)
@@ -3468,6 +3471,7 @@ public partial class MainWindow : Window
         LoadDashboardModuleOrderEditor();
         ApplyDashboardModuleOrder();
         ApplyDashboardModuleSizes();
+        ApplyDashboardObsScenePreviewSize();
         ApplyDashboardLayout();
 
         ObsHostBox.Text = _settings.Obs.Host;
@@ -4853,12 +4857,98 @@ public partial class MainWindow : Window
 
             // Dashboard-Module füllen ihren Grid-Slot; feste Pixelbreiten
             // würden das responsive Layout wieder brechen.
+            if (string.Equals(key, "ObsSceneControl", StringComparison.Ordinal))
+            {
+                // Breite/Höhe folgen der Vorschau, nicht dem Grid-Slot.
+                element.Width = double.NaN;
+                element.MinWidth = 0;
+                element.MaxWidth = double.PositiveInfinity;
+                element.HorizontalAlignment = HorizontalAlignment.Left;
+                element.VerticalAlignment = VerticalAlignment.Top;
+                continue;
+            }
+
             element.Width = double.NaN;
             element.MinWidth = 0;
             element.MaxWidth = double.PositiveInfinity;
             element.HorizontalAlignment = HorizontalAlignment.Stretch;
             element.VerticalAlignment = VerticalAlignment.Stretch;
         }
+    }
+
+    private const double DashboardObsPreviewDefaultAspect = 16.0 / 9.0;
+    private double _dashboardObsPreviewAspect = DashboardObsPreviewDefaultAspect;
+
+    private static double GetDashboardObsScenePreviewWidth(string size) => size switch
+    {
+        "Kompakt" => 200,
+        "Groß" => 800,
+        _ => 400
+    };
+
+    private (double Width, double Height) GetDashboardObsScenePreviewSize(string size)
+    {
+        var width = GetDashboardObsScenePreviewWidth(size);
+        var aspect = _dashboardObsPreviewAspect > 0
+            ? _dashboardObsPreviewAspect
+            : DashboardObsPreviewDefaultAspect;
+        var height = Math.Round(width / aspect);
+        return (width, height);
+    }
+
+    private void ApplyDashboardObsScenePreviewSize()
+    {
+        var size = _settings.Dashboard.ObsScenePreviewSize;
+        if (size is not ("Kompakt" or "Standard" or "Groß"))
+        {
+            size = "Standard";
+            _settings.Dashboard.ObsScenePreviewSize = size;
+        }
+
+        var (width, height) = GetDashboardObsScenePreviewSize(size);
+        DashboardObsScenePreviewBorder.Width = width;
+        DashboardObsScenePreviewBorder.MinWidth = width;
+        DashboardObsScenePreviewBorder.MaxWidth = width;
+        DashboardObsScenePreviewBorder.Height = height;
+        DashboardObsScenePreviewBorder.MinHeight = height;
+        DashboardObsScenePreviewBorder.MaxHeight = height;
+        DashboardObsSceneControlContent.MaxWidth = width;
+        DashboardSceneButtonsPanel.MaxWidth = width;
+
+        foreach (var item in DashboardObsScenePreviewSizeBox.Items
+                     .OfType<System.Windows.Controls.ComboBoxItem>())
+        {
+            if (string.Equals(item.Tag?.ToString() ?? item.Content?.ToString(), size, StringComparison.Ordinal))
+            {
+                DashboardObsScenePreviewSizeBox.SelectedItem = item;
+                break;
+            }
+        }
+    }
+
+    private async Task ApplyDashboardObsScenePreviewSizeFromUiAsync()
+    {
+        if (!_settingsUiLoaded ||
+            DashboardObsScenePreviewSizeBox.SelectedItem is not System.Windows.Controls.ComboBoxItem sizeItem)
+        {
+            return;
+        }
+
+        var size = sizeItem.Tag?.ToString() ?? sizeItem.Content?.ToString();
+        if (size is not ("Kompakt" or "Standard" or "Groß"))
+        {
+            return;
+        }
+
+        if (string.Equals(_settings.Dashboard.ObsScenePreviewSize, size, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _settings.Dashboard.ObsScenePreviewSize = size;
+        ApplyDashboardObsScenePreviewSize();
+        await _settingsStore.SaveAsync(_settings);
+        await RefreshDashboardObsScenePreviewAsync();
     }
 
     private void RefreshDashboardModuleSizeEditor()
@@ -13232,7 +13322,12 @@ private Task ApplyCombinedAlertDuckingAsync()
                 return;
             }
 
-            var bytes = await _obsClient.GetSourceScreenshotAsync(sceneName, 800, 450);
+            var previewWidth = GetDashboardObsScenePreviewWidth(
+                _settings.Dashboard.ObsScenePreviewSize);
+            var bytes = await _obsClient.GetSourceScreenshotAsync(
+                sceneName,
+                (int)Math.Clamp(previewWidth, 160, 1920),
+                imageHeight: null);
             if (bytes.Length == 0)
             {
                 DashboardObsScenePreviewImage.Source = null;
@@ -13247,6 +13342,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             bitmap.StreamSource = stream;
             bitmap.EndInit();
             bitmap.Freeze();
+
+            if (bitmap.PixelWidth > 0 && bitmap.PixelHeight > 0)
+            {
+                _dashboardObsPreviewAspect = bitmap.PixelWidth / (double)bitmap.PixelHeight;
+                ApplyDashboardObsScenePreviewSize();
+            }
 
             DashboardObsScenePreviewImage.Source = bitmap;
             DashboardObsScenePreviewPlaceholder.Visibility = Visibility.Collapsed;

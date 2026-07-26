@@ -610,6 +610,7 @@ public sealed class DashboardSettings
 
     public bool AutoFocusModeOnStreamStart { get; set; }
     public bool AutoExitFocusModeOnStreamEnd { get; set; } = true;
+    public string ObsScenePreviewSize { get; set; } = "Standard";
 
     public Dictionary<string, string> ModuleSizes { get; set; } =
         new(StringComparer.Ordinal)

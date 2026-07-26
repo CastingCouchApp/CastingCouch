@@ -239,7 +239,7 @@ public interface IObsWebSocketClient : IAsyncDisposable
     Task<byte[]> GetSourceScreenshotAsync(
         string sourceName,
         int imageWidth = 640,
-        int imageHeight = 360,
+        int? imageHeight = 360,
         CancellationToken cancellationToken = default);
 
 }
