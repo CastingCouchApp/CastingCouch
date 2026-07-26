@@ -214,6 +214,15 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
                 }),
 
             new Subscription(
+                "channel.guest_star_guest.update",
+                "beta",
+                new
+                {
+                    broadcaster_user_id = broadcasterUserId,
+                    moderator_user_id = broadcasterUserId
+                }),
+
+            new Subscription(
                 "stream.online",
                 "1",
                 new
@@ -541,6 +550,17 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
             "channel.raid" =>
                 $"{Get(data, "from_broadcaster_user_name")} raidet mit " +
                 $"{Get(data, "viewers")} Zuschauern.",
+
+            "channel.guest_star_guest.update" =>
+                Get(data, "state") switch
+                {
+                    "invited" => $"Stream-Together-Anfrage für {Get(data, "guest_user_name")}.",
+                    "accepted" => $"{Get(data, "guest_user_name")} hat Stream Together angenommen.",
+                    "ready" => $"{Get(data, "guest_user_name")} ist für Stream Together bereit.",
+                    "live" => $"{Get(data, "guest_user_name")} ist jetzt in Stream Together live.",
+                    "removed" => $"{Get(data, "guest_user_name")} hat Stream Together verlassen.",
+                    _ => $"Stream Together: {Get(data, "guest_user_name")} ({Get(data, "state")})."
+                },
 
             "stream.online" =>
                 "Der Stream ist online.",

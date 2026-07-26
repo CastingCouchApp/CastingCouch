@@ -665,9 +665,19 @@ public partial class MainWindow : Window
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PlayPauseAsync());
         DashboardTopMusicNextButton.Click += async (_, _) =>
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.NextAsync());
+        DashboardTopMusicVolumeSlider.ValueChanged += async (_, _) =>
+        {
+            var volume = (int)Math.Round(DashboardTopMusicVolumeSlider.Value);
+            DashboardTopMusicVolumeText.Text = $"{volume} %";
+            if (!_updatingMusicPlayerUi)
+            {
+                await ExecuteMusicCommandAsync(() => _musicPlayerRouter.SetVolumeAsync(volume));
+            }
+        };
         DashboardTopMusicWidget.MouseLeftButtonUp += (_, e) =>
         {
-            if (e.OriginalSource is System.Windows.Controls.Primitives.ButtonBase)
+            if (e.OriginalSource is System.Windows.Controls.Primitives.ButtonBase ||
+                FindVisualParent<System.Windows.Controls.Slider>(e.OriginalSource as DependencyObject) is not null)
                 return;
             ServicesNavigationPanel.Visibility = Visibility.Collapsed;
             ShowPage(MusicPlayerPage);
@@ -1139,6 +1149,12 @@ public partial class MainWindow : Window
             }
         };
         DashboardOpenRaidChannelButton.Click += (_, _) => OpenSelectedRaidChannel();
+        DashboardJoinStreamTogetherButton.Click += (_, _) =>
+            OpenConfiguredTarget(
+                string.IsNullOrWhiteSpace(_settings.Twitch.CreatorDashboardUrl)
+                    ? "https://dashboard.twitch.tv/stream-manager"
+                    : _settings.Twitch.CreatorDashboardUrl,
+                "Twitch Stream Together");
         ServicesTwitchOpenRaidChannelButton.Click += (_, _) => OpenSelectedRaidChannel();
         DashboardCancelRaidButton.Click += async (_, _) => await CancelActiveRaidAsync();
         DashboardStartRaidButton.Click += async (_, _) => await ExecuteRaidFromDashboardAsync();
@@ -1501,6 +1517,17 @@ public partial class MainWindow : Window
                     $"{twitchEvent.ReceivedAt:HH:mm:ss} · " +
                     twitchEvent.Summary,
                     200);
+
+                if (twitchEvent.Type == "channel.guest_star_guest.update")
+                {
+                    var state = twitchEvent.Data.TryGetValue("state", out var guestState)
+                        ? guestState
+                        : "";
+                    DashboardJoinStreamTogetherButton.Visibility =
+                        state is "invited" or "accepted" or "ready"
+                            ? Visibility.Visible
+                            : Visibility.Collapsed;
+                }
             });
 
             if (twitchEvent.Type == "channel.follow")
@@ -3422,10 +3449,26 @@ public partial class MainWindow : Window
         _settings.YouTubeMusic ??= new YouTubeMusicSettings();
         _settings.Dashboard ??= new DashboardSettings();
         _settings.Dashboard.SceneButtons ??= [];
+        var disabledLegacyAlertAutoCreate = _settings.Alerts.AutoCreateObsSources;
+        // Eine alte Einstellung darf beim Start niemals OBS-Alertquellen erzeugen.
+        // Das Anlegen bleibt ausschließlich der expliziten OBS-Übertragung im Alert-Bereich vorbehalten.
+        _settings.Alerts.AutoCreateObsSources = false;
+        _settings.Twitch.Scopes ??= [];
+        var addedGuestStarScope = !_settings.Twitch.Scopes.Contains(
+            "channel:read:guest_star",
+            StringComparer.Ordinal);
+        if (addedGuestStarScope)
+        {
+            _settings.Twitch.Scopes =
+            [
+                .. _settings.Twitch.Scopes,
+                "channel:read:guest_star"
+            ];
+        }
         if (string.IsNullOrWhiteSpace(_settings.MusicPlayer.ProviderId))
             _settings.MusicPlayer.ProviderId = MusicProviderIds.Spotify;
         var migratedSceneAutomation = MigrateLegacyStartToGameAutomation();
-        if (migratedSceneAutomation)
+        if (migratedSceneAutomation || addedGuestStarScope || disabledLegacyAlertAutoCreate)
         {
             await _settingsStore.SaveAsync(_settings);
         }
@@ -4289,6 +4332,22 @@ public partial class MainWindow : Window
         return (element as System.Windows.Controls.ListBoxItem)?.Content?.ToString();
     }
 
+    private static T? FindVisualParent<T>(DependencyObject? element)
+        where T : DependencyObject
+    {
+        while (element is not null)
+        {
+            if (element is T match)
+            {
+                return match;
+            }
+
+            element = System.Windows.Media.VisualTreeHelper.GetParent(element);
+        }
+
+        return null;
+    }
+
     private void RegisterDashboardDirectDragHandlers()
     {
         // Fixed reference dashboard: module dragging is disabled.
@@ -4922,6 +4981,17 @@ public partial class MainWindow : Window
         DashboardObsScenePreviewBorder.MaxHeight = height;
         DashboardObsSceneControlContent.MaxWidth = width;
         DashboardSceneButtonsPanel.MaxWidth = width;
+
+        var useWidePreviewLayout = string.Equals(size, "Groß", StringComparison.Ordinal);
+        Grid.SetRow(DashboardObsSceneColumn, 0);
+        Grid.SetColumn(DashboardObsSceneColumn, 0);
+        Grid.SetColumnSpan(DashboardObsSceneColumn, useWidePreviewLayout ? 2 : 1);
+        Grid.SetRow(DashboardPrimaryContentColumn, useWidePreviewLayout ? 1 : 0);
+        Grid.SetColumn(DashboardPrimaryContentColumn, useWidePreviewLayout ? 0 : 1);
+        Grid.SetColumnSpan(DashboardPrimaryContentColumn, useWidePreviewLayout ? 2 : 1);
+        DashboardObsSceneColumn.Margin = useWidePreviewLayout
+            ? new Thickness(0, 0, 0, 10)
+            : new Thickness(0, 0, 8, 0);
 
         foreach (var item in DashboardObsScenePreviewSizeBox.Items
                      .OfType<System.Windows.Controls.ComboBoxItem>())
@@ -10670,6 +10740,8 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 MusicPlayerVolumeSlider.Value = volume;
                 MusicPlayerVolumeText.Text = $"{volume} %";
+                DashboardTopMusicVolumeSlider.Value = volume;
+                DashboardTopMusicVolumeText.Text = $"{volume} %";
             }
         }
         finally
@@ -16143,8 +16215,15 @@ private Task ApplyCombinedAlertDuckingAsync()
                 var merged = users
                     .Where(user => !string.IsNullOrWhiteSpace(user))
                     .Concat(_twitchUserDisplayById.Values)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(user => user, StringComparer.OrdinalIgnoreCase)
+                    .GroupBy(
+                        GetTwitchUserNameFromDisplay,
+                        StringComparer.OrdinalIgnoreCase)
+                    .Select(group =>
+                        group.FirstOrDefault(item => item.StartsWith("[", StringComparison.Ordinal))
+                        ?? group.First())
+                    .OrderBy(
+                        GetTwitchUserNameFromDisplay,
+                        StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
                 _twitchUserItems.Clear();

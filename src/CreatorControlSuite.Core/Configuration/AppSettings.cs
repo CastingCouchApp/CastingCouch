@@ -141,6 +141,7 @@ public sealed class TwitchSettings
         "bits:read",
         "channel:read:redemptions",
         "channel:manage:redemptions",
+        "channel:read:guest_star",
         "channel:manage:polls",
         "channel:manage:predictions"
     ];
