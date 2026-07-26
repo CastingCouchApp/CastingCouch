@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versionsnummer (leer = aus Directory.Build.props)"
+        required: false
+        type: string
+      create_github_release:
+        description: "GitHub Release erstellen"
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CONFIGURATION: Release
+
+jobs:
+  release:
+    name: Release Build
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}".Trim()
+          if ([string]::IsNullOrWhiteSpace($version) -and $env:GITHUB_REF_TYPE -eq "tag") {
+            $version = $env:GITHUB_REF_NAME.TrimStart("v")
+          }
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            $props = Get-Content -LiteralPath "Directory.Build.props" -Raw
+            if ($props -match "<Version>(?<v>[^<]+)</Version>") {
+              $version = $Matches["v"]
+            }
+          }
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            throw "Keine Versionsnummer ermittelbar."
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Release-Version: $version"
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Build release
+        shell: pwsh
+        run: |
+          ./build/Build-Release.ps1 -Configuration $env:CONFIGURATION
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $publish = "artifacts/publish/win-x64"
+          $outDir = "artifacts/release"
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+          $zip = Join-Path $outDir "CreatorControlSuite-$version-win-x64.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $publish "*") -DestinationPath $zip -CompressionLevel Optimal
+          Write-Host "Portable: $zip"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.version.outputs.version }}
+          path: |
+            artifacts/publish/win-x64/**
+            artifacts/installer/**
+            artifacts/release/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: >
+          startsWith(github.ref, 'refs/tags/v') ||
+          (github.event_name == 'workflow_dispatch' && inputs.create_github_release)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
+          name: Creator Control Suite ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          draft: ${{ github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v') }}
+          files: |
+            artifacts/release/*.zip
+            artifacts/installer/*.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

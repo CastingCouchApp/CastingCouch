@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Creator Control Suite",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build Creator Control Suite",
+      "program": "${workspaceFolder}/artifacts/bin/CreatorControlSuite.App/Debug/net10.0-windows/CreatorControlSuite.dll",
+      "cwd": "${workspaceFolder}/artifacts/bin/CreatorControlSuite.App/Debug/net10.0-windows",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    }
+  ]
+}

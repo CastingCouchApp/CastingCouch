@@ -1,0 +1,53 @@
+:root {
+  --accent: #ff8c00;
+  --panel: rgba(18,18,20,.92);
+  --text: #ffffff;
+  --muted: #a9a9a9;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: var(--text);
+}
+.card {
+  background: var(--panel);
+  border: 1px solid rgba(255,140,0,.7);
+  border-radius: 16px;
+  box-shadow: 0 0 28px rgba(255,140,0,.18);
+}
+.accent { color: var(--accent); }
+.muted { color: var(--muted); }
+:root { --user-font: "Segoe UI"; --user-color: #fff; }
+.user-text { font-family: var(--user-font); color: var(--user-color); }
+.overlay-frame { position:absolute; inset:20px; border:4px solid var(--accent); border-radius:18px; pointer-events:none; }
+.overlay-frame.dashed { border-style:dashed; }
+.overlay-frame.double { border-style:double; border-width:8px; }
+.overlay-frame.glow { box-shadow:0 0 25px var(--accent), inset 0 0 18px rgba(255,140,0,.35); }
+.overlay-frame.pulse { animation:framePulse 2s ease-in-out infinite; }
+@keyframes framePulse { 0%,100%{opacity:.55} 50%{opacity:1} }
+.overlay-frame.dotted { border-style:dotted; }
+.overlay-frame.rounded { border-radius:38px; }
+.overlay-frame.neon { border-style:solid; box-shadow:0 0 10px currentColor,0 0 28px currentColor,inset 0 0 18px currentColor; }
+.overlay-frame.glass { border-color:rgba(255,255,255,.5)!important; background:rgba(255,255,255,.04); backdrop-filter:blur(6px); }
+.overlay-frame.threed { border-style:ridge; border-width:10px; }
+.overlay-frame.breathing { animation:breathing 3.2s ease-in-out infinite; }
+.overlay-frame.colorshift { animation:colorShift 6s linear infinite; }
+.overlay-frame.rainbow { animation:rainbow 4s linear infinite; }
+.overlay-frame.chase { border-style:dashed; animation:chase 1s linear infinite; }
+.overlay-frame.blink { animation:blink 1s steps(2,end) infinite; }
+.overlay-frame.zoompulse { animation:zoomPulse 1.8s ease-in-out infinite; }
+.overlay-frame.shadow { box-shadow:12px 12px 0 rgba(0,0,0,.55); }
+.overlay-frame.gradient { border-color:transparent; background:linear-gradient(#0000,#0000) padding-box,linear-gradient(90deg,var(--accent),#fff,var(--accent)) border-box; }
+@keyframes breathing {0%,100%{opacity:.45;filter:brightness(.75)}50%{opacity:1;filter:brightness(1.35)}}
+@keyframes colorShift {0%{filter:hue-rotate(0)}100%{filter:hue-rotate(360deg)}}
+@keyframes rainbow {0%{border-color:#ff3b30}20%{border-color:#ffcc00}40%{border-color:#32d74b}60%{border-color:#00e5ff}80%{border-color:#a855f7}100%{border-color:#ff3b30}}
+@keyframes chase {to{filter:hue-rotate(360deg);transform:translateZ(0)}}
+@keyframes blink {50%{opacity:0}}
+@keyframes zoomPulse {0%,100%{transform:scale(.985)}50%{transform:scale(1)}}
+.reaction-label{letter-spacing:.18em;text-transform:uppercase;font-weight:800;text-shadow:0 0 18px rgba(255,140,0,.65)}
+.reaction-safe-area{position:absolute;left:80px;top:120px;right:80px;bottom:100px;border:3px solid var(--accent);border-radius:26px;box-shadow:0 0 26px rgba(255,140,0,.45),inset 0 0 18px rgba(255,140,0,.18)}

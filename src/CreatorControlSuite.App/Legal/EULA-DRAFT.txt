@@ -1,0 +1,7 @@
+CREATOR CONTROL SUITE – EULA-ENTWURF
+
+DIES IST EIN TECHNISCHER PLATZHALTER UND KEINE FINAL GEPRÜFTE RECHTSFASSUNG.
+
+Vor einem kommerziellen Release muss diese Vereinbarung juristisch geprüft und an Anbieter, Lizenzmodell und Zielmärkte angepasst werden.
+
+Technisch vorgesehene Themen: Nutzungsrecht, Lizenzumfang, Installationen, Drittanbieter-Dienste, externe APIs, Updates, Support, Haftung im gesetzlich zulässigen Rahmen und Lizenzende.

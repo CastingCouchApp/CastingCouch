@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>CreatorControlSuite</AssemblyName>
+    <RootNamespace>CreatorControlSuite.App</RootNamespace>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="BundledOverlay\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CreatorControlSuite.Core/CreatorControlSuite.Core.csproj" />
+    <ProjectReference Include="../CreatorControlSuite.Modules.OBS/CreatorControlSuite.Modules.OBS.csproj" />
+    <ProjectReference Include="../CreatorControlSuite.Modules.Twitch/CreatorControlSuite.Modules.Twitch.csproj" />
+    <ProjectReference Include="../CreatorControlSuite.Modules.Spotify/CreatorControlSuite.Modules.Spotify.csproj" />
+    <ProjectReference Include="../CreatorControlSuite.Modules.Alerts/CreatorControlSuite.Modules.Alerts.csproj" />
+    <ProjectReference Include="../CreatorControlSuite.Modules.Overlay/CreatorControlSuite.Modules.Overlay.csproj" />
+    <ProjectReference Include="../CreatorControlSuite.Modules.Workflow/CreatorControlSuite.Modules.Workflow.csproj" />
+    <ProjectReference Include="../CreatorControlSuite.Modules.StreamDeck/CreatorControlSuite.Modules.StreamDeck.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Legal\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Keys\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\Brand\*.png" />
+  </ItemGroup>
+</Project>

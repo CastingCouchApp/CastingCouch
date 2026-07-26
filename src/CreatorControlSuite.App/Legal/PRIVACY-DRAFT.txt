@@ -1,0 +1,7 @@
+CREATOR CONTROL SUITE – DATENSCHUTZHINWEISE-ENTWURF
+
+DIES IST EIN TECHNISCHER PLATZHALTER UND KEINE FINAL GEPRÜFTE DATENSCHUTZERKLÄRUNG.
+
+Aktueller technischer Stand: Einstellungen lokal; OAuth-Tokens lokal verschlüsselt; Crashberichte und Logs lokal; kein automatischer Upload; Twitch-/Spotify-Daten direkt mit den jeweiligen Diensten; Lizenzserver noch nicht implementiert.
+
+Vor einem kommerziellen Release müssen Anbieterangaben, Zwecke, Rechtsgrundlagen, Empfänger, Speicherfristen, Betroffenenrechte und mögliche Drittlandtransfers juristisch geprüft werden.

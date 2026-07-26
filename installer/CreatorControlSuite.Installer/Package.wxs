@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="Creator Control Suite" Manufacturer="Creator Control Suite" Version="2.0.44" UpgradeCode="{EA074C62-3DDF-4149-ADA2-AECD7C6C485B}" Scope="perMachine">
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <MajorUpgrade DowngradeErrorMessage="Eine neuere Version der Creator Control Suite ist bereits installiert." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Creator Control Suite" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Creator Control Suite" />
+    </StandardDirectory>
+    <Feature Id="MainFeature" Title="Creator Control Suite" Level="1">
+      <ComponentGroupRef Id="ApplicationFiles" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentGroupRef Id="PublishedApplicationFiles" />
+    </Feature>
+    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
+      </ComponentGroup>
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="{9DFAC23B-7B04-4F11-893A-86AE167D6773}">
+      <Shortcut Id="StartMenuShortcut" Name="Creator Control Suite" Description="Streaming-Steuerzentrale" Target="[INSTALLFOLDER]CreatorControlSuite.exe" WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\CreatorControlSuite" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Package>
+</Wix>

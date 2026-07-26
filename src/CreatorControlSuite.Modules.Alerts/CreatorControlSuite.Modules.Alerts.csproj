@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../CreatorControlSuite.Core/CreatorControlSuite.Core.csproj" />
+    <ProjectReference Include="../CreatorControlSuite.Modules.OBS/CreatorControlSuite.Modules.OBS.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+Creator Control Suite 3.1.1
+
+Behoben:
+- Absturz durch WPF-Zugriff aus Twitch-/Workflow-Hintergrundthreads.
+- RefreshWorkflowUi wechselt nun automatisch auf den UI-Dispatcher.
+- Bereits laufende Suite wird per IPC und zusätzlicher Win32-Rückfallebene in den Vordergrund geholt.
+- Doppelte Registrierung des lokalen IPC-Servers entfernt.
+- Spotify-Anzeige bleibt grundsätzlich sichtbar; nur „bei Mute ausblenden“ steuert die OBS-Sichtbarkeit.
+- Spotify-JSON-Schalter bleibt über Neustarts gespeichert.
+- OBS-Sichtbarkeit wird nur bei echtem Mute-Zustandswechsel geändert, nicht bei jedem JSON-Update.
+- Workflow-Szenenauswahl bleibt von den HTML-Overlays getrennt.

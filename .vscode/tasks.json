@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build Creator Control Suite",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/src/CreatorControlSuite.App/CreatorControlSuite.App.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "run Creator Control Suite",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/src/CreatorControlSuite.App/CreatorControlSuite.App.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "none"
+    }
+  ]
+}

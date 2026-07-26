@@ -1,0 +1,15 @@
+{
+  "id": "denver-john",
+  "name": "Denver John",
+  "accentColor": "#FF8C00",
+  "scenes": {
+    "start": "Start",
+    "live": "Game",
+    "pause": "Metaschutz",
+    "end": "Ende"
+  },
+  "workflow": {
+    "startCountdownSeconds": 600,
+    "endSceneSeconds": 60
+  }
+}

@@ -1,0 +1,1 @@
+Mitgelieferte Beispielsets: Modern, Minimal und Neon. Jedes Set enthält Start, Game, Pause, Metaschutz, Reactions und Ende. Die aktiven Standardszenen liegen im Ordner scenes. Die Beispielsets dienen als Ausgangspunkt für weitere Designs.

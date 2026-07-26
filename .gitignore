@@ -1,0 +1,95 @@
+# Build outputs (Directory.Build.props → artifacts/)
+artifacts/
+[Bb]in/
+[Oo]bj/
+/[Dd]ebug/
+/[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+publish/
+
+# Packaging
+*.nupkg
+*.snupkg
+*.msi
+*.msix
+*.appx
+*.appxbundle
+*.wixpdb
+*.wixobj
+
+# Test / coverage
+[Tt]est[Rr]esults/
+[Cc]overage*/
+*.coverage
+*.coveragexml
+*.trx
+
+# NuGet
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+project.lock.json
+project.fragment.lock.json
+
+# Secrets & local config
+*.pfx
+*.p12
+*.snk
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+**/secrets/
+**/[Kk]eys/**
+!**/[Kk]eys/README.txt
+!**/[Kk]eys/*-public.pem
+
+# Logs
+*.log
+logs/
+
+# Visual Studio / MSBuild
+.vs/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.rsuser
+*.dbmdl
+*.jfm
+*.VC.db
+*.VC.VC.opendb
+ipch/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# VS Code (lokal; gemeinsame Config bleibt versioniert)
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Misc / local agent state
+*.swp
+*~
+.codex/*
+!.codex/skills/
+!.codex/skills/**
+.cursor/hooks/state/

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>STREAMSTATS · AKTUELLE SESSION</title>
+  <link rel="stylesheet" href="../assets/base.css">
+  <script src="../assets/data-client.js"></script>
+  <script src="../assets/config-client.js"></script>
+  <style>
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent}
+    body{display:flex;align-items:center;justify-content:center}
+    #panel{min-width:420px;padding:22px 26px}
+    #heading{font-size:25px;font-weight:900;letter-spacing:.08em;margin-bottom:15px;color:var(--accent)}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:30px;padding:6px 0;font-size:23px}
+    .label{opacity:.78}
+    .value{font-weight:850;font-variant-numeric:tabular-nums}
+  </style>
+</head>
+<body>
+  <div id="panel" class="card user-text">
+    <div id="heading">STREAMSTATS</div>
+    <div class="row"><span class="label">Neue Follower</span><span id="followers" class="value">0</span></div>
+    <div class="row"><span class="label">Neue Subs</span><span id="subs" class="value">0</span></div>
+    <div class="row"><span class="label">Geschenk-Subs</span><span id="giftSubs" class="value">0</span></div>
+    <div class="row"><span class="label">Peak-Zuschauer</span><span id="peak" class="value">0</span></div>
+    <div class="row"><span class="label">Ø Zuschauer</span><span id="average" class="value">0,0</span></div>
+    <div class="row"><span class="label">Chatnachrichten</span><span id="chatMessages" class="value">0</span></div>
+    <div class="row"><span class="label">Alerts</span><span id="alertsPlayed" class="value">0</span></div>
+    <div class="row"><span class="label">Bits</span><span id="bitsCheered" class="value">0</span></div>
+    <div class="row"><span class="label">Eingehende Raids</span><span id="incomingRaids" class="value">0</span></div>
+    <div class="row"><span class="label">Streamdauer</span><span id="duration" class="value">00:00:00</span></div>
+  </div>
+<script>
+  function formatDuration(totalSeconds){
+    const s=Math.max(0,Number(totalSeconds)||0);
+    const h=Math.floor(s/3600),m=Math.floor(s/60)%60,sec=Math.floor(s)%60;
+    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  }
+  CreatorOverlayData.subscribe(data=>{
+    const stats=data.stats||{};
+    const stream=data.stream||{};
+    followers.textContent=stats.followersGained||0;
+    subs.textContent=stats.newSubscriptions||0;
+    giftSubs.textContent=stats.giftSubscriptions||0;
+    peak.textContent=stats.peakViewers||0;
+    average.textContent=(Number(stats.averageViewers)||0).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
+    chatMessages.textContent=Number(stats.chatMessages)||0;
+    alertsPlayed.textContent=Number(stats.alertsPlayed)||0;
+    bitsCheered.textContent=(Number(stats.bitsCheered)||0).toLocaleString('de-DE');
+    incomingRaids.textContent=Number(stats.incomingRaids)||0;
+    duration.textContent=formatDuration(stats.streamTimeSeconds||stream.elapsedSeconds||0);
+  });
+  CreatorOverlayConfig.subscribe(config=>{
+    panel.style.fontFamily=config.fontFamily||'Segoe UI';
+    panel.style.color=config.fontColor||'#ffffff';
+  });
+</script>
+</body>
+</html>

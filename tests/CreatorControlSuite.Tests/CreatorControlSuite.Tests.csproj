@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/CreatorControlSuite.Core/CreatorControlSuite.Core.csproj" />
+    <ProjectReference Include="../../src/CreatorControlSuite.Modules.OBS/CreatorControlSuite.Modules.OBS.csproj" />
+    <ProjectReference Include="../../src/CreatorControlSuite.Modules.Twitch/CreatorControlSuite.Modules.Twitch.csproj" />
+    <ProjectReference Include="../../src/CreatorControlSuite.Modules.Spotify/CreatorControlSuite.Modules.Spotify.csproj" />
+    <ProjectReference Include="../../src/CreatorControlSuite.Modules.Alerts/CreatorControlSuite.Modules.Alerts.csproj" />
+    <ProjectReference Include="../../src/CreatorControlSuite.Modules.Workflow/CreatorControlSuite.Modules.Workflow.csproj" />
+    <ProjectReference Include="../../src/CreatorControlSuite.Modules.StreamDeck/CreatorControlSuite.Modules.StreamDeck.csproj" />
+    <ProjectReference Include="../../src/CreatorControlSuite.Modules.Overlay/CreatorControlSuite.Modules.Overlay.csproj" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

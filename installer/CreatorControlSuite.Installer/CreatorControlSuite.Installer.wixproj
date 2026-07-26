@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputName>CreatorControlSuite-x64</OutputName>
+    <Platform>x64</Platform>
+    <OutputPath>../../artifacts/installer/</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);PublishDir=$(PublishDir)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" />
+  </ItemGroup>
+</Project>
