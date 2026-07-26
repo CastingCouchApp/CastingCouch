@@ -26,6 +26,12 @@ public sealed class SpotifyModule : IConnectableModule
     private DateTimeOffset _lastValidPlaybackAt = DateTimeOffset.MinValue;
     private static readonly TimeSpan PlaybackEmptyGracePeriod = TimeSpan.FromSeconds(15);
     private const int EmptyPlaybackConfirmationCount = 5;
+    private const int PlayerControlDebounceMilliseconds = 1000;
+    private readonly object _playerControlDebounceSync = new();
+    private CancellationTokenSource? _volumeDebounceCts;
+    private CancellationTokenSource? _seekDebounceCts;
+    private int _pendingVolumePercent;
+    private int _pendingSeekPositionMs;
 
     public IReadOnlyDictionary<string, string> LastRefreshErrors => _lastRefreshErrors;
 
@@ -661,15 +667,46 @@ public sealed class SpotifyModule : IConnectableModule
             cancellationToken);
     }
 
-    public async Task SetVolumeAsync(
+    public Task SetVolumeAsync(
         int volumePercent,
         CancellationToken cancellationToken = default)
+        => SetVolumeCoreAsync(volumePercent, debounce: true, cancellationToken);
+
+    public Task SetVolumeImmediateAsync(
+        int volumePercent,
+        CancellationToken cancellationToken = default)
+        => SetVolumeCoreAsync(volumePercent, debounce: false, cancellationToken);
+
+    private async Task SetVolumeCoreAsync(
+        int volumePercent,
+        bool debounce,
+        CancellationToken cancellationToken)
     {
         var clamped = Math.Clamp(volumePercent, 0, 100);
-        await ExecutePlayerCommandAsync(
-            (deviceId, ct) => _apiClient.SetVolumeAsync(clamped, deviceId, ct),
-            cancellationToken);
+        _pendingVolumePercent = clamped;
         PatchPlaybackVolume(clamped);
+
+        if (!debounce)
+        {
+            await ExecutePlayerCommandAsync(
+                (deviceId, ct) => _apiClient.SetVolumeAsync(clamped, deviceId, ct),
+                cancellationToken);
+            PatchPlaybackVolume(clamped);
+            return;
+        }
+
+        await DebouncePlayerControlAsync(
+            () => _volumeDebounceCts,
+            cts => _volumeDebounceCts = cts,
+            async ct =>
+            {
+                var volume = _pendingVolumePercent;
+                await ExecutePlayerCommandAsync(
+                    (deviceId, token) => _apiClient.SetVolumeAsync(volume, deviceId, token),
+                    ct);
+                PatchPlaybackVolume(volume);
+            },
+            cancellationToken);
     }
 
     public async Task AdjustVolumeAsync(
@@ -677,8 +714,7 @@ public sealed class SpotifyModule : IConnectableModule
         CancellationToken cancellationToken = default)
     {
         EnsureConnected();
-        await RefreshPlaybackAsync(cancellationToken);
-        var current = _playback.Device?.VolumePercent ?? 50;
+        var current = _playback.Device?.VolumePercent ?? _pendingVolumePercent;
         await SetVolumeAsync(current + deltaPercent, cancellationToken);
     }
 
@@ -702,9 +738,20 @@ public sealed class SpotifyModule : IConnectableModule
         _playback = _playback with { RepeatMode = repeatMode };
     }
 
-    public async Task SeekAsync(
+    public Task SeekAsync(
         int positionMs,
         CancellationToken cancellationToken = default)
+        => SeekCoreAsync(positionMs, debounce: true, cancellationToken);
+
+    public Task SeekImmediateAsync(
+        int positionMs,
+        CancellationToken cancellationToken = default)
+        => SeekCoreAsync(positionMs, debounce: false, cancellationToken);
+
+    private async Task SeekCoreAsync(
+        int positionMs,
+        bool debounce,
+        CancellationToken cancellationToken)
     {
         EnsureConnected();
 
@@ -713,10 +760,30 @@ public sealed class SpotifyModule : IConnectableModule
             ? Math.Clamp(positionMs, 0, durationMs)
             : Math.Max(0, positionMs);
 
-        await ExecutePlayerCommandAsync(
-            (deviceId, ct) => _apiClient.SeekPlaybackAsync(clampedPosition, deviceId, ct),
-            cancellationToken);
+        _pendingSeekPositionMs = clampedPosition;
         _playback = _playback with { ProgressMs = clampedPosition };
+
+        if (!debounce)
+        {
+            await ExecutePlayerCommandAsync(
+                (deviceId, ct) => _apiClient.SeekPlaybackAsync(clampedPosition, deviceId, ct),
+                cancellationToken);
+            _playback = _playback with { ProgressMs = clampedPosition };
+            return;
+        }
+
+        await DebouncePlayerControlAsync(
+            () => _seekDebounceCts,
+            cts => _seekDebounceCts = cts,
+            async ct =>
+            {
+                var position = _pendingSeekPositionMs;
+                await ExecutePlayerCommandAsync(
+                    (deviceId, token) => _apiClient.SeekPlaybackAsync(position, deviceId, token),
+                    ct);
+                _playback = _playback with { ProgressMs = position };
+            },
+            cancellationToken);
     }
 
     public async Task FadeToAsync(
@@ -748,7 +815,7 @@ public sealed class SpotifyModule : IConnectableModule
                 currentVolume +
                 (target - currentVolume) * progress);
 
-            await SetVolumeAsync(volume, cancellationToken);
+            await SetVolumeImmediateAsync(volume, cancellationToken);
 
             if (step < steps)
             {
@@ -761,6 +828,33 @@ public sealed class SpotifyModule : IConnectableModule
         if (pauseAtEnd && target == 0)
         {
             await PauseAsync(cancellationToken);
+        }
+    }
+
+    private async Task DebouncePlayerControlAsync(
+        Func<CancellationTokenSource?> getCts,
+        Action<CancellationTokenSource> setCts,
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken)
+    {
+        CancellationTokenSource next;
+        lock (_playerControlDebounceSync)
+        {
+            var previous = getCts();
+            previous?.Cancel();
+            previous?.Dispose();
+            next = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            setCts(next);
+        }
+
+        try
+        {
+            await Task.Delay(PlayerControlDebounceMilliseconds, next.Token);
+            await action(next.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Ein neueres Seek-/Volume-Event hat dieses Signal ersetzt.
         }
     }
 

@@ -1149,7 +1149,7 @@ public partial class MainWindow : Window
             DashboardSpotifyVolumeText.Text = $"{(int)Math.Round(DashboardSpotifyVolumeSlider.Value)} %";
             if (!_updatingSpotifyUi)
             {
-                await QueueSpotifyVolumeUpdateAsync(75, (int)Math.Round(DashboardSpotifyVolumeSlider.Value));
+                await QueueSpotifyVolumeUpdateAsync((int)Math.Round(DashboardSpotifyVolumeSlider.Value));
             }
         };
         DashboardSendTwitchChatButton.Click += async (_, _) =>
@@ -2062,7 +2062,7 @@ public partial class MainWindow : Window
             {
                 // ValueChanged fires continuously while the thumb is dragged.
                 // A short debounce prevents API flooding while keeping the response live.
-                await QueueSpotifyVolumeUpdateAsync(60, volume);
+                await QueueSpotifyVolumeUpdateAsync(volume);
             }
         };
         ServicesTwitchSaveEndSettingsButton.Click += async (_, _) => await SaveTwitchEndSettingsAsync();
@@ -2127,16 +2127,7 @@ public partial class MainWindow : Window
                 StopAlertAudioPreview();
         };
         SpotifyVolumeSlider.ValueChanged += async (_, _) =>
-            await QueueSpotifyVolumeUpdateAsync(40);
-
-        SpotifyVolumeSlider.PreviewMouseMove += async (_, eventArgs) =>
-        {
-            if (eventArgs.LeftButton ==
-                System.Windows.Input.MouseButtonState.Pressed)
-            {
-                await QueueSpotifyVolumeUpdateAsync(20);
-            }
-        };
+            await QueueSpotifyVolumeUpdateAsync();
 
         TestSpotifyFadeButton.Click += async (_, _) =>
             await TestSpotifyFadeAsync();
@@ -9424,68 +9415,57 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
     }
 
-    private async Task QueueSpotifyVolumeUpdateAsync(
-    int debounceMilliseconds,
-    int? explicitVolume = null)
-{
-    SpotifyVolumeValueText.Text =
-        $"{(int)Math.Round(SpotifyVolumeSlider.Value)} %";
-
-    if (_updatingSpotifyUi)
+    private async Task QueueSpotifyVolumeUpdateAsync(int? explicitVolume = null)
     {
-        return;
-    }
+        SpotifyVolumeValueText.Text =
+            $"{(int)Math.Round(SpotifyVolumeSlider.Value)} %";
 
-    _spotifyVolumeChangeCts?.Cancel();
-    _spotifyVolumeChangeCts?.Dispose();
-
-    _spotifyVolumeChangeCts =
-        new CancellationTokenSource();
-
-    var cancellationToken =
-        _spotifyVolumeChangeCts.Token;
-
-    try
-    {
-        if (debounceMilliseconds > 0)
+        if (_updatingSpotifyUi)
         {
-            await Task.Delay(
-                debounceMilliseconds,
-                cancellationToken);
+            return;
         }
 
-        var volume = explicitVolume ??
-            (int)Math.Round(
-                SpotifyVolumeSlider.Value);
+        _spotifyVolumeChangeCts?.Cancel();
+        _spotifyVolumeChangeCts?.Dispose();
 
-        volume = Math.Clamp(volume, 0, 100);
-        _lastRequestedSpotifyVolumePercent = volume;
-        _lastRequestedSpotifyVolumeAt = DateTimeOffset.UtcNow;
+        _spotifyVolumeChangeCts =
+            new CancellationTokenSource();
 
-        await _spotifyModule.SetVolumeAsync(
-            volume,
-            cancellationToken);
+        var cancellationToken =
+            _spotifyVolumeChangeCts.Token;
 
-        // Die Spotify Web API meldet die neue Gerätelautstärke teilweise erst
-        // beim nächsten Polling. Die Overlay-Sichtbarkeit deshalb sofort anhand
-        // des vom Benutzer gesetzten Werts aktualisieren.
-        await ApplySpotifyOverlayMuteStateAsync(volume <= 0);
-        await WriteSpotifyOverlayRuntimeDataAsync(_spotifyModule.GetSnapshot(), _spotifyModule.GetSnapshot().Playback);
+        try
+        {
+            var volume = explicitVolume ??
+                (int)Math.Round(
+                    SpotifyVolumeSlider.Value);
+
+            volume = Math.Clamp(volume, 0, 100);
+            _lastRequestedSpotifyVolumePercent = volume;
+            _lastRequestedSpotifyVolumeAt = DateTimeOffset.UtcNow;
+
+            // SpotifyModule debounced Seek/Volume um 1s; hier nur den letzten Wert merken.
+            await _spotifyModule.SetVolumeAsync(
+                volume,
+                cancellationToken);
+
+            await ApplySpotifyOverlayMuteStateAsync(volume <= 0);
+            await WriteSpotifyOverlayRuntimeDataAsync(_spotifyModule.GetSnapshot(), _spotifyModule.GetSnapshot().Playback);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer slider position superseded this update.
+        }
+        catch (Exception exception)
+        {
+            SpotifyPlaybackDetailText.Text =
+                "Lautstärke konnte nicht gesetzt werden: " +
+                exception.Message;
+
+            SpotifyPlaybackDetailText.Foreground =
+                System.Windows.Media.Brushes.IndianRed;
+        }
     }
-    catch (OperationCanceledException)
-    {
-        // A newer slider position superseded this update.
-    }
-    catch (Exception exception)
-    {
-        SpotifyPlaybackDetailText.Text =
-            "Lautstärke konnte nicht gesetzt werden: " +
-            exception.Message;
-
-        SpotifyPlaybackDetailText.Foreground =
-            System.Windows.Media.Brushes.IndianRed;
-    }
-}
 
 
     private void RefreshSpotifyStatisticsUi()
@@ -10220,7 +10200,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                         !_settings.Spotify.MuteOnLiveTransition)
                     {
                         var liveVolume = Math.Clamp(_settings.Spotify.LiveVolumePercent, 0, 100);
-                        await _spotifyModule.SetVolumeAsync(liveVolume);
+                        await _spotifyModule.SetVolumeImmediateAsync(liveVolume);
                         _spotifyAutomationLog.Add(rule.Name,
                             $"Live-Lautstärke gesetzt: {liveVolume} % (veraltete Pause-Regel übersprungen).");
                         continue;
@@ -10236,7 +10216,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                                 shuffleOverride: rule.Shuffle);
                             break;
                         case "Pause": await _spotifyModule.PauseAsync(); break;
-                        case "SetVolume": await _spotifyModule.SetVolumeAsync(Math.Clamp(rule.VolumePercent, 0, 100)); break;
+                        case "SetVolume": await _spotifyModule.SetVolumeImmediateAsync(Math.Clamp(rule.VolumePercent, 0, 100)); break;
                         default: await _spotifyModule.ResumeAsync(); break;
                     }
                     _spotifyAutomationLog.Add(rule.Name, $"Aktion {rule.ActionType} für Szene '{sceneName}' ausgeführt.");
@@ -11396,7 +11376,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         volume = Math.Clamp(volume, 0, 100);
         _lastRequestedSpotifyVolumePercent = volume;
         _lastRequestedSpotifyVolumeAt = DateTimeOffset.UtcNow;
-        await _spotifyModule.SetVolumeAsync(volume, cancellationToken);
+        await _spotifyModule.SetVolumeImmediateAsync(volume, cancellationToken);
         await ApplySpotifyOverlayMuteStateAsync(volume <= 0);
     }
 
@@ -18331,7 +18311,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             await _obsClient.SetCurrentProgramSceneAsync(step.ObsScene);
             if (string.Equals(step.SpotifyAction, "Pause", StringComparison.OrdinalIgnoreCase)) await _spotifyModule.PauseAsync();
             else if (string.Equals(step.SpotifyAction, "Resume", StringComparison.OrdinalIgnoreCase)) await _spotifyModule.ResumeAsync();
-            else if (string.Equals(step.SpotifyAction, "SetVolume", StringComparison.OrdinalIgnoreCase)) await _spotifyModule.SetVolumeAsync(step.SpotifyVolumePercent);
+            else if (string.Equals(step.SpotifyAction, "SetVolume", StringComparison.OrdinalIgnoreCase)) await _spotifyModule.SetVolumeImmediateAsync(step.SpotifyVolumePercent);
 
             if (step.UpdateTwitchChannel)
             {
@@ -19462,7 +19442,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 {
                     if (string.IsNullOrWhiteSpace(rule.SpotifyPlaylistUri))
                         throw new InvalidOperationException("Für die Spotify-Automation wurde keine Playlist-URI eingetragen.");
-                    if (rule.SpotifyFadeSeconds > 0) await _spotifyModule.SetVolumeAsync(0, spotifyToken);
+                    if (rule.SpotifyFadeSeconds > 0) await _spotifyModule.SetVolumeImmediateAsync(0, spotifyToken);
                     await _spotifyModule.StartPlaylistAsync(
                         rule.SpotifyPlaylistUri,
                         applyConfiguredStartVolume: false,
@@ -20989,7 +20969,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         if (state is null)
             throw new InvalidOperationException($"Für die Spotify-Gruppe '{group}' wurde noch kein vorheriger Wiedergabezustand gesichert.");
 
-        if (rule.SpotifyFadeSeconds > 0) await _spotifyModule.SetVolumeAsync(0, cancellationToken);
+        if (rule.SpotifyFadeSeconds > 0) await _spotifyModule.SetVolumeImmediateAsync(0, cancellationToken);
         await _spotifyModule.SetRepeatAsync(state.RepeatMode, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(state.ContextUri))
@@ -21011,7 +20991,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             // Kurz warten, bis Spotify den Kontext/Track aktiviert hat, bevor Seek greift.
             await Task.Delay(350, cancellationToken);
-            await _spotifyModule.SeekAsync(state.ProgressMs, cancellationToken);
+            await _spotifyModule.SeekImmediateAsync(state.ProgressMs, cancellationToken);
         }
 
         var restoreVolumeRule = new TimedAutomationRuleSettings
@@ -21038,7 +21018,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         var target = Math.Clamp(rule.SpotifyVolumePercent, 0, 100);
         if (rule.SpotifyFadeSeconds <= 0)
         {
-            await _spotifyModule.SetVolumeAsync(target, cancellationToken);
+            await _spotifyModule.SetVolumeImmediateAsync(target, cancellationToken);
             return;
         }
 
@@ -21050,7 +21030,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             cancellationToken.ThrowIfCancellationRequested();
             var volume = (int)Math.Round(current + ((target - current) * (step / (double)steps)));
-            await _spotifyModule.SetVolumeAsync(Math.Clamp(volume, 0, 100), cancellationToken);
+            await _spotifyModule.SetVolumeImmediateAsync(Math.Clamp(volume, 0, 100), cancellationToken);
             if (step < steps) await Task.Delay(delay, cancellationToken);
         }
     }
