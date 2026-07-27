@@ -1,4 +1,4 @@
-namespace CreatorControlSuite.App.Core.Eventing;
+namespace CreatorControlSuite.Core.Eventing;
 
 public interface IEventBus
 {

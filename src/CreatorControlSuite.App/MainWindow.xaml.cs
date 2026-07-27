@@ -29,6 +29,8 @@ using CreatorControlSuite.Modules.StreamDeck;
 using CreatorControlSuite.App.Services;
 using CreatorControlSuite.App.Themes;
 using CreatorControlSuite.App.Hud;
+using CreatorControlSuite.App.Mvvm;
+using CreatorControlSuite.App.ViewModels;
 using CreatorControlSuite.Core.Ipc;
 using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Legal;
@@ -65,12 +67,16 @@ public partial class MainWindow : Window
     private DateTimeOffset? _lastRequestedSpotifyVolumeAt;
     private readonly ISettingsStore _settingsStore;
     private readonly ISecretStore _secretStore;
-    private readonly DiagnosticService _diagnostics;
     private readonly IObsWebSocketClient _obsClient;
     private readonly TwitchModule _twitchModule;
     private readonly SpotifyModule _spotifyModule;
     private readonly YouTubeMusicModule _youTubeMusicModule;
     private readonly IMusicPlayerRouter _musicPlayerRouter;
+    private readonly IMusicPlayerUiPresenter _musicPlayerUiPresenter;
+    private readonly IMultiPcAgentClient _multiPcAgentClient;
+    private readonly IStreamerBotClient _streamerBotClient;
+    private readonly INavigationService _navigationService;
+    private readonly DiagnosticsPageViewModel _diagnosticsPageViewModel;
     private readonly AlertsModule _alertsModule;
     private readonly OverlayModule _overlayModule;
     private readonly WorkflowModule _workflowModule;
@@ -301,10 +307,8 @@ public partial class MainWindow : Window
     private DateTimeOffset _followedLiveRaidTargetCacheAt = DateTimeOffset.MinValue;
     private CancellationTokenSource? _raidTargetSuggestStatusCts;
     private TaskCompletionSource<bool>? _streamEndRaidDecisionTcs;
-    private System.Net.WebSockets.ClientWebSocket? _streamerBotSocket;
     private System.Net.WebSockets.ClientWebSocket? _streamerBotEventSocket;
     private CancellationTokenSource? _streamerBotEventCts;
-    private readonly SemaphoreSlim _streamerBotRequestGate = new(1, 1);
     private readonly ObservableCollection<StreamerBotActionOption> _streamerBotActions = [];
     private readonly ObservableCollection<StreamerBotExecutionHistoryItem> _streamerBotExecutionHistory = [];
     private readonly ObservableCollection<StreamerBotActionTemplate> _streamerBotActionTemplates = [];
@@ -374,7 +378,6 @@ public partial class MainWindow : Window
     public MainWindow(
         ISettingsStore settingsStore,
         ISecretStore secretStore,
-        DiagnosticService diagnostics,
         IObsWebSocketClient obsClient,
         TwitchModule twitchModule,
         SpotifyModule spotifyModule,
@@ -402,7 +405,13 @@ public partial class MainWindow : Window
         IInstallerSelfTestService installerSelfTestService,
         IBetaReadinessService betaReadinessService,
         ExternalAlertActivityService externalAlertActivity,
-        IThemeService themeService)
+        IThemeService themeService,
+        IMusicPlayerUiPresenter musicPlayerUiPresenter,
+        IMultiPcAgentClient multiPcAgentClient,
+        IStreamerBotClient streamerBotClient,
+        INavigationService navigationService,
+        DiagnosticsPageViewModel diagnosticsPageViewModel,
+        AppEventBridge appEventBridge)
     {
         InitializeComponent();
         WindowState = WindowState.Maximized;
@@ -412,9 +421,14 @@ public partial class MainWindow : Window
         _settingsStore = settingsStore;
         _externalAlertActivity = externalAlertActivity;
         _themeService = themeService;
+        _musicPlayerUiPresenter = musicPlayerUiPresenter;
+        _multiPcAgentClient = multiPcAgentClient;
+        _streamerBotClient = streamerBotClient;
+        _navigationService = navigationService;
+        _diagnosticsPageViewModel = diagnosticsPageViewModel;
+        appEventBridge.Start();
         _externalAlertActivity.ActiveCountChanged += async (_, _) => await ApplyCombinedAlertDuckingAsync();
         _secretStore = secretStore;
-        _diagnostics = diagnostics;
         _obsClient = obsClient;
         _twitchModule = twitchModule;
         _spotifyModule = spotifyModule;
@@ -2707,6 +2721,22 @@ public partial class MainWindow : Window
         page.Visibility = Visibility.Visible;
         Panel.SetZIndex(page, 1);
 
+        var pageKey =
+            ReferenceEquals(page, DashboardPage) ? "dashboard" :
+            ReferenceEquals(page, MusicPlayerPage) ? "music" :
+            ReferenceEquals(page, ServicesPage) ? "services" :
+            ReferenceEquals(page, WorkflowPage) ? "workflow" :
+            ReferenceEquals(page, OverlayPage) ? "overlay" :
+            ReferenceEquals(page, AlertsPage) ? "alerts" :
+            ReferenceEquals(page, SettingsPage) ? "settings" :
+            ReferenceEquals(page, DiagnosticsPage) ? "diagnostics" :
+            ReferenceEquals(page, StatisticsPage) ? "statistics" :
+            ReferenceEquals(page, ProfilesPage) ? "profiles" :
+            ReferenceEquals(page, MultiPcPage) ? "multipc" :
+            ReferenceEquals(page, AboutPage) ? "about" :
+            "unknown";
+        _navigationService.Navigate(pageKey);
+
         if (ReferenceEquals(page, DashboardPage))
         {
             SetActiveNavigationButton(DashboardButton);
@@ -3172,14 +3202,11 @@ public partial class MainWindow : Window
     }
 
     private System.Net.Http.HttpClient CreateTrustedMultiPcClient(MultiPcDeviceRecord device)
-    {
-        var handler = new System.Net.Http.HttpClientHandler
-        {
-            ServerCertificateCustomValidationCallback = (_, certificate, _, _) => certificate is not null &&
-                string.Equals(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(certificate.GetRawCertData())), device.CertificateFingerprint, StringComparison.OrdinalIgnoreCase)
-        };
-        return new System.Net.Http.HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
-    }
+        => _multiPcAgentClient.CreateClient(
+            device.Host,
+            GetMultiPcAgentPort(device),
+            device.AgentKey,
+            device.CertificateFingerprint);
 
     private System.Net.Http.HttpClient CreateTrustedAgentClient(MultiPcDeviceRecord device)
         => CreateTrustedMultiPcClient(device);
@@ -8908,8 +8935,7 @@ public partial class MainWindow : Window
 
             // Streamer.bot top status
             var streamerBotConnected =
-                _streamerBotSocket?.State ==
-                System.Net.WebSockets.WebSocketState.Open;
+                _streamerBotClient.IsConnected;
 
             StreamerBotDashboardStatus.Text =
                 streamerBotConnected ? "VERBUNDEN" : "NICHT VERBUNDEN";
@@ -10201,7 +10227,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             }
 
             SetPrepareProgress(78, "Streamer.bot wird verbunden …", true);
-            if (_settings.StreamerBot.ConnectOnPrepare && (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)) await ConnectStreamerBotAsync();
+            if (_settings.StreamerBot.ConnectOnPrepare && (!_streamerBotClient.IsConnected)) await ConnectStreamerBotAsync();
 
             SetPrepareProgress(88, "Workflow und Startszene werden vorbereitet …", true);
             await ExecuteWorkflowAsync(() => _workflowModule.Service.PrepareAsync());
@@ -11011,54 +11037,63 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task RefreshMusicPlayerUiAsync()
     {
         ApplyMusicProviderUiState();
-        var snapshot = await _musicPlayerRouter.GetSnapshotAsync();
-        var trackLabel = string.IsNullOrWhiteSpace(snapshot.Title)
-            ? "Kein Titel"
-            : string.IsNullOrWhiteSpace(snapshot.Artist)
-                ? snapshot.Title
-                : $"{snapshot.Artist} – {snapshot.Title}";
+        var uiState = await _musicPlayerUiPresenter.GetStateAsync();
+        MusicNowPlayingWidget.SetState(uiState);
+        var trackLabel = uiState.TrackLabel;
+        var snapshot = new NowPlayingSnapshot(
+            uiState.ProviderId,
+            uiState.Connected,
+            uiState.IsPlaying,
+            uiState.Title,
+            uiState.Artist,
+            uiState.Album,
+            uiState.CoverUrl ?? "",
+            uiState.PositionMs,
+            uiState.DurationMs,
+            uiState.VolumePercent,
+            uiState.StatusText);
 
         _updatingMusicPlayerUi = true;
         try
         {
             TitleBarMusicTrackText.Text = trackLabel;
-            TitleBarMusicPlayPauseButton.Content = snapshot.IsPlaying ? "Ⅱ" : "▶";
-            DashboardTopMusicTitleText.Text = string.IsNullOrWhiteSpace(snapshot.Title) ? "Kein Titel" : snapshot.Title;
-            DashboardTopMusicArtistText.Text = string.IsNullOrWhiteSpace(snapshot.Artist) ? "-" : snapshot.Artist;
+            TitleBarMusicPlayPauseButton.Content = uiState.IsPlaying ? "Ⅱ" : "▶";
+            DashboardTopMusicTitleText.Text = string.IsNullOrWhiteSpace(uiState.Title) ? "Kein Titel" : uiState.Title;
+            DashboardTopMusicArtistText.Text = string.IsNullOrWhiteSpace(uiState.Artist) ? "-" : uiState.Artist;
             var showAlbum = !IsYouTubeMusicProvider();
             DashboardTopMusicAlbumText.Visibility = showAlbum ? Visibility.Visible : Visibility.Collapsed;
             MusicPlayerAlbumText.Visibility = showAlbum ? Visibility.Visible : Visibility.Collapsed;
             if (showAlbum)
             {
-                DashboardTopMusicAlbumText.Text = string.IsNullOrWhiteSpace(snapshot.Album) ? "Album: -" : "Album: " + snapshot.Album;
-                MusicPlayerAlbumText.Text = string.IsNullOrWhiteSpace(snapshot.Album) ? "Album: -" : "Album: " + snapshot.Album;
+                DashboardTopMusicAlbumText.Text = string.IsNullOrWhiteSpace(uiState.Album) ? "Album: -" : "Album: " + uiState.Album;
+                MusicPlayerAlbumText.Text = string.IsNullOrWhiteSpace(uiState.Album) ? "Album: -" : "Album: " + uiState.Album;
             }
-            DashboardTopMusicStatusText.Text = snapshot.StatusText;
-            DashboardTopMusicPlayPauseButton.Content = snapshot.IsPlaying ? "Ⅱ" : "▶";
-            MusicPlayerTitleText.Text = string.IsNullOrWhiteSpace(snapshot.Title) ? "Kein Titel" : snapshot.Title;
-            MusicPlayerArtistText.Text = string.IsNullOrWhiteSpace(snapshot.Artist) ? "-" : snapshot.Artist;
-            MusicPlayerStatusText.Text = snapshot.StatusText;
-            MusicPlayerPlayPauseButton.Content = snapshot.IsPlaying ? "Pause" : "Play";
+            DashboardTopMusicStatusText.Text = uiState.StatusText;
+            DashboardTopMusicPlayPauseButton.Content = uiState.IsPlaying ? "Ⅱ" : "▶";
+            MusicPlayerTitleText.Text = string.IsNullOrWhiteSpace(uiState.Title) ? "Kein Titel" : uiState.Title;
+            MusicPlayerArtistText.Text = string.IsNullOrWhiteSpace(uiState.Artist) ? "-" : uiState.Artist;
+            MusicPlayerStatusText.Text = uiState.StatusText;
+            MusicPlayerPlayPauseButton.Content = uiState.IsPlaying ? "Pause" : "Play";
             DashboardMusicNowPlayingText.Text = trackLabel;
-            DashboardMusicStatusText.Text = snapshot.StatusText;
+            DashboardMusicStatusText.Text = uiState.StatusText;
             _ = Dispatcher.BeginInvoke(UpdateMusicTitleMarquees, System.Windows.Threading.DispatcherPriority.Loaded);
 
             if (!IsSpotifyMusicProvider())
             {
-                SpotifyDashboardStatus.Text = snapshot.Connected || _youTubeMusicModule.IsBridgeRunning
+                SpotifyDashboardStatus.Text = uiState.Connected || _youTubeMusicModule.IsBridgeRunning
                     ? "VERBUNDEN"
                     : "NICHT VERBUNDEN";
-                SpotifyDashboardLamp.Fill = snapshot.Connected || _youTubeMusicModule.IsBridgeRunning
+                SpotifyDashboardLamp.Fill = uiState.Connected || _youTubeMusicModule.IsBridgeRunning
                     ? System.Windows.Media.Brushes.LimeGreen
                     : System.Windows.Media.Brushes.IndianRed;
             }
 
-            var duration = Math.Max(1, snapshot.DurationMs);
-            var progress = Math.Clamp(snapshot.ProgressMs, 0, duration);
-            MusicPlayerProgressBar.Value = snapshot.DurationMs <= 0 ? 0 : (double)progress / duration;
+            var duration = Math.Max(1, uiState.DurationMs);
+            var progress = Math.Clamp(uiState.PositionMs, 0, duration);
+            MusicPlayerProgressBar.Value = uiState.DurationMs <= 0 ? 0 : (double)progress / duration;
             MusicPlayerProgressText.Text = TimeSpan.FromMilliseconds(progress).ToString(@"mm\:ss");
-            MusicPlayerDurationText.Text = TimeSpan.FromMilliseconds(Math.Max(0, snapshot.DurationMs)).ToString(@"mm\:ss");
-            if (snapshot.VolumePercent is int volume)
+            MusicPlayerDurationText.Text = TimeSpan.FromMilliseconds(Math.Max(0, uiState.DurationMs)).ToString(@"mm\:ss");
+            if (uiState.VolumePercent is int volume)
             {
                 MusicPlayerVolumeSlider.Value = volume;
                 MusicPlayerVolumeText.Text = $"{volume} %";
@@ -12863,8 +12898,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task ToggleStreamerBotFromDashboardAsync()
     {
         var connected =
-            _streamerBotSocket?.State ==
-            System.Net.WebSockets.WebSocketState.Open;
+            _streamerBotClient.IsConnected;
 
         if (connected)
         {
@@ -12884,8 +12918,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         var twitchConnected = _twitchModule.GetSnapshot().Authenticated;
         var musicConnected = GetActiveMusicConnected();
         var streamerBotConnected =
-            _streamerBotSocket?.State ==
-            System.Net.WebSockets.WebSocketState.Open;
+            _streamerBotClient.IsConnected;
         var musicName = _musicPlayerRouter.ActiveDisplayName;
 
         DashboardServiceConnectObsButton.Content =
@@ -13103,8 +13136,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         await ConnectStreamerBotAsync();
 
         var connected =
-            _streamerBotSocket?.State ==
-            System.Net.WebSockets.WebSocketState.Open;
+            _streamerBotClient.IsConnected;
 
         StreamerBotDashboardStatus.Text =
             connected ? "VERBUNDEN" : "NICHT VERBUNDEN";
@@ -14771,8 +14803,8 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            DiagnosticsGrid.ItemsSource =
-                await _diagnostics.RunAsync();
+            await _diagnosticsPageViewModel.LoadStatusesAsync();
+            DiagnosticsGrid.ItemsSource = _diagnosticsPageViewModel.ModuleStatuses;
 
             _appLogger.Write(
                 AppLogLevel.Information,
@@ -14912,10 +14944,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 }
             }
 
-            var streamerBotConnected =
-                _streamerBotSocket is not null &&
-                _streamerBotSocket.State ==
-                    System.Net.WebSockets.WebSocketState.Open;
+            var streamerBotConnected = _streamerBotClient.IsConnected;
 
             if (_settings.General.ReconnectStreamerBot &&
                 (_settings.StreamerBot.AutoConnect ||
@@ -14930,9 +14959,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
                 await ConnectStreamerBotAsync();
 
-                if (_streamerBotSocket is not null &&
-                    _streamerBotSocket.State ==
-                        System.Net.WebSockets.WebSocketState.Open)
+                if (_streamerBotClient.IsConnected)
                 {
                     AddDashboardNotification(
                         "Streamer.bot wurde automatisch wieder verbunden.",
@@ -16775,8 +16802,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ApplyStreamerBotAlertSuppressionAsync()
     {
-        if (_streamerBotSocket is null ||
-            _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)
+        if (!_streamerBotClient.IsConnected)
         {
             StreamerBotAlertControlStatusText.Text =
                 "Streamer.bot ist nicht verbunden. Die Einstellung wird beim nächsten Verbindungsaufbau angewendet.";
@@ -16828,7 +16854,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RefreshStreamerBotActionsAsync(bool showStatus)
     {
-        if (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)
+        if (!_streamerBotClient.IsConnected)
         {
             StreamerBotAlertControlStatusText.Text = "Streamer.bot ist nicht verbunden.";
             return;
@@ -16910,7 +16936,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         ServicesStreamerBotFavoriteActionButton.IsEnabled = true;
         ServicesStreamerBotFavoriteActionButton.Content = _streamerBotFavoriteActionIds.Contains(action.Id) ? "★ FAVORIT" : "☆ FAVORIT";
         ServicesStreamerBotRunActionButton.IsEnabled = action.Enabled &&
-            _streamerBotSocket is { State: System.Net.WebSockets.WebSocketState.Open };
+            _streamerBotClient.IsConnected;
         ServicesStreamerBotActionResultText.Text = action.Enabled
             ? "Bereit zur Ausführung. Optionale Parameter können als JSON übergeben werden."
             : "Diese Streamer.bot-Aktion ist deaktiviert.";
@@ -17115,7 +17141,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 await DisconnectStreamerBotAsync();
                 await Task.Delay(attempt * 400);
                 await ConnectStreamerBotAsync();
-                if (_streamerBotSocket?.State == System.Net.WebSockets.WebSocketState.Open)
+                if (_streamerBotClient.IsConnected)
                 {
                     await RefreshStreamerBotActionsAsync(true);
                     ServicesStreamerBotDiagnosticText.Text = $"Neu verbunden · Versuch {attempt}/3 · Aktionen aktualisiert.";
@@ -17131,7 +17157,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task DiagnoseStreamerBotAsync()
     {
-        if (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)
+        if (!_streamerBotClient.IsConnected)
         {
             ServicesStreamerBotDiagnosticText.Text = "Nicht verbunden – zuerst die WebSocket-Verbindung herstellen.";
             ServicesStreamerBotDiagnosticText.Foreground = Brushes.IndianRed;
@@ -17166,53 +17192,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     }
 
     private async Task<System.Text.Json.JsonDocument> SendStreamerBotRequestAsync(object requestBody, TimeSpan? timeout = null)
-    {
-        if (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)
-            throw new InvalidOperationException("Streamer.bot ist nicht verbunden.");
-
-        await _streamerBotRequestGate.WaitAsync();
-        try
-        {
-            var id = "ccs-" + Guid.NewGuid().ToString("N");
-            var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
-            using var bodyDocument = System.Text.Json.JsonDocument.Parse(json);
-            var dictionary = bodyDocument.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone());
-            dictionary["id"] = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(id)).RootElement.Clone();
-            var payload = System.Text.Json.JsonSerializer.Serialize(dictionary);
-            var bytes = System.Text.Encoding.UTF8.GetBytes(payload);
-            await _streamerBotSocket.SendAsync(new ArraySegment<byte>(bytes), System.Net.WebSockets.WebSocketMessageType.Text, true, CancellationToken.None);
-
-            using var cts = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(8));
-            var buffer = new byte[64 * 1024];
-            using var stream = new MemoryStream();
-            while (true)
-            {
-                var result = await _streamerBotSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
-                if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Close) throw new InvalidOperationException("Streamer.bot hat die WebSocket-Verbindung geschlossen.");
-                stream.Write(buffer, 0, result.Count);
-                if (!result.EndOfMessage) continue;
-                var response = System.Text.Json.JsonDocument.Parse(stream.ToArray());
-                if (!response.RootElement.TryGetProperty("id", out var responseId) || !string.Equals(responseId.GetString(), id, StringComparison.Ordinal))
-                {
-                    response.Dispose();
-                    stream.SetLength(0);
-                    continue;
-                }
-                if (response.RootElement.TryGetProperty("status", out var status) && string.Equals(status.GetString(), "error", StringComparison.OrdinalIgnoreCase))
-                {
-                    var message = response.RootElement.TryGetProperty("message", out var messageNode) ? messageNode.GetString() : "Unbekannter Streamer.bot-Fehler";
-                    response.Dispose();
-                    throw new InvalidOperationException(message);
-                }
-                return response;
-            }
-        }
-        finally { _streamerBotRequestGate.Release(); }
-    }
+        => await _streamerBotClient.SendRequestAsync(requestBody, timeout);
 
     private async Task SetStreamerBotAlertsEnabledAsync(bool enabled, bool showSuccess = true)
     {
-        if (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)
+        if (!_streamerBotClient.IsConnected)
         {
             StreamerBotAlertControlStatusText.Text = "Streamer.bot ist nicht verbunden.";
             return;
@@ -17266,19 +17250,10 @@ private Task ApplyCombinedAlertDuckingAsync()
         await DisconnectStreamerBotAsync();
         try
         {
-            _streamerBotSocket = new System.Net.WebSockets.ClientWebSocket();
-            var endpoint = string.IsNullOrWhiteSpace(_settings.StreamerBot.Endpoint) ? "/" : _settings.StreamerBot.Endpoint;
-            if (!endpoint.StartsWith('/')) endpoint = "/" + endpoint;
-            if (!string.IsNullOrWhiteSpace(_settings.StreamerBot.Password))
-            {
-                _streamerBotSocket.Options.SetRequestHeader("Authorization", "Bearer " + _settings.StreamerBot.Password);
-                var separator = endpoint.Contains('?') ? "&" : "?";
-                endpoint += separator + "password=" + Uri.EscapeDataString(_settings.StreamerBot.Password);
-            }
-            await _streamerBotSocket.ConnectAsync(new Uri($"ws://{_settings.StreamerBot.Host}:{_settings.StreamerBot.Port}{endpoint}"), CancellationToken.None);
+            await _streamerBotClient.ConnectAsync(_settings.StreamerBot);
             await RefreshStreamerBotActionsAsync(false);
             await StartStreamerBotEventListenerAsync();
-            ServicesStreamerBotStatusText.Text = $"Verbunden · {_settings.StreamerBot.Host}:{_settings.StreamerBot.Port}";
+            ServicesStreamerBotStatusText.Text = _streamerBotClient.Status.Detail;
             ServicesStreamerBotDiagnosticText.Text = $"WebSocket verbunden · {_streamerBotActions.Count} Aktionen geladen · Event-Listener aktiv";
             ServicesStreamerBotDiagnosticText.Foreground = Brushes.LightGreen;
             ServicesStreamerBotStatusText.Foreground = System.Windows.Media.Brushes.LightGreen;
@@ -17302,17 +17277,11 @@ private Task ApplyCombinedAlertDuckingAsync()
         _streamerBotEventCts = new CancellationTokenSource();
         _streamerBotEventSocket = new System.Net.WebSockets.ClientWebSocket();
 
-        var endpoint = string.IsNullOrWhiteSpace(_settings.StreamerBot.Endpoint) ? "/" : _settings.StreamerBot.Endpoint;
-        if (!endpoint.StartsWith('/')) endpoint = "/" + endpoint;
-        if (!string.IsNullOrWhiteSpace(_settings.StreamerBot.Password))
-        {
-            _streamerBotEventSocket.Options.SetRequestHeader("Authorization", "Bearer " + _settings.StreamerBot.Password);
-            endpoint += (endpoint.Contains('?') ? "&" : "?") + "password=" + Uri.EscapeDataString(_settings.StreamerBot.Password);
-        }
+        var connection = _streamerBotClient.ResolveConnection(_settings.StreamerBot);
+        if (!string.IsNullOrWhiteSpace(connection.Password))
+            _streamerBotEventSocket.Options.SetRequestHeader("Authorization", "Bearer " + connection.Password);
 
-        await _streamerBotEventSocket.ConnectAsync(
-            new Uri($"ws://{_settings.StreamerBot.Host}:{_settings.StreamerBot.Port}{endpoint}"),
-            _streamerBotEventCts.Token);
+        await _streamerBotEventSocket.ConnectAsync(connection.WebSocketUri, _streamerBotEventCts.Token);
 
         var subscribe = System.Text.Json.JsonSerializer.Serialize(new
         {
@@ -17420,12 +17389,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         _streamerBotEventCts?.Dispose();
         _streamerBotEventCts = null;
 
-        if (_streamerBotSocket is { State: System.Net.WebSockets.WebSocketState.Open })
-        {
-            try { await _streamerBotSocket.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "disconnect", CancellationToken.None); } catch { }
-        }
-        _streamerBotSocket?.Dispose();
-        _streamerBotSocket = null;
+        await _streamerBotClient.DisconnectAsync();
         ServicesStreamerBotStatusText.Text = "Nicht verbunden";
         ServicesStreamerBotStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
         StreamerBotDashboardStatus.Text = "NICHT VERBUNDEN";
@@ -17510,7 +17474,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         AddCheck(_obsClient.IsConnected, "OBS WebSocket verbunden");
         AddCheck(_twitchModule.GetSnapshot().Authenticated, "Twitch verbunden");
         AddCheck(_spotifyModule.GetSnapshot().Authenticated, "Spotify verbunden");
-        AddCheck(_streamerBotSocket is not null && _streamerBotSocket.State == System.Net.WebSockets.WebSocketState.Open, "Streamer.bot verbunden");
+        AddCheck(_streamerBotClient.IsConnected, "Streamer.bot verbunden");
         AddCheck(!string.IsNullOrWhiteSpace(_settings.Obs.StartScene), $"Startszene: {_settings.Obs.StartScene}");
         AddCheck(!string.IsNullOrWhiteSpace(_settings.Obs.LiveScene), $"Live-Szene: {_settings.Obs.LiveScene}");
         AddCheck(!string.IsNullOrWhiteSpace(DashboardTwitchTitleBox.Text), "Streamtitel gesetzt");
@@ -18776,7 +18740,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         await RefreshStreamerBotActionsAsync(false);
         if (!showStatus) return;
-        if (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)
+        if (!_streamerBotClient.IsConnected)
         {
             RunOfShowStatusText.Text = "Streamer.bot ist nicht verbunden.";
             return;
@@ -19053,7 +19017,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 if (step.ActionDelayMilliseconds > 0) await Task.Delay(step.ActionDelayMilliseconds);
                 try
                 {
-                    if (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)
+                    if (!_streamerBotClient.IsConnected)
                         throw new InvalidOperationException("Streamer.bot ist nicht verbunden.");
                     var action = new { id = step.StreamerBotActionId, name = step.StreamerBotActionName };
                     using var response = await SendStreamerBotRequestAsync(new
@@ -19634,7 +19598,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 await AddResultAsync("Streamer.bot", () =>
                 {
-                    if (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)
+                    if (!_streamerBotClient.IsConnected)
                         throw new InvalidOperationException("Streamer.bot ist nicht verbunden.");
                     return Task.CompletedTask;
                 });
@@ -20047,7 +20011,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         bool result = rule.ConditionType switch
         {
             "ObsConnected" => _obsClient.IsConnected,
-            "StreamerBotConnected" => _streamerBotSocket is not null && _streamerBotSocket.State == System.Net.WebSockets.WebSocketState.Open,
+            "StreamerBotConnected" => _streamerBotClient.IsConnected,
             "StreamActive" => _streamSessionStartedAt.HasValue,
             "CurrentScene" => _obsClient.IsConnected && string.Equals(await _obsClient.GetCurrentProgramSceneAsync(cancellationToken), rule.ConditionValue, StringComparison.OrdinalIgnoreCase),
             _ => true
@@ -20087,7 +20051,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
         else if (string.Equals(rule.ActionType, "StreamerBotAction", StringComparison.OrdinalIgnoreCase))
         {
-            if (_streamerBotSocket is null || _streamerBotSocket.State != System.Net.WebSockets.WebSocketState.Open)
+            if (!_streamerBotClient.IsConnected)
                 throw new InvalidOperationException("Streamer.bot ist nicht verbunden.");
             if (string.IsNullOrWhiteSpace(rule.StreamerBotActionId) && string.IsNullOrWhiteSpace(rule.StreamerBotActionName))
                 throw new InvalidOperationException("Keine Streamer.bot-Aktion gewählt.");

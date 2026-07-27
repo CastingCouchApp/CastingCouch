@@ -70,6 +70,22 @@ bool Authorized(HttpRequest request) => request.Headers.TryGetValue("X-CCS-Agent
     System.Text.Encoding.UTF8.GetBytes(value.ToString()), System.Text.Encoding.UTF8.GetBytes(agentKey));
 bool Running(string name) => Process.GetProcessesByName(name).Length > 0;
 
+async Task<IResult> WithObsControl(HttpRequest request, AgentPermissions permissions, Func<IObsWebSocketClient, Task<IResult>> action)
+{
+    if (!Authorized(request)) return Results.Unauthorized();
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    try
+    {
+        await using var obs = await ConnectObsAsync(agentSettings);
+        return await action(obs);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+}
+
 app.MapGet("/api/status", (HttpRequest request) =>
 {
     if (!Authorized(request)) return Results.Unauthorized();
@@ -136,12 +152,8 @@ app.MapGet("/api/pair", (string code) =>
 
 
 app.MapGet("/api/obs/state", async (HttpRequest request) =>
-{
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    try
+    await WithObsControl(request, permissions, async obs =>
     {
-        await using var obs = await ConnectObsAsync(agentSettings);
         var scenes = await obs.GetSceneListAsync();
         var currentScene = await obs.GetCurrentProgramSceneAsync();
         var inputs = await obs.GetInputListAsync();
@@ -157,74 +169,113 @@ app.MapGet("/api/obs/state", async (HttpRequest request) =>
         }
         var sceneItems = await obs.GetSceneItemListAsync(currentScene);
         return Results.Ok(new { connected = true, currentScene, scenes = scenes.Select(x => x.Name).ToArray(), audioInputs = audio, sceneItems = sceneItems.Select(x => new { sourceName = x.SourceName, enabled = x.Enabled }).ToArray() });
-    }
-    catch (Exception ex) { return Results.Problem(ex.Message); }
-});
+    }));
 
 app.MapPost("/api/obs/scene", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
     var payload = await JsonSerializer.DeserializeAsync<ObsSceneRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName)) return Results.BadRequest("sceneName fehlt");
-    try { await using var obs = await ConnectObsAsync(agentSettings); await obs.SetCurrentProgramSceneAsync(payload.SceneName); return Results.Ok(new { accepted = true, sceneName = payload.SceneName }); }
-    catch (Exception ex) { return Results.Problem(ex.Message); }
+    return await WithObsControl(request, permissions, async obs =>
+    {
+        await obs.SetCurrentProgramSceneAsync(payload.SceneName);
+        return Results.Ok(new { accepted = true, sceneName = payload.SceneName });
+    });
 });
 
 app.MapPost("/api/obs/mute", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
     var payload = await JsonSerializer.DeserializeAsync<ObsMuteRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.InputName)) return Results.BadRequest("inputName fehlt");
-    try { await using var obs = await ConnectObsAsync(agentSettings); await obs.SetInputMuteAsync(payload.InputName, payload.Muted); return Results.Ok(new { accepted = true, inputName = payload.InputName, muted = payload.Muted }); }
-    catch (Exception ex) { return Results.Problem(ex.Message); }
+    return await WithObsControl(request, permissions, async obs =>
+    {
+        await obs.SetInputMuteAsync(payload.InputName, payload.Muted);
+        return Results.Ok(new { accepted = true, inputName = payload.InputName, muted = payload.Muted });
+    });
 });
 
 
 app.MapPost("/api/obs/volume", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
     var payload = await JsonSerializer.DeserializeAsync<ObsVolumeRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.InputName) || payload.VolumeDb is < -100 or > 26) return Results.BadRequest("Ungültige Lautstärke");
-    try { await using var obs = await ConnectObsAsync(agentSettings); await obs.SetInputVolumeDbAsync(payload.InputName, payload.VolumeDb); return Results.Ok(new { accepted = true, payload.InputName, payload.VolumeDb }); }
-    catch (Exception ex) { return Results.Problem(ex.Message); }
+    return await WithObsControl(request, permissions, async obs =>
+    {
+        await obs.SetInputVolumeDbAsync(payload.InputName, payload.VolumeDb);
+        return Results.Ok(new { accepted = true, payload.InputName, payload.VolumeDb });
+    });
 });
 
 app.MapPost("/api/obs/scene-item", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
     var payload = await JsonSerializer.DeserializeAsync<ObsSceneItemRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName) || string.IsNullOrWhiteSpace(payload.SourceName)) return Results.BadRequest("Szene oder Quelle fehlt");
-    try { await using var obs = await ConnectObsAsync(agentSettings); await obs.SetSceneItemEnabledAsync(payload.SceneName, payload.SourceName, payload.Enabled); return Results.Ok(new { accepted = true, payload.SceneName, payload.SourceName, payload.Enabled }); }
-    catch (Exception ex) { return Results.Problem(ex.Message); }
+    return await WithObsControl(request, permissions, async obs =>
+    {
+        await obs.SetSceneItemEnabledAsync(payload.SceneName, payload.SourceName, payload.Enabled);
+        return Results.Ok(new { accepted = true, payload.SceneName, payload.SourceName, payload.Enabled });
+    });
 });
 
 app.MapGet("/api/obs/filters", async (HttpRequest request, string sourceName) =>
-{
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    try { await using var obs = await ConnectObsAsync(agentSettings); return Results.Ok(await obs.GetSourceFilterListAsync(sourceName)); } catch (Exception ex) { return Results.Problem(ex.Message); }
-});
+    await WithObsControl(request, permissions, async obs =>
+        Results.Ok(await obs.GetSourceFilterListAsync(sourceName))));
 
 app.MapPost("/api/obs/filter", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized(); var payload = await JsonSerializer.DeserializeAsync<ObsFilterRequest>(request.Body); if (payload is null || string.IsNullOrWhiteSpace(payload.SourceName) || string.IsNullOrWhiteSpace(payload.FilterName)) return Results.BadRequest();
-    try { await using var obs = await ConnectObsAsync(agentSettings); await obs.SetSourceFilterEnabledAsync(payload.SourceName, payload.FilterName, payload.Enabled); return Results.Ok(new { accepted = true }); } catch (Exception ex) { return Results.Problem(ex.Message); }
+    var payload = await JsonSerializer.DeserializeAsync<ObsFilterRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.SourceName) || string.IsNullOrWhiteSpace(payload.FilterName))
+        return Results.BadRequest();
+    return await WithObsControl(request, permissions, async obs =>
+    {
+        await obs.SetSourceFilterEnabledAsync(payload.SourceName, payload.FilterName, payload.Enabled);
+        return Results.Ok(new { accepted = true });
+    });
 });
 
 app.MapPost("/api/obs/transform", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized(); var payload = await JsonSerializer.DeserializeAsync<ObsTransformRequest>(request.Body); if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName) || string.IsNullOrWhiteSpace(payload.SourceName)) return Results.BadRequest();
-    try { await using var obs = await ConnectObsAsync(agentSettings); if (payload.Reset) await obs.ResetSceneItemTransformAsync(payload.SceneName, payload.SourceName); else await obs.SetSceneItemDetailedTransformAsync(payload.SceneName, payload.SourceName, payload.X, payload.Y, payload.Width, payload.Height, payload.Rotation, 0, 0, 0, 0); return Results.Ok(new { accepted = true }); } catch (Exception ex) { return Results.Problem(ex.Message); }
+    var payload = await JsonSerializer.DeserializeAsync<ObsTransformRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName) || string.IsNullOrWhiteSpace(payload.SourceName))
+        return Results.BadRequest();
+    return await WithObsControl(request, permissions, async obs =>
+    {
+        if (payload.Reset)
+            await obs.ResetSceneItemTransformAsync(payload.SceneName, payload.SourceName);
+        else
+            await obs.SetSceneItemDetailedTransformAsync(
+                payload.SceneName,
+                payload.SourceName,
+                payload.X,
+                payload.Y,
+                payload.Width,
+                payload.Height,
+                payload.Rotation,
+                0,
+                0,
+                0,
+                0);
+        return Results.Ok(new { accepted = true });
+    });
 });
 
 app.MapPost("/api/obs/volume-fade", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized(); var payload = await JsonSerializer.DeserializeAsync<ObsVolumeFadeRequest>(request.Body); if (payload is null || string.IsNullOrWhiteSpace(payload.InputName)) return Results.BadRequest();
-    try { await using var obs = await ConnectObsAsync(agentSettings); var current = await obs.GetInputAudioStateAsync(payload.InputName); var duration = Math.Clamp(payload.DurationMilliseconds, 100, 30000); var steps = Math.Clamp(duration / 50, 2, 200); for (var i = 1; i <= steps; i++) { var value = current.VolumeDb + ((payload.TargetVolumeDb - current.VolumeDb) * i / steps); await obs.SetInputVolumeDbAsync(payload.InputName, value); await Task.Delay(Math.Max(10, duration / steps)); } return Results.Ok(new { accepted = true }); } catch (Exception ex) { return Results.Problem(ex.Message); }
+    var payload = await JsonSerializer.DeserializeAsync<ObsVolumeFadeRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.InputName))
+        return Results.BadRequest();
+    return await WithObsControl(request, permissions, async obs =>
+    {
+        var current = await obs.GetInputAudioStateAsync(payload.InputName);
+        var duration = Math.Clamp(payload.DurationMilliseconds, 100, 30000);
+        var steps = Math.Clamp(duration / 50, 2, 200);
+        for (var i = 1; i <= steps; i++)
+        {
+            var value = current.VolumeDb + ((payload.TargetVolumeDb - current.VolumeDb) * i / steps);
+            await obs.SetInputVolumeDbAsync(payload.InputName, value);
+            await Task.Delay(Math.Max(10, duration / steps));
+        }
+        return Results.Ok(new { accepted = true });
+    });
 });
 
 app.MapGet("/api/obs/configuration", async (HttpRequest request) =>

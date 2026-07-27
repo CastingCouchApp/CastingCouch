@@ -14,19 +14,21 @@ PUBLISH_DIR := $(ARTIFACTS)/publish/$(RID)
 LOG_DIR     := $(ARTIFACTS)/build-logs
 TEST_DIR    := $(ARTIFACTS)/test-results
 
-.PHONY: help restore build test publish app clean ci release watch
+.PHONY: help restore build test publish app clean ci release watch format format-check
 
 help:
 	@echo "Targets:"
-	@echo "  make restore   - NuGet-Pakete wiederherstellen"
-	@echo "  make build     - Solution bauen (CONFIG=$(CONFIG))"
-	@echo "  make test      - Tests ausführen"
-	@echo "  make publish   - App self-contained publishen ($(RID))"
-	@echo "  make app       - restore + test + publish"
-	@echo "  make ci        - restore + build + test"
-	@echo "  make release   - voller Release-Build (App+Client+Updater+MSI, Windows/pwsh)"
-	@echo "  make watch     - App mit Hot Reload starten (dotnet watch)"
-	@echo "  make clean     - Build-Artefakte löschen"
+	@echo "  make restore      - NuGet-Pakete wiederherstellen"
+	@echo "  make build        - Solution bauen (CONFIG=$(CONFIG))"
+	@echo "  make test         - Tests ausführen"
+	@echo "  make format       - C# Autoformat (whitespace + style + analyzers via .editorconfig)"
+	@echo "  make format-check - Format prüfen ohne Änderungen (--verify-no-changes)"
+	@echo "  make publish      - App self-contained publishen ($(RID))"
+	@echo "  make app          - restore + test + publish"
+	@echo "  make ci           - restore + build + test"
+	@echo "  make release      - voller Release-Build (App+Client+Updater+MSI, Windows/pwsh)"
+	@echo "  make watch        - App mit Hot Reload starten (dotnet watch)"
+	@echo "  make clean        - Build-Artefakte löschen"
 	@echo ""
 	@echo "Variablen: CONFIG=$(CONFIG) RID=$(RID) DOTNET=$(DOTNET)"
 
@@ -70,6 +72,18 @@ release:
 
 watch:
 	pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-app-hotreload.ps1 -Configuration $(CONFIG)
+
+# C# coding style: .editorconfig + SDK `dotnet format`
+# whitespace → Einrückung/Leerzeichen; style → IDE-Regeln; analyzers → Code-Fixes ab Severity info
+format: restore
+	$(DOTNET) format whitespace $(SLN) --verbosity minimal
+	$(DOTNET) format style $(SLN) --severity info --verbosity minimal
+	$(DOTNET) format analyzers $(SLN) --severity info --verbosity minimal
+
+format-check: restore
+	$(DOTNET) format whitespace $(SLN) --verify-no-changes --verbosity minimal
+	$(DOTNET) format style $(SLN) --severity info --verify-no-changes --verbosity minimal
+	$(DOTNET) format analyzers $(SLN) --severity info --verify-no-changes --verbosity minimal
 
 clean:
 	rm -rf $(ARTIFACTS)

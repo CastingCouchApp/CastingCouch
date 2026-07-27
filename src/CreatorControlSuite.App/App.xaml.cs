@@ -8,8 +8,14 @@ using CreatorControlSuite.Core.Setup;
 using CreatorControlSuite.Core.Ipc;
 using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Legal;
+using CreatorControlSuite.App.Core.Eventing;
+using CreatorControlSuite.App.Modules;
+using CreatorControlSuite.App.Mvvm;
 using CreatorControlSuite.App.Services;
 using CreatorControlSuite.App.Themes;
+using CreatorControlSuite.App.ViewModels;
+using CreatorControlSuite.Core.Automation;
+using CreatorControlSuite.Core.Eventing;
 using System.Threading;
 using System.Windows.Threading;
 using CreatorControlSuite.Core.Modules;
@@ -17,15 +23,8 @@ using CreatorControlSuite.Core.Security;
 using CreatorControlSuite.Core.Profiles;
 using CreatorControlSuite.Core.Updates;
 using CreatorControlSuite.Core.Migration;
-using CreatorControlSuite.Modules.StreamDeck;
-using CreatorControlSuite.Modules.Alerts;
-using CreatorControlSuite.Modules.OBS;
 using CreatorControlSuite.Modules.Overlay;
-using CreatorControlSuite.Modules.Spotify;
-using CreatorControlSuite.Modules.Twitch;
-using CreatorControlSuite.Modules.Workflow;
-using CreatorControlSuite.Modules.YouTubeMusic;
-using CreatorControlSuite.Core.Music;
+using CreatorControlSuite.Modules.StreamDeck;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Net.Http;
@@ -188,47 +187,16 @@ public partial class App : Application
                     new StreamDeckProfileService(
                         Path.Combine(localAppData, "StreamDeck")));
 
-                services.AddHttpClient<ITwitchOAuthClient, TwitchOAuthClient>();
-                services.AddHttpClient<ITwitchApiClient, TwitchApiClient>();
-                services.AddSingleton<ITwitchEventSubClient, TwitchEventSubClient>();
-                services.AddSingleton<TwitchTokenRepository>();
+                services.AddStreamingModules();
 
-                services.AddHttpClient<ISpotifyOAuthClient, SpotifyOAuthClient>();
-                services.AddHttpClient<ISpotifyApiClient, SpotifyApiClient>();
-                services.AddSingleton<SpotifyTokenRepository>();
-
-                services.AddSingleton<IObsWebSocketClient, ObsWebSocketClient>();
-                services.AddSingleton<OBSModule>();
-                services.AddSingleton<TwitchModule>();
-                services.AddSingleton<SpotifyModule>();
-                services.AddSingleton<SpotifyMusicPlayer>();
-                services.AddSingleton<YouTubeMusicBridge>();
-                services.AddSingleton<YouTubeMusicModule>();
-                services.AddSingleton<IMusicPlayer>(provider => provider.GetRequiredService<SpotifyMusicPlayer>());
-                services.AddSingleton<IMusicPlayer>(provider => provider.GetRequiredService<YouTubeMusicModule>());
-                services.AddSingleton<IMusicPlayerRouter, MusicPlayerRouter>();
-
-                services.AddSingleton<AlertDefinitionProvider>();
-                services.AddSingleton<ObsAlertRenderer>();
-                services.AddSingleton<IAlertEngine, AlertEngine>();
-                services.AddSingleton<AlertsModule>();
-
-                services.AddSingleton<IOverlayDataService, OverlayDataService>();
-                services.AddSingleton<OverlayModule>();
-
-                services.AddSingleton<IStreamWorkflowService, StreamWorkflowService>();
-                services.AddSingleton<WorkflowModule>();
-
-                services.AddSingleton<StreamDeckModule>();
-
-                services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<OBSModule>());
-                services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<TwitchModule>());
-                services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<SpotifyModule>());
-                services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<YouTubeMusicModule>());
-                services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<AlertsModule>());
-                services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<OverlayModule>());
-                services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<WorkflowModule>());
-                services.AddSingleton<IStreamingModule>(provider => provider.GetRequiredService<StreamDeckModule>());
+                services.AddSingleton<IEventBus, EventBus>();
+                services.AddSingleton<IAutomationRuleEngine, AutomationRuleEngine>();
+                services.AddSingleton<IMultiPcAgentClient, MultiPcAgentClient>();
+                services.AddSingleton<IStreamerBotClient, StreamerBotClient>();
+                services.AddSingleton<IMusicPlayerUiPresenter, MusicPlayerUiPresenter>();
+                services.AddSingleton<INavigationService, NavigationService>();
+                services.AddSingleton<DiagnosticsPageViewModel>();
+                services.AddSingleton<AppEventBridge>();
 
                 services.AddSingleton<IThemeService, ThemeService>();
                 services.AddSingleton<DiagnosticService>();
@@ -237,6 +205,7 @@ public partial class App : Application
             .Build();
 
         await _host.StartAsync();
+        _host.Services.GetRequiredService<AppEventBridge>().Start();
 
         try
         {

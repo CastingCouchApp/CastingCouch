@@ -4,7 +4,7 @@ using CreatorControlSuite.Modules.OBS;
 
 namespace CreatorControlSuite.Modules.Alerts;
 
-public sealed class ObsAlertRenderer
+public sealed class ObsAlertRenderer : IAlertRenderer
 {
     private readonly ISettingsStore _settingsStore;
     private readonly IObsWebSocketClient _obsClient;

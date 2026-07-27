@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace CreatorControlSuite.App.Core.Eventing;
+namespace CreatorControlSuite.Core.Eventing;
 
 public sealed class EventBus : IEventBus
 {

@@ -8,7 +8,7 @@ public sealed class AlertEngine : IAlertEngine
 {
     private readonly ISettingsStore _settingsStore;
     private readonly AlertDefinitionProvider _definitions;
-    private readonly ObsAlertRenderer _renderer;
+    private readonly IAlertRenderer _renderer;
 
     private readonly object _stateLock = new();
     private Channel<AlertRequest>? _channel;
@@ -21,7 +21,7 @@ public sealed class AlertEngine : IAlertEngine
     public AlertEngine(
         ISettingsStore settingsStore,
         AlertDefinitionProvider definitions,
-        ObsAlertRenderer renderer)
+        IAlertRenderer renderer)
     {
         _settingsStore = settingsStore;
         _definitions = definitions;
