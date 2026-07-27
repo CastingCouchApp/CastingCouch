@@ -1,3 +1,5 @@
+using System.Net.Http;
+
 namespace CreatorControlSuite.App.Services;
 
 public interface IMultiPcAgentClient
