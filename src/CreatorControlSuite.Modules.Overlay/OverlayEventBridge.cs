@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CreatorControlSuite.Core.Music;
 
 namespace CreatorControlSuite.Modules.Overlay;
 
@@ -68,6 +69,26 @@ public static class OverlayEventBridge
             $"Phase: {phase}",
             new Dictionary<string, string> { ["phase"] = phase ?? "" });
 
+    public static OverlayRealtimeEvent AppCountdown(
+        bool isRunning,
+        int remainingSeconds,
+        int totalSeconds,
+        string label,
+        DateTimeOffset? endsAt = null) =>
+        App(
+            "app.countdown",
+            isRunning
+                ? $"Countdown: {Math.Max(0, remainingSeconds)}s"
+                : "Countdown gestoppt",
+            new Dictionary<string, string>
+            {
+                ["isRunning"] = isRunning ? "true" : "false",
+                ["remainingSeconds"] = Math.Max(0, remainingSeconds).ToString(),
+                ["totalSeconds"] = Math.Max(0, totalSeconds).ToString(),
+                ["label"] = label ?? "",
+                ["endsAt"] = endsAt?.ToString("O") ?? ""
+            });
+
     public static OverlayRealtimeEvent AppStreamLive(bool isLive) =>
         App(
             "app.stream.live",
@@ -84,15 +105,28 @@ public static class OverlayEventBridge
         string title,
         string artist,
         string coverUrl) =>
-        App(
-            "app.spotify.track",
+        AppMusicTrack(MusicProviderIds.Spotify, title, artist, coverUrl);
+
+    public static OverlayRealtimeEvent AppMusicTrack(
+        string providerId,
+        string title,
+        string artist,
+        string coverUrl)
+    {
+        string provider = MusicProviderIds.Normalize(providerId);
+        string label = MusicProviderIds.DisplayName(provider);
+        return App(
+            "app.music.track",
             string.IsNullOrWhiteSpace(artist) ? title : $"{artist} – {title}",
             new Dictionary<string, string>
             {
+                ["provider"] = provider,
+                ["providerDisplayName"] = label,
                 ["title"] = title ?? "",
                 ["artist"] = artist ?? "",
                 ["coverUrl"] = coverUrl ?? ""
             });
+    }
 
     public static OverlayRealtimeEvent AppAlert(string alertType, string user) =>
         App(
@@ -119,6 +153,21 @@ public static class OverlayEventBridge
         }
 
         return App("app.ws.hello", "connected", data);
+    }
+
+    public static OverlayRealtimeEvent AppOverlayLayout(
+        string instanceId,
+        Models.OverlayLayout layout)
+    {
+        string layoutJson = JsonSerializer.Serialize(layout, OverlayLayoutStore.JsonOptions);
+        return App(
+            "app.overlay.layout",
+            $"Layout: {instanceId}",
+            new Dictionary<string, string>
+            {
+                ["instanceId"] = instanceId ?? "",
+                ["layout"] = layoutJson
+            });
     }
 
     private static OverlayRealtimeEvent App(

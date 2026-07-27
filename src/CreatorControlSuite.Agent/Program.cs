@@ -677,45 +677,6 @@ app.MapGet("/api/logs", (HttpRequest request, int? lines) =>
     return Results.Ok(File.ReadLines(agentLogPath).TakeLast(take).ToArray());
 });
 
-app.MapPost("/api/overlay/deploy", async (HttpRequest request) =>
-{
-    if (!Authorized(request))
-    {
-        return Results.Unauthorized();
-    }
-
-    if (!permissions.AllowedCommands.Contains("files.deploy", StringComparer.OrdinalIgnoreCase))
-    {
-        return Results.StatusCode(StatusCodes.Status403Forbidden);
-    }
-
-    FileDeployRequest? payload = await JsonSerializer.DeserializeAsync<FileDeployRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.Base64Zip))
-    {
-        return Results.BadRequest("ZIP-Daten fehlen");
-    }
-
-    try
-    {
-        string target = string.IsNullOrWhiteSpace(agentSettings.OverlayDirectory)
-            ? Path.Combine(dataDirectory, "Overlays") : Path.GetFullPath(agentSettings.OverlayDirectory);
-        Directory.CreateDirectory(target);
-        string backup = Path.Combine(dataDirectory, "overlay-backups", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
-        if (Directory.Exists(target) && Directory.EnumerateFileSystemEntries(target).Any())
-        {
-            CopyDirectory(target, backup);
-        }
-
-        string temp = Path.Combine(dataDirectory, "overlay-upload.zip");
-        await File.WriteAllBytesAsync(temp, Convert.FromBase64String(payload.Base64Zip));
-        SafeExtractZip(temp, target);
-        File.Delete(temp);
-        AppendAgentLog(agentLogPath, $"Overlay-Paket '{payload.FileName}' nach '{target}' verteilt.");
-        return Results.Ok(new { deployed = true, target, backup });
-    }
-    catch (Exception ex) { AppendAgentLog(agentLogPath, "Overlay-Verteilung fehlgeschlagen: " + ex.Message); return Results.Problem(ex.Message); }
-});
-
 app.MapPost("/api/update/stage", async (HttpRequest request) =>
 {
     if (!Authorized(request))

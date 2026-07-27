@@ -4,7 +4,8 @@ namespace CreatorControlSuite.Modules.Overlay;
 
 public sealed class OverlayModule(
     IOverlayDataService service,
-    IOverlayWebServer webServer) : IConnectableModule
+    IOverlayWebServer webServer,
+    IOverlayLayoutStore layoutStore) : IConnectableModule
 {
     private bool _initialized;
 
@@ -13,6 +14,7 @@ public sealed class OverlayModule(
 
     public IOverlayDataService Service { get; } = service;
     public IOverlayWebServer WebServer { get; } = webServer;
+    public IOverlayLayoutStore LayoutStore { get; } = layoutStore;
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {

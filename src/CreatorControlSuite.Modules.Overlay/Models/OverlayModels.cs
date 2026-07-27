@@ -9,7 +9,23 @@ public sealed class OverlayData
     public OverlayAlertState Alerts { get; set; } = new();
     public OverlaySessionStats Stats { get; set; } = new();
     public OverlayBranding Branding { get; set; } = new();
+    public OverlayCountdownState Countdown { get; set; } = new();
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// Globaler Overlay-Countdown (Dashboard / Workflow / Automationen).
+/// Canvas-Widget <c>countdown</c> liest diesen Zustand aus overlay-data.json.
+/// </summary>
+public sealed class OverlayCountdownState
+{
+    public bool IsRunning { get; set; }
+    public int RemainingSeconds { get; set; }
+    public int TotalSeconds { get; set; }
+    public DateTimeOffset? EndsAt { get; set; }
+    public string Label { get; set; } = "Countdown";
+    /// <summary>stream-start | manual</summary>
+    public string Mode { get; set; } = "manual";
 }
 
 public sealed class OverlayStreamState
@@ -39,6 +55,9 @@ public sealed class OverlayTwitchState
 
 public sealed class OverlaySpotifyState
 {
+    /// <summary>Aktiver Music-Provider: spotify | ytmusic.</summary>
+    public string Provider { get; set; } = "spotify";
+    public string ProviderDisplayName { get; set; } = "Spotify";
     public bool Connected { get; set; }
     public bool IsPlaying { get; set; }
     public string Title { get; set; } = "";

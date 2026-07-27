@@ -171,6 +171,16 @@ public sealed class SettingsValidator : ISettingsValidator
     {
         if (!string.IsNullOrWhiteSpace(settings.Overlay.RootPath))
         {
+            if (settings.Overlay.RootPath.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+            {
+                issues.Add(Error(
+                    "OVERLAY_PATH_INVALID",
+                    "Overlay",
+                    "Overlay-Datenpfad ist ungültig.",
+                    "Leer lassen (Standard) oder einen gültigen lokalen Pfad wählen."));
+                return;
+            }
+
             try
             {
                 _ = Path.GetFullPath(settings.Overlay.RootPath);
@@ -180,60 +190,8 @@ public sealed class SettingsValidator : ISettingsValidator
                 issues.Add(Error(
                     "OVERLAY_PATH_INVALID",
                     "Overlay",
-                    "Overlay-Pfad ist ungültig.",
-                    "Einen vollständigen lokalen Pfad wählen."));
-            }
-        }
-
-        settings.Overlay.Instances ??= [];
-        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (OverlayInstanceSettings instance in settings.Overlay.Instances)
-        {
-            if (string.IsNullOrWhiteSpace(instance.Id))
-            {
-                issues.Add(Error(
-                    "OVERLAY_INSTANCE_ID_EMPTY",
-                    "Overlay",
-                    "Overlay-Instanz ohne Id.",
-                    "Jeder Overlay-Eintrag braucht eine Id."));
-                continue;
-            }
-
-            if (!seenIds.Add(instance.Id.Trim()))
-            {
-                issues.Add(Error(
-                    "OVERLAY_INSTANCE_ID_DUPLICATE",
-                    "Overlay",
-                    $"Doppelte Overlay-Id „{instance.Id}“.",
-                    "Ids der Overlay-Instanzen müssen eindeutig sein."));
-            }
-
-            if (string.IsNullOrWhiteSpace(instance.RootPath))
-            {
-                continue;
-            }
-
-            if (instance.RootPath.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
-            {
-                issues.Add(Error(
-                    "OVERLAY_INSTANCE_PATH_INVALID",
-                    "Overlay",
-                    $"Overlay-Pfad für „{instance.Name}“ ist ungültig.",
-                    "Einen vollständigen lokalen Pfad wählen."));
-                continue;
-            }
-
-            try
-            {
-                _ = Path.GetFullPath(instance.RootPath);
-            }
-            catch
-            {
-                issues.Add(Error(
-                    "OVERLAY_INSTANCE_PATH_INVALID",
-                    "Overlay",
-                    $"Overlay-Pfad für „{instance.Name}“ ist ungültig.",
-                    "Einen vollständigen lokalen Pfad wählen."));
+                    "Overlay-Datenpfad ist ungültig.",
+                    "Leer lassen (Standard) oder einen gültigen lokalen Pfad wählen."));
             }
         }
     }

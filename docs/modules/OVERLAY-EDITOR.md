@@ -1,0 +1,105 @@
+# Overlay Editor
+
+Canvas-Editor: Widgets und Frames per Drag & Drop, Live-Push an OBS, Auto-Save.
+
+Siehe auch: [`OVERLAY-SYSTEM.md`](OVERLAY-SYSTEM.md)
+
+## URLs (Port Standard 8765)
+
+| URL | Zweck |
+|-----|--------|
+| `/editor/{id}` | Editor für Canvas `id` (WebView in der App oder Browser) |
+| `/view/{id}` | Volles Canvas-Layout als OBS-Browserquelle |
+| `/w/online` | Solo Online+Zeit |
+| `/w/alert` | Solo Alert-Widget |
+| `/w/music` | Solo Music Player (Spotify / YouTube Music) |
+| `/w/spotify` | Alias für `/w/music` |
+| `/w/chat` | Solo Chat-Widget |
+| `/w/ending-stats` | Solo Ending-Stats (Stream-Statistik) |
+| `/w/text` | Solo Text-Widget |
+| `/w/image` | Solo Image-Widget |
+| `/w/countdown` | Solo Countdown (globaler App-State) |
+| `/w/socials` | Solo Socials (alle Plattformen) |
+| `/w/shape/{shapeId}` | Solo Frame/Shape, z. B. `/w/shape/frame.neon` |
+| `GET/PUT /layout/{id}` | Layout laden/speichern (PUT nur Loopback) |
+| `/canvas/…` | Embedded Assets (CSS/JS) |
+
+Beispiel: `/editor/default`, `/view/just-chatting`.
+
+## Bedienung in der App
+
+1. Overlay-Webserver aktivieren und speichern.
+2. Canvas in der Liste wählen (oder **Neu** / **Duplizieren**).
+3. **EDITOR ÖFFNEN** (WebView) oder Editor-URL im Browser.
+4. Widgets/Shapes aus der Palette ziehen, verschieben, an den Ecken skalieren.
+5. **Fenstergröße (Canvas):** Preset wählen oder Breite/Höhe setzen.
+6. Auto-Save pusht Layout per WebSocket an `/view/{id}` und Solo-Quellen.
+
+Im App-WebView: Combobox **Fenster** für feste Editor-Fenstergrößen.
+
+## OBS-Setup
+
+**Variante A – mehrere Canvases:** Pro Design eine Browserquelle auf `/view/{id}` (Canvas-Auflösung, transparent). In OBS-Szenen die passende Quelle ein-/ausblenden.
+
+**Variante B – Einzelquellen:** jeweils `/w/…` oder `/w/shape/…` als eigene Browserquelle.
+
+Standalone-Chat bleibt zusätzlich unter `/chat` verfügbar.
+
+## Widgets
+
+| Typ | Daten |
+|-----|--------|
+| `online` | `stream.isLive`, Uhr, Uptime |
+| `alert` | WS `app.alert` / Twitch-Events |
+| `music` | Now Playing aus aktivem Music-Provider; Alias-Typ `spotify` |
+| `chat` | WS `channel.chat.message` (+ optional Twitch-Events); Appearance/Font per Widget-Props (Fallback: Overlay-Chat-Einstellungen); Session-History via `/chat/history` + WS-Replay |
+| `ending-stats` | Session-Stats (`stats.*`) + Followerziel (`twitch.followers` / `followerGoal`); Prop `variant` mit 10 Looks; skaliert bei Größenänderung |
+| `socials` | Social-Links (Twitch, YouTube, Discord, Instagram, TikTok, X, Kick, Bluesky + 2 Custom); Icons als Built-in-SVG oder Font Awesome CDN; optional eigenes Bild per `*IconUrl`; Props `variant` / `iconLibrary` / Handles |
+| `text` | Statischer Text aus Props (`content`, Typografie, Ausrichtung, Schatten) |
+| `image` | Bild aus URL (`src`, `fit`, Opacity, Radius) |
+| `countdown` | Globaler Countdown aus `countdown.*` (Dashboard / Workflow / Automationen); Props: `variant`, `format`, `showLabel`, `hideWhenIdle` |
+
+## Globaler Countdown
+
+Der Typ `countdown` zeigt den **gemeinsamen** App-Countdown (`overlay-data.json` → `countdown`), nicht einen lokalen Timer pro Widget.
+
+Steuerung:
+
+- Dashboard-Modul **COUNTDOWN** in der Titlebar neben SESSION (Start / Stop / Reset / Zahnrad)
+- Zahnrad: Label, Dauer, Presets 5 / 10 / 30 Minuten
+- Workflow-Buttons „Countdown“ / „Countdown stoppen“
+- Timed Automation Action `OverlayCountdown` (`Start` / `Stop`, optional eigene Dauer)
+- IPC `workflow.countdown` / `workflow.countdown.stop`
+- Automatischer Streamstart-Countdown (`StartWorkflowCountdownAfterObsStreamStart`)
+
+## Shapes / Frames
+
+`frame.rect`, `frame.circle`, `frame.corners`, `frame.bevel`, `frame.neon`, `frame.dashed`, `frame.card`, `shape.vignette`, `shape.scene-bg`.
+
+### Card Frame (`frame.card`)
+
+Port der Desktop-`card-frame-only`-Rahmen (Just Chatting, Square, Metaschutz, Start, BRB, Ending): Sweep, Topline/Bottomline und Corner-Borders, fluid in der Item-Box.
+
+**8 Varianten (`variant`):** `classic`, `neon`, `soft`, `bold`, `outline`, `glass`, `cyber`, `minimal`.
+
+**Größen-Presets (`sizePreset`):** setzen `w`/`h` — `chatting` 1060×420, `square` 500×500, `metaschutz`/`start` 1060×500, `brb` 1060×420, `ending` 920×500. Danach frei skalierbar.
+
+**Farben / Props:** `color` (Akzent), `color2` (Sweep/Glow), `fillOpacity` (0–1), `showSweep`, `showLines`.
+
+Solo-URL: `/w/shape/frame.card` (optional `?props={"variant":"neon","color":"#00e5ff"}`).
+
+### Starting Hintergrund (`shape.scene-bg`)
+
+Animierter Szenen-Hintergrund (Glow, Streifen, Partikel). Farben und Animation sind über Props steuerbar.
+
+**10 Variationen (`preset`):** `ember`, `crimson`, `aurora`, `violet`, `gold`, `ice`, `lime`, `magenta`, `steel`, `inferno`.
+
+Wichtige Props: `glow1`/`glow2`, `bgBase`/`bgMid`/`bgDeep`, `speed` (1 = normal), `driftDuration`/`particleDuration`, `stripes`/`particles`/`paused`, Opacity-Werte für Glow/Streifen/Partikel/Vignette/Scan.
+
+Solo-URL: `/w/shape/shape.scene-bg` (optional `?props={"preset":"aurora","speed":1.5}`).
+
+## Persistenz
+
+`%LocalAppData%\CreatorControlSuite\Overlay\layouts\{id}.json`
+
+Canvas-Namen und Auswahl: App-Einstellungen (`Overlay.Canvases`, `Overlay.SelectedCanvasId`).

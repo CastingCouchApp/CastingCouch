@@ -1,11 +1,11 @@
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 using CreatorControlSuite.Core.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -14,10 +14,12 @@ namespace CreatorControlSuite.Modules.Overlay;
 public sealed class OverlayWebServer(
     ISettingsStore settingsStore,
     IOverlayDataService overlayData,
+    IOverlayLayoutStore layoutStore,
     OverlayRealtimeHub realtimeHub) : IOverlayWebServer, IAsyncDisposable
 {
     private readonly ISettingsStore _settingsStore = settingsStore;
     private readonly IOverlayDataService _overlayData = overlayData;
+    private readonly IOverlayLayoutStore _layoutStore = layoutStore;
     private readonly OverlayRealtimeHub _realtimeHub = realtimeHub;
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
 
@@ -48,6 +50,7 @@ public sealed class OverlayWebServer(
             }
 
             settings.Overlay.EnsureInstancesMigrated();
+            settings.Overlay.EnsureCanvasesMigrated();
 
             string dataRoot = Path.GetFullPath(Environment.ExpandEnvironmentVariables(
                 await _overlayData.GetOverlayRootAsync(cancellationToken)));
@@ -58,32 +61,8 @@ public sealed class OverlayWebServer(
             Port = port;
             RootPath = dataRoot;
             BaseUrl = settings.Overlay.GetBaseUrl();
-
-            var mounts = new List<(string Id, string Name, string Root, string Url)>();
-            foreach (OverlayInstanceSettings instance in settings.Overlay.Instances)
-            {
-                if (!instance.Enabled || string.IsNullOrWhiteSpace(instance.Id))
-                {
-                    continue;
-                }
-
-                string root = Path.GetFullPath(Environment.ExpandEnvironmentVariables(instance.RootPath.Trim()));
-                if (!Directory.Exists(root))
-                {
-                    Directory.CreateDirectory(root);
-                }
-
-                mounts.Add((
-                    instance.Id.Trim(),
-                    string.IsNullOrWhiteSpace(instance.Name) ? instance.Id.Trim() : instance.Name.Trim(),
-                    root,
-                    settings.Overlay.GetInstanceUrl(instance.Id)));
-            }
-
-            // Legacy: RootPath ohne Instances → am Default-Mount /o/{id}/ bereits via Migration.
-            // Zusätzlich RootPath als ContentRoot für data-Routen behalten.
-            _mountedOverlays = mounts
-                .Select(m => (m.Id, m.Name, m.Url))
+            _mountedOverlays = settings.Overlay.Canvases
+                .Select(c => (c.Id, c.Name, settings.Overlay.GetViewUrl(c.Id)))
                 .ToArray();
 
             WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -147,44 +126,41 @@ public sealed class OverlayWebServer(
                 await next();
             });
 
-            foreach (var mount in mounts)
+            app.MapGet("/health", async (HttpContext context) =>
             {
-                var fileProvider = new PhysicalFileProvider(mount.Root);
-                string requestPath = "/o/" + mount.Id;
-                app.UseDefaultFiles(new DefaultFilesOptions
+                AppSettings live = await _settingsStore.LoadAsync(context.RequestAborted);
+                live.Overlay.EnsureCanvasesMigrated();
+                OverlayCanvasSettings selected = live.Overlay.GetSelectedCanvas();
+                // Port/BaseUrl aus laufendem Server; Canvas-URLs mit aktuellem Settings-Port.
+                live.Overlay.WebServerPort = Port;
+                return Results.Json(new
                 {
-                    FileProvider = fileProvider,
-                    RequestPath = requestPath
-                });
-                app.UseStaticFiles(new StaticFileOptions
-                {
-                    FileProvider = fileProvider,
-                    RequestPath = requestPath,
-                    ServeUnknownFileTypes = true,
-                    DefaultContentType = "application/octet-stream",
-                    OnPrepareResponse = ctx =>
-                    {
-                        string path = ctx.File.Name;
-                        if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
-                            path.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
-                            path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ||
-                            path.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+                    ok = true,
+                    port = Port,
+                    root = dataRoot,
+                    clients = _realtimeHub.ConnectedClients,
+                    baseUrl = BaseUrl,
+                    canvasId = selected.Id,
+                    canvases = live.Overlay.Canvases
+                        .Select(c => new
                         {
-                            ctx.Context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
-                        }
-                    }
+                            id = c.Id,
+                            name = c.Name,
+                            editorUrl = live.Overlay.GetEditorUrl(c.Id),
+                            viewUrl = live.Overlay.GetViewUrl(c.Id)
+                        })
+                        .ToArray(),
+                    editorUrl = live.Overlay.GetEditorUrl(selected.Id),
+                    viewUrl = live.Overlay.GetViewUrl(selected.Id),
+                    widgets = CanvasOverlayAssets.ListWidgetTypes()
+                        .Select(t => new { type = t, url = live.Overlay.GetWidgetUrl(t) })
+                        .Concat(CanvasOverlayAssets.ListShapeTypes()
+                            .Select(t => new { type = t, url = live.Overlay.GetWidgetUrl("shape/" + t) }))
+                        .ToArray()
                 });
-            }
+            });
 
-            app.MapGet("/health", () => Results.Json(new
-            {
-                ok = true,
-                port,
-                root = dataRoot,
-                clients = _realtimeHub.ConnectedClients,
-                baseUrl = BaseUrl,
-                overlays = _mountedOverlays.Select(o => new { id = o.Id, name = o.Name, url = o.Url }).ToArray()
-            }));
+            MapCanvasRoutes(app);
 
             app.MapGet("/chat", async (HttpContext context) =>
             {
@@ -234,10 +210,25 @@ public sealed class OverlayWebServer(
                     paddingPx = chat.PaddingPx,
                     borderRadiusPx = chat.BorderRadiusPx,
                     gapPx = chat.GapPx,
+                    fontSizePx = chat.FontSizePx,
+                    fontFamily = chat.FontFamily,
                     backgroundVersion = hasImage
                         ? File.GetLastWriteTimeUtc(Environment.ExpandEnvironmentVariables(chat.BackgroundImagePath)).Ticks.ToString()
                         : "0"
                 });
+            });
+
+            app.MapGet("/chat/history", async (HttpContext context) =>
+            {
+                AppSettings chatSettings = await _settingsStore.LoadAsync(context.RequestAborted);
+                OverlayChatSettings chat = chatSettings.Overlay.Chat ?? new OverlayChatSettings();
+                context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+                if (!chat.Enabled)
+                {
+                    return Results.Json(new { events = Array.Empty<OverlayRealtimeEvent>() });
+                }
+
+                return Results.Json(new { events = _realtimeHub.GetBufferedChatEvents() });
             });
 
             app.MapGet("/chat/background", async (HttpContext context) =>
@@ -274,7 +265,8 @@ public sealed class OverlayWebServer(
             {
                 string safe = Path.GetFileName(fileName);
                 if (string.Equals(safe, "config", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(safe, "background", StringComparison.OrdinalIgnoreCase))
+                    string.Equals(safe, "background", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(safe, "history", StringComparison.OrdinalIgnoreCase))
                 {
                     return Results.NotFound();
                 }
@@ -329,10 +321,143 @@ public sealed class OverlayWebServer(
         await StartAsync(cancellationToken);
     }
 
+    public async Task RefreshMountedCanvasesAsync(CancellationToken cancellationToken = default)
+    {
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        settings.Overlay.EnsureCanvasesMigrated();
+        settings.Overlay.WebServerPort = Port > 0 ? Port : settings.Overlay.WebServerPort;
+        _mountedOverlays = settings.Overlay.Canvases
+            .Select(c => (c.Id, c.Name, settings.Overlay.GetViewUrl(c.Id)))
+            .ToArray();
+    }
+
     public async ValueTask DisposeAsync()
     {
         await StopAsync();
         _lifecycle.Dispose();
+    }
+
+    private void MapCanvasRoutes(WebApplication app)
+    {
+        app.MapGet("/editor", async (HttpContext context) =>
+        {
+            AppSettings live = await _settingsStore.LoadAsync(context.RequestAborted);
+            live.Overlay.EnsureCanvasesMigrated();
+            string id = live.Overlay.GetSelectedCanvas().Id;
+            context.Response.Redirect("/editor/" + Uri.EscapeDataString(id), permanent: false);
+        });
+
+        app.MapGet("/view", async (HttpContext context) =>
+        {
+            AppSettings live = await _settingsStore.LoadAsync(context.RequestAborted);
+            live.Overlay.EnsureCanvasesMigrated();
+            string id = live.Overlay.GetSelectedCanvas().Id;
+            context.Response.Redirect("/view/" + Uri.EscapeDataString(id), permanent: false);
+        });
+
+        app.MapGet("/editor/{instanceId}", (string instanceId, HttpContext context) =>
+            ServeCanvasPage("editor/index.html", context));
+
+        app.MapGet("/view/{instanceId}", (string instanceId, HttpContext context) =>
+            ServeCanvasPage("view/index.html", context));
+
+        app.MapGet("/w/{type}", (string type, HttpContext context) =>
+            ServeCanvasPage("solo/index.html", context));
+
+        app.MapGet("/w/shape/{*shapeId}", (string shapeId, HttpContext context) =>
+            ServeCanvasPage("solo/index.html", context));
+
+        app.MapGet("/canvas/size-presets", () =>
+        {
+            return Results.Json(OverlayCanvasSizePresets.All.Select(p => new
+            {
+                id = p.Id,
+                label = p.Label,
+                width = p.Width,
+                height = p.Height
+            }));
+        });
+
+        app.MapGet("/canvas/{*assetPath}", (string assetPath, HttpContext context) =>
+        {
+            string safe = (assetPath ?? "").Replace('\\', '/').Trim('/');
+            if (string.IsNullOrWhiteSpace(safe) || safe.Contains("..", StringComparison.Ordinal))
+            {
+                return Results.NotFound();
+            }
+
+            if (!CanvasOverlayAssets.TryGet(safe, out string content, out string contentType))
+            {
+                return Results.NotFound();
+            }
+
+            context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            return Results.Content(content, contentType);
+        });
+
+        app.MapGet("/layout/{instanceId}", async (string instanceId, HttpContext context) =>
+        {
+            try
+            {
+                Models.OverlayLayout layout = await _layoutStore.LoadAsync(instanceId, context.RequestAborted);
+                context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+                return Results.Json(layout, OverlayLayoutStore.JsonOptions);
+            }
+            catch (ArgumentException)
+            {
+                return Results.BadRequest(new { error = "invalid instance id" });
+            }
+        });
+
+        app.MapPut("/layout/{instanceId}", async (string instanceId, HttpContext context) =>
+        {
+            if (!IsLoopback(context))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            try
+            {
+                Models.OverlayLayout? layout = await System.Text.Json.JsonSerializer.DeserializeAsync<Models.OverlayLayout>(
+                    context.Request.Body,
+                    OverlayLayoutStore.JsonOptions,
+                    context.RequestAborted);
+                if (layout is null)
+                {
+                    return Results.BadRequest(new { error = "invalid layout" });
+                }
+
+                await _layoutStore.SaveAsync(instanceId, layout, context.RequestAborted);
+                OverlayRealtimeEvent evt = OverlayEventBridge.AppOverlayLayout(instanceId, layout);
+                await _realtimeHub.PublishEventAsync(evt, context.RequestAborted);
+                return Results.Json(layout, OverlayLayoutStore.JsonOptions);
+            }
+            catch (ArgumentException)
+            {
+                return Results.BadRequest(new { error = "invalid instance id" });
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return Results.BadRequest(new { error = "invalid json" });
+            }
+        });
+    }
+
+    private static IResult ServeCanvasPage(string assetPath, HttpContext context)
+    {
+        if (!CanvasOverlayAssets.TryGet(assetPath, out string html, out string contentType))
+        {
+            return Results.NotFound();
+        }
+
+        context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+        return Results.Content(html, contentType);
+    }
+
+    private static bool IsLoopback(HttpContext context)
+    {
+        IPAddress? remote = context.Connection.RemoteIpAddress;
+        return remote is null || IPAddress.IsLoopback(remote);
     }
 
     private async Task StopCoreAsync()
@@ -421,7 +546,8 @@ public sealed class OverlayWebServer(
                 }
             }
 
-            var buffer = new byte[4 * 1024];
+            var buffer = new byte[64 * 1024];
+            var message = new MemoryStream();
             while (socket.State == WebSocketState.Open)
             {
                 WebSocketReceiveResult result = await socket.ReceiveAsync(buffer, context.RequestAborted);
@@ -429,6 +555,21 @@ public sealed class OverlayWebServer(
                 {
                     break;
                 }
+
+                if (result.MessageType != WebSocketMessageType.Text)
+                {
+                    continue;
+                }
+
+                message.Write(buffer, 0, result.Count);
+                if (!result.EndOfMessage)
+                {
+                    continue;
+                }
+
+                string text = Encoding.UTF8.GetString(message.ToArray());
+                message.SetLength(0);
+                await HandleIncomingClientMessageAsync(text, context.RequestAborted);
             }
         }
         catch (OperationCanceledException)
@@ -456,6 +597,77 @@ public sealed class OverlayWebServer(
                     // ignore
                 }
             }
+        }
+    }
+
+    private async Task HandleIncomingClientMessageAsync(string text, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(text);
+            JsonElement root = doc.RootElement;
+            string type = root.TryGetProperty("type", out JsonElement typeEl)
+                ? typeEl.GetString() ?? ""
+                : "";
+
+            if (!string.Equals(type, "editor.layout.set", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(type, "editor.layout.patch", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (!root.TryGetProperty("data", out JsonElement data))
+            {
+                return;
+            }
+
+            string instanceId = data.TryGetProperty("instanceId", out JsonElement idEl)
+                ? idEl.GetString() ?? ""
+                : "";
+            if (string.IsNullOrWhiteSpace(instanceId))
+            {
+                return;
+            }
+
+            Models.OverlayLayout? layout = null;
+            if (data.TryGetProperty("layout", out JsonElement layoutEl))
+            {
+                if (layoutEl.ValueKind == JsonValueKind.String)
+                {
+                    layout = System.Text.Json.JsonSerializer.Deserialize<Models.OverlayLayout>(
+                        layoutEl.GetString() ?? "{}",
+                        OverlayLayoutStore.JsonOptions);
+                }
+                else if (layoutEl.ValueKind == JsonValueKind.Object)
+                {
+                    layout = System.Text.Json.JsonSerializer.Deserialize<Models.OverlayLayout>(
+                        layoutEl.GetRawText(),
+                        OverlayLayoutStore.JsonOptions);
+                }
+            }
+
+            if (layout is null)
+            {
+                return;
+            }
+
+            await _layoutStore.SaveAsync(instanceId, layout, cancellationToken);
+            await _realtimeHub.PublishEventAsync(
+                OverlayEventBridge.AppOverlayLayout(instanceId, layout),
+                cancellationToken);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // ignore malformed client frames
+        }
+        catch (ArgumentException)
+        {
+            // invalid instance id
         }
     }
 }

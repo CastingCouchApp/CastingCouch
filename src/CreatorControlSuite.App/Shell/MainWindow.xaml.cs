@@ -47,6 +47,7 @@ using CreatorControlSuite.Modules.Alerts.Models;
 using CreatorControlSuite.Modules.OBS;
 using CreatorControlSuite.Modules.OBS.Models;
 using CreatorControlSuite.Modules.Overlay;
+using CreatorControlSuite.Modules.Overlay.Models;
 using CreatorControlSuite.Modules.Spotify;
 using CreatorControlSuite.Modules.Spotify.Models;
 using CreatorControlSuite.Modules.StreamDeck;
@@ -293,6 +294,8 @@ public partial class MainWindow : Window
     private int _suiteAlertQueueLength;
     private string? _lastOverlayPublishedPhase;
     private bool? _lastOverlayPublishedLive;
+    private int? _lastOverlayPublishedCountdownRemaining;
+    private bool? _lastOverlayPublishedCountdownRunning;
     private string? _lastOverlayPublishedScene;
     private string? _lastOverlayPublishedSpotifyTrack;
     private int? _spotifyVolumeBeforeAlert;
@@ -305,6 +308,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _endSceneCountdownCts;
     private CancellationTokenSource? _raidAutoStartCts;
     private bool _raidCountdownActive;
+    private bool _raidCountdownSkipRequested;
     private bool _plannedStreamEndActive;
     private bool _streamEndFlowActive;
     private bool _streamEndAbortRequested;
@@ -376,9 +380,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<string> _multiPcDeviceItems = [];
     private readonly ObservableCollection<string> _multiPcHistoryItems = [];
     private readonly ObservableCollection<string> _multiPcRolloutItems = [];
-    private readonly ObservableCollection<OverlayInstanceSettings> _overlayInstances = [];
-    private bool _loadingOverlayInstanceEditor;
-    private bool _suppressOverlayInstanceSelection;
+    private readonly ObservableCollection<string> _runOfShowPlanNames = [];
     private CancellationTokenSource? _multiPcRolloutCts;
     private CancellationTokenSource? _scheduledMultiPcRolloutCts;
     private readonly Dictionary<string, string> _multiPcRolloutGroups = new(StringComparer.OrdinalIgnoreCase);
@@ -2343,15 +2345,14 @@ public partial class MainWindow : Window
             }
         };
 
-        AddOverlayInstanceButton.Click += (_, _) => AddOverlayInstance();
-        RemoveOverlayInstanceButton.Click += (_, _) => RemoveSelectedOverlayInstance();
-        BrowseOverlayInstanceFolderButton.Click += (_, _) => BrowseOverlayInstanceFolder();
-        CopyOverlayInstanceUrlButton.Click += (_, _) => CopySelectedOverlayInstanceUrl();
-        OverlayInstancesList.SelectionChanged += (_, _) => OnOverlayInstanceSelectionChanged();
-        OverlayInstanceNameBox.TextChanged += (_, _) => ApplyOverlayInstanceEditorToSelection();
-        OverlayInstanceRootBox.TextChanged += (_, _) => ApplyOverlayInstanceEditorToSelection();
-        OverlayInstanceEnabledBox.Checked += (_, _) => ApplyOverlayInstanceEditorToSelection();
-        OverlayInstanceEnabledBox.Unchecked += (_, _) => ApplyOverlayInstanceEditorToSelection();
+        CopyOverlayViewUrlButton.Click += (_, _) => CopySelectedOverlayViewUrl();
+        CopyOverlayWidgetUrlButton.Click += (_, _) => CopySelectedOverlayWidgetUrl();
+        OpenOverlayEditorButton.Click += (_, _) => OpenSelectedOverlayEditor();
+        NewOverlayCanvasButton.Click += async (_, _) => await CreateOverlayCanvasAsync();
+        RenameOverlayCanvasButton.Click += async (_, _) => await RenameOverlayCanvasAsync();
+        DuplicateOverlayCanvasButton.Click += async (_, _) => await DuplicateOverlayCanvasAsync();
+        DeleteOverlayCanvasButton.Click += async (_, _) => await DeleteOverlayCanvasAsync();
+        OverlayCanvasCombo.SelectionChanged += async (_, _) => await OnOverlayCanvasSelectionChangedAsync();
         CopyOverlayWebServerUrlButton.Click += (_, _) =>
         {
             string url = string.IsNullOrWhiteSpace(OverlayWebServerUrlBox.Text)
@@ -2393,6 +2394,25 @@ public partial class MainWindow : Window
 
         StartCountdownButton.Click += async (_, _) =>
             await ExecuteWorkflowAsync(() => _workflowModule.Service.StartCountdownAsync());
+
+        StopCountdownButton.Click += async (_, _) =>
+            await ExecuteWorkflowAsync(() => _workflowModule.Service.StopCountdownAsync());
+
+        DashboardCountdownStartButton.Click += async (_, _) =>
+            await StartDashboardOverlayCountdownAsync();
+
+        DashboardCountdownStopButton.Click += async (_, _) =>
+            await ExecuteWorkflowAsync(() => _workflowModule.Service.StopCountdownAsync());
+
+        DashboardCountdownResetButton.Click += async (_, _) =>
+            await ResetDashboardOverlayCountdownAsync();
+
+        DashboardCountdownSettingsButton.Click += (_, _) => OpenDashboardCountdownSettingsPopup();
+        DashboardCountdownSettingsCancelButton.Click += (_, _) => DashboardCountdownSettingsPopup.IsOpen = false;
+        DashboardCountdownSettingsSaveButton.Click += async (_, _) => await SaveDashboardCountdownSettingsFromPopupAsync();
+        DashboardCountdownPreset5Button.Click += (_, _) => ApplyDashboardCountdownPreset(300);
+        DashboardCountdownPreset10Button.Click += (_, _) => ApplyDashboardCountdownPreset(600);
+        DashboardCountdownPreset30Button.Click += (_, _) => ApplyDashboardCountdownPreset(1800);
 
         GoLiveButton.Click += async (_, _) =>
             await ExecuteWorkflowAsync(() => _workflowModule.Service.GoLiveAsync());
@@ -3678,7 +3698,10 @@ public partial class MainWindow : Window
         }
 
         bool migratedSceneAutomation = MigrateLegacyStartToGameAutomation();
-        if (migratedSceneAutomation || addedGuestStarScope || disabledLegacyAlertAutoCreate)
+        _settings.Overlay.EnsureInstancesMigrated();
+        bool canvasesWereEmpty = _settings.Overlay.Canvases is null || _settings.Overlay.Canvases.Count == 0;
+        _settings.Overlay.EnsureCanvasesMigrated();
+        if (migratedSceneAutomation || addedGuestStarScope || disabledLegacyAlertAutoCreate || canvasesWereEmpty)
         {
             await _settingsStore.SaveAsync(_settings);
         }
@@ -3898,8 +3921,11 @@ public partial class MainWindow : Window
         OverlayChatPaddingBox.Text = _settings.Overlay.Chat.PaddingPx.ToString();
         OverlayChatRadiusBox.Text = _settings.Overlay.Chat.BorderRadiusPx.ToString();
         OverlayChatGapBox.Text = _settings.Overlay.Chat.GapPx.ToString();
+        OverlayChatFontSizeBox.Text = _settings.Overlay.Chat.FontSizePx.ToString();
+        OverlayChatFontFamilyBox.Text = _settings.Overlay.Chat.FontFamily;
         OverlayChatUrlBox.Text = _settings.Overlay.GetOverlayUrl("chat");
-        LoadOverlayInstancesUi();
+        RefreshOverlayCanvasCombo();
+        RefreshOverlayCanvasUrls();
         RefreshOverlayWebServerStatusUi();
 
         StartSceneBox.Text = _settings.Obs.StartScene;
@@ -3911,6 +3937,11 @@ public partial class MainWindow : Window
             _settings.Twitch.EndSceneDurationSeconds > 0
                 ? _settings.Twitch.EndSceneDurationSeconds
                 : _settings.Workflow.EndSceneSeconds).ToString();
+        DashboardCountdownSecondsBox.Text = Math.Max(0, _settings.Workflow.StartCountdownSeconds).ToString();
+        DashboardCountdownLabelBox.Text = string.IsNullOrWhiteSpace(_settings.Workflow.CountdownLabel)
+            ? "Countdown"
+            : _settings.Workflow.CountdownLabel;
+        RefreshDashboardCountdownIdleDisplay();
         _liveViewerSampleTimer.Interval = TimeSpan.FromSeconds(
             Math.Clamp(_settings.Workflow.ViewerSampleSeconds, 5, 300));
 
@@ -4157,7 +4188,6 @@ public partial class MainWindow : Window
 
             SaveAlertDefinitionToSettings();
 
-            CommitOverlayInstancesFromUi();
             _settings.Overlay.WebServerEnabled = OverlayWebServerEnabledBox.IsChecked == true;
             if (!int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int overlayPort) || overlayPort is <= 0 or > 65535)
             {
@@ -4194,6 +4224,13 @@ public partial class MainWindow : Window
                 _settings.Overlay.Chat.GapPx = gapPx;
             }
 
+            if (int.TryParse(OverlayChatFontSizeBox.Text.Trim(), out int fontSizePx))
+            {
+                _settings.Overlay.Chat.FontSizePx = fontSizePx;
+            }
+
+            _settings.Overlay.Chat.FontFamily = OverlayChatFontFamilyBox.Text.Trim();
+
             _settings.Overlay.Chat.NormalizeAppearance();
             SelectOverlayChatBackgroundType(_settings.Overlay.Chat.BackgroundType);
             OverlayChatBackgroundColorBox.Text = _settings.Overlay.Chat.BackgroundColor;
@@ -4201,14 +4238,23 @@ public partial class MainWindow : Window
             OverlayChatPaddingBox.Text = _settings.Overlay.Chat.PaddingPx.ToString();
             OverlayChatRadiusBox.Text = _settings.Overlay.Chat.BorderRadiusPx.ToString();
             OverlayChatGapBox.Text = _settings.Overlay.Chat.GapPx.ToString();
+            OverlayChatFontSizeBox.Text = _settings.Overlay.Chat.FontSizePx.ToString();
+            OverlayChatFontFamilyBox.Text = _settings.Overlay.Chat.FontFamily;
             OverlayWebServerUrlBox.Text = _settings.Overlay.GetBaseUrl();
             OverlayChatUrlBox.Text = _settings.Overlay.GetOverlayUrl("chat");
-            RefreshSelectedOverlayInstanceUrl();
+            if (OverlayCanvasCombo.SelectedItem is OverlayCanvasSettings selectedCanvas)
+            {
+                _settings.Overlay.SelectedCanvasId = selectedCanvas.Id;
+            }
+
+            _settings.Overlay.EnsureCanvasesMigrated();
+            RefreshOverlayCanvasUrls();
             _overlayRealtimeHub.ConfigureChatBuffer(_settings.Overlay.Chat.MaxBufferedMessages);
             await RefreshChatEmoteCatalogFromSettingsAsync();
 
             _settings.Workflow.EndSceneSeconds = int.Parse(EndSceneSecondsBox.Text.Trim());
             _settings.Twitch.EndSceneDurationSeconds = _settings.Workflow.EndSceneSeconds;
+            PersistDashboardCountdownSettings();
 
             _settings.StreamDeck.Enabled = StreamDeckEnabledBox.IsChecked == true;
             _settings.StreamDeck.AutoInstallProfile = StreamDeckProfileBox.IsChecked == true;
@@ -8417,13 +8463,15 @@ public partial class MainWindow : Window
     private void UpdateDashboardRaidActionButtons()
     {
         bool hasTarget = !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel);
+        bool canSkipCountdown = _raidCountdownActive;
         bool raidReady = hasTarget && _raidTargetIsOnline && !_raidCountdownActive
             && (_awaitingManualRaid || _streamEndFlowActive);
-        DashboardStartRaidButton.IsEnabled = raidReady;
-        DashboardStartRaidButton.Visibility = raidReady ? Visibility.Visible : Visibility.Collapsed;
+        bool showJetztRaiden = raidReady || canSkipCountdown;
+        DashboardStartRaidButton.IsEnabled = showJetztRaiden;
+        DashboardStartRaidButton.Visibility = showJetztRaiden ? Visibility.Visible : Visibility.Collapsed;
         DashboardCancelRaidButton.IsEnabled = _raidCountdownActive;
 
-        _activeStreamEndDialog?.SetRaidReady(raidReady);
+        _activeStreamEndDialog?.SetRaidReady(showJetztRaiden);
         _activeStreamEndDialog?.SetCancelRaidEnabled(_raidCountdownActive);
         if (_awaitingManualRaid && !_raidCountdownActive)
         {
@@ -8874,6 +8922,10 @@ public partial class MainWindow : Window
             await action();
             RefreshWorkflowUi(_workflowModule.Service.State);
         }
+        catch (OperationCanceledException)
+        {
+            RefreshWorkflowUi(_workflowModule.Service.State);
+        }
         catch (Exception exception)
         {
             MessageBox.Show(
@@ -8882,6 +8934,120 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+    }
+
+    private void PersistDashboardCountdownSettings()
+    {
+        if (int.TryParse(DashboardCountdownSecondsBox.Text.Trim(), out int seconds))
+        {
+            _settings.Workflow.StartCountdownSeconds = Math.Max(0, seconds);
+        }
+
+        string label = DashboardCountdownLabelBox.Text.Trim();
+        _settings.Workflow.CountdownLabel = string.IsNullOrWhiteSpace(label) ? "Countdown" : label;
+        DashboardCountdownLabelText.Text = _settings.Workflow.CountdownLabel;
+    }
+
+    private void OpenDashboardCountdownSettingsPopup()
+    {
+        DashboardCountdownSecondsBox.Text = Math.Max(0, _settings.Workflow.StartCountdownSeconds).ToString();
+        DashboardCountdownLabelBox.Text = string.IsNullOrWhiteSpace(_settings.Workflow.CountdownLabel)
+            ? "Countdown"
+            : _settings.Workflow.CountdownLabel;
+        DashboardCountdownSettingsPopup.IsOpen = true;
+    }
+
+    private void ApplyDashboardCountdownPreset(int seconds)
+    {
+        DashboardCountdownSecondsBox.Text = Math.Max(0, seconds).ToString();
+    }
+
+    private async Task SaveDashboardCountdownSettingsFromPopupAsync()
+    {
+        PersistDashboardCountdownSettings();
+        try
+        {
+            await _settingsStore.SaveAsync(_settings);
+        }
+        catch
+        {
+            // Settings-Save ist best-effort.
+        }
+
+        DashboardCountdownSettingsPopup.IsOpen = false;
+        if (_workflowModule.Service.State.Phase != StreamPhase.Countdown)
+        {
+            await SyncIdleOverlayCountdownAsync();
+            RefreshDashboardCountdownIdleDisplay();
+        }
+    }
+
+    private async Task StartDashboardOverlayCountdownAsync()
+    {
+        PersistDashboardCountdownSettings();
+        try
+        {
+            await _settingsStore.SaveAsync(_settings);
+        }
+        catch
+        {
+            // Settings-Save ist best-effort; Countdown darf trotzdem starten.
+        }
+
+        int duration = Math.Max(0, _settings.Workflow.StartCountdownSeconds);
+        await ExecuteWorkflowAsync(() => _workflowModule.Service.StartCountdownAsync(duration));
+    }
+
+    private async Task ResetDashboardOverlayCountdownAsync()
+    {
+        if (_workflowModule.Service.State.Phase == StreamPhase.Countdown)
+        {
+            await ExecuteWorkflowAsync(() => _workflowModule.Service.StopCountdownAsync());
+        }
+
+        await SyncIdleOverlayCountdownAsync();
+        RefreshDashboardCountdownIdleDisplay();
+    }
+
+    private async Task SyncIdleOverlayCountdownAsync()
+    {
+        int total = Math.Max(0, _settings.Workflow.StartCountdownSeconds);
+        string label = string.IsNullOrWhiteSpace(_settings.Workflow.CountdownLabel)
+            ? "Countdown"
+            : _settings.Workflow.CountdownLabel.Trim();
+
+        try
+        {
+            await _overlayModule.Service.UpdateAsync(data =>
+            {
+                data.Countdown.IsRunning = false;
+                data.Countdown.RemainingSeconds = total;
+                data.Countdown.TotalSeconds = total;
+                data.Countdown.EndsAt = null;
+                data.Countdown.Label = label;
+                data.Countdown.Mode = "manual";
+            });
+
+            await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppCountdown(
+                false,
+                total,
+                total,
+                label,
+                null));
+        }
+        catch
+        {
+            // Overlay-Sync ist best-effort.
+        }
+    }
+
+    private void RefreshDashboardCountdownIdleDisplay()
+    {
+        int total = Math.Max(0, _settings.Workflow.StartCountdownSeconds);
+        DashboardCountdownRemainingText.Text = TimeSpan.FromSeconds(total).ToString(@"mm\:ss");
+        DashboardCountdownLabelText.Text = string.IsNullOrWhiteSpace(_settings.Workflow.CountdownLabel)
+            ? "Countdown"
+            : _settings.Workflow.CountdownLabel;
     }
 
     private async Task AddViewerSampleAsync()
@@ -8914,6 +9080,14 @@ public partial class MainWindow : Window
         WorkflowCountdownText.Text =
             TimeSpan.FromSeconds(Math.Max(0, state.CountdownRemainingSeconds))
                 .ToString(@"mm\:ss");
+        if (state.Phase == StreamPhase.Countdown)
+        {
+            DashboardCountdownRemainingText.Text = WorkflowCountdownText.Text;
+        }
+        else
+        {
+            RefreshDashboardCountdownIdleDisplay();
+        }
 
         StreamSessionStats stats = _workflowModule.Service.SessionStats;
         WorkflowPeakViewersText.Text = stats.PeakViewers.ToString();
@@ -10382,202 +10556,455 @@ public partial class MainWindow : Window
         }
     }
 
-    private void LoadOverlayInstancesUi()
+    private void RefreshOverlayCanvasCombo()
     {
-        _settings.Overlay.EnsureInstancesMigrated();
-        _suppressOverlayInstanceSelection = true;
+        bool previousLoading = _loadingSettingsIntoUi;
+        _loadingSettingsIntoUi = true;
         try
         {
-            _overlayInstances.Clear();
-            foreach (OverlayInstanceSettings instance in _settings.Overlay.Instances)
-            {
-                _overlayInstances.Add(new OverlayInstanceSettings
-                {
-                    Id = string.IsNullOrWhiteSpace(instance.Id) ? Guid.NewGuid().ToString("N") : instance.Id,
-                    Name = instance.Name,
-                    RootPath = instance.RootPath,
-                    Enabled = instance.Enabled
-                });
-            }
-
-            OverlayInstancesList.ItemsSource = _overlayInstances;
-            if (_overlayInstances.Count > 0)
-            {
-                OverlayInstancesList.SelectedIndex = 0;
-            }
-            else
-            {
-                ClearOverlayInstanceEditor();
-            }
+            _settings.Overlay.EnsureCanvasesMigrated();
+            OverlayCanvasCombo.ItemsSource = null;
+            OverlayCanvasCombo.ItemsSource = _settings.Overlay.Canvases.ToList();
+            OverlayCanvasCombo.DisplayMemberPath = nameof(OverlayCanvasSettings.Name);
+            OverlayCanvasSettings selected = _settings.Overlay.GetSelectedCanvas();
+            OverlayCanvasCombo.SelectedItem = _settings.Overlay.Canvases.FirstOrDefault(c =>
+                string.Equals(c.Id, selected.Id, StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
-            _suppressOverlayInstanceSelection = false;
-        }
-
-        OnOverlayInstanceSelectionChanged();
-    }
-
-    private void CommitOverlayInstancesFromUi()
-    {
-        ApplyOverlayInstanceEditorToSelection();
-        _settings.Overlay.Instances = _overlayInstances
-            .Select(item => new OverlayInstanceSettings
-            {
-                Id = string.IsNullOrWhiteSpace(item.Id) ? Guid.NewGuid().ToString("N") : item.Id.Trim(),
-                Name = item.Name?.Trim() ?? "",
-                RootPath = item.RootPath?.Trim() ?? "",
-                Enabled = item.Enabled
-            })
-            .ToList();
-
-        // Legacy-Feld: erster Root bleibt für Datenpfad-Fallback synchron.
-        _settings.Overlay.RootPath = _settings.Overlay.Instances
-            .Select(i => i.RootPath)
-            .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path))
-            ?? _settings.Overlay.RootPath;
-    }
-
-    private void AddOverlayInstance()
-    {
-        var instance = new OverlayInstanceSettings
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            Name = $"Overlay {_overlayInstances.Count + 1}",
-            RootPath = "",
-            Enabled = true
-        };
-        _overlayInstances.Add(instance);
-        OverlayInstancesList.SelectedItem = instance;
-        OverlayStatusText.Text = "Neue Overlay-Instanz angelegt.";
-    }
-
-    private void RemoveSelectedOverlayInstance()
-    {
-        if (OverlayInstancesList.SelectedItem is not OverlayInstanceSettings selected)
-        {
-            return;
-        }
-
-        int index = OverlayInstancesList.SelectedIndex;
-        _overlayInstances.Remove(selected);
-        if (_overlayInstances.Count == 0)
-        {
-            ClearOverlayInstanceEditor();
-            return;
-        }
-
-        OverlayInstancesList.SelectedIndex = Math.Clamp(index, 0, _overlayInstances.Count - 1);
-    }
-
-    private void OnOverlayInstanceSelectionChanged()
-    {
-        if (_suppressOverlayInstanceSelection)
-        {
-            return;
-        }
-
-        _loadingOverlayInstanceEditor = true;
-        try
-        {
-            if (OverlayInstancesList.SelectedItem is not OverlayInstanceSettings selected)
-            {
-                ClearOverlayInstanceEditor();
-                return;
-            }
-
-            OverlayInstanceNameBox.Text = selected.Name ?? "";
-            OverlayInstanceRootBox.Text = selected.RootPath ?? "";
-            OverlayInstanceEnabledBox.IsChecked = selected.Enabled;
-            OverlayInstanceIdText.Text = "Id: " + selected.Id;
-            RefreshSelectedOverlayInstanceUrl();
-        }
-        finally
-        {
-            _loadingOverlayInstanceEditor = false;
+            _loadingSettingsIntoUi = previousLoading;
         }
     }
 
-    private void ClearOverlayInstanceEditor()
+    private OverlayCanvasSettings? GetUiSelectedOverlayCanvas()
     {
-        _loadingOverlayInstanceEditor = true;
-        try
+        if (OverlayCanvasCombo.SelectedItem is OverlayCanvasSettings selected)
         {
-            OverlayInstanceNameBox.Text = "";
-            OverlayInstanceRootBox.Text = "";
-            OverlayInstanceEnabledBox.IsChecked = true;
-            OverlayInstanceUrlBox.Text = "";
-            OverlayInstanceIdText.Text = "";
+            return selected;
         }
-        finally
-        {
-            _loadingOverlayInstanceEditor = false;
-        }
+
+        _settings.Overlay.EnsureCanvasesMigrated();
+        return _settings.Overlay.GetSelectedCanvas();
     }
 
-    private void ApplyOverlayInstanceEditorToSelection()
+    private void RefreshOverlayCanvasUrls()
     {
-        if (_loadingOverlayInstanceEditor ||
-            OverlayInstancesList.SelectedItem is not OverlayInstanceSettings selected)
-        {
-            return;
-        }
-
-        selected.Name = OverlayInstanceNameBox.Text;
-        selected.RootPath = OverlayInstanceRootBox.Text;
-        selected.Enabled = OverlayInstanceEnabledBox.IsChecked == true;
-        RefreshSelectedOverlayInstanceUrl();
-
-        // DisplayMemberPath aktualisieren
-        int index = OverlayInstancesList.SelectedIndex;
-        _suppressOverlayInstanceSelection = true;
-        try
-        {
-            OverlayInstancesList.Items.Refresh();
-            OverlayInstancesList.SelectedIndex = index;
-        }
-        finally
-        {
-            _suppressOverlayInstanceSelection = false;
-        }
-    }
-
-    private void RefreshSelectedOverlayInstanceUrl()
-    {
-        if (OverlayInstancesList.SelectedItem is not OverlayInstanceSettings selected ||
-            string.IsNullOrWhiteSpace(selected.Id))
-        {
-            OverlayInstanceUrlBox.Text = "";
-            return;
-        }
-
         if (int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int port) && port is > 0 and <= 65535)
         {
             _settings.Overlay.WebServerPort = port;
         }
 
-        OverlayInstanceUrlBox.Text = _settings.Overlay.GetInstanceUrl(selected.Id);
+        OverlayCanvasSettings canvas = GetUiSelectedOverlayCanvas() ?? _settings.Overlay.GetSelectedCanvas();
+        OverlayViewUrlBox.Text = _settings.Overlay.GetViewUrl(canvas.Id);
+        OverlayEditorUrlBox.Text = _settings.Overlay.GetEditorUrl(canvas.Id);
+        EnsureOverlayWidgetUrlCombo();
     }
 
-    private void BrowseOverlayInstanceFolder()
+    private async Task OnOverlayCanvasSelectionChangedAsync()
     {
-        var dialog = new Microsoft.Win32.OpenFolderDialog
+        if (_loadingSettingsIntoUi)
         {
-            Title = "Overlay-Ordner auswählen",
-            Multiselect = false
+            RefreshOverlayCanvasUrls();
+            return;
+        }
+
+        if (OverlayCanvasCombo.SelectedItem is not OverlayCanvasSettings selected)
+        {
+            RefreshOverlayCanvasUrls();
+            return;
+        }
+
+        if (string.Equals(_settings.Overlay.SelectedCanvasId, selected.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            RefreshOverlayCanvasUrls();
+            return;
+        }
+
+        _settings.Overlay.SelectedCanvasId = selected.Id;
+        RefreshOverlayCanvasUrls();
+        try
+        {
+            await _settingsStore.SaveAsync(_settings);
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "Canvas-Auswahl konnte nicht gespeichert werden: " + exception.Message;
+        }
+    }
+
+    private async Task PersistOverlayCanvasesAsync(string statusMessage)
+    {
+        _settings.Overlay.EnsureCanvasesMigrated();
+        await _settingsStore.SaveAsync(_settings);
+        RefreshOverlayCanvasCombo();
+        RefreshOverlayCanvasUrls();
+        try
+        {
+            if (_overlayModule.WebServer.IsRunning)
+            {
+                await _overlayModule.WebServer.RefreshMountedCanvasesAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            _appLogger.Write(
+                AppLogLevel.Warning,
+                "Overlay",
+                "Canvas-Liste im Webserver konnte nicht aktualisiert werden: " + exception.Message,
+                exception);
+        }
+
+        OverlayStatusText.Text = statusMessage;
+    }
+
+    private bool TryPromptOverlayCanvasName(string title, string prompt, string initialValue, out string name)
+    {
+        name = "";
+        var dialog = new TextPromptWindow(title, prompt, initialValue)
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return false;
+        }
+
+        name = dialog.Value;
+        return !string.IsNullOrWhiteSpace(name);
+    }
+
+    private async Task CreateOverlayCanvasAsync()
+    {
+        try
+        {
+            if (!TryPromptOverlayCanvasName(
+                    "Neues Canvas",
+                    "Name für das neue Overlay-Canvas:",
+                    "",
+                    out string name))
+            {
+                return;
+            }
+
+            _settings.Overlay.EnsureCanvasesMigrated();
+            string id = OverlaySettings.CreateCanvasId(
+                name,
+                _settings.Overlay.Canvases.Select(c => c.Id));
+            var canvas = new OverlayCanvasSettings { Id = id, Name = name };
+            var layout = OverlayLayout.CreateDefault();
+            layout.Name = name;
+            await _overlayModule.LayoutStore.SaveAsync(id, layout);
+            _settings.Overlay.Canvases.Add(canvas);
+            _settings.Overlay.SelectedCanvasId = id;
+            await PersistOverlayCanvasesAsync($"Canvas „{name}“ angelegt.");
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "Canvas konnte nicht angelegt werden: " + exception.Message;
+            MessageBox.Show(this, exception.Message, "Neues Canvas", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async Task RenameOverlayCanvasAsync()
+    {
+        try
+        {
+            OverlayCanvasSettings? canvas = GetUiSelectedOverlayCanvas();
+            if (canvas is null)
+            {
+                return;
+            }
+
+            if (!TryPromptOverlayCanvasName(
+                    "Canvas umbenennen",
+                    "Neuer Anzeigename (URL/Id bleibt gleich):",
+                    canvas.Name,
+                    out string name))
+            {
+                return;
+            }
+
+            canvas.Name = name;
+            OverlayLayout layout = await _overlayModule.LayoutStore.LoadAsync(canvas.Id);
+            layout.Name = name;
+            await _overlayModule.LayoutStore.SaveAsync(canvas.Id, layout);
+            _settings.Overlay.SelectedCanvasId = canvas.Id;
+            await PersistOverlayCanvasesAsync($"Canvas umbenannt in „{name}“.");
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "Canvas konnte nicht umbenannt werden: " + exception.Message;
+            MessageBox.Show(this, exception.Message, "Canvas umbenennen", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async Task DuplicateOverlayCanvasAsync()
+    {
+        try
+        {
+            OverlayCanvasSettings? source = GetUiSelectedOverlayCanvas();
+            if (source is null)
+            {
+                return;
+            }
+
+            string suggestedName = source.Name.EndsWith(" (Kopie)", StringComparison.Ordinal)
+                ? source.Name
+                : source.Name + " (Kopie)";
+            if (!TryPromptOverlayCanvasName(
+                    "Canvas duplizieren",
+                    "Name für die Kopie:",
+                    suggestedName,
+                    out string name))
+            {
+                return;
+            }
+
+            _settings.Overlay.EnsureCanvasesMigrated();
+            string id = OverlaySettings.CreateCanvasId(
+                name,
+                _settings.Overlay.Canvases.Select(c => c.Id));
+            await _overlayModule.LayoutStore.DuplicateAsync(source.Id, id);
+            OverlayLayout layout = await _overlayModule.LayoutStore.LoadAsync(id);
+            layout.Name = name;
+            await _overlayModule.LayoutStore.SaveAsync(id, layout);
+            _settings.Overlay.Canvases.Add(new OverlayCanvasSettings { Id = id, Name = name });
+            _settings.Overlay.SelectedCanvasId = id;
+            await PersistOverlayCanvasesAsync($"Canvas „{name}“ dupliziert.");
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "Canvas konnte nicht dupliziert werden: " + exception.Message;
+            MessageBox.Show(this, exception.Message, "Canvas duplizieren", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async Task DeleteOverlayCanvasAsync()
+    {
+        try
+        {
+            _settings.Overlay.EnsureCanvasesMigrated();
+            OverlayCanvasSettings? canvas = GetUiSelectedOverlayCanvas();
+            if (canvas is null)
+            {
+                return;
+            }
+
+            if (_settings.Overlay.Canvases.Count <= 1)
+            {
+                MessageBox.Show(
+                    this,
+                    "Das letzte Canvas kann nicht gelöscht werden.",
+                    "Canvas löschen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            MessageBoxResult confirm = MessageBox.Show(
+                this,
+                $"Canvas „{canvas.Name}“ wirklich löschen?\nLayout-Datei und OBS-URL /view/{canvas.Id} entfallen.",
+                "Canvas löschen",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            await _overlayModule.LayoutStore.DeleteAsync(canvas.Id);
+            _settings.Overlay.Canvases.RemoveAll(c =>
+                string.Equals(c.Id, canvas.Id, StringComparison.OrdinalIgnoreCase));
+            _settings.Overlay.EnsureCanvasesMigrated();
+            await PersistOverlayCanvasesAsync($"Canvas „{canvas.Name}“ gelöscht.");
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "Canvas konnte nicht gelöscht werden: " + exception.Message;
+            MessageBox.Show(this, exception.Message, "Canvas löschen", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void EnsureOverlayWidgetUrlCombo()
+    {
+        if (OverlayWidgetUrlCombo.Items.Count > 0)
+        {
+            return;
+        }
+
+        var entries = new List<(string Label, string Path)>
+        {
+            ("Widget: Online + Zeit", "online"),
+            ("Widget: Alert", "alert"),
+            ("Widget: Music Player", "music"),
+            ("Widget: Music Player (Legacy Spotify-URL)", "spotify"),
+            ("Widget: Chat", "chat"),
+            ("Widget: Ending Stats", "ending-stats"),
+            ("Widget: Text", "text"),
+            ("Widget: Image", "image"),
+            ("Widget: Countdown", "countdown"),
+            ("Widget: Socials", "socials"),
+            ("Shape: Frame Rechteck", "shape/frame.rect"),
+            ("Shape: Frame Kreis", "shape/frame.circle"),
+            ("Shape: Frame Corners", "shape/frame.corners"),
+            ("Shape: Frame Bezel", "shape/frame.bevel"),
+            ("Shape: Frame Neon", "shape/frame.neon"),
+            ("Shape: Frame Dashed", "shape/frame.dashed"),
+            ("Shape: Card Frame", "shape/frame.card"),
+            ("Shape: Vignette", "shape/shape.vignette"),
+            ("Shape: Starting Hintergrund", "shape/shape.scene-bg")
         };
 
-        string currentPath = OverlayInstanceRootBox.Text.Trim();
-        if (!string.IsNullOrWhiteSpace(currentPath) && Directory.Exists(currentPath))
+        foreach ((string label, string path) in entries)
         {
-            dialog.InitialDirectory = currentPath;
+            OverlayWidgetUrlCombo.Items.Add(new OverlayWidgetUrlItem(label, path));
         }
 
-        if (dialog.ShowDialog(this) == true)
+        OverlayWidgetUrlCombo.DisplayMemberPath = nameof(OverlayWidgetUrlItem.Label);
+        OverlayWidgetUrlCombo.SelectedIndex = 0;
+    }
+
+    private sealed record OverlayWidgetUrlItem(string Label, string Path);
+
+    private void CopySelectedOverlayViewUrl()
+    {
+        RefreshOverlayCanvasUrls();
+        string url = OverlayViewUrlBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(url))
         {
-            OverlayInstanceRootBox.Text = dialog.FolderName;
-            ApplyOverlayInstanceEditorToSelection();
+            OverlayStatusText.Text = "Keine View-URL.";
+            return;
         }
+
+        try
+        {
+            Clipboard.SetText(url);
+            OverlayStatusText.Text = "Canvas-View-URL kopiert: " + url;
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "URL konnte nicht kopiert werden: " + exception.Message;
+        }
+    }
+
+    private void CopySelectedOverlayWidgetUrl()
+    {
+        EnsureOverlayWidgetUrlCombo();
+        if (int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int port) && port is > 0 and <= 65535)
+        {
+            _settings.Overlay.WebServerPort = port;
+        }
+
+        string path = OverlayWidgetUrlCombo.SelectedItem is OverlayWidgetUrlItem item
+            ? item.Path
+            : "music";
+        string url = _settings.Overlay.GetWidgetUrl(path);
+        try
+        {
+            Clipboard.SetText(url);
+            OverlayStatusText.Text = "Widget-URL kopiert: " + url;
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "URL konnte nicht kopiert werden: " + exception.Message;
+        }
+    }
+
+    private void OpenSelectedOverlayEditor()
+    {
+        try
+        {
+            _settings.Overlay.EnsureCanvasesMigrated();
+            OverlayCanvasSettings canvas = GetUiSelectedOverlayCanvas() ?? _settings.Overlay.GetSelectedCanvas();
+            _settings.Overlay.SelectedCanvasId = canvas.Id;
+            if (int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int port) && port is > 0 and <= 65535)
+            {
+                _settings.Overlay.WebServerPort = port;
+            }
+
+            string url = _settings.Overlay.GetEditorUrl(canvas.Id);
+            OverlayEditorUrlBox.Text = url;
+            OverlayViewUrlBox.Text = _settings.Overlay.GetViewUrl(canvas.Id);
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                OverlayStatusText.Text = "Keine Editor-URL.";
+                return;
+            }
+
+            if (!_overlayModule.WebServer.IsRunning)
+            {
+                if (_settings.Overlay.WebServerEnabled)
+                {
+                    OverlayStatusText.Text = "Overlay-Webserver startet…";
+                    _ = EnsureOverlayWebServerRunningForEditorAsync(url);
+                    return;
+                }
+
+                OverlayStatusText.Text = "Overlay-Webserver läuft nicht. Bitte aktivieren und speichern.";
+                MessageBox.Show(
+                    this,
+                    "Der Overlay-Webserver ist deaktiviert.\nBitte unter Overlay → Webserver aktivieren und speichern.",
+                    "Overlay Editor",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            ShowOverlayEditorWindow(url);
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "Editor konnte nicht geöffnet werden: " + exception.Message;
+            MessageBox.Show(
+                this,
+                "Editor konnte nicht geöffnet werden:\n" + exception.Message,
+                "Overlay Editor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private async Task EnsureOverlayWebServerRunningForEditorAsync(string url)
+    {
+        try
+        {
+            await _overlayModule.WebServer.RestartAsync();
+            if (!_overlayModule.WebServer.IsRunning)
+            {
+                OverlayStatusText.Text = "Overlay-Webserver konnte nicht gestartet werden.";
+                MessageBox.Show(
+                    this,
+                    "Overlay-Webserver konnte nicht gestartet werden.\nEinstellungen speichern und erneut versuchen.",
+                    "Overlay Editor",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            RefreshOverlayWebServerStatusUi();
+            ShowOverlayEditorWindow(url);
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "Webserver-Start fehlgeschlagen: " + exception.Message;
+            MessageBox.Show(
+                this,
+                "Webserver-Start fehlgeschlagen:\n" + exception.Message,
+                "Overlay Editor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void ShowOverlayEditorWindow(string url)
+    {
+        OverlayCanvasSettings canvas = GetUiSelectedOverlayCanvas() ?? _settings.Overlay.GetSelectedCanvas();
+        var window = new OverlayEditorWindow(url, canvas.Name)
+        {
+            Owner = this
+        };
+        window.Show();
+        OverlayStatusText.Text = "Editor geöffnet: " + url;
     }
 
     private void BrowseOverlayChatBackgroundImage()
@@ -10642,27 +11069,6 @@ public partial class MainWindow : Window
         return "None";
     }
 
-    private void CopySelectedOverlayInstanceUrl()
-    {
-        RefreshSelectedOverlayInstanceUrl();
-        string url = OverlayInstanceUrlBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            OverlayStatusText.Text = "Keine Overlay-URL – Instanz wählen.";
-            return;
-        }
-
-        try
-        {
-            Clipboard.SetText(url);
-            OverlayStatusText.Text = "Overlay-URL kopiert: " + url;
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = "URL konnte nicht kopiert werden: " + exception.Message;
-        }
-    }
-
     private string ResolveConfiguredOverlayRoot()
     {
         string fromSettings = _settings.Overlay.RootPath?.Trim() ?? "";
@@ -10671,15 +11077,10 @@ public partial class MainWindow : Window
             return fromSettings;
         }
 
-        return _settings.Overlay.Instances
-            .Select(i => i.RootPath?.Trim() ?? "")
-            .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path))
-            ?? "";
-    }
-
-    private void BrowseOverlayFolder()
-    {
-        BrowseOverlayInstanceFolder();
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "CreatorControlSuite",
+            "Overlay");
     }
 
     private void OpenConfiguredTarget(string? target, string displayName, bool showMissingMessage = true)
@@ -11705,7 +12106,24 @@ public partial class MainWindow : Window
             MusicPlayerBridgeStatusText.Text = _youTubeMusicModule.IsBridgeRunning
                 ? snapshot.StatusText
                 : "Bridge gestoppt";
-            await WriteMusicOverlayRuntimeDataAsync(snapshot);
+        }
+
+        // Overlay-Now-Playing: YouTube Music über den generischen Writer.
+        // Spotify bleibt beim dedizierten WriteSpotifyOverlayRuntimeDataAsync (Mute/Latch).
+        if (!IsSpotifyMusicProvider())
+        {
+            try
+            {
+                await WriteMusicOverlayRuntimeDataAsync(snapshot);
+            }
+            catch (Exception exception)
+            {
+                _appLogger.Write(
+                    AppLogLevel.Debug,
+                    "Music",
+                    "Music-Overlay-Refresh übersprungen: " + exception.Message,
+                    exception);
+            }
         }
 
         RefreshDashboardServiceActionButtons();
@@ -11792,29 +12210,38 @@ public partial class MainWindow : Window
                 _spotifyOverlayConnectionLatched = true;
             }
 
-            spotify["provider"] = snapshot.ProviderId;
-            spotify["connected"] = connected;
-            spotify["isPlaying"] = snapshot.IsPlaying;
-            spotify["title"] = snapshot.Title;
-            spotify["artist"] = snapshot.Artist;
-            spotify["album"] = snapshot.Album;
-            spotify["coverUrl"] = snapshot.CoverUrl;
-            spotify["cover"] = snapshot.CoverUrl;
-            spotify["showInOverlay"] = connected;
-            spotify["visible"] = connected;
-            spotify["showTitle"] = true;
-            spotify["showArtist"] = true;
-            spotify["showAlbumCover"] = true;
-            spotify["showProgress"] = true;
-            spotify["hideWhenPaused"] = _settings.Spotify.OverlayHideWhenPaused;
-            spotify["hideWhenMuted"] = _settings.Spotify.OverlayHideWhenMuted;
-            spotify["progressMs"] = Math.Max(0, snapshot.ProgressMs);
-            spotify["durationMs"] = Math.Max(0, snapshot.DurationMs);
-            spotify["statusText"] = snapshot.StatusText;
+            string provider = MusicProviderIds.Normalize(snapshot.ProviderId);
+            ApplyMusicOverlayFields(
+                spotify,
+                provider,
+                connected,
+                snapshot.IsPlaying,
+                snapshot.Title,
+                snapshot.Artist,
+                snapshot.Album,
+                snapshot.CoverUrl,
+                snapshot.ProgressMs,
+                snapshot.DurationMs,
+                snapshot.StatusText,
+                showInOverlay: connected && _lastSpotifyOverlayMuted != true);
+
             rootObject["spotify"] = spotify;
+            rootObject["music"] = spotify.DeepClone();
+            rootObject["updatedAt"] = DateTimeOffset.UtcNow;
 
             string json = rootObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(targetPath, json);
+
+            string trackKey = $"{provider}|{snapshot.Artist}|{snapshot.Title}|{snapshot.CoverUrl}";
+            if (!string.Equals(_lastOverlayPublishedSpotifyTrack, trackKey, StringComparison.Ordinal))
+            {
+                _lastOverlayPublishedSpotifyTrack = trackKey;
+                await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppMusicTrack(
+                    provider,
+                    snapshot.Title,
+                    snapshot.Artist,
+                    snapshot.CoverUrl));
+            }
         }
         catch (Exception exception)
         {
@@ -11828,6 +12255,44 @@ public partial class MainWindow : Window
         {
             OverlayDataWriteCoordinator.Lock.Release();
         }
+    }
+
+    private void ApplyMusicOverlayFields(
+        JsonObject target,
+        string provider,
+        bool connected,
+        bool isPlaying,
+        string title,
+        string artist,
+        string album,
+        string coverUrl,
+        int progressMs,
+        int durationMs,
+        string statusText,
+        bool showInOverlay)
+    {
+        target["provider"] = provider;
+        target["providerDisplayName"] = MusicProviderIds.DisplayName(provider);
+        target["connected"] = connected;
+        target["isPlaying"] = isPlaying;
+        target["title"] = title ?? "";
+        target["artist"] = artist ?? "";
+        target["album"] = album ?? "";
+        target["coverUrl"] = coverUrl ?? "";
+        target["cover"] = coverUrl ?? "";
+        target["showInOverlay"] = showInOverlay;
+        target["visible"] = showInOverlay;
+        target["showTitle"] = true;
+        target["showArtist"] = true;
+        target["showAlbumCover"] = true;
+        target["showProgress"] = true;
+        target["hideWhenPaused"] = _settings.Spotify.OverlayHideWhenPaused;
+        target["hideWhenMuted"] = _settings.Spotify.OverlayHideWhenMuted;
+        target["progressMs"] = Math.Max(0, progressMs);
+        target["durationMs"] = Math.Max(0, durationMs);
+        target["statusText"] = string.IsNullOrWhiteSpace(statusText)
+            ? (!connected ? "Nicht verbunden" : isPlaying ? "Spielt" : "Pause")
+            : statusText;
     }
 
     private void RefreshSpotifyAutomationLogUi()
@@ -12229,34 +12694,23 @@ public partial class MainWindow : Window
                 _spotifyOverlayConnectionLatched = true;
             }
 
-            spotify["connected"] = overlayConnected;
-            spotify["provider"] = MusicProviderIds.Spotify;
-            spotify["isPlaying"] = playback.IsPlaying;
-            spotify["title"] = playback.Track?.Name ?? "";
-            spotify["artist"] = playback.Track?.Artist ?? "";
-            spotify["album"] = playback.Track?.Album ?? "";
-            spotify["coverUrl"] = playback.Track?.AlbumImageUrl ?? "";
-            spotify["cover"] = playback.Track?.AlbumImageUrl ?? "";
-            // Die für die HTML zwingend erforderliche Sichtbarkeit wird bei jedem
-            // Spotify-Schreibvorgang mitgeführt. Dadurch bleibt showInOverlay nicht
-            // versehentlich fehlend/false, wenn die separate Mute-Routine wegen ihres
-            // Cachewerts keinen erneuten Schreibvorgang ausführt.
             bool overlayVisible = overlayConnected && _lastSpotifyOverlayMuted != true;
-            spotify["showInOverlay"] = overlayVisible;
-            spotify["visible"] = overlayVisible;
-            spotify["showTitle"] = true;
-            spotify["showArtist"] = true;
-            spotify["showAlbumCover"] = true;
-            spotify["showProgress"] = true;
-            spotify["hideWhenPaused"] = _settings.Spotify.OverlayHideWhenPaused;
-            spotify["hideWhenMuted"] = _settings.Spotify.OverlayHideWhenMuted;
-            spotify["progressMs"] = Math.Max(0, playback.ProgressMs);
-            spotify["durationMs"] = Math.Max(0, playback.Track?.DurationMs ?? 0);
-            spotify["statusText"] = !overlayConnected
-                ? "Nicht verbunden"
-                : playback.IsPlaying ? "Spielt" : "Pause";
+            ApplyMusicOverlayFields(
+                spotify,
+                MusicProviderIds.Spotify,
+                overlayConnected,
+                playback.IsPlaying,
+                playback.Track?.Name ?? "",
+                playback.Track?.Artist ?? "",
+                playback.Track?.Album ?? "",
+                playback.Track?.AlbumImageUrl ?? "",
+                playback.ProgressMs,
+                playback.Track?.DurationMs ?? 0,
+                !overlayConnected ? "Nicht verbunden" : playback.IsPlaying ? "Spielt" : "Pause",
+                overlayVisible);
 
             rootObject["spotify"] = spotify;
+            rootObject["music"] = spotify.DeepClone();
             rootObject["updatedAt"] = DateTimeOffset.UtcNow;
 
             string json = rootObject.ToJsonString(new JsonSerializerOptions
@@ -12596,6 +13050,22 @@ public partial class MainWindow : Window
         {
             _lastOverlayPublishedScene = state.CurrentScene;
             await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppObsScene(state.CurrentScene));
+        }
+
+        bool countdownRunning = state.Phase == StreamPhase.Countdown;
+        int remaining = Math.Max(0, state.CountdownRemainingSeconds);
+        if (_lastOverlayPublishedCountdownRunning != countdownRunning ||
+            _lastOverlayPublishedCountdownRemaining != remaining)
+        {
+            _lastOverlayPublishedCountdownRunning = countdownRunning;
+            _lastOverlayPublishedCountdownRemaining = remaining;
+            OverlayCountdownState countdown = _overlayModule.Service.Current.Countdown;
+            await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppCountdown(
+                countdownRunning,
+                remaining,
+                countdown.TotalSeconds > 0 ? countdown.TotalSeconds : _settings.Workflow.StartCountdownSeconds,
+                string.IsNullOrWhiteSpace(countdown.Label) ? _settings.Workflow.CountdownLabel : countdown.Label,
+                countdown.EndsAt));
         }
     }
 
@@ -14926,7 +15396,10 @@ public partial class MainWindow : Window
         _raidCountdownCts?.Dispose();
         _raidCountdownCts = new CancellationTokenSource();
         CancellationToken token = _raidCountdownCts.Token;
+        _raidCountdownSkipRequested = false;
         _raidCountdownActive = true;
+        // Endszene-Wartezeit beenden – Raid-Countdown läuft parallel zur Endszene-Anzeige.
+        _endSceneCountdownCts?.Cancel();
         UpdateDashboardStreamEndModuleVisibility();
         UpdateDashboardRaidActionButtons();
         DashboardRaidCountdownTitleText.Text = "RAID LÄUFT";
@@ -14934,9 +15407,10 @@ public partial class MainWindow : Window
         DashboardRaidViewerText.Text = $"Aktuelle Zuschauer: {_currentLiveViewerCount}";
         DashboardRaidCountdownProgress.Minimum = 0;
         DashboardRaidCountdownProgress.Maximum = Math.Max(1, seconds);
-        SetStreamEndStatus("Raid läuft");
+        SetStreamEndStatus("Raid läuft · JETZT RAIDEN überspringt den Countdown");
         _activeStreamEndDialog?.ShowRaidActions(false);
         _activeStreamEndDialog?.SetCancelRaidEnabled(true);
+        _activeStreamEndDialog?.SetRaidReady(true);
 
         try
         {
@@ -14968,6 +15442,22 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException)
         {
+            RaidCountdownOutcome outcome = RaidCountdownPolicy.DecideAfterCancellation(
+                _raidCountdownSkipRequested);
+            if (RaidCountdownPolicy.IsSuccessful(outcome))
+            {
+                DashboardRaidCountdownTitleText.Text = "RAID JETZT";
+                DashboardRaidCountdownText.Text = "Countdown übersprungen · Stream wird beendet …";
+                DashboardRaidCountdownProgress.Value = seconds;
+                DashboardWorkflowStageText.Text = $"RAID → {displayName} · sofort";
+                SetStreamEndStatus("Raid-Countdown übersprungen");
+                _activeStreamEndDialog?.UpdateCountdown("Raid jetzt", "00:00", seconds, seconds);
+                AddDashboardNotification(
+                    $"Raid-Countdown zu {displayName} übersprungen – Streamende geht weiter.",
+                    "Info");
+                return true;
+            }
+
             DashboardRaidCountdownTitleText.Text = "RAID ABGEBROCHEN";
             DashboardRaidCountdownText.Text = "Stream bleibt aktiv";
             DashboardWorkflowStageText.Text = "RAID ABGEBROCHEN · STREAM LÄUFT WEITER";
@@ -14977,9 +15467,21 @@ public partial class MainWindow : Window
         finally
         {
             _raidCountdownActive = false;
+            _raidCountdownSkipRequested = false;
             UpdateDashboardStreamEndModuleVisibility();
             UpdateDashboardRaidActionButtons();
         }
+    }
+
+    private void SkipActiveRaidCountdown()
+    {
+        if (!_raidCountdownActive)
+        {
+            return;
+        }
+
+        _raidCountdownSkipRequested = true;
+        _raidCountdownCts?.Cancel();
     }
 
     private async Task CancelActiveRaidAsync()
@@ -15117,6 +15619,8 @@ public partial class MainWindow : Window
     {
         if (_raidCountdownActive)
         {
+            // „JETZT RAIDEN“ während Countdown: lokalen Warte-Countdown überspringen.
+            SkipActiveRaidCountdown();
             return;
         }
 
@@ -15174,7 +15678,9 @@ public partial class MainWindow : Window
                 return;
             }
 
-            AddDashboardNotification($"Twitch-Raid zu {raidStatus.DisplayName} wurde gestartet.", "Info");
+            AddDashboardNotification(
+                $"Raid-Befehl (/raid {RaidChatCommand.NormalizeLogin(raidChannel)}) zu {raidStatus.DisplayName} wurde gestartet.",
+                "Info");
             SetWorkflowVisualStage("Raid", $"Raid zu {raidStatus.DisplayName} wird gestartet.");
 
             bool raidCompleted = await RunRaidCountdownAsync(
@@ -15651,45 +16157,33 @@ public partial class MainWindow : Window
             bool wantsRaid = mode == StreamEndMode.EndSceneRaidThenStop
                 && !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel);
 
+            Task? endSceneTask = null;
+            Task<bool>? raidTask = null;
+
             if (wantsRaid)
             {
                 _awaitingManualRaid = true;
                 EnsureStreamEndRaidDecisionTcs();
                 UpdateDashboardStreamEndModuleVisibility();
-                SetStreamEndStatus("Endszene · Raid manuell starten oder automatisch danach");
+                UpdateDashboardRaidActionButtons();
+                SetStreamEndStatus("Raid startet sofort (/raid) …");
+                DashboardWorkflowStageText.Text = "RAID STARTET SOFORT";
                 AddDashboardNotification(
-                    "Endszene läuft. Raid kann früh gestartet werden – nach der Endszene startet der Auto-Versuch.",
+                    $"Raid-Befehl (/raid {RaidChatCommand.NormalizeLogin(_settings.Twitch.SelectedRaidChannel)}) wird sofort gesendet. „JETZT RAIDEN“ überspringt den Countdown.",
                     "Info");
                 _ = RefreshRaidTargetStatusAsync(_settings.Twitch.SelectedRaidChannel);
+                // Sofort starten – nicht erst nach der Endszene warten.
+                // Endszene bleibt sichtbar; der Raid-Countdown steuert die Wartezeit.
+                raidTask = TryExecuteRaidWithRetriesAsync(_settings.Twitch.SelectedRaidChannel);
             }
-
-            if (endSeconds > 0)
+            else if (endSeconds > 0)
             {
-                await RunEndSceneCountdownAsync(endSeconds);
-            }
-
-            if (_streamEndAbortRequested || !_streamEndFlowActive)
-            {
-                return;
+                endSceneTask = RunEndSceneCountdownAsync(endSeconds);
             }
 
             if (wantsRaid)
             {
-                bool raided;
-                if (_streamEndRaidDecisionTcs is { Task.IsCompleted: true })
-                {
-                    raided = await _streamEndRaidDecisionTcs.Task;
-                }
-                else
-                {
-                    _awaitingManualRaid = true;
-                    EnsureStreamEndRaidDecisionTcs();
-                    UpdateDashboardStreamEndModuleVisibility();
-                    SetStreamEndStatus("Auto-Raid · Ziel wird geprüft …");
-                    DashboardWorkflowStageText.Text = "ENDSZENE FERTIG · AUTO-RAID";
-                    UpdateDashboardRaidActionButtons();
-                    raided = await TryExecuteRaidWithRetriesAsync(_settings.Twitch.SelectedRaidChannel);
-                }
+                bool raided = await raidTask!;
 
                 if (_streamEndAbortRequested || !_streamEndFlowActive)
                 {
@@ -15712,6 +16206,19 @@ public partial class MainWindow : Window
 
                     return;
                 }
+
+                await FinalizeObsStreamStopAsync();
+                return;
+            }
+
+            if (endSceneTask is not null)
+            {
+                await endSceneTask;
+            }
+
+            if (_streamEndAbortRequested || !_streamEndFlowActive)
+            {
+                return;
             }
 
             await FinalizeObsStreamStopAsync();
@@ -15726,8 +16233,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// After the end scene: poll target status and retry StartRaid until success,
-    /// skip, abort, permanent error, or timeout – then optionally run the local countdown.
+    /// Immediately after stream-end starts (with raid): poll target status and retry StartRaid
+    /// until success, skip, abort, permanent error, or timeout – then run the local countdown.
+    /// „JETZT RAIDEN“ skips that countdown; RAID ABBRECHEN cancels the Twitch raid.
     /// </summary>
     private async Task<bool> TryExecuteRaidWithRetriesAsync(string raidChannel)
     {
@@ -15744,7 +16252,7 @@ public partial class MainWindow : Window
 
         int attempt = 0;
         AddDashboardNotification(
-            $"Auto-Raid: Ziel „{raidChannel}“ wird bis zu {timeoutSeconds}s geprüft und gestartet.",
+            $"Raid startet sofort: Ziel „{raidChannel}“ wird bis zu {timeoutSeconds}s geprüft und per /raid gestartet.",
             "Info");
 
         try
@@ -15857,7 +16365,9 @@ public partial class MainWindow : Window
                 }
 
                 string displayName = status?.DisplayName ?? raidChannel;
-                AddDashboardNotification($"Twitch-Raid zu {displayName} wurde gestartet.", "Info");
+                AddDashboardNotification(
+                    $"Raid-Befehl (/raid {RaidChatCommand.NormalizeLogin(raidChannel)}) zu {displayName} wurde gestartet.",
+                    "Info");
                 SetWorkflowVisualStage("Raid", $"Raid zu {displayName} wird gestartet.");
 
                 bool raidCompleted = await RunRaidCountdownAsync(
@@ -20544,7 +21054,7 @@ public partial class MainWindow : Window
     private async Task AddTimedAutomationTemplateAsync()
     {
         MessageBoxResult result = MessageBox.Show(this,
-            "Vorlage '10-Minuten-Streamstart' anlegen?\n\nSie erstellt drei verkettete Regeln: direkt beim Streamstart, nach 5 Minuten Intro-Quelle ausblenden und nach 10 Minuten auf die Game-Szene wechseln.",
+            "Vorlage '10-Minuten-Streamstart' anlegen?\n\nSie erstellt verkettete Regeln: Streamstart (Spotify + Overlay-Countdown), nach 5 Minuten Intro-Quelle ausblenden und nach 10 Minuten auf die Game-Szene wechseln.",
             "Automationsvorlage", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result != MessageBoxResult.Yes)
         {
@@ -20552,9 +21062,20 @@ public partial class MainWindow : Window
         }
 
         var start = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Streamstart – Initialisierung"), TriggerType = "StreamStarted", DelaySeconds = 0, ActionType = "SpotifyOnly", SpotifyAction = "Resume", OncePerStream = true };
+        var countdown = new TimedAutomationRuleSettings
+        {
+            Name = EnsureUniqueAutomationName("Streamstart – Overlay-Countdown"),
+            TriggerType = "StreamStarted",
+            DelaySeconds = 0,
+            ActionType = "OverlayCountdown",
+            OverlayCountdownAction = "Start",
+            OverlayCountdownSeconds = 0,
+            OncePerStream = true
+        };
         var intro = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Streamstart – Intro ausblenden"), TriggerType = "StreamElapsed", DelaySeconds = 300, ActionType = "SetSourceVisibility", ObsScene = "Start", ObsSource = "Intro", SourceVisible = false, OncePerStream = true };
         var game = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Startszene – nach 10 Minuten zu Game"), TriggerType = "SceneElapsed", TriggerScene = string.IsNullOrWhiteSpace(_settings.Obs.StartScene) ? "Start" : _settings.Obs.StartScene, DelaySeconds = 600, ActionType = "SwitchScene", TargetScene = string.IsNullOrWhiteSpace(_settings.Obs.LiveScene) ? "Game" : _settings.Obs.LiveScene, OncePerStream = true };
         _settings.Workflow.TimedAutomations.Add(start);
+        _settings.Workflow.TimedAutomations.Add(countdown);
         _settings.Workflow.TimedAutomations.Add(intro);
         _settings.Workflow.TimedAutomations.Add(game);
         await _settingsStore.SaveAsync(_settings);
@@ -20595,6 +21116,9 @@ public partial class MainWindow : Window
             "StartObsStream" => "OBS-Stream starten",
             "StopObsStream" => "OBS-Stream stoppen",
             "StreamerBotAction" => $"Streamer.bot-Aktion '{rule.StreamerBotActionName}' ausführen",
+            "OverlayCountdown" => string.Equals(rule.OverlayCountdownAction, "Stop", StringComparison.OrdinalIgnoreCase)
+                ? "Overlay-Countdown stoppen"
+                : $"Overlay-Countdown starten{(rule.OverlayCountdownSeconds > 0 ? $" ({rule.OverlayCountdownSeconds}s)" : "")}",
             _ => "keine OBS-Aktion"
         };
         if (!string.Equals(rule.SpotifyAction, "None", StringComparison.OrdinalIgnoreCase))
@@ -20639,6 +21163,8 @@ public partial class MainWindow : Window
         TimedAutomationTargetSceneBox.Text = rule.TargetScene;
         TimedAutomationTransitionBox.Text = rule.TransitionName;
         TimedAutomationTransitionDurationBox.Text = rule.TransitionDurationMilliseconds.ToString();
+        SelectComboByTag(TimedAutomationOverlayCountdownActionBox, rule.OverlayCountdownAction);
+        TimedAutomationOverlayCountdownSecondsBox.Text = Math.Max(0, rule.OverlayCountdownSeconds).ToString();
         TimedAutomationSourceSceneBox.Text = rule.ObsScene;
         TimedAutomationSourceBox.Text = rule.ObsSource;
         TimedAutomationSourceVisibleBox.IsChecked = rule.SourceVisible;
@@ -20717,6 +21243,10 @@ public partial class MainWindow : Window
         rule.TargetScene = TimedAutomationTargetSceneBox.Text.Trim();
         rule.TransitionName = TimedAutomationTransitionBox.Text.Trim();
         rule.TransitionDurationMilliseconds = int.TryParse(TimedAutomationTransitionDurationBox.Text, out int transitionMs) ? Math.Clamp(transitionMs, 50, 20000) : 1000;
+        rule.OverlayCountdownAction = ComboTag(TimedAutomationOverlayCountdownActionBox, "Start");
+        rule.OverlayCountdownSeconds = int.TryParse(TimedAutomationOverlayCountdownSecondsBox.Text, out int countdownSeconds)
+            ? Math.Max(0, countdownSeconds)
+            : 0;
         rule.ObsScene = TimedAutomationSourceSceneBox.Text.Trim();
         rule.ObsSource = TimedAutomationSourceBox.Text.Trim();
         rule.SourceVisible = TimedAutomationSourceVisibleBox.IsChecked == true;
@@ -21483,6 +22013,26 @@ public partial class MainWindow : Window
             if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("Streamer.bot hat die Aktion nicht bestätigt.");
+            }
+        }
+        else if (string.Equals(rule.ActionType, "OverlayCountdown", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(rule.OverlayCountdownAction, "Stop", StringComparison.OrdinalIgnoreCase))
+            {
+                await _workflowModule.Service.StopCountdownAsync(cancellationToken);
+            }
+            else
+            {
+                PersistDashboardCountdownSettings();
+                int duration = rule.OverlayCountdownSeconds > 0
+                    ? rule.OverlayCountdownSeconds
+                    : Math.Max(0, _settings.Workflow.StartCountdownSeconds);
+                // Countdown läuft asynchron; die Automation soll nicht die volle Dauer blockieren.
+                _ = Task.Run(
+                    () => duration > 0
+                        ? _workflowModule.Service.StartCountdownAsync(duration)
+                        : _workflowModule.Service.StartCountdownAsync(),
+                    CancellationToken.None);
             }
         }
 

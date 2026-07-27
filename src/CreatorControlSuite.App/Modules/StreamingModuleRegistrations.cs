@@ -112,6 +112,7 @@ public static class StreamingModuleRegistrations
             services.AddSingleton<OverlayRealtimeHub>();
             services.AddSingleton<IOverlayRealtimeHub>(sp => sp.GetRequiredService<OverlayRealtimeHub>());
             services.AddSingleton<IOverlayDataService, OverlayDataService>();
+            services.AddSingleton<IOverlayLayoutStore, OverlayLayoutStore>();
             services.AddSingleton<IOverlayWebServer, OverlayWebServer>();
             services.AddSingleton<OverlayModule>();
             services.AddStreamingModuleBinding<OverlayModule>();

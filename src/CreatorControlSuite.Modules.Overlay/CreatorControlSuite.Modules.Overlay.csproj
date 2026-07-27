@@ -5,5 +5,6 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="ChatOverlay\**\*" />
+    <EmbeddedResource Include="CanvasOverlay\**\*" />
   </ItemGroup>
 </Project>

@@ -99,13 +99,16 @@
                                    Foreground="{DynamicResource AccentBrush}"
                                    FontSize="22"
                                    FontWeight="Bold"/>
-                        <TextBlock Text="Overlay-Ordner" Margin="0,14,0,4"/>
+                        <TextBlock Text="Canvas und Widgets laufen über den lokalen Overlay-Webserver (kein Ordner nötig)."
+                                   TextWrapping="Wrap"
+                                   Margin="0,14,0,8"/>
+                        <TextBlock Text="Optionaler Datenordner (leer = LocalAppData)" Margin="0,8,0,4"/>
                         <TextBox x:Name="OverlayRootBox"/>
                         <CheckBox x:Name="InstallBundledOverlayBox"
-                                  Content="Standard-Overlay installieren"
+                                  Content="Overlay-Daten vorbereiten"
                                   IsChecked="True"
                                   Margin="0,12,0,0"/>
-                        <TextBlock Text="Ein leerer Pfad verwendet den Standardordner unter LocalAppData."
+                        <TextBlock Text="OBS nutzt /view/default (Canvas) oder /w/… (Einzel-Widgets)."
                                    Foreground="{DynamicResource TextMutedBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,12,0,0"/>

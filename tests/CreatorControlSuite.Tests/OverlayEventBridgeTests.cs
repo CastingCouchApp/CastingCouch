@@ -63,7 +63,7 @@ public sealed class OverlayEventBridgeTests
     }
 
     [Fact]
-    public void AppSpotifyTrack_BuildsTypedEvent()
+    public void AppSpotifyTrack_BuildsMusicTrackEvent()
     {
         OverlayRealtimeEvent evt = OverlayEventBridge.AppSpotifyTrack(
             "Song",
@@ -71,10 +71,25 @@ public sealed class OverlayEventBridgeTests
             "https://cover");
 
         Assert.Equal("app", evt.Source);
-        Assert.Equal("app.spotify.track", evt.Type);
+        Assert.Equal("app.music.track", evt.Type);
+        Assert.Equal("spotify", evt.Data["provider"]);
         Assert.Equal("Song", evt.Data["title"]);
         Assert.Equal("Artist", evt.Data["artist"]);
         Assert.Equal("https://cover", evt.Data["coverUrl"]);
+    }
+
+    [Fact]
+    public void AppMusicTrack_BuildsYouTubeMusicEvent()
+    {
+        OverlayRealtimeEvent evt = OverlayEventBridge.AppMusicTrack(
+            "ytmusic",
+            "Song",
+            "Artist",
+            "https://cover");
+
+        Assert.Equal("app.music.track", evt.Type);
+        Assert.Equal("ytmusic", evt.Data["provider"]);
+        Assert.Equal("YouTube Music", evt.Data["providerDisplayName"]);
     }
 
     [Fact]

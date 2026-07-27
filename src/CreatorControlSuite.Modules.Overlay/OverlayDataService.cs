@@ -136,6 +136,7 @@ public sealed class OverlayDataService(
         // bereits gültigen Spotify-Unterbaum mit connected=false und leeren
         // Titeldaten überschreiben.
         managed.Remove("spotify");
+        managed.Remove("music");
 
         // Der komplette Stream-Laufzeitzustand hat ebenfalls genau einen Besitzer:
         // die OBS-Streamüberwachung in MainWindow. Workflow-, Remote- und

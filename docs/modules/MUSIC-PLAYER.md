@@ -43,4 +43,8 @@ Die Bridge lauscht auf `http://127.0.0.1:{BridgePort}/ytmusic/`:
 
 ## Overlay
 
-Weiterhin Key `spotify` in `overlay-data.json` (Kompatibilität). Zusätzliches Feld `provider` (`spotify` | `ytmusic`).
+Weiterhin Key `spotify` in `overlay-data.json` (Kompatibilität mit DenverJohn). Zusätzlich Key `music` (Spiegel). Feld `provider` / `providerDisplayName` (`spotify` | `ytmusic`).
+
+Canvas-Widget-Typ: **`music`** (Solo-URL `/w/music`). Legacy-Typ/`/w/spotify` bleibt Alias.
+
+WebSocket: `app.music.track` (mit `provider`).

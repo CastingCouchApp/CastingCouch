@@ -88,6 +88,8 @@ public sealed class AppIpcCommandRouter(
                 await _workflow.Service.PrepareAsync(ct); return Ok(command, "Vorbereitet.");
             case IpcCommandNames.Countdown:
                 _ = Task.Run(() => _workflow.Service.StartCountdownAsync()); return Ok(command, "Countdown gestartet.");
+            case IpcCommandNames.CountdownStop:
+                await _workflow.Service.StopCountdownAsync(ct); return Ok(command, "Countdown gestoppt.");
             case IpcCommandNames.Live:
                 await _workflow.Service.GoLiveAsync(ct); return Ok(command, "Live.");
             case IpcCommandNames.Pause:

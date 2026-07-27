@@ -10,4 +10,6 @@ public interface IOverlayWebServer
     Task StartAsync(CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);
     Task RestartAsync(CancellationToken cancellationToken = default);
+    /// <summary>Aktualisiert die Canvas-Liste für Health/WS-Hello ohne Server-Neustart.</summary>
+    Task RefreshMountedCanvasesAsync(CancellationToken cancellationToken = default);
 }

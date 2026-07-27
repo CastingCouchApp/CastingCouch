@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CCS Overlay Editor</title>
+  <link rel="stylesheet" href="/canvas/shared/styles.css" />
+  <link rel="stylesheet" href="/canvas/editor/editor.css" />
+</head>
+<body class="ccs-editor-body">
+  <div class="ccs-editor-shell">
+    <aside class="ccs-palette">
+      <h1>Overlay Editor</h1>
+      <p class="ccs-muted" id="instanceLabel">Instanz</p>
+      <h2>Widgets</h2>
+      <div class="ccs-palette-list" id="widgetPalette"></div>
+      <h2>Shapes / Frames</h2>
+      <div class="ccs-palette-list" id="shapePalette"></div>
+      <div class="ccs-editor-status" id="saveStatus">Bereit</div>
+      <h2>Fenstergröße</h2>
+      <label class="ccs-size-label">Preset
+        <select id="canvasSizePreset"></select>
+      </label>
+      <div class="ccs-size-row">
+        <label>B <input id="canvasWidthInput" type="number" min="320" max="7680" step="1" /></label>
+        <label>H <input id="canvasHeightInput" type="number" min="180" max="4320" step="1" /></label>
+      </div>
+      <button type="button" id="btnApplyCanvasSize" class="ccs-palette-item">Größe anwenden</button>
+      <p class="ccs-muted" id="canvasSizeHint">Canvas ist fest; OBS-Browserquelle gleich setzen.</p>
+    </aside>
+    <main class="ccs-stage-wrap">
+      <div class="ccs-stage-toolbar">
+        <button type="button" id="btnDelete" disabled>Löschen</button>
+        <button type="button" id="btnFront">Nach vorne</button>
+        <button type="button" id="btnBack">Nach hinten</button>
+        <span class="ccs-muted" id="canvasSizeBadge">1920 × 1080</span>
+        <span class="ccs-muted" id="hint">Ziehen · Ecken zum Vergrößern · Auto-Save</span>
+      </div>
+      <div class="ccs-canvas-root" id="stage"></div>
+    </main>
+    <aside class="ccs-props">
+      <h2>Eigenschaften</h2>
+      <div id="propsEmpty" class="ccs-muted">Kein Element ausgewählt</div>
+      <div id="propsForm" class="ccs-props-form" hidden>
+        <label>Typ <input id="propType" readonly /></label>
+        <label>X <input id="propX" type="number" /></label>
+        <label>Y <input id="propY" type="number" /></label>
+        <label>Breite <input id="propW" type="number" /></label>
+        <label>Höhe <input id="propH" type="number" /></label>
+        <label>Z <input id="propZ" type="number" /></label>
+        <label><input id="propLocked" type="checkbox" /> Gesperrt</label>
+        <div id="propExtra"></div>
+      </div>
+    </aside>
+  </div>
+  <script src="/canvas/shared/runtime.js"></script>
+  <script src="/canvas/editor/editor.js"></script>
+</body>
+</html>

@@ -18,6 +18,7 @@ public static class IpcCommandNames
     public const string Status = "system.status";
     public const string Prepare = "workflow.prepare";
     public const string Countdown = "workflow.countdown";
+    public const string CountdownStop = "workflow.countdown.stop";
     public const string Live = "workflow.live";
     public const string Pause = "workflow.pause";
     public const string Resume = "workflow.resume";

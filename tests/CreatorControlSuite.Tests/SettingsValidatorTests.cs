@@ -103,31 +103,8 @@ public sealed class SettingsValidatorTests
             settings => settings.Workflow.EndSceneSeconds = 0
         },
         {
-            "OVERLAY_INSTANCE_ID_EMPTY",
-            settings => settings.Overlay.Instances =
-            [
-                new OverlayInstanceSettings { Id = "", Name = "A", RootPath = @"C:\O" }
-            ]
-        },
-        {
-            "OVERLAY_INSTANCE_ID_DUPLICATE",
-            settings => settings.Overlay.Instances =
-            [
-                new OverlayInstanceSettings { Id = "same", Name = "A", RootPath = @"C:\A" },
-                new OverlayInstanceSettings { Id = "same", Name = "B", RootPath = @"C:\B" }
-            ]
-        },
-        {
-            "OVERLAY_INSTANCE_PATH_INVALID",
-            settings => settings.Overlay.Instances =
-            [
-                new OverlayInstanceSettings
-                {
-                    Id = "x",
-                    Name = "Bad",
-                    RootPath = "C:\\bad|path"
-                }
-            ]
+            "OVERLAY_PATH_INVALID",
+            settings => settings.Overlay.RootPath = "C:\\bad|path"
         }
     };
 
