@@ -26,15 +26,25 @@
         <label>H <input id="canvasHeightInput" type="number" min="180" max="4320" step="1" /></label>
       </div>
       <button type="button" id="btnApplyCanvasSize" class="ccs-palette-item">Größe anwenden</button>
+      <p class="ccs-muted" id="obsSizeLabel">OBS: –</p>
+      <button type="button" id="btnApplyObsSize" class="ccs-palette-item">Von OBS übernehmen</button>
       <p class="ccs-muted" id="canvasSizeHint">Canvas ist fest; OBS-Browserquelle gleich setzen.</p>
     </aside>
     <main class="ccs-stage-wrap">
       <div class="ccs-stage-toolbar">
         <button type="button" id="btnDelete" disabled>Löschen</button>
-        <button type="button" id="btnFront">Nach vorne</button>
-        <button type="button" id="btnBack">Nach hinten</button>
+        <button type="button" id="btnDuplicate">Duplizieren</button>
+        <button type="button" id="btnFront">Ganz nach oben</button>
+        <button type="button" id="btnLayerUp">Ebene rauf</button>
+        <button type="button" id="btnLayerDown">Ebene runter</button>
+        <button type="button" id="btnBack">Ganz nach unten</button>
+        <label class="ccs-toolbar-toggle"><input type="checkbox" id="toggleObsPreview" /> OBS-Vorschau</label>
+        <label class="ccs-toolbar-toggle"><input type="checkbox" id="toggleGrid" /> Raster</label>
+        <label class="ccs-toolbar-toggle">H <input type="number" id="gridHInput" min="2" max="64" step="1" value="16" /></label>
+        <label class="ccs-toolbar-toggle">V <input type="number" id="gridVInput" min="2" max="64" step="1" value="6" /></label>
+        <label class="ccs-toolbar-toggle"><input type="checkbox" id="toggleMagnet" /> Magnet</label>
         <span class="ccs-muted" id="canvasSizeBadge">1920 × 1080</span>
-        <span class="ccs-muted" id="hint">Ziehen · Ecken zum Vergrößern · Auto-Save</span>
+        <span class="ccs-muted" id="hint">Rechtsklick · Ziehen · Auto-Save</span>
       </div>
       <div class="ccs-canvas-root" id="stage"></div>
     </main>

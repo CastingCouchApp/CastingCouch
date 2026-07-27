@@ -14,11 +14,12 @@ PUBLISH_DIR := $(ARTIFACTS)/publish/$(RID)
 LOG_DIR     := $(ARTIFACTS)/build-logs
 TEST_DIR    := $(ARTIFACTS)/test-results
 
-.PHONY: help restore build test publish app clean ci release watch format format-check format-analyzers
+.PHONY: help restore canvas build test publish app clean ci release watch format format-check format-analyzers
 
 help:
 	@echo "Targets:"
 	@echo "  make restore         - NuGet-Pakete wiederherstellen"
+	@echo "  make canvas          - Canvas Overlay TypeScript bundlen"
 	@echo "  make build           - Solution bauen (CONFIG=$(CONFIG))"
 	@echo "  make test            - Tests ausführen"
 	@echo "  make format          - C# Autoformat (whitespace + style)"
@@ -33,8 +34,14 @@ help:
 	@echo ""
 	@echo "Variablen: CONFIG=$(CONFIG) RID=$(RID) DOTNET=$(DOTNET)"
 
+CANVAS_DIR := src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+
 restore:
 	$(DOTNET) restore $(SLN)
+
+canvas:
+	@cd $(CANVAS_DIR) && npm ci --prefer-offline --no-audit --no-fund 2>/dev/null || (cd $(CANVAS_DIR) && npm install --no-audit --no-fund)
+	cd $(CANVAS_DIR) && npm run build
 
 build: restore
 	$(DOTNET) build $(SLN) -c $(CONFIG) --no-restore

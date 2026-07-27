@@ -2,12 +2,9 @@
   "use strict";
 
   const parts = location.pathname.split("/").filter(Boolean);
-  // /w/{type} or /w/shape/{shapeId}
   let type = "online";
   if (parts[0] === "w") {
     if (parts[1] === "shape" && parts[2]) {
-      type = decodeURIComponent(parts.slice(2).join("."));
-      // Prefer literal segment: /w/shape/frame.neon → "frame.neon"
       type = decodeURIComponent(parts[2]);
     } else if (parts[1]) {
       type = decodeURIComponent(parts[1]);
@@ -15,14 +12,14 @@
   }
 
   const params = new URLSearchParams(location.search);
-  let props = {};
+  let props: Record<string, unknown> = {};
   if (params.get("props")) {
     try {
-      props = JSON.parse(decodeURIComponent(params.get("props")));
-    } catch (_) {
+      props = JSON.parse(decodeURIComponent(params.get("props")!));
+    } catch {
       try {
-        props = JSON.parse(atob(params.get("props")));
-      } catch (__) { /* ignore */ }
+        props = JSON.parse(atob(params.get("props")!));
+      } catch { /* ignore */ }
     }
   }
 
@@ -40,6 +37,7 @@
     w: Number(params.get("w")) || def.w,
     h: Number(params.get("h")) || def.h,
     z: 1,
+    effects: [] as unknown[],
     props: { ...(def.props || {}), ...props }
   };
 
@@ -51,28 +49,30 @@
   };
 
   const runtime = CcsCanvas.createRuntime({
-    root: document.getElementById("root"),
+    root: document.getElementById("root")!,
     editing: false,
     center: true,
-    layout
+    layout: layout as never
   });
-  runtime.setLayout(layout);
+  runtime.setLayout(layout as never);
 
-  async function refreshData() {
+  async function refreshData(): Promise<void> {
     try {
-      runtime.setData(await CcsCanvas.fetchJson("/data/overlay-data.json"));
-    } catch (_) { /* ignore */ }
+      runtime.setData(await CcsCanvas.fetchJson("/data/overlay-data.json") as Record<string, unknown>);
+    } catch { /* ignore */ }
   }
 
   CcsCanvas.connectWs((evt) => runtime.handleRealtime(evt));
-  refreshData();
+  void refreshData();
   setInterval(refreshData, 1500);
 
-  async function loadChatConfig() {
+  async function loadChatConfig(): Promise<void> {
     try {
       runtime.setChatConfig(await CcsCanvas.fetchJson("/chat/config"));
-    } catch (_) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 
-  Promise.all([loadChatConfig(), runtime.loadChatHistory()]);
+  void CcsCanvas.loadExtensions().then(() => {
+    void Promise.all([loadChatConfig(), runtime.loadChatHistory()]);
+  });
 })();

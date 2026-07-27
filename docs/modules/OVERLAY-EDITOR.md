@@ -19,23 +19,33 @@ Siehe auch: [`OVERLAY-SYSTEM.md`](OVERLAY-SYSTEM.md)
 | `/w/text` | Solo Text-Widget |
 | `/w/image` | Solo Image-Widget |
 | `/w/countdown` | Solo Countdown (globaler App-State) |
-| `/w/socials` | Solo Socials (alle Plattformen) |
+| `/w/socials` | Solo Socials (eine Plattform, Auswahl per Prop) |
 | `/w/shape/{shapeId}` | Solo Frame/Shape, z. B. `/w/shape/frame.neon` |
 | `GET/PUT /layout/{id}` | Layout laden/speichern (PUT nur Loopback) |
 | `/canvas/…` | Embedded Assets (CSS/JS) |
+| `GET /obs/video-settings` | OBS-Base-/Output-Auflösung (`connected`, `baseWidth`, …) |
+| `GET /obs/preview` | PNG-Screenshot der aktuellen Programmszene (Editor-Vorschau) |
 
 Beispiel: `/editor/default`, `/view/just-chatting`.
 
-## Bedienung in der App
+## Editor-Hilfen (nur `/editor`, nicht `/view`)
 
-1. Overlay-Webserver aktivieren und speichern.
-2. Canvas in der Liste wählen (oder **Neu** / **Duplizieren**).
-3. **EDITOR ÖFFNEN** (WebView) oder Editor-URL im Browser.
-4. Widgets/Shapes aus der Palette ziehen, verschieben, an den Ecken skalieren.
-5. **Fenstergröße (Canvas):** Preset wählen oder Breite/Höhe setzen.
-6. Auto-Save pusht Layout per WebSocket an `/view/{id}` und Solo-Quellen.
+- **32px Padding** um die Zeichenfläche (Fit/Scale berücksichtigt den Abstand).
+- **OBS-Vorschau** (Toolbar-Toggle, default aus): periodischer Screenshot nur auf `.ccs-canvas`; Prefs in `localStorage` (`ccs-editor-prefs`).
+- **Canvas-Größe von OBS**: Anzeige der Base-Auflösung + Button **Von OBS übernehmen** (`baseWidth`/`baseHeight`).
+- **Raster** ein/aus, Unterteilungen **H × V** (Default 16×6), nur visuell.
+- **Magnet** ein/aus: Snap an Kanten/Mitten **anderer Widgets** (Threshold 8px) inkl. Guide-Linien.
+- **Rechtsklick-Menü** / Toolbar: Duplizieren, Sperren/Entsperren, Ganz nach oben/unten, Ebene rauf/runter, Löschen.
 
-Im App-WebView: Combobox **Fenster** für feste Editor-Fenstergrößen.
+## Props-Panel
+
+Eigenschaften sind gruppiert (`propSection`, ein-/ausklappbar; **Position & Größe** default eingeklappt). Features nutzen LiveFX-artige `featureSection`-Toggles. Farben: `colorProp` (Picker + Swatches), Schriften: `fontProp` (Typeahead + Dropdown).
+
+**Effekte:** Jedes Item hat `effects[]` (Glow, Particles, Scanlines, Vignette, Blur, Noise). Im Props-Panel unten stapelbar, einzeln aktivierbar. Weitere Modifier: Skill `overlay-effect` / Packs: `overlay-extension-pack`.
+
+## TypeScript-Quellen
+
+Editor/Runtime liegen unter `src/CreatorControlSuite.Modules.Overlay/CanvasOverlay/src/` und werden per `npm run build` (MSBuild-Target) nach `shared/runtime.js` / `editor/editor.js` gebündelt. Die Bundles sind gitignored und entstehen lokal bzw. in CI beim Build.
 
 ## OBS-Setup
 
@@ -54,7 +64,7 @@ Standalone-Chat bleibt zusätzlich unter `/chat` verfügbar.
 | `music` | Now Playing aus aktivem Music-Provider; Alias-Typ `spotify` |
 | `chat` | WS `channel.chat.message` (+ optional Twitch-Events); Appearance/Font per Widget-Props (Fallback: Overlay-Chat-Einstellungen); Session-History via `/chat/history` + WS-Replay |
 | `ending-stats` | Session-Stats (`stats.*`) + Followerziel (`twitch.followers` / `followerGoal`); Prop `variant` mit 10 Looks; skaliert bei Größenänderung |
-| `socials` | Social-Links (Twitch, YouTube, Discord, Instagram, TikTok, X, Kick, Bluesky + 2 Custom); Icons als Built-in-SVG oder Font Awesome CDN; optional eigenes Bild per `*IconUrl`; Props `variant` / `iconLibrary` / Handles |
+| `socials` | Ein Social-Link pro Widget (`platform` + `handle`/`url`/`label`/`iconUrl`); für YT+Twitch zwei Instanzen; Icons SVG oder Font Awesome; Props `variant` / `iconLibrary` |
 | `text` | Statischer Text aus Props (`content`, Typografie, Ausrichtung, Schatten) |
 | `image` | Bild aus URL (`src`, `fit`, Opacity, Radius) |
 | `countdown` | Globaler Countdown aus `countdown.*` (Dashboard / Workflow / Automationen); Props: `variant`, `format`, `showLabel`, `hideWhenIdle` |

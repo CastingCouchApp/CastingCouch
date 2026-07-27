@@ -2,9 +2,29 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../CreatorControlSuite.Core/CreatorControlSuite.Core.csproj" />
+    <ProjectReference Include="../CreatorControlSuite.Modules.OBS/CreatorControlSuite.Modules.OBS.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="ChatOverlay\**\*" />
-    <EmbeddedResource Include="CanvasOverlay\**\*" />
+    <EmbeddedResource Include="CanvasOverlay\**\*"
+                      Exclude="CanvasOverlay\src\**;CanvasOverlay\node_modules\**;CanvasOverlay\package.json;CanvasOverlay\package-lock.json;CanvasOverlay\tsconfig.json;CanvasOverlay\esbuild.config.mjs;CanvasOverlay\**\*.map;CanvasOverlay\**\*.ts" />
   </ItemGroup>
+  <Target Name="BuildCanvasOverlay" BeforeTargets="BeforeBuild;BeforePublish">
+    <PropertyGroup>
+      <CanvasOverlayDir>$(MSBuildProjectDirectory)\CanvasOverlay</CanvasOverlayDir>
+      <CanvasOverlayNpmCi Condition="!Exists('$(CanvasOverlayDir)\node_modules')">true</CanvasOverlayNpmCi>
+    </PropertyGroup>
+    <Exec Command="node -v" IgnoreExitCode="true" ConsoleToMSBuild="true">
+      <Output TaskParameter="ExitCode" PropertyName="NodeExitCode" />
+    </Exec>
+    <Error Condition="'$(NodeExitCode)' != '0'"
+           Text="Node.js is required to build Canvas Overlay TypeScript. Install Node 18+ and ensure 'node' is on PATH." />
+    <Exec Condition="'$(CanvasOverlayNpmCi)' == 'true'"
+          Command="npm ci"
+          WorkingDirectory="$(CanvasOverlayDir)"
+          ConsoleToMSBuild="true" />
+    <Exec Command="npm run build"
+          WorkingDirectory="$(CanvasOverlayDir)"
+          ConsoleToMSBuild="true" />
+  </Target>
 </Project>

@@ -9,6 +9,7 @@ x86/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 publish/
+*.binlog
 
 # Packaging
 *.nupkg
@@ -85,6 +86,19 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+
+# Node / Canvas Overlay
+**/node_modules/
+*.tsbuildinfo
+*.js.map
+*.css.map
+# esbuild outputs (npm run build / MSBuild BuildCanvasOverlay)
+**/CanvasOverlay/shared/runtime.js
+**/CanvasOverlay/shared/styles.css
+**/CanvasOverlay/editor/editor.js
+**/CanvasOverlay/editor/editor.css
+**/CanvasOverlay/view/view.js
+**/CanvasOverlay/solo/solo.js
 
 # Misc / local agent state
 *.swp

@@ -1,0 +1,9 @@
+:root {
+  --accent: #ff7a00;
+  --accent2: #ffb347;
+  --muted: #a89a91;
+  --panel-bg: rgba(12, 10, 9, 0.78);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --text: #fff;
+  --font: "Segoe UI", system-ui, sans-serif;
+}

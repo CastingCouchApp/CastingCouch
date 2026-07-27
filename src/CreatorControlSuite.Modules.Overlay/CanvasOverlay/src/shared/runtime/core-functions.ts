@@ -1,347 +1,11 @@
-(function (global) {
-  "use strict";
-
-  const DEFAULT_LAYOUT = {
-    version: 1,
-    canvasWidth: 1920,
-    canvasHeight: 1080,
-    items: []
-  };
-
-  const WIDGET_DEFAULTS = {
-    online: { w: 280, h: 90, props: { showClock: true, showUptime: true } },
-    alert: { w: 480, h: 140, props: { durationMs: 5000, maxQueue: 5 } },
-    music: {
-      w: 950,
-      h: 188,
-      props: {
-        showTitle: true,
-        showArtist: true,
-        showAlbumCover: true,
-        showProgress: true,
-        hideWhenPaused: false
-      }
-    },
-    chat: {
-      w: 420,
-      h: 560,
-      props: {
-        showTwitchEvents: true,
-        maxLines: 80,
-        backgroundType: "None",
-        backgroundColor: "#000000",
-        backgroundOpacityPercent: 55,
-        paddingPx: 12,
-        borderRadiusPx: 12,
-        gapPx: 6,
-        fontSizePx: 18,
-        fontFamily: "Segoe UI, system-ui, sans-serif"
-      }
-    },
-    "ending-stats": {
-      w: 980,
-      h: 220,
-      props: {
-        variant: "classic",
-        showTitle: true
-      }
-    },
-    text: {
-      w: 480,
-      h: 120,
-      props: {
-        content: "Text",
-        fontSizePx: 48,
-        fontFamily: "Segoe UI, system-ui, sans-serif",
-        color: "#ffffff",
-        align: "center",
-        verticalAlign: "middle",
-        fontWeight: "700",
-        letterSpacingPx: 0,
-        lineHeight: 1.15,
-        textShadow: "0 2px 12px rgba(0,0,0,.55)"
-      }
-    },
-    image: {
-      w: 400,
-      h: 400,
-      props: {
-        src: "",
-        fit: "contain",
-        opacity: 1,
-        borderRadiusPx: 0,
-        objectPosition: "center"
-      }
-    },
-    countdown: {
-      w: 520,
-      h: 160,
-      props: {
-        variant: "classic",
-        format: "mm:ss",
-        showLabel: true,
-        hideWhenIdle: false,
-        fontSizePx: 72,
-        color: "#ffffff",
-        align: "center"
-      }
-    },
-    socials: {
-      w: 720,
-      h: 96,
-      props: {
-        variant: "row",
-        showLabels: true,
-        showHandles: true,
-        colorMode: "brand",
-        iconLibrary: "svg",
-        iconSize: 36,
-        gap: 18,
-        iconColor: "#ffffff",
-        showTwitch: true,
-        twitchHandle: "",
-        twitchUrl: "",
-        twitchIconUrl: "",
-        showYoutube: true,
-        youtubeHandle: "",
-        youtubeUrl: "",
-        youtubeIconUrl: "",
-        showDiscord: true,
-        discordHandle: "",
-        discordUrl: "",
-        discordIconUrl: "",
-        showInstagram: true,
-        instagramHandle: "",
-        instagramUrl: "",
-        instagramIconUrl: "",
-        showTiktok: true,
-        tiktokHandle: "",
-        tiktokUrl: "",
-        tiktokIconUrl: "",
-        showX: true,
-        xHandle: "",
-        xUrl: "",
-        xIconUrl: "",
-        showKick: false,
-        kickHandle: "",
-        kickUrl: "",
-        kickIconUrl: "",
-        showBluesky: false,
-        blueskyHandle: "",
-        blueskyUrl: "",
-        blueskyIconUrl: "",
-        showCustom1: false,
-        custom1Label: "Custom 1",
-        custom1Handle: "",
-        custom1Url: "",
-        custom1IconUrl: "",
-        showCustom2: false,
-        custom2Label: "Custom 2",
-        custom2Handle: "",
-        custom2Url: "",
-        custom2IconUrl: ""
-      }
-    },
-    // Alias für bestehende Layouts
-    spotify: {
-      w: 950,
-      h: 188,
-      props: {
-        showTitle: true,
-        showArtist: true,
-        showAlbumCover: true,
-        showProgress: true,
-        hideWhenPaused: false
-      }
-    }
-  };
-
-  const SCENE_BG_PRESETS = {
-    ember: {
-      label: "Ember",
-      bgBase: "#030303", bgMid: "#101010", bgDeep: "#1a0d03",
-      glow1: "#ff7a00", glow2: "#ffb36b",
-      glow1Opacity: 0.18, glow2Opacity: 0.10,
-      stripeColor: "#ff7a00", stripeOpacity: 0.065,
-      particleColor: "#ff7a00", particleOpacity: 0.34,
-      driftDuration: 18, particleDuration: 22,
-      vignetteOpacity: 0, scanOpacity: 0
-    },
-    crimson: {
-      label: "Crimson",
-      bgBase: "#050102", bgMid: "#14060a", bgDeep: "#2a0610",
-      glow1: "#ff2d55", glow2: "#ff8aa8",
-      glow1Opacity: 0.22, glow2Opacity: 0.12,
-      stripeColor: "#ff2d55", stripeOpacity: 0.08,
-      particleColor: "#ff4d6d", particleOpacity: 0.38,
-      driftDuration: 16, particleDuration: 20,
-      vignetteOpacity: 0.35, scanOpacity: 0.04
-    },
-    aurora: {
-      label: "Aurora",
-      bgBase: "#02080a", bgMid: "#061418", bgDeep: "#04302a",
-      glow1: "#00e5c0", glow2: "#5cf0ff",
-      glow1Opacity: 0.20, glow2Opacity: 0.14,
-      stripeColor: "#00c9a7", stripeOpacity: 0.07,
-      particleColor: "#7ef9ff", particleOpacity: 0.32,
-      driftDuration: 24, particleDuration: 28,
-      glow1X: "22%", glow1Y: "30%", glow2X: "78%", glow2Y: "62%",
-      vignetteOpacity: 0.25, scanOpacity: 0.05
-    },
-    violet: {
-      label: "Violet Storm",
-      bgBase: "#06040f", bgMid: "#120a22", bgDeep: "#1d0b3a",
-      glow1: "#a855f7", glow2: "#e9b3ff",
-      glow1Opacity: 0.24, glow2Opacity: 0.12,
-      stripeColor: "#c084fc", stripeOpacity: 0.075,
-      particleColor: "#d8b4fe", particleOpacity: 0.36,
-      driftDuration: 20, particleDuration: 24,
-      stripeAngle: "128deg", vignetteOpacity: 0.3, scanOpacity: 0.06
-    },
-    gold: {
-      label: "Gold Rush",
-      bgBase: "#070501", bgMid: "#151008", bgDeep: "#2a1a05",
-      glow1: "#f5b400", glow2: "#ffe08a",
-      glow1Opacity: 0.20, glow2Opacity: 0.14,
-      stripeColor: "#f0b429", stripeOpacity: 0.07,
-      particleColor: "#ffd56a", particleOpacity: 0.30,
-      driftDuration: 22, particleDuration: 26,
-      vignetteOpacity: 0.2, scanOpacity: 0.03
-    },
-    ice: {
-      label: "Ice Blue",
-      bgBase: "#03060c", bgMid: "#0a1422", bgDeep: "#0d2240",
-      glow1: "#4ea1ff", glow2: "#b7dcff",
-      glow1Opacity: 0.18, glow2Opacity: 0.12,
-      stripeColor: "#6eb6ff", stripeOpacity: 0.06,
-      particleColor: "#9fd0ff", particleOpacity: 0.28,
-      driftDuration: 28, particleDuration: 32,
-      particleSize: "88px", vignetteOpacity: 0.28, scanOpacity: 0.05
-    },
-    lime: {
-      label: "Neon Lime",
-      bgBase: "#030805", bgMid: "#08140a", bgDeep: "#0f2a12",
-      glow1: "#8dff2e", glow2: "#d4ff8a",
-      glow1Opacity: 0.18, glow2Opacity: 0.10,
-      stripeColor: "#9dff4a", stripeOpacity: 0.07,
-      particleColor: "#b8ff66", particleOpacity: 0.33,
-      driftDuration: 14, particleDuration: 18,
-      stripeAngle: "100deg", vignetteOpacity: 0.22, scanOpacity: 0.04
-    },
-    magenta: {
-      label: "Magenta Pulse",
-      bgBase: "#0a0308", bgMid: "#1a0616", bgDeep: "#320a28",
-      glow1: "#ff2bd6", glow2: "#ff9ae8",
-      glow1Opacity: 0.22, glow2Opacity: 0.13,
-      stripeColor: "#ff4de1", stripeOpacity: 0.08,
-      particleColor: "#ff7aec", particleOpacity: 0.40,
-      driftDuration: 12, particleDuration: 15,
-      particleSize: "60px", vignetteOpacity: 0.32, scanOpacity: 0.08
-    },
-    steel: {
-      label: "Steel",
-      bgBase: "#050607", bgMid: "#101418", bgDeep: "#1a222b",
-      glow1: "#9aa7b5", glow2: "#d7dee6",
-      glow1Opacity: 0.14, glow2Opacity: 0.08,
-      stripeColor: "#aeb8c4", stripeOpacity: 0.05,
-      particleColor: "#c5ced8", particleOpacity: 0.22,
-      driftDuration: 36, particleDuration: 42,
-      particleSize: "96px", vignetteOpacity: 0.4, scanOpacity: 0.02,
-      brightness: 1.05, sat: 0.85
-    },
-    inferno: {
-      label: "Inferno",
-      bgBase: "#080200", bgMid: "#1a0800", bgDeep: "#3a1000",
-      glow1: "#ff4500", glow2: "#ffb347",
-      glow1Opacity: 0.28, glow2Opacity: 0.16,
-      stripeColor: "#ff5a1a", stripeOpacity: 0.10,
-      particleColor: "#ff7a33", particleOpacity: 0.42,
-      driftDuration: 10, particleDuration: 12,
-      glow1Size: "36%", glow2Size: "40%",
-      vignetteOpacity: 0.38, scanOpacity: 0.10,
-      brightness: 1.08, sat: 1.15
-    }
-  };
-
-  const CARD_FRAME_SIZE_PRESETS = {
-    chatting: { w: 1060, h: 420, label: "Just Chatting" },
-    square: { w: 500, h: 500, label: "Quadrat" },
-    metaschutz: { w: 1060, h: 500, label: "Metaschutz" },
-    start: { w: 1060, h: 500, label: "Start" },
-    brb: { w: 1060, h: 420, label: "BRB" },
-    ending: { w: 920, h: 500, label: "Ending" }
-  };
-
-  const CARD_FRAME_VARIANTS = [
-    "classic", "neon", "soft", "bold", "outline", "glass", "cyber", "minimal"
-  ];
-
-  const SHAPE_DEFAULTS = {
-    "frame.rect": { w: 400, h: 300, props: { color: "#ff7a00", radius: 16 } },
-    "frame.circle": { w: 320, h: 320, props: { color: "#ff7a00" } },
-    "frame.corners": { w: 400, h: 300, props: { color: "#ff7a00" } },
-    "frame.bevel": { w: 420, h: 320, props: { color: "#ff7a00" } },
-    "frame.neon": { w: 400, h: 300, props: { color: "#ff7a00" } },
-    "frame.dashed": { w: 400, h: 300, props: { color: "#ff7a00" } },
-    "frame.card": {
-      w: 1060,
-      h: 500,
-      props: {
-        variant: "classic",
-        sizePreset: "metaschutz",
-        color: "#ff7a00",
-        color2: "#ffb36b",
-        fillOpacity: 0.18,
-        showSweep: true,
-        showLines: true
-      }
-    },
-    "shape.vignette": { w: 1920, h: 1080, props: {} },
-    "shape.scene-bg": {
-      w: 1920,
-      h: 1080,
-      props: {
-        preset: "ember",
-        speed: 1,
-        stripes: true,
-        particles: true,
-        paused: false
-      }
-    }
-  };
-
-  function uid() {
-    return Math.random().toString(16).slice(2) + Date.now().toString(16);
-  }
-
-  function formatClock(date) {
-    const h = String(date.getHours()).padStart(2, "0");
-    const m = String(date.getMinutes()).padStart(2, "0");
-    const s = String(date.getSeconds()).padStart(2, "0");
-    return `${h}:${m}:${s}`;
-  }
-
-  function formatUptime(totalSeconds) {
-    const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-  }
-
-  function formatMs(ms) {
-    const totalSeconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  function prop(item, key, fallback) {
-    const props = item && item.props ? item.props : {};
-    return props[key] === undefined ? fallback : props[key];
-  }
-
-  function createOnlineEl(item) {
+﻿import type { LayoutItem } from '../types';
+import { prop } from '../utils/prop';
+import { escapeHtml } from '../utils/html';
+import { formatClock, formatUptime, formatMs } from '../utils/format';
+import { rgbaFrom } from '../utils/color';
+import { SCENE_BG_PRESETS } from '../defaults/scene-bg';
+import { CARD_FRAME_VARIANTS, SHAPE_DEFAULTS } from '../defaults/shapes';
+export function createOnlineEl(item) {
     const el = document.createElement("div");
     el.className = "ccs-online";
     el.innerHTML =
@@ -351,7 +15,7 @@
     return el;
   }
 
-  function updateOnline(el, item, data) {
+export function updateOnline(el, item, data) {
     const stream = (data && data.stream) || {};
     const live = stream.isLive === true;
     el.classList.toggle("is-live", live);
@@ -363,10 +27,10 @@
     if (prop(item, "showUptime", true) && live) {
       parts.push("Live " + formatUptime(stream.elapsedSeconds));
     }
-    el.querySelector(".ccs-online-time").textContent = parts.join(" · ");
+    el.querySelector(".ccs-online-time").textContent = parts.join(" Â· ");
   }
 
-  function createAlertEl() {
+export function createAlertEl() {
     const el = document.createElement("div");
     el.className = "ccs-alert";
     el.innerHTML =
@@ -380,17 +44,17 @@
     return el;
   }
 
-  const ENDING_STATS_VARIANTS = [
+export const ENDING_STATS_VARIANTS = [
     "classic", "neon", "minimal", "cards", "strip",
     "bold", "outline", "solid", "gradient", "compact"
   ];
 
-  function endingStatsVariant(item) {
+export function endingStatsVariant(item) {
     const raw = String(prop(item, "variant", "classic") || "classic").toLowerCase();
     return ENDING_STATS_VARIANTS.includes(raw) ? raw : "classic";
   }
 
-  function createEndingStatsEl(item) {
+export function createEndingStatsEl(item) {
     const el = document.createElement("div");
     el.className = "ccs-ending-stats";
     el.innerHTML =
@@ -399,7 +63,7 @@
       `<div class="ccs-ending-stat"><div class="ccs-ending-stat-value" data-stat="time">00:00:00</div><span class="ccs-ending-stat-label">Livezeit</span></div>` +
       `<div class="ccs-ending-stat"><div class="ccs-ending-stat-value" data-stat="gain">+0</div><span class="ccs-ending-stat-label">Neue Follower</span></div>` +
       `<div class="ccs-ending-stat"><div class="ccs-ending-stat-value" data-stat="peak">0</div><span class="ccs-ending-stat-label">Peak Zuschauer</span></div>` +
-      `<div class="ccs-ending-stat"><div class="ccs-ending-stat-value" data-stat="avg">0</div><span class="ccs-ending-stat-label">Ø Zuschauer</span></div>` +
+      `<div class="ccs-ending-stat"><div class="ccs-ending-stat-value" data-stat="avg">0</div><span class="ccs-ending-stat-label">Ã˜ Zuschauer</span></div>` +
       `<div class="ccs-ending-stat"><div class="ccs-ending-stat-value" data-stat="subs">0</div><span class="ccs-ending-stat-label">Subs gesamt</span></div>` +
       `<div class="ccs-ending-stat"><div class="ccs-ending-stat-value" data-stat="chat">0</div><span class="ccs-ending-stat-label">Chat</span></div>` +
       `<div class="ccs-ending-stat"><div class="ccs-ending-stat-value" data-stat="alarms">0</div><span class="ccs-ending-stat-label">Alarme</span></div>` +
@@ -414,7 +78,7 @@
     return el;
   }
 
-  function applyEndingStatsVariant(el, item) {
+export function applyEndingStatsVariant(el, item) {
     const variant = endingStatsVariant(item);
     ENDING_STATS_VARIANTS.forEach((name) => {
       el.classList.remove("ccs-ending-stats-v-" + name);
@@ -424,7 +88,7 @@
     el.classList.toggle("hide-title", prop(item, "showTitle", true) === false);
   }
 
-  function fitEndingStats(el) {
+export function fitEndingStats(el) {
     if (!el) return;
     const w = Math.max(1, el.clientWidth || el.offsetWidth || 980);
     const h = Math.max(1, el.clientHeight || el.offsetHeight || 220);
@@ -439,13 +103,13 @@
     el.style.setProperty("--ccs-stats-cols", String(cols));
   }
 
-  function updateEndingStats(el, item, data) {
+export function updateEndingStats(el, item, data) {
     applyEndingStatsVariant(el, item);
     fitEndingStats(el);
     paintEndingStats(el, data);
   }
 
-  function paintEndingStats(el, data) {
+export function paintEndingStats(el, data) {
     const stats = (data && data.stats) || {};
     const stream = (data && data.stream) || {};
     const twitch = (data && data.twitch) || {};
@@ -473,8 +137,8 @@
     set("goal", `${followers} / ${goal}`);
   }
 
-  // Brand SVG paths (Simple Icons–style, viewBox 0 0 24 24). customIconUrl overrides per slot.
-  const SOCIALS_PLATFORMS = [
+  // Brand SVG paths (Simple Iconsâ€“style, viewBox 0 0 24 24). customIconUrl overrides per slot.
+export const SOCIALS_PLATFORMS = [
     {
       id: "twitch",
       label: "Twitch",
@@ -597,10 +261,10 @@
     }
   ];
 
-  const SOCIALS_VARIANTS = ["row", "pills", "cards", "stack", "neon", "minimal"];
+export const SOCIALS_VARIANTS = ["row", "pills", "cards", "stack", "neon", "minimal"];
   let socialsFaLoaded = false;
 
-  function ensureSocialsFontAwesome() {
+export function ensureSocialsFontAwesome() {
     if (socialsFaLoaded) return;
     if (document.getElementById("ccs-socials-fa")) {
       socialsFaLoaded = true;
@@ -614,17 +278,51 @@
     socialsFaLoaded = true;
   }
 
-  function socialsVariant(item) {
+export function socialsVariant(item) {
     const raw = String(prop(item, "variant", "row") || "row").toLowerCase();
     return SOCIALS_VARIANTS.includes(raw) ? raw : "row";
   }
 
-  function socialsIconLibrary(item) {
+export function socialsIconLibrary(item) {
     const raw = String(prop(item, "iconLibrary", "svg") || "svg").toLowerCase();
     return raw === "fontawesome" ? "fontawesome" : "svg";
   }
 
-  function resolveSocialsEntries(item) {
+export function resolveSocialsEntries(item) {
+    const platformId = String(prop(item, "platform", "") || "").trim().toLowerCase();
+    if (platformId) {
+      const platform = SOCIALS_PLATFORMS.find((p) => p.id === platformId) || SOCIALS_PLATFORMS[0];
+      if (!platform) return [];
+      const handle = String(
+        prop(item, "handle", prop(item, platform.handleKey, "")) || ""
+      ).trim();
+      const urlRaw = String(
+        prop(item, "url", prop(item, platform.urlKey, "")) || ""
+      ).trim();
+      const customIconUrl = String(
+        prop(item, "iconUrl", prop(item, platform.iconUrlKey, "")) || ""
+      ).trim();
+      const labelDefault = platform.labelKey
+        ? String(prop(item, platform.labelKey, platform.label) || platform.label)
+        : platform.label;
+      const label = String(prop(item, "label", labelDefault) || labelDefault).trim() || platform.label;
+      let href = urlRaw;
+      if (!href && handle && typeof platform.urlFromHandle === "function") {
+        href = platform.urlFromHandle(handle);
+      }
+      return [{
+        id: platform.id,
+        label,
+        handle,
+        href,
+        customIconUrl,
+        fa: platform.fa,
+        color: platform.color,
+        svg: platform.svg
+      }];
+    }
+
+    // Legacy: multi-platform props (showTwitch, …) for older layouts
     const entries = [];
     for (const platform of SOCIALS_PLATFORMS) {
       const enabledDefault = platform.id.indexOf("custom") === 0 ||
@@ -657,7 +355,7 @@
     return entries;
   }
 
-  function renderSocialsIcon(entry, library) {
+export function renderSocialsIcon(entry, library) {
     if (entry.customIconUrl) {
       return `<img class="ccs-socials-icon ccs-socials-icon-img" src="${escapeHtml(entry.customIconUrl)}" alt="" />`;
     }
@@ -670,7 +368,7 @@
     );
   }
 
-  function createSocialsEl(item) {
+export function createSocialsEl(item) {
     const el = document.createElement("div");
     el.className = "ccs-socials";
     el.innerHTML = `<div class="ccs-socials-list"></div>`;
@@ -682,7 +380,7 @@
     return el;
   }
 
-  function applySocialsVariant(el, item) {
+export function applySocialsVariant(el, item) {
     const variant = socialsVariant(item);
     SOCIALS_VARIANTS.forEach((name) => {
       el.classList.remove("ccs-socials-v-" + name);
@@ -696,7 +394,7 @@
     el.classList.toggle("hide-handles", prop(item, "showHandles", true) === false);
   }
 
-  function fitSocials(el) {
+export function fitSocials(el) {
     if (!el) return;
     const w = Math.max(1, el.clientWidth || el.offsetWidth || 720);
     const h = Math.max(1, el.clientHeight || el.offsetHeight || 96);
@@ -704,7 +402,7 @@
     el.style.setProperty("--ccs-socials-scale", String(scale));
   }
 
-  function updateSocials(el, item) {
+export function updateSocials(el, item) {
     if (!el) return;
     const library = socialsIconLibrary(item);
     if (library === "fontawesome") {
@@ -740,7 +438,7 @@
     requestAnimationFrame(() => fitSocials(el));
   }
 
-  function createTextEl(item) {
+export function createTextEl(item) {
     const el = document.createElement("div");
     el.className = "ccs-text";
     el.innerHTML = `<div class="ccs-text-content"></div>`;
@@ -748,7 +446,7 @@
     return el;
   }
 
-  function updateText(el, item) {
+export function updateText(el, item) {
     const content = el.querySelector(".ccs-text-content");
     if (!content) return;
     const text = String(prop(item, "content", "Text") ?? "");
@@ -770,7 +468,7 @@
     content.style.textAlign = align;
   }
 
-  function createImageEl(item) {
+export function createImageEl(item) {
     const el = document.createElement("div");
     el.className = "ccs-image";
     el.innerHTML =
@@ -780,7 +478,7 @@
     return el;
   }
 
-  function updateImage(el, item) {
+export function updateImage(el, item) {
     const img = el.querySelector(".ccs-image-media");
     const placeholder = el.querySelector(".ccs-image-placeholder");
     if (!img) return;
@@ -806,14 +504,14 @@
     }
   }
 
-  const COUNTDOWN_VARIANTS = ["classic", "neon", "minimal", "bold"];
+export const COUNTDOWN_VARIANTS = ["classic", "neon", "minimal", "bold"];
 
-  function countdownVariant(item) {
+export function countdownVariant(item) {
     const raw = String(prop(item, "variant", "classic") || "classic").toLowerCase();
     return COUNTDOWN_VARIANTS.includes(raw) ? raw : "classic";
   }
 
-  function formatCountdownSeconds(totalSeconds, format) {
+export function formatCountdownSeconds(totalSeconds, format) {
     const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
     const fmt = String(format || "mm:ss").toLowerCase();
     if (fmt === "ss") {
@@ -828,7 +526,7 @@
     return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   }
 
-  function resolveCountdownRemaining(data) {
+export function resolveCountdownRemaining(data) {
     const countdown = (data && data.countdown) || {};
     if (countdown.endsAt) {
       const ends = Date.parse(countdown.endsAt);
@@ -839,7 +537,7 @@
     return Math.max(0, Math.floor(Number(countdown.remainingSeconds) || 0));
   }
 
-  function createCountdownEl(item) {
+export function createCountdownEl(item) {
     const el = document.createElement("div");
     el.className = "ccs-countdown";
     el.innerHTML =
@@ -854,7 +552,7 @@
     return el;
   }
 
-  function applyCountdownAppearance(el, item) {
+export function applyCountdownAppearance(el, item) {
     const variant = countdownVariant(item);
     COUNTDOWN_VARIANTS.forEach((name) => {
       el.classList.remove("ccs-countdown-v-" + name);
@@ -868,7 +566,7 @@
     el.style.setProperty("--ccs-countdown-size", (Number(prop(item, "fontSizePx", 72)) || 72) + "px");
   }
 
-  function fitCountdown(el) {
+export function fitCountdown(el) {
     if (!el) return;
     const w = Math.max(1, el.clientWidth || el.offsetWidth || 520);
     const h = Math.max(1, el.clientHeight || el.offsetHeight || 160);
@@ -876,13 +574,13 @@
     el.style.setProperty("--ccs-countdown-scale", String(scale));
   }
 
-  function updateCountdown(el, item, data) {
+export function updateCountdown(el, item, data) {
     applyCountdownAppearance(el, item);
     fitCountdown(el);
     paintCountdown(el, item, data);
   }
 
-  function paintCountdown(el, item, data) {
+export function paintCountdown(el, item, data) {
     const countdown = (data && data.countdown) || {};
     const running = countdown.isRunning === true;
     const remaining = resolveCountdownRemaining(data);
@@ -900,7 +598,7 @@
     }
   }
 
-  function enqueueAlert(el, item, payload) {
+export function enqueueAlert(el, item, payload) {
     const max = Number(prop(item, "maxQueue", 5)) || 5;
     el._queue.push(payload);
     while (el._queue.length > max) {
@@ -909,7 +607,7 @@
     pumpAlert(el, item);
   }
 
-  function pumpAlert(el, item) {
+export function pumpAlert(el, item) {
     if (el._showing || !el._queue.length) {
       return;
     }
@@ -931,7 +629,7 @@
     }, duration);
   }
 
-  function createSpotifyEl() {
+export function createSpotifyEl() {
     const el = document.createElement("div");
     el.className = "ccs-spotify ccs-music";
     el.innerHTML =
@@ -939,7 +637,7 @@
       `<div class="ccs-spotify-cover"></div>` +
       `<div class="ccs-spotify-info">` +
       `<div class="ccs-spotify-topline">` +
-      `<div class="ccs-spotify-heading">MUSIC · NOW PLAYING</div>` +
+      `<div class="ccs-spotify-heading">MUSIC Â· NOW PLAYING</div>` +
       `<div class="ccs-spotify-status">SPIELT</div>` +
       `</div>` +
       `<div class="ccs-spotify-title">-</div>` +
@@ -956,30 +654,30 @@
     return el;
   }
 
-  function resolveMusicState(data) {
+export function resolveMusicState(data) {
     const music = (data && data.music) || {};
     const spotify = (data && data.spotify) || {};
-    // music hat Vorrang, wenn vorhanden; sonst spotify (DenverJohn-Kompatibilität)
+    // music hat Vorrang, wenn vorhanden; sonst spotify (DenverJohn-KompatibilitÃ¤t)
     const hasMusic = music && (music.title || music.artist || music.connected === true || music.provider);
     return hasMusic ? music : spotify;
   }
 
-  function providerHeading(music) {
+export function providerHeading(music) {
     const name = (music.providerDisplayName || "").trim();
     if (name) {
-      return name.toUpperCase() + " · NOW PLAYING";
+      return name.toUpperCase() + " Â· NOW PLAYING";
     }
     const id = (music.provider || "").toLowerCase();
     if (id === "ytmusic") {
-      return "YOUTUBE MUSIC · NOW PLAYING";
+      return "YOUTUBE MUSIC Â· NOW PLAYING";
     }
     if (id === "spotify") {
-      return "SPOTIFY · NOW PLAYING";
+      return "SPOTIFY Â· NOW PLAYING";
     }
-    return "MUSIC · NOW PLAYING";
+    return "MUSIC Â· NOW PLAYING";
   }
 
-  function updateSpotify(el, item, data) {
+export function updateSpotify(el, item, data) {
     const music = resolveMusicState(data);
     const showTitle = prop(item, "showTitle", music.showTitle !== false);
     const showArtist = prop(item, "showArtist", music.showArtist !== false);
@@ -1012,7 +710,7 @@
     el.querySelector(".ccs-spotify-progress-row").style.display = showProgress ? "" : "none";
 
     el.querySelector(".ccs-spotify-title").textContent = music.title || "Unbekannter Titel";
-    el.querySelector(".ccs-spotify-artist").textContent = music.artist || "Unbekannter Künstler";
+    el.querySelector(".ccs-spotify-artist").textContent = music.artist || "Unbekannter KÃ¼nstler";
     el.querySelector(".ccs-spotify-album").textContent = music.album || "";
     el.querySelector(".ccs-spotify-status").textContent = music.isPlaying ? "SPIELT" : "PAUSIERT";
 
@@ -1023,7 +721,7 @@
     paintSpotifyProgress(el);
   }
 
-  function paintSpotifyProgress(el) {
+export function paintSpotifyProgress(el) {
     let current = el._progressBase || 0;
     if (el._playing) {
       current += Date.now() - (el._progressAt || Date.now());
@@ -1035,7 +733,7 @@
       `${formatMs(current)} / ${formatMs(duration)}`;
   }
 
-  const CHAT_EVENT_TYPES = new Set([
+export const CHAT_EVENT_TYPES = new Set([
     "channel.follow",
     "channel.subscribe",
     "channel.subscription.message",
@@ -1057,7 +755,7 @@
     "stream.offline": "https://static-cdn.jtvnw.net/badges/v1/d12a2e27-16f6-41d0-ab77-b780518f00a3/2"
   };
 
-  function escapeHtml(value) {
+export function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -1065,7 +763,7 @@
       .replaceAll('"', "&quot;");
   }
 
-  function renderChatParts(partsJson) {
+export function renderChatParts(partsJson) {
     let parts = [];
     try {
       parts = JSON.parse(partsJson || "[]");
@@ -1082,7 +780,7 @@
     }).join("");
   }
 
-  function renderChatBadges(badgesJson) {
+export function renderChatBadges(badgesJson) {
     let badges = [];
     try {
       const parsed = JSON.parse(badgesJson || "[]");
@@ -1100,7 +798,7 @@
       .join("");
   }
 
-  function createChatEl(item) {
+export function createChatEl(item) {
     const el = document.createElement("div");
     el.className = "ccs-chat";
     el.innerHTML =
@@ -1112,7 +810,7 @@
     return el;
   }
 
-  function resolveChatAppearance(item, chatConfig) {
+export function resolveChatAppearance(item, chatConfig) {
     const cfg = chatConfig || {};
     const props = item && item.props ? item.props : {};
     let opacity;
@@ -1144,7 +842,7 @@
     };
   }
 
-  function applyChatAppearance(el, appearance) {
+export function applyChatAppearance(el, appearance) {
     const cfg = appearance || {};
     const type = String(cfg.backgroundType || "None");
     const opacity = Math.min(1, Math.max(0, Number(cfg.backgroundOpacity ?? 0.55)));
@@ -1177,21 +875,21 @@
     }
   }
 
-  function updateChat(el, item, chatConfig) {
+export function updateChat(el, item, chatConfig) {
     const appearance = resolveChatAppearance(item, chatConfig);
     el._showTwitchEvents = appearance.showTwitchEvents !== false;
     el._maxLines = appearance.maxLines;
     applyChatAppearance(el, appearance);
   }
 
-  function clearChatStatus(el) {
+export function clearChatStatus(el) {
     const status = el._lines && el._lines.querySelector(".ccs-chat-status");
     if (status) {
       el._lines.innerHTML = "";
     }
   }
 
-  function trimChatLines(el) {
+export function trimChatLines(el) {
     const root = el._lines;
     if (!root) return;
     const max = el._maxLines || 80;
@@ -1205,7 +903,7 @@
     root.scrollTop = root.scrollHeight;
   }
 
-  function appendChatMessage(el, data) {
+export function appendChatMessage(el, data) {
     const messageId = data && data.messageId ? String(data.messageId) : "";
     if (messageId) {
       el._seenMessageIds = el._seenMessageIds || new Set();
@@ -1233,7 +931,7 @@
     return true;
   }
 
-  function appendChatEvent(el, payload) {
+export function appendChatEvent(el, payload) {
     clearChatStatus(el);
     const line = document.createElement("div");
     line.className = "ccs-chat-line ccs-chat-event";
@@ -1248,12 +946,12 @@
     trimChatLines(el);
   }
 
-  function isShapeItem(item) {
+export function isShapeItem(item) {
     const type = (item && item.type) || "";
     return item.kind === "shape" || type.startsWith("frame.") || type.startsWith("shape.") || !!SHAPE_DEFAULTS[type];
   }
 
-  function shapeClass(type, item) {
+export function shapeClass(type, item) {
     switch (type) {
       case "frame.rect": return "ccs-shape ccs-frame-rect";
       case "frame.circle": return "ccs-shape ccs-frame-circle";
@@ -1272,7 +970,7 @@
     }
   }
 
-  function applyCardFrame(el, item) {
+export function applyCardFrame(el, item) {
     const color = prop(item, "color", "#ff7a00");
     const color2 = prop(item, "color2", "#ffb36b");
     let fillOpacity = Number(prop(item, "fillOpacity", 0.18));
@@ -1295,7 +993,7 @@
     if (bottomline) bottomline.style.display = showLines ? "" : "none";
   }
 
-  function parseHexColor(color) {
+export function parseHexColor(color) {
     if (!color) return null;
     let c = String(color).trim();
     if (c[0] === "#") c = c.slice(1);
@@ -1308,13 +1006,13 @@
     };
   }
 
-  function rgbaFrom(color, alpha) {
+export function rgbaFrom(color, alpha) {
     const rgb = parseHexColor(color);
     if (!rgb) return `rgba(255,122,0,${alpha})`;
     return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
   }
 
-  function resolveSceneBgConfig(item) {
+export function resolveSceneBgConfig(item) {
     const props = (item && item.props) || {};
     const name = String(props.preset || "ember").toLowerCase();
     const preset = SCENE_BG_PRESETS[name] || SCENE_BG_PRESETS.ember;
@@ -1338,7 +1036,7 @@
     return merged;
   }
 
-  function applySceneBg(el, item) {
+export function applySceneBg(el, item) {
     const cfg = resolveSceneBgConfig(item);
     const glow1 = cfg.glow1 || "#ff7a00";
     const glow2 = cfg.glow2 || "#ffb36b";
@@ -1397,7 +1095,7 @@
     el.dataset.paused = paused ? "1" : "0";
   }
 
-  function createShapeEl(item) {
+export function createShapeEl(item) {
     const el = document.createElement("div");
     el.className = shapeClass(item.type, item);
     if (item.type === "shape.scene-bg") {
@@ -1425,7 +1123,7 @@
     return el;
   }
 
-  function createItemContent(item) {
+export function createItemContent(item) {
     if (isShapeItem(item)) {
       return createShapeEl(item);
     }
@@ -1444,383 +1142,3 @@
     unknown.style.background = "rgba(0,0,0,.5)";
     return unknown;
   }
-
-  function applyItemBox(wrapper, item) {
-    wrapper.style.left = (item.x || 0) + "px";
-    wrapper.style.top = (item.y || 0) + "px";
-    wrapper.style.width = (item.w || 100) + "px";
-    wrapper.style.height = (item.h || 100) + "px";
-    wrapper.style.zIndex = String(item.z || 0);
-    wrapper.style.transform = item.rotation ? `rotate(${item.rotation}deg)` : "";
-  }
-
-  function createRuntime(options) {
-    const opts = options || {};
-    const root = opts.root;
-    const editing = !!opts.editing;
-    const soloType = opts.soloType || null;
-    let layout = opts.layout || { ...DEFAULT_LAYOUT, items: [] };
-    let data = opts.data || {};
-    let chatConfig = opts.chatConfig || null;
-    const itemNodes = new Map();
-    let selectedId = null;
-    let onSelect = opts.onSelect || null;
-    let onChange = opts.onChange || null;
-    const chatHistory = [];
-    const seenMessageIds = new Set();
-    const CHAT_HISTORY_LIMIT = 200;
-
-    const canvas = document.createElement("div");
-    canvas.className = "ccs-canvas";
-    root.appendChild(canvas);
-
-    function trimChatHistory() {
-      while (chatHistory.length > CHAT_HISTORY_LIMIT) {
-        const removed = chatHistory.shift();
-        if (removed && removed.kind === "message" && removed.data && removed.data.messageId) {
-          seenMessageIds.delete(String(removed.data.messageId));
-        }
-      }
-    }
-
-    function rememberChatMessage(messageData) {
-      const data = messageData || {};
-      const messageId = data.messageId ? String(data.messageId) : "";
-      if (messageId && seenMessageIds.has(messageId)) {
-        return false;
-      }
-      if (messageId) {
-        seenMessageIds.add(messageId);
-      }
-      chatHistory.push({ kind: "message", data });
-      trimChatHistory();
-      return true;
-    }
-
-    function rememberChatEvent(payload) {
-      chatHistory.push({ kind: "event", payload: payload || {} });
-      trimChatHistory();
-      return true;
-    }
-
-    function restoreChatWidget(el) {
-      if (!el || !el._lines) return;
-      el._lines.innerHTML = "";
-      el._seenMessageIds = new Set();
-      for (const entry of chatHistory) {
-        if (entry.kind === "message") {
-          appendChatMessage(el, entry.data || {});
-        } else if (entry.kind === "event" && el._showTwitchEvents !== false) {
-          appendChatEvent(el, entry.payload || {});
-        }
-      }
-      if (!el._lines.children.length) {
-        el._lines.innerHTML = `<div class="ccs-chat-line ccs-chat-status">Chat bereit</div>`;
-      }
-    }
-
-    function restoreAllChatWidgets() {
-      for (const node of itemNodes.values()) {
-        if (node.item.type === "chat") {
-          restoreChatWidget(node.content);
-        }
-      }
-    }
-
-    function ingestChatHistory(events) {
-      if (!Array.isArray(events)) {
-        return;
-      }
-      let added = false;
-      for (const evt of events) {
-        if (evt && evt.source === "twitch" && evt.type === "channel.chat.message") {
-          if (rememberChatMessage(evt.data || {})) {
-            added = true;
-          }
-        }
-      }
-      if (added) {
-        restoreAllChatWidgets();
-      }
-    }
-
-    async function loadChatHistory() {
-      try {
-        const payload = await fetchJson("/chat/history");
-        ingestChatHistory(payload && payload.events);
-      } catch (_) { /* optional */ }
-    }
-
-    function fit() {
-      const cw = layout.canvasWidth || 1920;
-      const ch = layout.canvasHeight || 1080;
-      canvas.style.width = cw + "px";
-      canvas.style.height = ch + "px";
-      const rw = root.clientWidth || cw;
-      const rh = root.clientHeight || ch;
-      const scale = Math.min(rw / cw, rh / ch);
-      canvas.style.transform = `scale(${scale})`;
-      if (opts.center) {
-        canvas.style.left = ((rw - cw * scale) / 2) + "px";
-        canvas.style.top = ((rh - ch * scale) / 2) + "px";
-      }
-    }
-
-    function clearItems() {
-      itemNodes.clear();
-      canvas.innerHTML = "";
-    }
-
-    function renderItems() {
-      clearItems();
-      const items = (layout.items || []).slice().sort((a, b) => (a.z || 0) - (b.z || 0));
-      for (const item of items) {
-        if (soloType && item.type !== soloType && `${item.kind}/${item.type}` !== soloType) {
-          continue;
-        }
-        const wrapper = document.createElement("div");
-        wrapper.className = "ccs-item"
-          + (editing ? " edit-chrome" : "")
-          + (editing && item.id === selectedId ? " editing" : "");
-        wrapper.dataset.id = item.id;
-        applyItemBox(wrapper, item);
-        const content = createItemContent(item);
-        content.dataset.role = "content";
-        wrapper.appendChild(content);
-        if (editing) {
-          ["nw", "ne", "sw", "se"].forEach((pos) => {
-            const h = document.createElement("div");
-            h.className = "ccs-handle " + pos;
-            h.dataset.handle = pos;
-            wrapper.appendChild(h);
-          });
-        }
-        canvas.appendChild(wrapper);
-        itemNodes.set(item.id, { wrapper, content, item });
-        refreshItemData(item.id);
-      }
-      restoreAllChatWidgets();
-      fit();
-    }
-
-    function refreshItemData(id) {
-      const node = itemNodes.get(id);
-      if (!node) return;
-      const item = node.item;
-      if (item.type === "online") updateOnline(node.content, item, data);
-      if (item.type === "music" || item.type === "spotify") updateSpotify(node.content, item, data);
-      if (item.type === "chat") updateChat(node.content, item, chatConfig);
-      if (item.type === "ending-stats") updateEndingStats(node.content, item, data);
-      if (item.type === "text") updateText(node.content, item);
-      if (item.type === "image") updateImage(node.content, item);
-      if (item.type === "countdown") updateCountdown(node.content, item, data);
-      if (item.type === "socials") updateSocials(node.content, item);
-    }
-
-    function refreshAllData() {
-      for (const id of itemNodes.keys()) {
-        refreshItemData(id);
-      }
-    }
-
-    function setLayout(next, keepSelection) {
-      layout = next || { ...DEFAULT_LAYOUT, items: [] };
-      if (!keepSelection) {
-        selectedId = null;
-        renderItems();
-        return;
-      }
-      renderItems();
-      // Layout WS/PUT echoes replace item object refs; rebind selection so editors
-      // (and onSelect consumers) hold the live item instead of a stale closure.
-      if (keepSelection && selectedId) {
-        if (!(layout.items || []).some((i) => i.id === selectedId)) {
-          selectedId = null;
-        }
-        select(selectedId);
-      }
-    }
-
-    function setData(next) {
-      data = next || {};
-      refreshAllData();
-    }
-
-    function setChatConfig(next) {
-      chatConfig = next || null;
-      for (const node of itemNodes.values()) {
-        if (node.item.type === "chat") {
-          updateChat(node.content, node.item, chatConfig);
-        }
-      }
-    }
-
-    function select(id) {
-      selectedId = id;
-      for (const [key, node] of itemNodes) {
-        node.wrapper.classList.toggle("editing", editing && key === id);
-      }
-      if (onSelect) {
-        const item = (layout.items || []).find((i) => i.id === id) || null;
-        onSelect(item);
-      }
-    }
-
-    function emitChange() {
-      if (onChange) onChange(layout);
-    }
-
-    function handleRealtime(evt) {
-      if (!evt || !evt.type) return;
-      if (evt.type === "app.overlay.layout") {
-        const instanceId = (evt.data && evt.data.instanceId) || "";
-        if (opts.instanceId && instanceId && instanceId !== opts.instanceId) {
-          return;
-        }
-        try {
-          const parsed = JSON.parse(evt.data.layout || "{}");
-          setLayout(parsed, true);
-        } catch (_) { /* ignore */ }
-        return;
-      }
-      if (evt.type === "app.alert" || (evt.source === "twitch" && /follow|subscribe|cheer|raid/i.test(evt.type || ""))) {
-        for (const node of itemNodes.values()) {
-          if (node.item.type !== "alert") continue;
-          enqueueAlert(node.content, node.item, {
-            alertType: (evt.data && (evt.data.alertType || evt.type)) || evt.type,
-            user: (evt.data && (evt.data.user || evt.data.user_name || evt.data.userName)) || "",
-            summary: evt.summary || ""
-          });
-        }
-      }
-      if (evt.source === "twitch" && evt.type === "channel.chat.message") {
-        const messageData = evt.data || {};
-        if (!rememberChatMessage(messageData)) {
-          return;
-        }
-        for (const node of itemNodes.values()) {
-          if (node.item.type !== "chat") continue;
-          appendChatMessage(node.content, messageData);
-        }
-        return;
-      }
-      if (evt.source === "twitch" && CHAT_EVENT_TYPES.has(evt.type)) {
-        rememberChatEvent(evt);
-        for (const node of itemNodes.values()) {
-          if (node.item.type !== "chat") continue;
-          if (node.content._showTwitchEvents === false) continue;
-          appendChatEvent(node.content, evt);
-        }
-      }
-      if (evt.type === "app.stream.live" || evt.type === "app.music.track" || evt.type === "app.spotify.track") {
-        // full refresh comes from data poll; light hint only
-        refreshAllData();
-      }
-      if (evt.type === "app.countdown") {
-        const payload = evt.data || {};
-        data = data || {};
-        data.countdown = Object.assign({}, data.countdown || {}, {
-          isRunning: payload.isRunning === true || payload.isRunning === "true",
-          remainingSeconds: Number(payload.remainingSeconds) || 0,
-          totalSeconds: Number(payload.totalSeconds) || 0,
-          label: payload.label || (data.countdown && data.countdown.label) || "Countdown",
-          endsAt: payload.endsAt || null
-        });
-        for (const node of itemNodes.values()) {
-          if (node.item.type === "countdown") {
-            paintCountdown(node.content, node.item, data);
-          }
-        }
-      }
-    }
-
-    function tick() {
-      for (const node of itemNodes.values()) {
-        if (node.item.type === "online") updateOnline(node.content, node.item, data);
-        if (node.item.type === "music" || node.item.type === "spotify") paintSpotifyProgress(node.content);
-        if (node.item.type === "ending-stats") paintEndingStats(node.content, data);
-        if (node.item.type === "countdown") paintCountdown(node.content, node.item, data);
-      }
-    }
-
-    setInterval(tick, 250);
-    window.addEventListener("resize", fit);
-    renderItems();
-
-    return {
-      canvas,
-      fit,
-      setLayout,
-      getLayout: () => layout,
-      setData,
-      getData: () => data,
-      setChatConfig,
-      loadChatHistory,
-      ingestChatHistory,
-      select,
-      getSelectedId: () => selectedId,
-      handleRealtime,
-      renderItems,
-      emitChange,
-      itemNodes,
-      defaultsFor(type, kind) {
-        if (kind === "shape" || SHAPE_DEFAULTS[type]) {
-          return SHAPE_DEFAULTS[type] || { w: 300, h: 300, props: { color: "#ff7a00" } };
-        }
-        return WIDGET_DEFAULTS[type] || { w: 240, h: 120, props: {} };
-      },
-      createItem(type, kind, x, y) {
-        const def = this.defaultsFor(type, kind);
-        return {
-          id: uid(),
-          kind: kind || (SHAPE_DEFAULTS[type] ? "shape" : "widget"),
-          type,
-          x: x || 80,
-          y: y || 80,
-          w: def.w,
-          h: def.h,
-          z: (layout.items || []).length + 1,
-          rotation: 0,
-          locked: false,
-          props: { ...(def.props || {}) }
-        };
-      },
-      WIDGET_DEFAULTS,
-      SHAPE_DEFAULTS,
-      DEFAULT_LAYOUT
-    };
-  }
-
-  async function fetchJson(url) {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return res.json();
-  }
-
-  function connectWs(onEvent) {
-    const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${proto}//${location.host}/ws`);
-    ws.addEventListener("message", (msg) => {
-      try {
-        onEvent(JSON.parse(msg.data));
-      } catch (_) { /* ignore */ }
-    });
-    ws.addEventListener("close", () => {
-      setTimeout(() => connectWs(onEvent), 1500);
-    });
-    return ws;
-  }
-
-  global.CcsCanvas = {
-    createRuntime,
-    fetchJson,
-    connectWs,
-    WIDGET_DEFAULTS,
-    SHAPE_DEFAULTS,
-    SCENE_BG_PRESETS,
-    CARD_FRAME_SIZE_PRESETS,
-    CARD_FRAME_VARIANTS,
-    DEFAULT_LAYOUT,
-    uid
-  };
-})(window);

@@ -183,25 +183,17 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("iconLibrary", runtime);
         Assert.Contains("fontawesome", runtime);
         Assert.Contains("customIconUrl", runtime);
-        Assert.Contains("showTwitch", runtime);
-        Assert.Contains("twitchHandle", runtime);
-        Assert.Contains("showYoutube", runtime);
-        Assert.Contains("showDiscord", runtime);
-        Assert.Contains("showInstagram", runtime);
-        Assert.Contains("showTiktok", runtime);
-        Assert.Contains("showX", runtime);
-        Assert.Contains("showKick", runtime);
-        Assert.Contains("showCustom1", runtime);
+        Assert.Contains("platform", runtime);
+        Assert.Contains("resolveSocialsEntries", runtime);
         Assert.Contains("ResizeObserver", runtime);
 
         Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
         Assert.Contains("type: \"socials\"", editor);
         Assert.Contains("selectProp(\"variant\"", editor);
         Assert.Contains("selectProp(\"iconLibrary\"", editor);
+        Assert.Contains("selectProp(\"platform\"", editor);
         Assert.Contains("Font Awesome", editor);
-        Assert.Contains("twitchHandle", editor);
-        Assert.Contains("twitchIconUrl", editor);
-        Assert.Contains("custom1Label", editor);
+        Assert.Contains("textProp(\"handle\"", editor);
         Assert.Contains("Row", editor);
         Assert.Contains("Pills", editor);
 
@@ -343,6 +335,45 @@ public sealed class CanvasOverlayAssetsTests
         Assert.DoesNotContain("item.props[key] = e.target.checked;", editor);
         Assert.DoesNotContain("item.props[key] = Number(input.value);", editor);
         Assert.DoesNotContain("item.props[key] = input.value;", editor);
+    }
+
+    [Fact]
+    public void Runtime_ExposesEffectStrategiesAndApplyItemEffects()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("EFFECT_STRATEGIES", runtime);
+        Assert.Contains("applyItemEffects", runtime);
+        Assert.Contains("registerEffect", runtime);
+        Assert.Contains("listEffectTypes", runtime);
+        Assert.Contains("glow", runtime);
+        Assert.Contains("particles", runtime);
+        Assert.Contains("scanlines", runtime);
+        Assert.Contains("vignette", runtime);
+        Assert.Contains("blur", runtime);
+        Assert.Contains("noise", runtime);
+        Assert.Contains("effects: []", runtime);
+        Assert.Contains("loadExtensions", runtime);
+        Assert.Contains("extUrl", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains("ccs-item-fx-layer", styles);
+        Assert.Contains("ccs-item-fx-glow", styles);
+        Assert.Contains("ccs-item-fx-scanlines", styles);
+    }
+
+    [Fact]
+    public void Editor_HasSectionsFontColorAndEffectsPanel()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("function propSection", editor);
+        Assert.Contains("function featureSection", editor);
+        Assert.Contains("function fontProp", editor);
+        Assert.Contains("function colorProp", editor);
+        Assert.Contains("renderEffectsPanel", editor);
+        Assert.Contains("ccs-prop-section", editor);
+        Assert.Contains("Position", editor);
+        Assert.Contains("addBtn.textContent", editor);
+        Assert.Contains("Effekt", editor);
     }
 
     [Fact]
