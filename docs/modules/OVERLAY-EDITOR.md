@@ -20,7 +20,8 @@ Siehe auch: [`OVERLAY-SYSTEM.md`](OVERLAY-SYSTEM.md)
 | `/w/image` | Solo Image-Widget |
 | `/w/countdown` | Solo Countdown (globaler App-State) |
 | `/w/socials` | Solo Socials (eine Plattform, Auswahl per Prop) |
-| `/w/shape/{shapeId}` | Solo Frame/Shape, z. B. `/w/shape/frame.neon` |
+| `/w/partner-roulette` | Solo Partner Roulette (Partner-Logos rotieren) |
+| `/w/shape/{shapeId}` | Solo Frame/Shape, z. B. `/w/shape/frame` |
 | `GET/PUT /layout/{id}` | Layout laden/speichern (PUT nur Loopback) |
 | `/canvas/…` | Embedded Assets (CSS/JS) |
 | `GET /obs/video-settings` | OBS-Base-/Output-Auflösung (`connected`, `baseWidth`, …) |
@@ -61,13 +62,14 @@ Standalone-Chat bleibt zusätzlich unter `/chat` verfügbar.
 |-----|--------|
 | `online` | `stream.isLive`, Uhr, Uptime |
 | `alert` | WS `app.alert` / Twitch-Events |
-| `music` | Now Playing aus aktivem Music-Provider; Alias-Typ `spotify` |
+| `music` | Now Playing aus aktivem Music-Provider; Alias-Typ `spotify`. Props: `variant` (22 Styles), `sizePreset` (Mini–XL/Banner/Cover), Anzeige-Toggles; Titel/Artist/Album scrollen bei Overflow (Marquee); skaliert responsiv |
 | `chat` | WS `channel.chat.message` (+ optional Twitch-Events); Appearance/Font per Widget-Props (Fallback: Overlay-Chat-Einstellungen); Session-History via `/chat/history` + WS-Replay |
 | `ending-stats` | Session-Stats (`stats.*`) + Followerziel (`twitch.followers` / `followerGoal`); Prop `variant` mit 10 Looks; skaliert bei Größenänderung |
 | `socials` | Ein Social-Link pro Widget (`platform` + `handle`/`url`/`label`/`iconUrl`); für YT+Twitch zwei Instanzen; Icons SVG oder Font Awesome; Props `variant` / `iconLibrary` |
 | `text` | Statischer Text aus Props (`content`, Typografie, Ausrichtung, Schatten) |
 | `image` | Bild aus URL (`src`, `fit`, Opacity, Radius) |
 | `countdown` | Globaler Countdown aus `countdown.*` (Dashboard / Workflow / Automationen); Props: `variant`, `format`, `showLabel`, `hideWhenIdle` |
+| `partner-roulette` | Partner-Logos/-Bilder rotieren; Props: `images[]`, `intervalMs`, `transition` (`fade`/`crossfade`/`slide`/`none`), `transitionMs`, `fit`, `borderRadiusPx` |
 
 ## Globaler Countdown
 
@@ -84,7 +86,28 @@ Steuerung:
 
 ## Shapes / Frames
 
-`frame.rect`, `frame.circle`, `frame.corners`, `frame.bevel`, `frame.neon`, `frame.dashed`, `frame.card`, `shape.vignette`, `shape.scene-bg`.
+`frame`, `frame.card`, `shape.vignette`, `shape.cutout`, `shape.scene-bg`.
+
+Legacy-Typen `frame.rect` / `frame.circle` / `frame.corners` / `frame.bevel` / `frame.neon` / `frame.dashed` bleiben renderbar (Map auf `mode`), sind aber nicht mehr in der Palette.
+
+### Frame (`frame`)
+
+Einheitlicher Rahmen mit Modus-Auswahl. Props: `mode`, `color`, `radius` (Eckenradius in px, Default `16`).
+
+**26 Modi (`mode`):**
+
+- Klassisch: `rect`, `circle`, `corners`, `bevel`, `neon`, `dashed`
+- Kreativ: `double`, `dotted`, `groove`, `ridge`, `pixel`, `ticket`, `stamp`, `film`, `hud`, `hex`, `octagon`, `tape`, `scan`, `rainbow`, `comic`, `frosted`, `chrome`, `notch`, `brackets`, `orbit`
+
+Solo-URL: `/w/shape/frame` (optional `?props={"mode":"neon","radius":24,"color":"#00e5ff"}`).
+
+### Cutout (`shape.cutout`)
+
+Schneidet ein Loch in alles darunter auf dem Canvas (`mix-blend-mode: destination-out`). In OBS (Browserquelle mit Transparenz) scheint die darunterliegende Szene durch. Items mit höherem `z` bleiben unberührt.
+
+**Props:** `radius` — Eckenradius in px (Default `24`).
+
+Solo-URL: `/w/shape/shape.cutout` (optional `?props={"radius":48}`).
 
 ### Card Frame (`frame.card`)
 

@@ -38,6 +38,7 @@ Overlay Widget Progress:
 |-------|------|
 | Widget-Modul | `CanvasOverlay/src/shared/widgets/<name>/` |
 | Shape-Modul | `CanvasOverlay/src/shared/shapes/<name>/` |
+| Frame (unified) | `shapes/frame/` — Typ `frame`, Prop `mode` (+ Legacy `frame.*`) |
 | Editor-Panel | `CanvasOverlay/src/editor/props/` (+ ggf. `panels/<name>/`) |
 | Controls | `…/editor/controls/` (`fontProp`, `colorProp`, …) |
 | Sections | `…/editor/sections/` (`propSection`, `featureSection`) |
@@ -80,6 +81,12 @@ dotnet test tests/CreatorControlSuite.Tests/CreatorControlSuite.Tests.csproj --f
 - Farbe/Font als `textProp`
 - Effekt-Logik in Widget-`update` hardcoden
 - Alias wie `spotify` in `ListWidgetTypes` listen
+
+## Spezial: Cutout (`shape.cutout`)
+
+Transparenz-Loch über `mix-blend-mode: destination-out` am Item-Wrapper (`.ccs-item-cutout`),
+Canvas mit `isolation: isolate`. Modul: `shapes/cutout/`. Prop `radius` (Eckenradius).
+Im Editor (`.edit-chrome`) Blend aus + Hatch, sonst unsichtbar.
 
 ## Weiterführend
 
