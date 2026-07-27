@@ -3,6 +3,8 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using CreatorControlSuite.Core.Configuration;
+using CreatorControlSuite.Modules.OBS;
+using CreatorControlSuite.Modules.Overlay.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -15,12 +17,16 @@ public sealed class OverlayWebServer(
     ISettingsStore settingsStore,
     IOverlayDataService overlayData,
     IOverlayLayoutStore layoutStore,
-    OverlayRealtimeHub realtimeHub) : IOverlayWebServer, IAsyncDisposable
+    OverlayRealtimeHub realtimeHub,
+    IOverlayExtensionStore extensionStore,
+    IObsWebSocketClient obsClient) : IOverlayWebServer, IAsyncDisposable
 {
     private readonly ISettingsStore _settingsStore = settingsStore;
     private readonly IOverlayDataService _overlayData = overlayData;
     private readonly IOverlayLayoutStore _layoutStore = layoutStore;
     private readonly OverlayRealtimeHub _realtimeHub = realtimeHub;
+    private readonly IOverlayExtensionStore _extensionStore = extensionStore;
+    private readonly IObsWebSocketClient _obsClient = obsClient;
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
 
     private WebApplication? _app;
@@ -161,6 +167,7 @@ public sealed class OverlayWebServer(
             });
 
             MapCanvasRoutes(app);
+            MapExtensionRoutes(app);
 
             app.MapGet("/chat", async (HttpContext context) =>
             {
@@ -378,6 +385,80 @@ public sealed class OverlayWebServer(
             }));
         });
 
+        app.MapGet("/obs/video-settings", async (HttpContext context) =>
+        {
+            context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            if (!_obsClient.IsConnected)
+            {
+                return Results.Json(new
+                {
+                    connected = false,
+                    baseWidth = 0,
+                    baseHeight = 0,
+                    outputWidth = 0,
+                    outputHeight = 0
+                });
+            }
+
+            try
+            {
+                var video = await _obsClient.GetVideoSettingsAsync(context.RequestAborted);
+                return Results.Json(new
+                {
+                    connected = true,
+                    baseWidth = video.BaseWidth,
+                    baseHeight = video.BaseHeight,
+                    outputWidth = video.OutputWidth,
+                    outputHeight = video.OutputHeight
+                });
+            }
+            catch (Exception)
+            {
+                return Results.Json(new
+                {
+                    connected = false,
+                    baseWidth = 0,
+                    baseHeight = 0,
+                    outputWidth = 0,
+                    outputHeight = 0
+                });
+            }
+        });
+
+        app.MapGet("/obs/preview", async (HttpContext context) =>
+        {
+            context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            if (!_obsClient.IsConnected)
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            try
+            {
+                string scene = await _obsClient.GetCurrentProgramSceneAsync(context.RequestAborted);
+                if (string.IsNullOrWhiteSpace(scene))
+                {
+                    return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+                }
+
+                byte[] image = await _obsClient.GetSourceScreenshotAsync(
+                    scene,
+                    imageWidth: 960,
+                    imageHeight: null,
+                    context.RequestAborted);
+                if (image.Length == 0)
+                {
+                    return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+                }
+
+                return Results.File(image, "image/png");
+            }
+            catch (Exception)
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        });
+
         app.MapGet("/canvas/{*assetPath}", (string assetPath, HttpContext context) =>
         {
             string safe = (assetPath ?? "").Replace('\\', '/').Trim('/');
@@ -439,6 +520,101 @@ public sealed class OverlayWebServer(
             catch (System.Text.Json.JsonException)
             {
                 return Results.BadRequest(new { error = "invalid json" });
+            }
+        });
+    }
+
+    private void MapExtensionRoutes(WebApplication app)
+    {
+        app.MapGet("/extensions", () =>
+        {
+            var packs = _extensionStore.ListCatalog().Select(pack => new
+            {
+                id = pack.Id,
+                name = pack.Name,
+                version = pack.Version,
+                apiVersion = pack.ApiVersion,
+                widgets = pack.Widgets,
+                effects = pack.Effects,
+                fonts = pack.Fonts,
+                assets = pack.Assets,
+                baseUrl = "/ext/" + pack.Id + "/"
+            }).ToArray();
+
+            return Results.Json(new { packs });
+        });
+
+        app.MapGet("/ext/{packId}/{*path}", (string packId, string? path, HttpContext context) =>
+        {
+            if (!_extensionStore.TryResolveFile(packId, path ?? "", out string fullPath))
+            {
+                return Results.NotFound();
+            }
+
+            context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            return Results.File(fullPath, OverlayExtensionStore.GuessContentType(fullPath));
+        });
+
+        app.MapPost("/extensions/install", async (HttpContext context) =>
+        {
+            if (!IsLoopback(context))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            if (!context.Request.HasFormContentType)
+            {
+                return Results.BadRequest(new { error = "multipart/form-data mit ZIP-Datei erwartet" });
+            }
+
+            IFormCollection form = await context.Request.ReadFormAsync(context.RequestAborted);
+            IFormFile? file = form.Files.Count > 0 ? form.Files[0] : null;
+            if (file is null || file.Length == 0)
+            {
+                return Results.BadRequest(new { error = "keine ZIP-Datei übermittelt" });
+            }
+
+            try
+            {
+                await using Stream stream = file.OpenReadStream();
+                OverlayExtensionPackSummary summary = await _extensionStore.InstallFromZipAsync(stream, context.RequestAborted);
+                return Results.Json(new
+                {
+                    id = summary.Id,
+                    name = summary.Name,
+                    version = summary.Version,
+                    apiVersion = summary.ApiVersion,
+                    widgets = summary.Widgets,
+                    effects = summary.Effects,
+                    fonts = summary.Fonts,
+                    assets = summary.Assets
+                });
+            }
+            catch (OverlayExtensionValidationException exception)
+            {
+                return Results.BadRequest(new { error = exception.Message });
+            }
+            catch (InvalidDataException)
+            {
+                return Results.BadRequest(new { error = "ungültiges ZIP-Archiv" });
+            }
+        });
+
+        app.MapDelete("/extensions/{packId}", async (string packId, HttpContext context) =>
+        {
+            if (!IsLoopback(context))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            try
+            {
+                await _extensionStore.UninstallAsync(packId, context.RequestAborted);
+                return Results.Json(new { ok = true });
+            }
+            catch (ArgumentException)
+            {
+                return Results.BadRequest(new { error = "invalid pack id" });
             }
         });
     }

@@ -43,6 +43,19 @@ Session-History: Nachrichten werden serverseitig gepuffert und bei Connect sowie
 
 Appearance (Hintergrund, Padding, Radius, Gap, Schriftgröße, Schriftart): `/chat/config` bzw. Props am Canvas-Widget.
 
+## Extension Packs
+
+ZIP-Pakete mit zusätzlichen Widgets, Effekten und Schriften, ohne die App-Assemblies neu zu bauen.
+
+- Speicherort: `%LocalAppData%\CreatorControlSuite\Overlay\extensions\{packId}\`
+- Katalog: `GET /extensions` → `{ packs: [...] }` (aus jeder installierten `manifest.json`)
+- Dateien: `GET /ext/{packId}/{*path}` (nur Dateien innerhalb des Pack-Ordners, `no-store`)
+- Verwaltung (nur Loopback): `POST /extensions/install` (multipart ZIP), `DELETE /extensions/{packId}`
+- Manifest-Schema (`apiVersion: 1`): `id` (Slug `[a-z0-9-]+`), `name`, `version`, `apiVersion`, `widgets[]`, `effects[]`, `fonts[]`, optional `assets[]`
+- Installation validiert Manifest, erlaubte Dateitypen (`.js,.css,.woff2,.woff,.ttf,.otf,.svg,.png,.jpg,.jpeg,.webp,.gif,.json,.md`), Zip-Slip-Schutz und eine Größenobergrenze (50 MB)
+
+Verwaltung in der Overlay-Seite: Karte „Extension Packs“ (ZIP importieren, deinstallieren). Implementierung: `IOverlayExtensionStore` / `OverlayExtensionStore` in `CreatorControlSuite.Modules.Overlay/Extensions/`.
+
 ## WebSocket-Event-Schema
 
 Jedes Frame ist ein JSON-Objekt:

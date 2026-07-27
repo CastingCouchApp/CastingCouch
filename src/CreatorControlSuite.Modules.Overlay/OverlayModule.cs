@@ -1,11 +1,13 @@
 using CreatorControlSuite.Core.Modules;
+using CreatorControlSuite.Modules.Overlay.Extensions;
 
 namespace CreatorControlSuite.Modules.Overlay;
 
 public sealed class OverlayModule(
     IOverlayDataService service,
     IOverlayWebServer webServer,
-    IOverlayLayoutStore layoutStore) : IConnectableModule
+    IOverlayLayoutStore layoutStore,
+    IOverlayExtensionStore extensionStore) : IConnectableModule
 {
     private bool _initialized;
 
@@ -15,6 +17,7 @@ public sealed class OverlayModule(
     public IOverlayDataService Service { get; } = service;
     public IOverlayWebServer WebServer { get; } = webServer;
     public IOverlayLayoutStore LayoutStore { get; } = layoutStore;
+    public IOverlayExtensionStore ExtensionStore { get; } = extensionStore;
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {

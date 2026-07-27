@@ -1,0 +1,29 @@
+{
+  "id": "cool-kit",
+  "name": "Cool Kit",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "widgets": [
+    {
+      "id": "banner",
+      "name": "Cool Banner",
+      "entry": "widgets/banner/index.js"
+    }
+  ],
+  "effects": [
+    {
+      "id": "sparkle",
+      "name": "Sparkle",
+      "entry": "effects/sparkle/index.js"
+    }
+  ],
+  "fonts": [
+    {
+      "family": "CoolFont",
+      "src": "fonts/CoolFont.woff2"
+    }
+  ],
+  "assets": [
+    "assets/icons/logo.svg"
+  ]
+}

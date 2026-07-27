@@ -3,6 +3,7 @@ using CreatorControlSuite.Core.Music;
 using CreatorControlSuite.Modules.Alerts;
 using CreatorControlSuite.Modules.OBS;
 using CreatorControlSuite.Modules.Overlay;
+using CreatorControlSuite.Modules.Overlay.Extensions;
 using CreatorControlSuite.Modules.Spotify;
 using CreatorControlSuite.Modules.StreamDeck;
 using CreatorControlSuite.Modules.Twitch;
@@ -113,6 +114,7 @@ public static class StreamingModuleRegistrations
             services.AddSingleton<IOverlayRealtimeHub>(sp => sp.GetRequiredService<OverlayRealtimeHub>());
             services.AddSingleton<IOverlayDataService, OverlayDataService>();
             services.AddSingleton<IOverlayLayoutStore, OverlayLayoutStore>();
+            services.AddSingleton<IOverlayExtensionStore, OverlayExtensionStore>();
             services.AddSingleton<IOverlayWebServer, OverlayWebServer>();
             services.AddSingleton<OverlayModule>();
             services.AddStreamingModuleBinding<OverlayModule>();

@@ -47,6 +47,7 @@ using CreatorControlSuite.Modules.Alerts.Models;
 using CreatorControlSuite.Modules.OBS;
 using CreatorControlSuite.Modules.OBS.Models;
 using CreatorControlSuite.Modules.Overlay;
+using CreatorControlSuite.Modules.Overlay.Extensions;
 using CreatorControlSuite.Modules.Overlay.Models;
 using CreatorControlSuite.Modules.Spotify;
 using CreatorControlSuite.Modules.Spotify.Models;
@@ -298,6 +299,7 @@ public partial class MainWindow : Window
     private bool? _lastOverlayPublishedCountdownRunning;
     private string? _lastOverlayPublishedScene;
     private string? _lastOverlayPublishedSpotifyTrack;
+    private List<OverlayExtensionPackSummary> _overlayExtensionPacksCache = [];
     private int? _spotifyVolumeBeforeAlert;
     private bool _spotifyWasPlayingBeforeAlert;
     private bool _spotifyAlertMuteActive;
@@ -2353,6 +2355,8 @@ public partial class MainWindow : Window
         DuplicateOverlayCanvasButton.Click += async (_, _) => await DuplicateOverlayCanvasAsync();
         DeleteOverlayCanvasButton.Click += async (_, _) => await DeleteOverlayCanvasAsync();
         OverlayCanvasCombo.SelectionChanged += async (_, _) => await OnOverlayCanvasSelectionChangedAsync();
+        ImportOverlayExtensionPackButton.Click += async (_, _) => await ImportOverlayExtensionPackAsync();
+        UninstallOverlayExtensionPackButton.Click += async (_, _) => await UninstallSelectedOverlayExtensionPackAsync();
         CopyOverlayWebServerUrlButton.Click += (_, _) =>
         {
             string url = string.IsNullOrWhiteSpace(OverlayWebServerUrlBox.Text)
@@ -3927,6 +3931,7 @@ public partial class MainWindow : Window
         RefreshOverlayCanvasCombo();
         RefreshOverlayCanvasUrls();
         RefreshOverlayWebServerStatusUi();
+        RefreshOverlayExtensionPacksList();
 
         StartSceneBox.Text = _settings.Obs.StartScene;
         LiveSceneBox.Text = _settings.Obs.LiveScene;
@@ -10573,6 +10578,90 @@ public partial class MainWindow : Window
         finally
         {
             _loadingSettingsIntoUi = previousLoading;
+        }
+    }
+
+    private void RefreshOverlayExtensionPacksList()
+    {
+        _overlayExtensionPacksCache = _overlayModule.ExtensionStore.ListCatalog().ToList();
+        OverlayExtensionPacksList.ItemsSource = null;
+        OverlayExtensionPacksList.ItemsSource = _overlayExtensionPacksCache
+            .Select(pack => $"{pack.Name} ({pack.Id}) · v{pack.Version} · {pack.Widgets.Count} Widget(s), {pack.Effects.Count} Effekt(e), {pack.Fonts.Count} Font(s)")
+            .ToList();
+
+        OverlayExtensionPacksStatusText.Text = _overlayExtensionPacksCache.Count == 0
+            ? "Keine Extension Packs installiert."
+            : $"{_overlayExtensionPacksCache.Count} Extension Pack(s) installiert.";
+    }
+
+    private async Task ImportOverlayExtensionPackAsync()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Overlay Extension Pack importieren",
+            Filter = "Extension Pack (*.zip)|*.zip",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await using FileStream zipStream = File.OpenRead(dialog.FileName);
+            OverlayExtensionPackSummary summary = await _overlayModule.ExtensionStore.InstallFromZipAsync(zipStream);
+            RefreshOverlayExtensionPacksList();
+            OverlayExtensionPacksStatusText.Text = $"Extension Pack „{summary.Name}“ ({summary.Id}) installiert.";
+            OverlayExtensionPacksStatusText.Foreground = Brushes.LightGreen;
+        }
+        catch (OverlayExtensionValidationException exception)
+        {
+            OverlayExtensionPacksStatusText.Text = "Import fehlgeschlagen: " + exception.Message;
+            OverlayExtensionPacksStatusText.Foreground = Brushes.OrangeRed;
+            MessageBox.Show(this, exception.Message, "Extension Pack importieren", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (Exception exception)
+        {
+            OverlayExtensionPacksStatusText.Text = "Import fehlgeschlagen: " + exception.Message;
+            OverlayExtensionPacksStatusText.Foreground = Brushes.OrangeRed;
+            MessageBox.Show(this, exception.Message, "Extension Pack importieren", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async Task UninstallSelectedOverlayExtensionPackAsync()
+    {
+        int index = OverlayExtensionPacksList.SelectedIndex;
+        if (index < 0 || index >= _overlayExtensionPacksCache.Count)
+        {
+            OverlayExtensionPacksStatusText.Text = "Bitte zuerst ein Extension Pack auswählen.";
+            return;
+        }
+
+        OverlayExtensionPackSummary pack = _overlayExtensionPacksCache[index];
+        if (MessageBox.Show(
+                this,
+                $"Extension Pack „{pack.Name}“ ({pack.Id}) wirklich deinstallieren?",
+                "Extension Pack deinstallieren",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            await _overlayModule.ExtensionStore.UninstallAsync(pack.Id);
+            RefreshOverlayExtensionPacksList();
+            OverlayExtensionPacksStatusText.Text = $"Extension Pack „{pack.Name}“ deinstalliert.";
+            OverlayExtensionPacksStatusText.Foreground = Brushes.LightGreen;
+        }
+        catch (Exception exception)
+        {
+            OverlayExtensionPacksStatusText.Text = "Deinstallation fehlgeschlagen: " + exception.Message;
+            OverlayExtensionPacksStatusText.Foreground = Brushes.OrangeRed;
         }
     }
 
