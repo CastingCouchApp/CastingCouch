@@ -84,9 +84,10 @@ dotnet test tests/CreatorControlSuite.Tests/CreatorControlSuite.Tests.csproj --f
 
 ## Spezial: Cutout (`shape.cutout`)
 
-Transparenz-Loch über `mix-blend-mode: destination-out` am Item-Wrapper (`.ccs-item-cutout`),
-Canvas mit `isolation: isolate`. Modul: `shapes/cutout/`. Prop `radius` (Eckenradius).
-Im Editor (`.edit-chrome`) Blend aus + Hatch, sonst unsichtbar.
+Transparenz-Loch über SVG-Luminanz-Maske (`applyCutoutStackMask`): wrappt bereits gemalte
+Items in `.ccs-cutout-stack` und stanzt `radius`-abgerundete Löcher. Modul: `shapes/cutout/`.
+Im Editor Hatch auf dem Placeholder-Item; Live-View bleibt klar (kein schwarzes Fill).
+Nicht `destination-out` — bricht in OBS/CEF-Compositing oft zu opakem Schwarz.
 
 ## Weiterführend
 

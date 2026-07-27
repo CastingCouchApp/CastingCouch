@@ -32,8 +32,6 @@ html, body {
   top: 0;
   transform-origin: 0 0;
   background: transparent;
-  /* Groups destination-out cutouts so they punch to page alpha (OBS). */
-  isolation: isolate;
 }
 
 .ccs-item {

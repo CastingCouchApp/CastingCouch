@@ -6,6 +6,7 @@ import { uid } from '../utils/format';
 import { fetchJson } from '../net/fetch-json';
 import { createItemContent, applyItemBox } from './item-content';
 import { applyItemEffects } from '../effects/apply';
+import { applyCutoutStackMask } from '../shapes/cutout';
 import {
   updateOnline, updateSpotify, updateChat, updateEndingStats, updateText, updateImage,
   updateCountdown, updateSocials, updatePartnerRoulette, paintSpotifyProgress, paintEndingStats, paintCountdown,
@@ -127,15 +128,22 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
 
     function clearItems() {
       itemNodes.clear();
-      canvas.querySelectorAll(".ccs-item").forEach((node) => node.remove());
+      canvas.replaceChildren();
     }
 
     function renderItems() {
       clearItems();
       const items = (layout.items || []).slice().sort((a, b) => (a.z || 0) - (b.z || 0));
+      let cutoutSeq = 0;
+      const canvasWidth = layout.canvasWidth || 1920;
+      const canvasHeight = layout.canvasHeight || 1080;
       for (const item of items) {
         if (soloType && item.type !== soloType && `${item.kind}/${item.type}` !== soloType) {
           continue;
+        }
+        if (item.type === "shape.cutout") {
+          cutoutSeq += 1;
+          applyCutoutStackMask(canvas, item, cutoutSeq, canvasWidth, canvasHeight);
         }
         const wrapper = document.createElement("div");
         wrapper.className = "ccs-item"

@@ -103,7 +103,7 @@ Solo-URL: `/w/shape/frame` (optional `?props={"mode":"neon","radius":24,"color":
 
 ### Cutout (`shape.cutout`)
 
-Schneidet ein Loch in alles darunter auf dem Canvas (`mix-blend-mode: destination-out`). In OBS (Browserquelle mit Transparenz) scheint die darunterliegende Szene durch. Items mit höherem `z` bleiben unberührt.
+Schneidet ein Loch in alles darunter auf dem Canvas (SVG-Luminanz-Maske → echte Alpha-Transparenz). In OBS (Browserquelle mit Transparenz) scheint die darunterliegende Szene durch. Items mit höherem `z` bleiben unberührt.
 
 **Props:** `radius` — Eckenradius in px (Default `24`).
 

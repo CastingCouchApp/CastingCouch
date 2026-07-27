@@ -1,24 +1,37 @@
-/* Cutout punches a transparent hole through lower canvas items (OBS alpha). */
+/* Cutout: SVG luminance mask punches true alpha through lower items (OBS-safe). */
+
+.ccs-cutout-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ccs-cutout-stack {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .ccs-item-cutout {
-  mix-blend-mode: destination-out;
-  /* Let rounded corners define the punch; avoid clipping soft edges oddly. */
+  /* Placeholder / editor chrome only — hole is the mask on .ccs-cutout-stack. */
   overflow: visible;
+  background: transparent;
 }
 
 .ccs-shape-cutout {
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  background: #000;
+  background: transparent;
   border-radius: var(--cutout-radius, 0px);
   pointer-events: none;
 }
 
-/* Editor: show a hatch so the hole is selectable; live view keeps destination-out. */
-.ccs-item-cutout.edit-chrome {
-  mix-blend-mode: normal;
-}
-
+/* Editor: hatch so the hole is selectable; live view stays fully clear. */
 .ccs-item-cutout.edit-chrome .ccs-shape-cutout {
   background:
     repeating-conic-gradient(

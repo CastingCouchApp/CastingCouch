@@ -384,9 +384,12 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("\"shape.cutout\":", runtime);
         Assert.Contains("createCutoutEl", runtime);
         Assert.Contains("applyCutout", runtime);
+        Assert.Contains("applyCutoutStackMask", runtime);
         Assert.Contains("ccs-shape-cutout", runtime);
         Assert.Contains("ccs-item-cutout", runtime);
+        Assert.Contains("ccs-cutout-stack", runtime);
         Assert.Contains("--cutout-radius", runtime);
+        Assert.Contains("maskUnits", runtime);
 
         Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
         Assert.Contains("type: \"shape.cutout\"", editor);
@@ -396,9 +399,9 @@ public sealed class CanvasOverlayAssetsTests
         Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
         Assert.Contains(".ccs-shape-cutout", styles);
         Assert.Contains(".ccs-item-cutout", styles);
-        Assert.Contains("mix-blend-mode: destination-out", styles);
-        Assert.Contains("isolation: isolate", styles);
+        Assert.Contains(".ccs-cutout-stack", styles);
         Assert.Contains("--cutout-radius", styles);
+        Assert.DoesNotContain("mix-blend-mode: destination-out", styles);
 
         Assert.True(CanvasOverlayAssets.TryGet("solo/solo.js", out string solo, out _));
         Assert.Contains("startsWith(\"shape.\")", solo);
