@@ -242,4 +242,6 @@ public interface IObsWebSocketClient : IAsyncDisposable
         int? imageHeight = 360,
         CancellationToken cancellationToken = default);
 
+    Task<ObsVideoSettings> GetVideoSettingsAsync(CancellationToken cancellationToken = default);
+
 }

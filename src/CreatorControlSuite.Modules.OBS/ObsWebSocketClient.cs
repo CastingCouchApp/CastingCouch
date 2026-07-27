@@ -1066,6 +1066,16 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         return Convert.FromBase64String(base64);
     }
 
+    public async Task<ObsVideoSettings> GetVideoSettingsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        JsonElement data = await SendRequestAsync(
+            "GetVideoSettings",
+            requestData: null,
+            cancellationToken);
+        return ObsVideoSettings.Parse(data);
+    }
+
     public async Task<ObsSnapshot> GetSnapshotAsync(
         CancellationToken cancellationToken = default)
     {

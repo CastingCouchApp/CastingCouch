@@ -842,6 +842,10 @@ public sealed class StreamWorkflowServiceTests
             CancellationToken cancellationToken = default)
             => Task.FromResult(Array.Empty<byte>());
 
+        public Task<ObsVideoSettings> GetVideoSettingsAsync(
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new ObsVideoSettings(1920, 1080, 1280, 720, 30, 1));
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

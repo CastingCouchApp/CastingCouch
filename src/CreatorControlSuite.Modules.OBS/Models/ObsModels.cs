@@ -106,3 +106,29 @@ public sealed record ObsSceneItemTransformInfo(
     int CropTop,
     int CropRight,
     int CropBottom);
+
+public sealed record ObsVideoSettings(
+    int BaseWidth,
+    int BaseHeight,
+    int OutputWidth,
+    int OutputHeight,
+    int FpsNumerator,
+    int FpsDenominator)
+{
+    public static ObsVideoSettings Parse(System.Text.Json.JsonElement data)
+    {
+        static int ReadInt(System.Text.Json.JsonElement element, string name)
+            => element.TryGetProperty(name, out System.Text.Json.JsonElement property) &&
+               property.TryGetInt32(out int value)
+                ? value
+                : 0;
+
+        return new ObsVideoSettings(
+            ReadInt(data, "baseWidth"),
+            ReadInt(data, "baseHeight"),
+            ReadInt(data, "outputWidth"),
+            ReadInt(data, "outputHeight"),
+            ReadInt(data, "fpsNumerator"),
+            ReadInt(data, "fpsDenominator"));
+    }
+}
