@@ -140,7 +140,8 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
         const wrapper = document.createElement("div");
         wrapper.className = "ccs-item"
           + (editing ? " edit-chrome" : "")
-          + (editing && item.id === selectedId ? " editing" : "");
+          + (editing && item.id === selectedId ? " editing" : "")
+          + (item.type === "shape.cutout" ? " ccs-item-cutout" : "");
         wrapper.dataset.id = item.id;
         applyItemBox(wrapper, item);
         const content = createItemContent(item);

@@ -1,0 +1,31 @@
+/* Cutout punches a transparent hole through lower canvas items (OBS alpha). */
+.ccs-item-cutout {
+  mix-blend-mode: destination-out;
+  /* Let rounded corners define the punch; avoid clipping soft edges oddly. */
+  overflow: visible;
+}
+
+.ccs-shape-cutout {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background: #000;
+  border-radius: var(--cutout-radius, 0px);
+  pointer-events: none;
+}
+
+/* Editor: show a hatch so the hole is selectable; live view keeps destination-out. */
+.ccs-item-cutout.edit-chrome {
+  mix-blend-mode: normal;
+}
+
+.ccs-item-cutout.edit-chrome .ccs-shape-cutout {
+  background:
+    repeating-conic-gradient(
+      rgba(255, 255, 255, 0.22) 0% 25%,
+      rgba(0, 0, 0, 0.35) 0% 50%
+    )
+    50% / 14px 14px;
+  outline: 1px dashed rgba(255, 255, 255, 0.55);
+  outline-offset: -1px;
+}

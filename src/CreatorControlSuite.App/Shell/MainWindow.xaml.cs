@@ -10933,14 +10933,10 @@ public partial class MainWindow : Window
             ("Widget: Image", "image"),
             ("Widget: Countdown", "countdown"),
             ("Widget: Socials", "socials"),
-            ("Shape: Frame Rechteck", "shape/frame.rect"),
-            ("Shape: Frame Kreis", "shape/frame.circle"),
-            ("Shape: Frame Corners", "shape/frame.corners"),
-            ("Shape: Frame Bezel", "shape/frame.bevel"),
-            ("Shape: Frame Neon", "shape/frame.neon"),
-            ("Shape: Frame Dashed", "shape/frame.dashed"),
+            ("Shape: Frame", "shape/frame"),
             ("Shape: Card Frame", "shape/frame.card"),
             ("Shape: Vignette", "shape/shape.vignette"),
+            ("Shape: Cutout", "shape/shape.cutout"),
             ("Shape: Starting Hintergrund", "shape/shape.scene-bg")
         };
 

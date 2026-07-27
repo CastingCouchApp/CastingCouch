@@ -23,7 +23,7 @@
     }
   }
 
-  const kind = (type.startsWith("frame.") || type.startsWith("shape.") || type === "shape.vignette" || type === "shape.scene-bg") ? "shape" : "widget";
+  const kind = (type === "frame" || type.startsWith("frame.") || type.startsWith("shape.") || type === "shape.vignette" || type === "shape.scene-bg") ? "shape" : "widget";
   const def = kind === "shape"
     ? (CcsCanvas.SHAPE_DEFAULTS[type] || { w: 400, h: 300, props: {} })
     : (CcsCanvas.WIDGET_DEFAULTS[type] || { w: 400, h: 200, props: {} });

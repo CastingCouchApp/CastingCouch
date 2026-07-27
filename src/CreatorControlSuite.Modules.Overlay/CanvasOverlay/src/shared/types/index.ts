@@ -122,6 +122,8 @@ export interface CcsCanvasApi {
   SCENE_BG_PRESETS: Record<string, Record<string, unknown>>;
   CARD_FRAME_SIZE_PRESETS: Record<string, { w: number; h: number; label: string }>;
   CARD_FRAME_VARIANTS: string[];
+  FRAME_MODES: readonly string[];
+  FRAME_MODE_LABELS: Record<string, string>;
   MUSIC_VARIANTS: readonly string[];
   MUSIC_VARIANT_LABELS: Record<string, string>;
   MUSIC_SIZE_PRESETS: Record<string, { w: number; h: number; label: string; scale?: number }>;

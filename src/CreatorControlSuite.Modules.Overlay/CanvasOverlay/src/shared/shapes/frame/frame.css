@@ -1,0 +1,366 @@
+/* Unified border frame — modes via .ccs-frame-m-<mode> */
+
+.ccs-frame {
+  --frame-color: var(--accent, #ff7a00);
+  --frame-radius: 16px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  pointer-events: none;
+  position: relative;
+  border-radius: var(--frame-radius);
+}
+
+.ccs-frame-m-rect {
+  border: 4px solid var(--frame-color);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--frame-color) 40%, transparent);
+}
+
+.ccs-frame-m-circle {
+  border: 5px solid var(--frame-color);
+  border-radius: 50%;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--frame-color) 45%, transparent);
+}
+
+.ccs-frame-m-corners {
+  border-radius: var(--frame-radius);
+  background:
+    linear-gradient(var(--frame-color), var(--frame-color)) left top / 28px 4px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left top / 4px 28px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right top / 28px 4px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right top / 4px 28px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left bottom / 28px 4px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left bottom / 4px 28px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right bottom / 28px 4px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right bottom / 4px 28px no-repeat;
+}
+
+.ccs-frame-m-bevel {
+  border: 10px solid #1a1410;
+  border-image: linear-gradient(145deg, #3a2a1a, var(--frame-color), #1a1410) 1;
+  border-radius: 0;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08), 0 0 20px rgba(0, 0, 0, 0.45);
+}
+
+.ccs-frame-m-neon {
+  border: 3px solid var(--frame-color);
+  box-shadow:
+    0 0 8px var(--frame-color),
+    0 0 24px var(--frame-color),
+    inset 0 0 12px color-mix(in srgb, var(--frame-color) 30%, transparent);
+  animation: ccs-frame-neon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ccs-frame-neon-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px var(--frame-color), 0 0 20px var(--frame-color);
+  }
+  50% {
+    box-shadow: 0 0 14px var(--frame-color), 0 0 36px var(--frame-color);
+  }
+}
+
+.ccs-frame-m-dashed {
+  border: 4px dashed var(--frame-color);
+  animation: ccs-frame-dash-hue 12s linear infinite;
+}
+
+@keyframes ccs-frame-dash-hue {
+  to { filter: hue-rotate(20deg); }
+}
+
+.ccs-frame-m-double {
+  border: 6px double var(--frame-color);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--frame-color) 28%, transparent);
+}
+
+.ccs-frame-m-dotted {
+  border: 5px dotted var(--frame-color);
+}
+
+.ccs-frame-m-groove {
+  border: 8px groove var(--frame-color);
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--frame-color) 22%, transparent);
+}
+
+.ccs-frame-m-ridge {
+  border: 8px ridge var(--frame-color);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--frame-color) 30%, transparent);
+}
+
+.ccs-frame-m-pixel {
+  border: 4px solid var(--frame-color);
+  border-radius: 0;
+  clip-path: polygon(
+    0 12px, 12px 12px, 12px 0,
+    calc(100% - 12px) 0, calc(100% - 12px) 12px, 100% 12px,
+    100% calc(100% - 12px), calc(100% - 12px) calc(100% - 12px), calc(100% - 12px) 100%,
+    12px 100%, 12px calc(100% - 12px), 0 calc(100% - 12px)
+  );
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--frame-color) 40%, transparent);
+}
+
+.ccs-frame-m-ticket {
+  border: 3px solid var(--frame-color);
+  border-radius: var(--frame-radius);
+  background:
+    radial-gradient(circle at 0 50%, transparent 10px, var(--frame-color) 10.5px, var(--frame-color) 13px, transparent 13.5px) left center / 14px 28px repeat-y,
+    radial-gradient(circle at 100% 50%, transparent 10px, var(--frame-color) 10.5px, var(--frame-color) 13px, transparent 13.5px) right center / 14px 28px repeat-y;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--frame-color) 35%, transparent);
+}
+
+.ccs-frame-m-stamp {
+  border: 3px dashed var(--frame-color);
+  border-radius: calc(var(--frame-radius) * 0.35);
+  outline: 2px solid color-mix(in srgb, var(--frame-color) 55%, transparent);
+  outline-offset: 6px;
+  background:
+    radial-gradient(circle, var(--frame-color) 2.5px, transparent 3px) 0 0 / 14px 14px;
+  box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--frame-color) 12%, transparent);
+}
+
+.ccs-frame-m-film {
+  border: 14px solid #111;
+  border-radius: calc(var(--frame-radius) * 0.4);
+  box-shadow:
+    inset 0 0 0 3px var(--frame-color),
+    0 0 18px color-mix(in srgb, var(--frame-color) 35%, transparent);
+  background:
+    linear-gradient(#111, #111) padding-box,
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 10px,
+      #111 10px 14px,
+      var(--frame-color) 14px 22px,
+      #111 22px 26px
+    ) border-box;
+  border-image: none;
+}
+
+.ccs-frame-m-film::before,
+.ccs-frame-m-film::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 8px,
+    color-mix(in srgb, var(--frame-color) 70%, #fff) 8px 16px
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+.ccs-frame-m-film::before { top: 3px; }
+.ccs-frame-m-film::after { bottom: 3px; }
+
+.ccs-frame-m-hud {
+  border: 1px solid color-mix(in srgb, var(--frame-color) 55%, transparent);
+  border-radius: var(--frame-radius);
+  background:
+    linear-gradient(var(--frame-color), var(--frame-color)) left top / 36px 2px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left top / 2px 36px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right top / 36px 2px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right top / 2px 36px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left bottom / 36px 2px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left bottom / 2px 36px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right bottom / 36px 2px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right bottom / 2px 36px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) center top / 48px 1px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) center bottom / 48px 1px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left center / 1px 48px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right center / 1px 48px no-repeat;
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--frame-color) 12%, transparent);
+}
+
+.ccs-frame-m-hex {
+  border: 3px solid var(--frame-color);
+  border-radius: 0;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--frame-color) 40%, transparent);
+}
+
+.ccs-frame-m-octagon {
+  border: 3px solid var(--frame-color);
+  border-radius: 0;
+  clip-path: polygon(
+    30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%
+  );
+  box-shadow: 0 0 18px color-mix(in srgb, var(--frame-color) 38%, transparent);
+}
+
+.ccs-frame-m-tape {
+  border: 2px solid color-mix(in srgb, var(--frame-color) 70%, transparent);
+  border-radius: var(--frame-radius);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--frame-color) 20%, transparent);
+}
+
+.ccs-frame-m-tape::before,
+.ccs-frame-m-tape::after {
+  content: "";
+  position: absolute;
+  width: 52px;
+  height: 18px;
+  background: color-mix(in srgb, var(--frame-color) 72%, #fff);
+  opacity: 0.9;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.ccs-frame-m-tape::before {
+  top: 10px;
+  left: -8px;
+  transform: rotate(-18deg);
+}
+.ccs-frame-m-tape::after {
+  bottom: 12px;
+  right: -8px;
+  transform: rotate(-22deg);
+}
+
+.ccs-frame-m-scan {
+  border: 2px solid var(--frame-color);
+  overflow: hidden;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--frame-color) 30%, transparent);
+}
+
+.ccs-frame-m-scan::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28%;
+  top: -30%;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--frame-color) 35%, transparent),
+    transparent
+  );
+  animation: ccs-frame-scan-sweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes ccs-frame-scan-sweep {
+  0% { top: -30%; }
+  100% { top: 110%; }
+}
+
+.ccs-frame-m-rainbow {
+  border: 4px solid transparent;
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    conic-gradient(from var(--frame-rainbow-angle, 0deg), #ff0040, #ff7a00, #ffe600, #00e676, #00e5ff, #7c4dff, #ff0040) border-box;
+  animation: ccs-frame-rainbow-spin 4s linear infinite;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--frame-color) 25%, transparent);
+}
+
+@keyframes ccs-frame-rainbow-spin {
+  to { --frame-rainbow-angle: 360deg; filter: hue-rotate(360deg); }
+}
+
+@property --frame-rainbow-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.ccs-frame-m-comic {
+  border: 5px solid #111;
+  border-radius: calc(var(--frame-radius) * 0.6);
+  box-shadow:
+    6px 6px 0 var(--frame-color),
+    6px 6px 0 2px #111;
+}
+
+.ccs-frame-m-frosted {
+  border: 1px solid color-mix(in srgb, var(--frame-color) 45%, #fff);
+  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--frame-color) 8%, rgba(255, 255, 255, 0.08));
+  box-shadow:
+    0 0 24px color-mix(in srgb, var(--frame-color) 18%, transparent),
+    inset 0 0 20px rgba(255, 255, 255, 0.06);
+}
+
+.ccs-frame-m-chrome {
+  border: 5px solid transparent;
+  border-radius: var(--frame-radius);
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    linear-gradient(
+      135deg,
+      #f5f5f5,
+      var(--frame-color),
+      #888,
+      #fff,
+      var(--frame-color),
+      #444
+    ) border-box;
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--frame-color) 35%, transparent),
+    inset 0 0 12px rgba(255, 255, 255, 0.12);
+}
+
+.ccs-frame-m-notch {
+  border: 3px solid var(--frame-color);
+  border-radius: 0;
+  clip-path: polygon(
+    0 18px, 18px 0, calc(100% - 18px) 0, 100% 18px,
+    100% calc(100% - 18px), calc(100% - 18px) 100%, 18px 100%, 0 calc(100% - 18px)
+  );
+  box-shadow: 0 0 16px color-mix(in srgb, var(--frame-color) 35%, transparent);
+}
+
+.ccs-frame-m-brackets {
+  border: none;
+  border-radius: var(--frame-radius);
+  background:
+    linear-gradient(var(--frame-color), var(--frame-color)) left top / 6px 40% no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left top / 28px 6px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left bottom / 6px 40% no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) left bottom / 28px 6px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right top / 6px 40% no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right top / 28px 6px no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right bottom / 6px 40% no-repeat,
+    linear-gradient(var(--frame-color), var(--frame-color)) right bottom / 28px 6px no-repeat;
+}
+
+.ccs-frame-m-orbit {
+  border: 2px solid color-mix(in srgb, var(--frame-color) 65%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--frame-color) 28%, transparent);
+}
+
+.ccs-frame-orbit-dots {
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  animation: ccs-frame-orbit-spin 5s linear infinite;
+  pointer-events: none;
+}
+
+.ccs-frame-orbit-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--frame-color);
+  box-shadow: 0 0 10px var(--frame-color);
+  top: 50%;
+  left: 50%;
+  transform:
+    rotate(calc(var(--i) * 90deg))
+    translateY(calc(-50% - 0px))
+    translateX(0)
+    translateY(calc(-1 * min(50vw, 100%)));
+  /* Place dots on the rim using inset box */
+  offset-path: none;
+}
+
+.ccs-frame-orbit-dot:nth-child(1) { top: -5px; left: calc(50% - 5px); transform: none; }
+.ccs-frame-orbit-dot:nth-child(2) { top: calc(50% - 5px); right: -5px; left: auto; transform: none; }
+.ccs-frame-orbit-dot:nth-child(3) { bottom: -5px; top: auto; left: calc(50% - 5px); transform: none; }
+.ccs-frame-orbit-dot:nth-child(4) { top: calc(50% - 5px); left: -5px; transform: none; }
+
+@keyframes ccs-frame-orbit-spin {
+  to { transform: rotate(360deg); }
+}

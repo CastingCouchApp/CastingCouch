@@ -127,11 +127,10 @@ export function syncProps(
     appendSocialsProps(item, ctx, propExtra);
   } else if (item.type === "frame.card") {
     appendFrameCardProps(item, ctx, propExtra);
-  } else if ((item.type || "").startsWith("frame.")) {
-    propExtra.appendChild(colorProp("color", "Farbe", item, ctx, "#ff7a00"));
-    if (item.type === "frame.rect") {
-      propExtra.appendChild(numProp("radius", "Radius", item, ctx, 16));
-    }
+  } else if (item.type === "frame" || (item.type || "").startsWith("frame.")) {
+    appendFrameProps(item, ctx, propExtra);
+  } else if (item.type === "shape.cutout") {
+    propExtra.appendChild(numProp("radius", "Eckenradius px", item, ctx, 24));
   } else if (item.type === "shape.scene-bg") {
     appendSceneBgProps(item, ctx, propExtra);
   }
@@ -208,6 +207,31 @@ function appendSocialsProps(item: LayoutItem, ctx: EditorContext, propExtra: HTM
   propExtra.appendChild(numProp("iconSize", "Icon-Größe px", item, ctx, 36));
   propExtra.appendChild(numProp("gap", "Abstand px", item, ctx, 12));
   propExtra.appendChild(colorProp("iconColor", "Mono-Farbe", item, ctx, "#ffffff"));
+}
+
+function appendFrameProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
+  const modes = window.CcsCanvas.FRAME_MODES || [];
+  const labels = window.CcsCanvas.FRAME_MODE_LABELS || {};
+  const modeOptions = modes.map((key) => ({
+    value: key,
+    label: (labels as Record<string, string>)[key] || key
+  }));
+  const legacyFallback: Record<string, string> = {
+    "frame.rect": "rect",
+    "frame.circle": "circle",
+    "frame.corners": "corners",
+    "frame.bevel": "bevel",
+    "frame.neon": "neon",
+    "frame.dashed": "dashed"
+  };
+  const modeFallback = legacyFallback[item.type] || "rect";
+  propExtra.appendChild(selectProp("mode", "Modus", item, ctx, modeOptions, modeFallback, (live, value) => {
+    live.props.mode = value;
+    // Normalize legacy shape ids to the unified frame type once the user picks a mode.
+    if (live.type !== "frame") live.type = "frame";
+  }));
+  propExtra.appendChild(colorProp("color", "Farbe", item, ctx, "#ff7a00"));
+  propExtra.appendChild(numProp("radius", "Eckenradius px", item, ctx, 16));
 }
 
 function appendFrameCardProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {

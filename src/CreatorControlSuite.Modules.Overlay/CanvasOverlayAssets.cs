@@ -71,15 +71,11 @@ public static class CanvasOverlayAssets
 
     public static IReadOnlyList<string> ListShapeTypes() =>
     [
-        "frame.rect",
-        "frame.circle",
-        "frame.corners",
-        "frame.bevel",
-        "frame.neon",
-        "frame.dashed",
+        "frame",
         "frame.card",
         "shape.vignette",
-        "shape.scene-bg"
+        "shape.scene-bg",
+        "shape.cutout"
     ];
 
     private static string GuessContentType(string path)

@@ -30,8 +30,8 @@ public sealed class OverlayLayoutUrlTests
             "http://127.0.0.1:8765/w/spotify",
             settings.GetWidgetUrl("spotify"));
         Assert.Equal(
-            "http://127.0.0.1:8765/w/shape/frame.neon",
-            settings.GetWidgetUrl("shape/frame.neon"));
+            "http://127.0.0.1:8765/w/shape/frame",
+            settings.GetWidgetUrl("shape/frame"));
     }
 
     [Fact]

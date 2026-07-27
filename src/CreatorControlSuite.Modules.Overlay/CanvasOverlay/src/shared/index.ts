@@ -2,7 +2,7 @@ import "./styles/index.css";
 
 import { DEFAULT_LAYOUT } from "./defaults/layout";
 import { WIDGET_DEFAULTS } from "./defaults/widgets";
-import { SHAPE_DEFAULTS, CARD_FRAME_SIZE_PRESETS, CARD_FRAME_VARIANTS } from "./defaults/shapes";
+import { SHAPE_DEFAULTS, CARD_FRAME_SIZE_PRESETS, CARD_FRAME_VARIANTS, FRAME_MODES, FRAME_MODE_LABELS } from "./defaults/shapes";
 import { SCENE_BG_PRESETS } from "./defaults/scene-bg";
 import { MUSIC_VARIANTS, MUSIC_VARIANT_LABELS, MUSIC_SIZE_PRESETS } from "./widgets/music";
 import { uid } from "./utils/format";
@@ -23,6 +23,8 @@ const CcsCanvas = {
   SCENE_BG_PRESETS,
   CARD_FRAME_SIZE_PRESETS,
   CARD_FRAME_VARIANTS,
+  FRAME_MODES,
+  FRAME_MODE_LABELS,
   MUSIC_VARIANTS,
   MUSIC_VARIANT_LABELS,
   MUSIC_SIZE_PRESETS,

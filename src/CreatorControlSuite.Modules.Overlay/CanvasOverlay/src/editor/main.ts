@@ -2,7 +2,7 @@ import "../editor/editor-shell.css";
 import type { CreateRuntime, LayoutItem } from "../../shared/types";
 import type { EditorContext } from "./props/context";
 import { syncProps } from "./props/sync-props";
-import { propSection } from "./sections/prop-section";
+import { propSection, featureSection } from "./sections/prop-section";
 import { fillPalette, setupPaletteDrop, type PaletteEntry } from "./shell/palette";
 import { setupCanvasSize } from "./shell/canvas-size";
 import { setupDrag } from "./shell/drag";
@@ -121,14 +121,10 @@ function bootEditor(): void {
     { type: "socials", label: "Socials" }
   ];
   const shapes: PaletteEntry[] = [
-    { type: "frame.rect", label: "Frame Rechteck" },
-    { type: "frame.circle", label: "Frame Kreis" },
-    { type: "frame.corners", label: "Frame Corners" },
-    { type: "frame.bevel", label: "Frame Bezel" },
-    { type: "frame.neon", label: "Frame Neon" },
-    { type: "frame.dashed", label: "Frame Dashed" },
+    { type: "frame", label: "Frame" },
     { type: "frame.card", label: "Card Frame" },
     { type: "shape.vignette", label: "Vignette" },
+    { type: "shape.cutout", label: "Cutout" },
     { type: "shape.scene-bg", label: "Starting Hintergrund" }
   ];
 
@@ -359,4 +355,4 @@ async function boot(
 
 bootEditor();
 
-export { liveItem, commitProp };
+export { liveItem, commitProp, featureSection };

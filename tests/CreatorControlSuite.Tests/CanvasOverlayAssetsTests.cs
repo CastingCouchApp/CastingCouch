@@ -263,14 +263,115 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("container-type", styles);
     }
 
+
     [Fact]
     public void ListShapeTypes_ContainsFrames()
     {
         IReadOnlyList<string> types = CanvasOverlayAssets.ListShapeTypes();
-        Assert.Contains("frame.neon", types);
+        Assert.Contains("frame", types);
+        Assert.DoesNotContain("frame.rect", types);
+        Assert.DoesNotContain("frame.neon", types);
+        Assert.DoesNotContain("frame.circle", types);
+        Assert.DoesNotContain("frame.corners", types);
+        Assert.DoesNotContain("frame.bevel", types);
+        Assert.DoesNotContain("frame.dashed", types);
         Assert.Contains("frame.card", types);
         Assert.Contains("shape.vignette", types);
         Assert.Contains("shape.scene-bg", types);
+        Assert.Contains("shape.cutout", types);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersUnifiedFrameShape()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("frame:", runtime);
+        Assert.Contains("FRAME_MODES", runtime);
+        Assert.Contains("createFrameEl", runtime);
+        Assert.Contains("applyFrame", runtime);
+        Assert.Contains("resolveFrameMode", runtime);
+        Assert.Contains("ccs-frame-m-", runtime);
+        Assert.Contains("\"rect\"", runtime);
+        Assert.Contains("\"circle\"", runtime);
+        Assert.Contains("\"corners\"", runtime);
+        Assert.Contains("\"bevel\"", runtime);
+        Assert.Contains("\"neon\"", runtime);
+        Assert.Contains("\"dashed\"", runtime);
+        Assert.Contains("\"double\"", runtime);
+        Assert.Contains("\"dotted\"", runtime);
+        Assert.Contains("\"groove\"", runtime);
+        Assert.Contains("\"ridge\"", runtime);
+        Assert.Contains("\"pixel\"", runtime);
+        Assert.Contains("\"ticket\"", runtime);
+        Assert.Contains("\"stamp\"", runtime);
+        Assert.Contains("\"film\"", runtime);
+        Assert.Contains("\"hud\"", runtime);
+        Assert.Contains("\"hex\"", runtime);
+        Assert.Contains("\"octagon\"", runtime);
+        Assert.Contains("\"tape\"", runtime);
+        Assert.Contains("\"scan\"", runtime);
+        Assert.Contains("\"rainbow\"", runtime);
+        Assert.Contains("\"comic\"", runtime);
+        Assert.Contains("\"frosted\"", runtime);
+        Assert.Contains("\"chrome\"", runtime);
+        Assert.Contains("\"notch\"", runtime);
+        Assert.Contains("\"brackets\"", runtime);
+        Assert.Contains("\"orbit\"", runtime);
+        Assert.Contains("--frame-radius", runtime);
+        // Legacy types remain renderable as mode aliases
+        Assert.Contains("frame.rect", runtime);
+        Assert.Contains("frame.neon", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"frame\"", editor);
+        Assert.Contains("selectProp(\"mode\"", editor);
+        Assert.Contains("numProp(\"radius\"", editor);
+        Assert.Contains("FRAME_MODES", editor);
+        Assert.DoesNotContain("type: \"frame.rect\"", editor);
+        Assert.DoesNotContain("type: \"frame.neon\"", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-frame", styles);
+        Assert.Contains(".ccs-frame-m-rect", styles);
+        Assert.Contains(".ccs-frame-m-neon", styles);
+        Assert.Contains(".ccs-frame-m-double", styles);
+        Assert.Contains(".ccs-frame-m-pixel", styles);
+        Assert.Contains(".ccs-frame-m-ticket", styles);
+        Assert.Contains(".ccs-frame-m-hud", styles);
+        Assert.Contains(".ccs-frame-m-hex", styles);
+        Assert.Contains(".ccs-frame-m-rainbow", styles);
+        Assert.Contains(".ccs-frame-m-orbit", styles);
+        Assert.Contains("--frame-radius", styles);
+
+        Assert.True(CanvasOverlayAssets.TryGet("solo/solo.js", out string solo, out _));
+        Assert.Contains("frame", solo);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersCutoutShape()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"shape.cutout\":", runtime);
+        Assert.Contains("createCutoutEl", runtime);
+        Assert.Contains("applyCutout", runtime);
+        Assert.Contains("ccs-shape-cutout", runtime);
+        Assert.Contains("ccs-item-cutout", runtime);
+        Assert.Contains("--cutout-radius", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"shape.cutout\"", editor);
+        Assert.Contains("numProp(\"radius\"", editor);
+        Assert.Contains("Cutout", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-shape-cutout", styles);
+        Assert.Contains(".ccs-item-cutout", styles);
+        Assert.Contains("mix-blend-mode: destination-out", styles);
+        Assert.Contains("isolation: isolate", styles);
+        Assert.Contains("--cutout-radius", styles);
+
+        Assert.True(CanvasOverlayAssets.TryGet("solo/solo.js", out string solo, out _));
+        Assert.Contains("startsWith(\"shape.\")", solo);
     }
 
     [Fact]

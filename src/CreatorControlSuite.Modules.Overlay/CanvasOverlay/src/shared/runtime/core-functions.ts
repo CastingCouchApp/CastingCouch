@@ -5,7 +5,8 @@ import { formatClock, formatUptime } from '../utils/format';
 import { rgbaFrom } from '../utils/color';
 import { SCENE_BG_PRESETS } from '../defaults/scene-bg';
 import { CARD_FRAME_VARIANTS, SHAPE_DEFAULTS } from '../defaults/shapes';
-
+import { createCutoutEl } from '../shapes/cutout';
+import { createFrameEl, isUnifiedFrameType, resolveFrameMode } from '../shapes/frame';
 import {
   createSpotifyEl,
   updateSpotify,
@@ -19,7 +20,6 @@ import {
   MUSIC_VARIANTS,
   MUSIC_SIZE_PRESETS
 } from '../widgets/music';
-
 export {
   createSpotifyEl,
   updateSpotify,
@@ -873,17 +873,15 @@ export function appendChatEvent(el, payload) {
 
 export function isShapeItem(item) {
     const type = (item && item.type) || "";
-    return item.kind === "shape" || type.startsWith("frame.") || type.startsWith("shape.") || !!SHAPE_DEFAULTS[type];
+    return item.kind === "shape" || type === "frame" || type.startsWith("frame.") || type.startsWith("shape.") || !!SHAPE_DEFAULTS[type];
   }
 
 export function shapeClass(type, item) {
+    if (isUnifiedFrameType(type)) {
+      const mode = resolveFrameMode(item);
+      return "ccs-shape ccs-frame ccs-frame-m-" + mode;
+    }
     switch (type) {
-      case "frame.rect": return "ccs-shape ccs-frame-rect";
-      case "frame.circle": return "ccs-shape ccs-frame-circle";
-      case "frame.corners": return "ccs-shape ccs-frame-corners";
-      case "frame.bevel": return "ccs-shape ccs-frame-bevel";
-      case "frame.neon": return "ccs-shape ccs-frame-neon";
-      case "frame.dashed": return "ccs-shape ccs-frame-dashed";
       case "frame.card": {
         let variant = String(prop(item, "variant", "classic") || "classic").toLowerCase();
         if (CARD_FRAME_VARIANTS.indexOf(variant) < 0) variant = "classic";
@@ -891,7 +889,8 @@ export function shapeClass(type, item) {
       }
       case "shape.vignette": return "ccs-shape ccs-shape-vignette";
       case "shape.scene-bg": return "ccs-shape ccs-shape-scene-bg";
-      default: return "ccs-shape ccs-frame-rect";
+      case "shape.cutout": return "ccs-shape ccs-shape-cutout";
+      default: return "ccs-shape ccs-frame ccs-frame-m-rect";
     }
   }
 
@@ -1021,6 +1020,12 @@ export function applySceneBg(el, item) {
   }
 
 export function createShapeEl(item) {
+    if (item.type === "shape.cutout") {
+      return createCutoutEl(item);
+    }
+    if (isUnifiedFrameType(item.type)) {
+      return createFrameEl(item);
+    }
     const el = document.createElement("div");
     el.className = shapeClass(item.type, item);
     if (item.type === "shape.scene-bg") {
@@ -1039,11 +1044,6 @@ export function createShapeEl(item) {
       el.appendChild(bottomline);
       applyCardFrame(el, item);
       return el;
-    }
-    const color = prop(item, "color", "#ff7a00");
-    el.style.setProperty("--frame-color", color);
-    if (item.type === "frame.rect") {
-      el.style.setProperty("--frame-radius", (prop(item, "radius", 16) || 16) + "px");
     }
     return el;
   }
