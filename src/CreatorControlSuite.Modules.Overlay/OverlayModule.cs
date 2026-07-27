@@ -2,24 +2,18 @@ using CreatorControlSuite.Core.Modules;
 
 namespace CreatorControlSuite.Modules.Overlay;
 
-public sealed class OverlayModule : IConnectableModule
+public sealed class OverlayModule(IOverlayDataService service) : IConnectableModule
 {
-    private readonly IOverlayDataService _service;
     private bool _initialized;
-
-    public OverlayModule(IOverlayDataService service)
-    {
-        _service = service;
-    }
 
     public string Id => "overlay";
     public string DisplayName => "Overlay";
 
-    public IOverlayDataService Service => _service;
+    public IOverlayDataService Service { get; } = service;
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
-        await _service.InitializeAsync(cancellationToken);
+        await Service.InitializeAsync(cancellationToken);
         _initialized = true;
     }
 
@@ -37,7 +31,7 @@ public sealed class OverlayModule : IConnectableModule
     public async Task<ModuleStatus> GetStatusAsync(
         CancellationToken cancellationToken)
     {
-        var path = await _service.GetDataFilePathAsync(cancellationToken);
+        string path = await Service.GetDataFilePathAsync(cancellationToken);
 
         return new ModuleStatus(
             Id,

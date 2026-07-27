@@ -9,7 +9,7 @@ public sealed class TwitchRoleToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var text = value?.ToString() ?? string.Empty;
+        string text = value?.ToString() ?? string.Empty;
 
         if (text.Contains("[STREAMER]", StringComparison.OrdinalIgnoreCase))
         {

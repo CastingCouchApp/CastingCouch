@@ -28,14 +28,14 @@ public sealed class JsonProfileService : IProfileService
     {
         var results = new List<ProfileSummary>();
 
-        foreach (var path in Directory.GetFiles(
+        foreach (string path in Directory.GetFiles(
                      _profileRoot,
                      "*.json",
                      SearchOption.TopDirectoryOnly))
         {
             try
             {
-                var profile = await ReadAsync(path, cancellationToken);
+                CreatorProfile profile = await ReadAsync(path, cancellationToken);
 
                 results.Add(new ProfileSummary(
                     profile.Id,
@@ -48,9 +48,7 @@ public sealed class JsonProfileService : IProfileService
             }
         }
 
-        return results
-            .OrderBy(profile => profile.Name, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+        return [.. results.OrderBy(profile => profile.Name, StringComparer.CurrentCultureIgnoreCase)];
     }
 
     public Task<CreatorProfile> LoadAsync(
@@ -69,8 +67,8 @@ public sealed class JsonProfileService : IProfileService
 
         profile.UpdatedAt = DateTimeOffset.UtcNow;
 
-        var path = GetPath(profile.Id);
-        var temp = path + ".tmp";
+        string path = GetPath(profile.Id);
+        string temp = path + ".tmp";
 
         await File.WriteAllTextAsync(
             temp,
@@ -101,7 +99,7 @@ public sealed class JsonProfileService : IProfileService
         string profileId,
         CancellationToken cancellationToken = default)
     {
-        var profile = await LoadAsync(profileId, cancellationToken);
+        CreatorProfile profile = await LoadAsync(profileId, cancellationToken);
         await _settingsStore.SaveAsync(profile.Settings, cancellationToken);
     }
 
@@ -109,7 +107,7 @@ public sealed class JsonProfileService : IProfileService
         string profileId,
         CancellationToken cancellationToken = default)
     {
-        var path = GetPath(profileId);
+        string path = GetPath(profileId);
 
         if (File.Exists(path))
         {
@@ -124,8 +122,8 @@ public sealed class JsonProfileService : IProfileService
         string targetPath,
         CancellationToken cancellationToken = default)
     {
-        var profile = await LoadAsync(profileId, cancellationToken);
-        var targetDirectory = Path.GetDirectoryName(targetPath);
+        CreatorProfile profile = await LoadAsync(profileId, cancellationToken);
+        string? targetDirectory = Path.GetDirectoryName(targetPath);
 
         if (!string.IsNullOrWhiteSpace(targetDirectory))
         {
@@ -144,7 +142,7 @@ public sealed class JsonProfileService : IProfileService
         string sourcePath,
         CancellationToken cancellationToken = default)
     {
-        var profile = await ReadAsync(sourcePath, cancellationToken);
+        CreatorProfile profile = await ReadAsync(sourcePath, cancellationToken);
         profile.Id = Guid.NewGuid().ToString("N");
         profile.Name += " (Import)";
         profile.CreatedAt = DateTimeOffset.UtcNow;
@@ -164,7 +162,7 @@ public sealed class JsonProfileService : IProfileService
                 path);
         }
 
-        await using var stream = File.OpenRead(path);
+        await using FileStream stream = File.OpenRead(path);
 
         return await JsonSerializer.DeserializeAsync<CreatorProfile>(
                    stream,
@@ -176,7 +174,7 @@ public sealed class JsonProfileService : IProfileService
 
     private string GetPath(string profileId)
     {
-        var safeId = string.Concat(
+        string safeId = string.Concat(
             profileId.Where(character =>
                 char.IsLetterOrDigit(character) ||
                 character is '-' or '_'));

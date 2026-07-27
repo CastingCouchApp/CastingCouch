@@ -23,9 +23,9 @@ public static partial class AlertTemplateRenderer
             template,
             match =>
             {
-                var name = match.Groups["name"].Value;
+                string name = match.Groups["name"].Value;
 
-                return values.TryGetValue(name, out var value)
+                return values.TryGetValue(name, out string? value)
                     ? value
                     : match.Value;
             });

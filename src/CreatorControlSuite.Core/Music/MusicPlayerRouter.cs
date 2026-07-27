@@ -6,7 +6,6 @@ public sealed class MusicPlayerRouter : IMusicPlayerRouter
 {
     private readonly ISettingsStore _settingsStore;
     private readonly Dictionary<string, IMusicPlayer> _players;
-    private string _activeProviderId = MusicProviderIds.Spotify;
 
     public MusicPlayerRouter(
         ISettingsStore settingsStore,
@@ -19,21 +18,23 @@ public sealed class MusicPlayerRouter : IMusicPlayerRouter
             StringComparer.OrdinalIgnoreCase);
 
         if (_players.Count == 0)
+        {
             throw new InvalidOperationException("Es ist kein Music-Player registriert.");
+        }
     }
 
-    public string ActiveProviderId => _activeProviderId;
+    public string ActiveProviderId { get; private set; } = MusicProviderIds.Spotify;
 
     public string ActiveDisplayName =>
         ActivePlayer.DisplayName;
 
     public IMusicPlayer ActivePlayer =>
-        _players.TryGetValue(_activeProviderId, out var player)
+        _players.TryGetValue(ActiveProviderId, out IMusicPlayer? player)
             ? player
             : _players[MusicProviderIds.Spotify];
 
     public IReadOnlyList<IMusicPlayer> Players =>
-        _players.Values.OrderBy(player => player.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+        [.. _players.Values.OrderBy(player => player.DisplayName, StringComparer.OrdinalIgnoreCase)];
 
     public event EventHandler? ActiveProviderChanged;
     public event EventHandler? SnapshotChanged;
@@ -42,18 +43,20 @@ public sealed class MusicPlayerRouter : IMusicPlayerRouter
         string providerId,
         CancellationToken cancellationToken = default)
     {
-        var normalized = MusicProviderIds.Normalize(providerId);
+        string normalized = MusicProviderIds.Normalize(providerId);
         if (!_players.ContainsKey(normalized))
+        {
             throw new InvalidOperationException($"Unbekannter Music-Provider: {providerId}");
+        }
 
-        if (string.Equals(_activeProviderId, normalized, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(ActiveProviderId, normalized, StringComparison.OrdinalIgnoreCase))
         {
             await EnsureExclusiveAsync(cancellationToken);
             return;
         }
 
-        var previous = ActivePlayer;
-        _activeProviderId = normalized;
+        IMusicPlayer previous = ActivePlayer;
+        ActiveProviderId = normalized;
 
         try
         {
@@ -71,8 +74,8 @@ public sealed class MusicPlayerRouter : IMusicPlayerRouter
 
     public async Task RefreshFromSettingsAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var providerId = settings.MusicPlayer?.ProviderId ?? MusicProviderIds.Spotify;
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        string providerId = settings.MusicPlayer?.ProviderId ?? MusicProviderIds.Spotify;
         await ApplyProviderAsync(providerId, cancellationToken);
     }
 
@@ -111,10 +114,12 @@ public sealed class MusicPlayerRouter : IMusicPlayerRouter
 
     private async Task EnsureExclusiveAsync(CancellationToken cancellationToken)
     {
-        foreach (var player in _players.Values)
+        foreach (IMusicPlayer player in _players.Values)
         {
-            if (string.Equals(player.Id, _activeProviderId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(player.Id, ActiveProviderId, StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             try
             {

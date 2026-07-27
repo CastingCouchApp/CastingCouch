@@ -3,19 +3,12 @@ using CreatorControlSuite.Modules.Workflow.Models;
 
 namespace CreatorControlSuite.Modules.Workflow;
 
-public sealed class WorkflowModule : IConnectableModule
+public sealed class WorkflowModule(IStreamWorkflowService service) : IConnectableModule
 {
-    private readonly IStreamWorkflowService _service;
-
-    public WorkflowModule(IStreamWorkflowService service)
-    {
-        _service = service;
-    }
-
     public string Id => "workflow";
     public string DisplayName => "Workflow";
 
-    public IStreamWorkflowService Service => _service;
+    public IStreamWorkflowService Service { get; } = service;
 
     public Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -35,7 +28,7 @@ public sealed class WorkflowModule : IConnectableModule
     public Task<ModuleStatus> GetStatusAsync(
         CancellationToken cancellationToken)
     {
-        var state = _service.State;
+        WorkflowState state = Service.State;
 
         return Task.FromResult(
             new ModuleStatus(

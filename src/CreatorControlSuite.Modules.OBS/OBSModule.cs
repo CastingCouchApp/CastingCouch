@@ -5,21 +5,14 @@ using CreatorControlSuite.Modules.OBS.Models;
 
 namespace CreatorControlSuite.Modules.OBS;
 
-public sealed class OBSModule : IConnectableModule
+public sealed class OBSModule(
+    ISettingsStore settingsStore,
+    ISecretStore secretStore,
+    IObsWebSocketClient client) : IConnectableModule
 {
-    private readonly ISettingsStore _settingsStore;
-    private readonly ISecretStore _secretStore;
-    private readonly IObsWebSocketClient _client;
-
-    public OBSModule(
-        ISettingsStore settingsStore,
-        ISecretStore secretStore,
-        IObsWebSocketClient client)
-    {
-        _settingsStore = settingsStore;
-        _secretStore = secretStore;
-        _client = client;
-    }
+    private readonly ISettingsStore _settingsStore = settingsStore;
+    private readonly ISecretStore _secretStore = secretStore;
+    private readonly IObsWebSocketClient _client = client;
 
     public string Id => "obs";
     public string DisplayName => "OBS";
@@ -31,8 +24,8 @@ public sealed class OBSModule : IConnectableModule
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var password =
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        string password =
             await _secretStore.LoadAsync(
                 "obs.password",
                 cancellationToken)
@@ -68,7 +61,7 @@ public sealed class OBSModule : IConnectableModule
 
         try
         {
-            var snapshot =
+            ObsSnapshot snapshot =
                 await _client.GetSnapshotAsync(cancellationToken);
 
             return new ModuleStatus(

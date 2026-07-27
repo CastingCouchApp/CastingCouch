@@ -7,7 +7,7 @@ public sealed class SettingsStoreTests
     [Fact]
     public async Task SettingsCanBeSavedAndLoaded()
     {
-        var directory = Path.Combine(
+        string directory = Path.Combine(
             Path.GetTempPath(),
             "CreatorControlSuite.Tests",
             Guid.NewGuid().ToString("N"));
@@ -16,7 +16,7 @@ public sealed class SettingsStoreTests
 
         try
         {
-            var path = Path.Combine(directory, "settings.json");
+            string path = Path.Combine(directory, "settings.json");
             var store = new JsonSettingsStore(path);
 
             var settings = new AppSettings();
@@ -25,7 +25,7 @@ public sealed class SettingsStoreTests
 
             await store.SaveAsync(settings);
 
-            var loaded = await store.LoadAsync();
+            AppSettings loaded = await store.LoadAsync();
 
             Assert.Equal("Denver John", loaded.Branding.DisplayName);
             Assert.Equal(60, loaded.Workflow.EndSceneSeconds);

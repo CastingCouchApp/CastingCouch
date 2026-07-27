@@ -7,6 +7,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
     <Deterministic>true</Deterministic>
+    <!-- Erlaubt Restore/Format auf macOS/Linux; Laufzeit bleibt Windows-only. -->
+    <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('windows'))">true</EnableWindowsTargeting>
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
     <BaseOutputPath>$(MSBuildThisFileDirectory)artifacts\bin\$(MSBuildProjectName)\</BaseOutputPath>
     <DefaultItemExcludes>$(DefaultItemExcludes);**\artifacts\**</DefaultItemExcludes>

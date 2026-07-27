@@ -43,20 +43,15 @@ public interface IAutomationRuleEngine
         CancellationToken cancellationToken = default);
 }
 
-public sealed class AutomationRuleEngine : IAutomationRuleEngine
+public sealed class AutomationRuleEngine(IEnumerable<IAutomationActionHandler> handlers) : IAutomationRuleEngine
 {
-    private readonly IReadOnlyDictionary<string, IAutomationActionHandler> _handlers;
-    private readonly object _sync = new();
+    private readonly IReadOnlyDictionary<string, IAutomationActionHandler> _handlers = handlers.ToDictionary(
+            handler => handler.ActionType,
+            StringComparer.OrdinalIgnoreCase);
+    private readonly Lock _sync = new();
     private List<AutomationRule> _rules = [];
     private readonly HashSet<string> _firedOnce = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DateTimeOffset> _lastFired = new(StringComparer.Ordinal);
-
-    public AutomationRuleEngine(IEnumerable<IAutomationActionHandler> handlers)
-    {
-        _handlers = handlers.ToDictionary(
-            handler => handler.ActionType,
-            StringComparer.OrdinalIgnoreCase);
-    }
 
     public IReadOnlyList<AutomationRule> Rules
     {
@@ -64,7 +59,7 @@ public sealed class AutomationRuleEngine : IAutomationRuleEngine
         {
             lock (_sync)
             {
-                return _rules.ToList();
+                return [.. _rules];
             }
         }
     }
@@ -73,9 +68,7 @@ public sealed class AutomationRuleEngine : IAutomationRuleEngine
     {
         lock (_sync)
         {
-            _rules = rules
-                .OrderBy(rule => rule.Priority)
-                .ToList();
+            _rules = [.. rules.OrderBy(rule => rule.Priority)];
         }
     }
 
@@ -86,17 +79,16 @@ public sealed class AutomationRuleEngine : IAutomationRuleEngine
         List<AutomationRule> candidates;
         lock (_sync)
         {
-            candidates = _rules
+            candidates = [.. _rules
                 .Where(rule =>
                     rule.Enabled &&
                     string.Equals(
                         rule.TriggerType,
                         context.TriggerType,
-                        StringComparison.OrdinalIgnoreCase))
-                .ToList();
+                        StringComparison.OrdinalIgnoreCase))];
         }
 
-        foreach (var rule in candidates)
+        foreach (AutomationRule rule in candidates)
         {
             if (rule.FireOnce && _firedOnce.Contains(rule.Id))
             {
@@ -104,13 +96,13 @@ public sealed class AutomationRuleEngine : IAutomationRuleEngine
             }
 
             if (rule.HoldDuration is { } hold &&
-                _lastFired.TryGetValue(rule.Id, out var last) &&
+                _lastFired.TryGetValue(rule.Id, out DateTimeOffset last) &&
                 DateTimeOffset.UtcNow - last < hold)
             {
                 continue;
             }
 
-            if (!_handlers.TryGetValue(rule.ActionType, out var handler))
+            if (!_handlers.TryGetValue(rule.ActionType, out IAutomationActionHandler? handler))
             {
                 continue;
             }

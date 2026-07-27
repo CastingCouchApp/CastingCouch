@@ -4,22 +4,16 @@ using CreatorControlSuite.Core.Music;
 
 namespace CreatorControlSuite.App.Services;
 
-public sealed class MusicPlayerUiPresenter : IMusicPlayerUiPresenter
+public sealed class MusicPlayerUiPresenter(IMusicPlayerRouter router, IEventBus eventBus) : IMusicPlayerUiPresenter
 {
-    private readonly IMusicPlayerRouter _router;
-    private readonly IEventBus _eventBus;
-
-    public MusicPlayerUiPresenter(IMusicPlayerRouter router, IEventBus eventBus)
-    {
-        _router = router;
-        _eventBus = eventBus;
-    }
+    private readonly IMusicPlayerRouter _router = router;
+    private readonly IEventBus _eventBus = eventBus;
 
     public async Task<MusicPlayerUiState> GetStateAsync(
         CancellationToken cancellationToken = default)
     {
-        var snapshot = await _router.GetSnapshotAsync(cancellationToken);
-        var trackLabel = string.IsNullOrWhiteSpace(snapshot.Title)
+        NowPlayingSnapshot snapshot = await _router.GetSnapshotAsync(cancellationToken);
+        string trackLabel = string.IsNullOrWhiteSpace(snapshot.Title)
             ? "Kein Titel"
             : string.IsNullOrWhiteSpace(snapshot.Artist)
                 ? snapshot.Title

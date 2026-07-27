@@ -65,7 +65,7 @@ public partial class TwitchChannelEditorWindow : Window
         }
 
         _searchTimer.Stop();
-        var query = CategorySearchBox.Text.Trim();
+        string query = CategorySearchBox.Text.Trim();
         if (query.Length < 2)
         {
             CloseSuggestions();
@@ -139,7 +139,7 @@ public partial class TwitchChannelEditorWindow : Window
 
     private async Task SearchAsync()
     {
-        var query = CategorySearchBox.Text.Trim();
+        string query = CategorySearchBox.Text.Trim();
         if (query.Length < 2)
         {
             return;
@@ -148,11 +148,11 @@ public partial class TwitchChannelEditorWindow : Window
         _searchCts?.Cancel();
         _searchCts?.Dispose();
         _searchCts = new CancellationTokenSource();
-        var token = _searchCts.Token;
+        CancellationToken token = _searchCts.Token;
 
         try
         {
-            var categories = await _searchCategories(query);
+            IReadOnlyList<TwitchCategory> categories = await _searchCategories(query);
             if (token.IsCancellationRequested)
             {
                 return;
@@ -209,13 +209,13 @@ public partial class TwitchChannelEditorWindow : Window
 
     private void MoveSuggestion(int delta)
     {
-        var count = CategorySuggestionsBox.Items.Count;
+        int count = CategorySuggestionsBox.Items.Count;
         if (count == 0)
         {
             return;
         }
 
-        var next = CategorySuggestionsBox.SelectedIndex + delta;
+        int next = CategorySuggestionsBox.SelectedIndex + delta;
         if (next < 0)
         {
             next = count - 1;

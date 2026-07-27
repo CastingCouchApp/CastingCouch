@@ -3,14 +3,9 @@ using System.Text;
 
 namespace CreatorControlSuite.Core.Updates;
 
-public sealed class RsaUpdateSignatureVerifier : IUpdateSignatureVerifier
+public sealed class RsaUpdateSignatureVerifier(string publicKeyPath) : IUpdateSignatureVerifier
 {
-    private readonly string _publicKeyPath;
-
-    public RsaUpdateSignatureVerifier(string publicKeyPath)
-    {
-        _publicKeyPath = publicKeyPath;
-    }
+    private readonly string _publicKeyPath = publicKeyPath;
 
     public bool VerifyManifest(SignedUpdateManifest manifest)
     {
@@ -24,9 +19,9 @@ public sealed class RsaUpdateSignatureVerifier : IUpdateSignatureVerifier
 
         try
         {
-            var payload = Encoding.UTF8.GetBytes(
+            byte[] payload = Encoding.UTF8.GetBytes(
                 UpdateManifestCanonical.GetPayload(manifest));
-            var signature = Convert.FromBase64String(manifest.Signature);
+            byte[] signature = Convert.FromBase64String(manifest.Signature);
 
             using var rsa = RSA.Create();
             rsa.ImportFromPem(File.ReadAllText(_publicKeyPath));
@@ -61,8 +56,8 @@ public sealed class RsaUpdateSignatureVerifier : IUpdateSignatureVerifier
             return false;
         }
 
-        await using var stream = File.OpenRead(packagePath);
-        var hash = Convert.ToHexString(
+        await using FileStream stream = File.OpenRead(packagePath);
+        string hash = Convert.ToHexString(
             await SHA256.HashDataAsync(stream, cancellationToken));
 
         return hash.Equals(

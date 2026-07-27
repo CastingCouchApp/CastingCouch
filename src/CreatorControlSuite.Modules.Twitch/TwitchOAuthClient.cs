@@ -6,19 +6,14 @@ using CreatorControlSuite.Modules.Twitch.Models;
 
 namespace CreatorControlSuite.Modules.Twitch;
 
-public sealed class TwitchOAuthClient : ITwitchOAuthClient
+public sealed class TwitchOAuthClient(HttpClient httpClient) : ITwitchOAuthClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly HttpClient _httpClient;
-
-    public TwitchOAuthClient(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
-    }
+    private readonly HttpClient _httpClient = httpClient;
 
     public async Task<TwitchDeviceCode> StartDeviceAuthorizationAsync(
         string clientId,
@@ -34,14 +29,14 @@ public sealed class TwitchOAuthClient : ITwitchOAuthClient
                 ["scopes"] = string.Join(' ', scopes)
             });
 
-        using var response = await _httpClient.PostAsync(
+        using HttpResponseMessage response = await _httpClient.PostAsync(
             TwitchConstants.OAuthDeviceUrl,
             content,
             cancellationToken);
 
         await EnsureSuccessAsync(response, cancellationToken);
 
-        var result = await response.Content.ReadFromJsonAsync<DeviceCodeResponse>(
+        DeviceCodeResponse result = await response.Content.ReadFromJsonAsync<DeviceCodeResponse>(
             JsonOptions,
             cancellationToken)
             ?? throw new InvalidOperationException(
@@ -63,7 +58,7 @@ public sealed class TwitchOAuthClient : ITwitchOAuthClient
     {
         ValidateClientId(clientId);
 
-        var expiresAt = DateTimeOffset.UtcNow.AddSeconds(
+        DateTimeOffset expiresAt = DateTimeOffset.UtcNow.AddSeconds(
             deviceCode.ExpiresInSeconds);
 
         var interval = TimeSpan.FromSeconds(
@@ -88,14 +83,14 @@ public sealed class TwitchOAuthClient : ITwitchOAuthClient
                         "urn:ietf:params:oauth:grant-type:device_code"
                 });
 
-            using var response = await _httpClient.PostAsync(
+            using HttpResponseMessage response = await _httpClient.PostAsync(
                 TwitchConstants.OAuthTokenUrl,
                 content,
                 cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
-                var token = await response.Content.ReadFromJsonAsync<TokenResponse>(
+                TokenResponse token = await response.Content.ReadFromJsonAsync<TokenResponse>(
                     JsonOptions,
                     cancellationToken)
                     ?? throw new InvalidOperationException(
@@ -104,7 +99,7 @@ public sealed class TwitchOAuthClient : ITwitchOAuthClient
                 return ToTokenSet(token);
             }
 
-            var error = await ReadErrorAsync(response, cancellationToken);
+            ErrorResponse error = await ReadErrorAsync(response, cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.BadRequest &&
                 string.Equals(
@@ -149,14 +144,14 @@ public sealed class TwitchOAuthClient : ITwitchOAuthClient
                 ["refresh_token"] = refreshToken
             });
 
-        using var response = await _httpClient.PostAsync(
+        using HttpResponseMessage response = await _httpClient.PostAsync(
             TwitchConstants.OAuthTokenUrl,
             content,
             cancellationToken);
 
         await EnsureSuccessAsync(response, cancellationToken);
 
-        var token = await response.Content.ReadFromJsonAsync<TokenResponse>(
+        TokenResponse token = await response.Content.ReadFromJsonAsync<TokenResponse>(
             JsonOptions,
             cancellationToken)
             ?? throw new InvalidOperationException(
@@ -180,13 +175,13 @@ public sealed class TwitchOAuthClient : ITwitchOAuthClient
                 "OAuth",
                 accessToken);
 
-        using var response = await _httpClient.SendAsync(
+        using HttpResponseMessage response = await _httpClient.SendAsync(
             request,
             cancellationToken);
 
         await EnsureSuccessAsync(response, cancellationToken);
 
-        var validation =
+        ValidationResponse validation =
             await response.Content.ReadFromJsonAsync<ValidationResponse>(
                 JsonOptions,
                 cancellationToken)
@@ -209,7 +204,7 @@ public sealed class TwitchOAuthClient : ITwitchOAuthClient
                 "Twitch Client-ID fehlt. Bitte unter Einstellungen → Twitch eine gültige Client-ID eintragen.");
         }
 
-        var value = clientId.Trim();
+        string value = clientId.Trim();
 
         if (value.Length < 20 ||
             value.Contains("your_client_id", StringComparison.OrdinalIgnoreCase) ||
@@ -240,7 +235,7 @@ public sealed class TwitchOAuthClient : ITwitchOAuthClient
             return;
         }
 
-        var error = await ReadErrorAsync(
+        ErrorResponse error = await ReadErrorAsync(
             response,
             cancellationToken);
 

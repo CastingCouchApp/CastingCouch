@@ -19,7 +19,7 @@ public sealed class StreamWorkflowServiceTests
     [Fact]
     public async Task PrepareAsync_SetsPreparingPhaseAndOverlay()
     {
-        var harness = CreateHarness();
+        Harness harness = CreateHarness();
 
         await harness.Service.PrepareAsync();
 
@@ -33,7 +33,7 @@ public sealed class StreamWorkflowServiceTests
     [Fact]
     public async Task GoLiveAsync_SetsLivePhaseAndSwitchesScene()
     {
-        var harness = CreateHarness(settings =>
+        Harness harness = CreateHarness(settings =>
         {
             settings.Workflow.AutoSwitchScenes = true;
         });
@@ -50,7 +50,7 @@ public sealed class StreamWorkflowServiceTests
     [Fact]
     public async Task PauseAsync_Then_ResumeAsync_Transitions()
     {
-        var harness = CreateHarness(settings =>
+        Harness harness = CreateHarness(settings =>
         {
             settings.Workflow.AutoSwitchScenes = true;
         });
@@ -72,7 +72,7 @@ public sealed class StreamWorkflowServiceTests
     [Fact]
     public async Task EndAsync_StopsAlertsAndCompletes()
     {
-        var harness = CreateHarness(settings =>
+        Harness harness = CreateHarness(settings =>
         {
             settings.Workflow.AutoSwitchScenes = true;
             settings.Workflow.EndSceneSeconds = 1;
@@ -98,8 +98,8 @@ public sealed class StreamWorkflowServiceTests
         int expectedSubs,
         int expectedBits)
     {
-        var harness = CreateHarness();
-        var count = eventType == "channel.cheer" ? 42 : 1;
+        Harness harness = CreateHarness();
+        int count = eventType == "channel.cheer" ? 42 : 1;
 
         await harness.Service.RegisterTwitchEventAsync(eventType, count);
 
@@ -112,7 +112,7 @@ public sealed class StreamWorkflowServiceTests
     [Fact]
     public async Task ResetAsync_ClearsStatsAndReturnsIdle()
     {
-        var harness = CreateHarness();
+        Harness harness = CreateHarness();
 
         await harness.Service.PrepareAsync();
         await harness.Service.RegisterTwitchEventAsync("channel.subscribe");
@@ -162,11 +162,9 @@ public sealed class StreamWorkflowServiceTests
         FakeOverlayDataService Overlay,
         FakeAlertEngine Alerts);
 
-    private sealed class InMemorySettingsStore : ISettingsStore
+    private sealed class InMemorySettingsStore(AppSettings settings) : ISettingsStore
     {
-        private AppSettings _settings;
-
-        public InMemorySettingsStore(AppSettings settings) => _settings = settings;
+        private AppSettings _settings = settings;
 
         public Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(_settings);
@@ -180,7 +178,7 @@ public sealed class StreamWorkflowServiceTests
 
     private sealed class MemorySecretStore : ISecretStore
     {
-        private readonly Dictionary<string, string> _values = new();
+        private readonly Dictionary<string, string> _values = [];
 
         public Task SaveAsync(string key, string value, CancellationToken cancellationToken = default)
         {
@@ -190,7 +188,7 @@ public sealed class StreamWorkflowServiceTests
 
         public Task<string?> LoadAsync(string key, CancellationToken cancellationToken = default)
         {
-            _values.TryGetValue(key, out var value);
+            _values.TryGetValue(key, out string? value);
             return Task.FromResult(value);
         }
 

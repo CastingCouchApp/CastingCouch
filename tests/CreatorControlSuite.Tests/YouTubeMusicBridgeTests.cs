@@ -21,13 +21,13 @@ public sealed class YouTubeMusicBridgeTests
         };
 
         var bridge = new YouTubeMusicBridge(store);
-        var bookmarklet = bridge.GetBookmarklet(43831);
+        string bookmarklet = bridge.GetBookmarklet(43831);
 
         Assert.StartsWith("javascript:", bookmarklet, StringComparison.Ordinal);
         Assert.DoesNotContain("createElement('script')", bookmarklet, StringComparison.Ordinal);
         Assert.DoesNotContain("s.src=", bookmarklet, StringComparison.Ordinal);
 
-        var decoded = Uri.UnescapeDataString(bookmarklet["javascript:".Length..]);
+        string decoded = Uri.UnescapeDataString(bookmarklet["javascript:".Length..]);
         Assert.Contains('\n', decoded);
         Assert.Contains("43831", decoded, StringComparison.Ordinal);
         Assert.Contains("__ccsYtMusicBridge", decoded, StringComparison.Ordinal);
@@ -55,7 +55,7 @@ public sealed class YouTubeMusicBridgeTests
         try
         {
             using var client = new HttpClient();
-            var payload = JsonSerializer.Serialize(new
+            string payload = JsonSerializer.Serialize(new
             {
                 title = "Test Track",
                 artist = "Test Artist",
@@ -67,10 +67,10 @@ public sealed class YouTubeMusicBridgeTests
             });
 
             using var content = new StringContent(payload, Encoding.UTF8, "application/json");
-            var post = await client.PostAsync("http://127.0.0.1:43899/ytmusic/state", content);
+            HttpResponseMessage post = await client.PostAsync("http://127.0.0.1:43899/ytmusic/state", content);
             post.EnsureSuccessStatusCode();
 
-            var snapshot = bridge.GetSnapshot(30);
+            NowPlayingSnapshot snapshot = bridge.GetSnapshot(30);
             Assert.Equal(MusicProviderIds.YouTubeMusic, snapshot.ProviderId);
             Assert.True(snapshot.Connected);
             Assert.True(snapshot.IsPlaying);
@@ -80,13 +80,11 @@ public sealed class YouTubeMusicBridgeTests
             bridge.EnqueueCommand("next");
             bridge.EnqueueCommand("playpause");
 
-            var response = await client.GetAsync("http://127.0.0.1:43899/ytmusic/commands");
+            HttpResponseMessage response = await client.GetAsync("http://127.0.0.1:43899/ytmusic/commands");
             response.EnsureSuccessStatusCode();
-            var json = await response.Content.ReadAsStringAsync();
+            string json = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
-            var commands = doc.RootElement.GetProperty("commands").EnumerateArray()
-                .Select(x => x.GetString() ?? "")
-                .ToArray();
+            string[] commands = [.. doc.RootElement.GetProperty("commands").EnumerateArray().Select(x => x.GetString() ?? "")];
             Assert.Equal(new[] { "next", "playpause" }, commands);
         }
         finally

@@ -4,29 +4,20 @@ using CreatorControlSuite.Modules.Alerts.Models;
 
 namespace CreatorControlSuite.Modules.Alerts;
 
-public sealed class AlertEngine : IAlertEngine
+public sealed class AlertEngine(
+    ISettingsStore settingsStore,
+    AlertDefinitionProvider definitions,
+    IAlertRenderer renderer) : IAlertEngine
 {
-    private readonly ISettingsStore _settingsStore;
-    private readonly AlertDefinitionProvider _definitions;
-    private readonly IAlertRenderer _renderer;
+    private readonly ISettingsStore _settingsStore = settingsStore;
+    private readonly AlertDefinitionProvider _definitions = definitions;
+    private readonly IAlertRenderer _renderer = renderer;
 
-    private readonly object _stateLock = new();
+    private readonly Lock _stateLock = new();
     private Channel<AlertRequest>? _channel;
     private CancellationTokenSource? _workerCancellation;
     private Task? _worker;
-    private AlertPlaybackState _state =
-        new(false, null, 0, null, "Gestoppt");
     private int _queueLength;
-
-    public AlertEngine(
-        ISettingsStore settingsStore,
-        AlertDefinitionProvider definitions,
-        IAlertRenderer renderer)
-    {
-        _settingsStore = settingsStore;
-        _definitions = definitions;
-        _renderer = renderer;
-    }
 
     public event EventHandler<AlertPlaybackState>? StateChanged;
 
@@ -36,10 +27,12 @@ public sealed class AlertEngine : IAlertEngine
         {
             lock (_stateLock)
             {
-                return _state;
+                return field;
             }
         }
-    }
+
+        private set;
+    } = new(false, null, 0, null, "Gestoppt");
 
     public async Task StartAsync(
         CancellationToken cancellationToken = default)
@@ -49,7 +42,7 @@ public sealed class AlertEngine : IAlertEngine
             return;
         }
 
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
         _channel = Channel.CreateBounded<AlertRequest>(
@@ -122,13 +115,13 @@ public sealed class AlertEngine : IAlertEngine
             await StartAsync(cancellationToken);
         }
 
-        var writer = _channel!.Writer;
+        ChannelWriter<AlertRequest> writer = _channel!.Writer;
 
         await writer.WriteAsync(
             request,
             cancellationToken);
 
-        var queueLength = Interlocked.Increment(
+        int queueLength = Interlocked.Increment(
             ref _queueLength);
 
         UpdateState(
@@ -182,11 +175,11 @@ public sealed class AlertEngine : IAlertEngine
         IReadOnlyDictionary<string, string>? variables = null,
         CancellationToken cancellationToken = default)
     {
-        var definition = await _definitions.GetAsync(
+        AlertDefinition definition = await _definitions.GetAsync(
             type,
             cancellationToken);
 
-        var rendered = AlertTemplateRenderer.Render(
+        string rendered = AlertTemplateRenderer.Render(
             definition.TextTemplate,
             user,
             variables ??
@@ -211,11 +204,11 @@ public sealed class AlertEngine : IAlertEngine
         IReadOnlyDictionary<string, string>? variables = null,
         CancellationToken cancellationToken = default)
     {
-        var definition = await _definitions.GetAsync(
+        AlertDefinition definition = await _definitions.GetAsync(
             type,
             cancellationToken);
 
-        var rendered = AlertTemplateRenderer.Render(
+        string rendered = AlertTemplateRenderer.Render(
             definition.TextTemplate,
             user,
             variables ??
@@ -236,7 +229,7 @@ public sealed class AlertEngine : IAlertEngine
     private async Task WorkerAsync(
         CancellationToken cancellationToken)
     {
-        var channel = _channel
+        Channel<AlertRequest> channel = _channel
                       ?? throw new InvalidOperationException(
                           "Alert-Queue wurde nicht initialisiert.");
 
@@ -245,7 +238,7 @@ public sealed class AlertEngine : IAlertEngine
             while (await channel.Reader.WaitToReadAsync(
                        cancellationToken))
             {
-                while (channel.Reader.TryRead(out var request))
+                while (channel.Reader.TryRead(out AlertRequest? request))
                 {
                     Interlocked.Decrement(ref _queueLength);
 
@@ -275,10 +268,10 @@ public sealed class AlertEngine : IAlertEngine
         AlertRequest request,
         CancellationToken cancellationToken)
     {
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
-        var definition = await _definitions.GetAsync(
+        AlertDefinition definition = await _definitions.GetAsync(
             request.Type,
             cancellationToken);
 
@@ -287,7 +280,7 @@ public sealed class AlertEngine : IAlertEngine
             return;
         }
 
-        var text = AlertTemplateRenderer.Render(
+        string text = AlertTemplateRenderer.Render(
             definition.TextTemplate,
             request.User,
             request.Variables);
@@ -344,7 +337,7 @@ public sealed class AlertEngine : IAlertEngine
     {
         lock (_stateLock)
         {
-            _state = state;
+            State = state;
         }
 
         StateChanged?.Invoke(

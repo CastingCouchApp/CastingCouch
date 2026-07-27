@@ -31,8 +31,8 @@ public sealed class YouTubeMusicModule : IConnectableModule, IMusicPlayer
 
     public async Task<ModuleStatus> GetStatusAsync(CancellationToken cancellationToken)
     {
-        var snapshot = await GetSnapshotAsync(cancellationToken);
-        var health = !_connected
+        NowPlayingSnapshot snapshot = await GetSnapshotAsync(cancellationToken);
+        ModuleHealth health = !_connected
             ? ModuleHealth.Ready
             : snapshot.Connected && !string.Equals(snapshot.StatusText, "Bookmarklet inaktiv", StringComparison.Ordinal)
                 ? ModuleHealth.Connected
@@ -62,9 +62,11 @@ public sealed class YouTubeMusicModule : IConnectableModule, IMusicPlayer
 
     public async Task<NowPlayingSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
         if (!_connected)
+        {
             return NowPlayingSnapshot.Empty(MusicProviderIds.YouTubeMusic);
+        }
 
         return _bridge.GetSnapshot(settings.YouTubeMusic.StateTimeoutSeconds);
     }
@@ -112,13 +114,13 @@ public sealed class YouTubeMusicModule : IConnectableModule, IMusicPlayer
 
     public async Task<string> GetBookmarkletAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
         return _bridge.GetBookmarklet(settings.YouTubeMusic.BridgePort);
     }
 
     public async Task<string> GetBookmarkletInstallPageUrlAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
         return _bridge.GetBookmarkletInstallPageUrl(settings.YouTubeMusic.BridgePort);
     }
 
@@ -130,6 +132,8 @@ public sealed class YouTubeMusicModule : IConnectableModule, IMusicPlayer
     private void EnsureConnected()
     {
         if (!_connected || !_bridge.IsRunning)
+        {
             throw new InvalidOperationException("YouTube Music Bridge ist nicht gestartet.");
+        }
     }
 }

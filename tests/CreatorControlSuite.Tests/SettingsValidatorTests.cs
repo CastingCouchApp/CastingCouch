@@ -9,7 +9,7 @@ public sealed class SettingsValidatorTests
     public void DefaultSettingsAreValidOrWarningsOnly()
     {
         var validator = new SettingsValidator();
-        var report = validator.Validate(new AppSettings());
+        ValidationReport report = validator.Validate(new AppSettings());
 
         Assert.DoesNotContain(
             report.Issues,
@@ -24,10 +24,10 @@ public sealed class SettingsValidatorTests
         string code,
         Action<AppSettings> mutate)
     {
-        var settings = CreateBaselineSettings();
+        AppSettings settings = CreateBaselineSettings();
         mutate(settings);
 
-        var report = new SettingsValidator().Validate(settings);
+        ValidationReport report = new SettingsValidator().Validate(settings);
 
         Assert.Contains(
             report.Issues,
@@ -41,13 +41,13 @@ public sealed class SettingsValidatorTests
     [InlineData("SPOTIFY_CLIENT_ID_EMPTY")]
     public void Validate_ReportsExpectedWarning(string code)
     {
-        var settings = CreateBaselineSettings();
+        AppSettings settings = CreateBaselineSettings();
         settings.Twitch.AutoConnect = true;
         settings.Twitch.ClientId = "";
         settings.Spotify.AutoConnect = true;
         settings.Spotify.ClientId = "";
 
-        var report = new SettingsValidator().Validate(settings);
+        ValidationReport report = new SettingsValidator().Validate(settings);
 
         Assert.Contains(
             report.Issues,

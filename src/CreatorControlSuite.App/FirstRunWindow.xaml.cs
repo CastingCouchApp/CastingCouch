@@ -48,7 +48,7 @@ public partial class FirstRunWindow : Window
 
     private async Task LoadAsync()
     {
-        var settings = await _settingsStore.LoadAsync();
+        AppSettings settings = await _settingsStore.LoadAsync();
 
         DisplayNameBox.Text = settings.Branding.DisplayName;
         ChannelNameBox.Text = settings.Twitch.ChannelName;
@@ -98,7 +98,7 @@ public partial class FirstRunWindow : Window
 
     private void ShowStep()
     {
-        for (var index = 0; index < _steps.Length; index++)
+        for (int index = 0; index < _steps.Length; index++)
         {
             _steps[index].Visibility =
                 index == _stepIndex
@@ -140,7 +140,7 @@ public partial class FirstRunWindow : Window
         {
             if (!int.TryParse(
                     ObsPortBox.Text.Trim(),
-                    out var port) ||
+                    out int port) ||
                 port is < 1 or > 65535)
             {
                 MessageBox.Show(
@@ -196,7 +196,7 @@ public partial class FirstRunWindow : Window
 
     private async Task CompleteAsync()
     {
-        var settings = await _settingsStore.LoadAsync();
+        AppSettings settings = await _settingsStore.LoadAsync();
 
         settings.Branding.DisplayName =
             DisplayNameBox.Text.Trim();

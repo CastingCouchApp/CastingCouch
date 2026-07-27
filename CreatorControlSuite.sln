@@ -33,9 +33,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CreatorControlSuite.Agent",
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CreatorControlSuite.Modules.YouTubeMusic", "src\CreatorControlSuite.Modules.YouTubeMusic\CreatorControlSuite.Modules.YouTubeMusic.csproj", "{1C6F89ED-4C35-41BC-8447-D38075749611}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CreatorControlSuite.Core", "src\CreatorControlSuite.Core\CreatorControlSuite.Core.csproj", "{FEED6259-F8B8-4AA8-A076-632ED0946FA9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CreatorControlSuite.Modules.YouTubeMusic", "src/CreatorControlSuite.Modules.YouTubeMusic/CreatorControlSuite.Modules.YouTubeMusic.csproj", "{1C6F89ED-4C35-41BC-8447-D38075749611}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -227,24 +225,11 @@ Global
 		{1C6F89ED-4C35-41BC-8447-D38075749611}.Release|x64.Build.0 = Release|Any CPU
 		{1C6F89ED-4C35-41BC-8447-D38075749611}.Release|x86.ActiveCfg = Release|Any CPU
 		{1C6F89ED-4C35-41BC-8447-D38075749611}.Release|x86.Build.0 = Release|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Debug|x64.Build.0 = Debug|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Debug|x86.Build.0 = Debug|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Release|x64.ActiveCfg = Release|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Release|x64.Build.0 = Release|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Release|x86.ActiveCfg = Release|Any CPU
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{1C6F89ED-4C35-41BC-8447-D38075749611} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
-		{FEED6259-F8B8-4AA8-A076-632ED0946FA9} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

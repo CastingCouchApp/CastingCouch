@@ -22,7 +22,7 @@ public sealed class LicenseFeatureTests
             publicKeyPath: "unused.pem",
             developmentMode: true);
 
-        var status = await service.GetStatusAsync();
+        LicenseStatus status = await service.GetStatusAsync();
 
         Assert.Equal(LicenseState.Development, status.State);
         Assert.Contains("*", status.EnabledFeatures);
@@ -33,7 +33,7 @@ public sealed class LicenseFeatureTests
     public async Task ActivateValidLicense_Active()
     {
         using var keys = RsaKeyPair.Create();
-        var document = Sign(
+        LicenseDocument document = Sign(
             keys,
             CreateDocument(
                 productId: "creator-control-suite",
@@ -41,12 +41,12 @@ public sealed class LicenseFeatureTests
                 features: [FeatureCatalog.Twitch],
                 expiresAt: DateTimeOffset.UtcNow.AddDays(30)));
 
-        var service = CreateService(keys);
-        var path = WriteLicenseFile(document);
+        LocalLicenseService service = CreateService(keys);
+        string path = WriteLicenseFile(document);
 
         try
         {
-            var status = await service.ActivateAsync(path);
+            LicenseStatus status = await service.ActivateAsync(path);
 
             Assert.Equal(LicenseState.Active, status.State);
             Assert.True(status.IsUsable);
@@ -63,7 +63,7 @@ public sealed class LicenseFeatureTests
     {
         using var keys = RsaKeyPair.Create();
         var other = RsaKeyPair.Create();
-        var document = Sign(
+        LicenseDocument document = Sign(
             other,
             CreateDocument(
                 productId: "creator-control-suite",
@@ -72,12 +72,12 @@ public sealed class LicenseFeatureTests
                 expiresAt: DateTimeOffset.UtcNow.AddDays(30)));
         other.Dispose();
 
-        var service = CreateService(keys);
-        var path = WriteLicenseFile(document);
+        LocalLicenseService service = CreateService(keys);
+        string path = WriteLicenseFile(document);
 
         try
         {
-            var status = await service.ActivateAsync(path);
+            LicenseStatus status = await service.ActivateAsync(path);
 
             Assert.Equal(LicenseState.Invalid, status.State);
             Assert.False(status.IsUsable);
@@ -92,7 +92,7 @@ public sealed class LicenseFeatureTests
     public async Task ExpiredLicense_Expired()
     {
         using var keys = RsaKeyPair.Create();
-        var document = Sign(
+        LicenseDocument document = Sign(
             keys,
             CreateDocument(
                 productId: "creator-control-suite",
@@ -100,12 +100,12 @@ public sealed class LicenseFeatureTests
                 features: [FeatureCatalog.Twitch],
                 expiresAt: DateTimeOffset.UtcNow.AddMinutes(-5)));
 
-        var service = CreateService(keys);
-        var path = WriteLicenseFile(document);
+        LocalLicenseService service = CreateService(keys);
+        string path = WriteLicenseFile(document);
 
         try
         {
-            var status = await service.ActivateAsync(path);
+            LicenseStatus status = await service.ActivateAsync(path);
 
             Assert.Equal(LicenseState.Expired, status.State);
             Assert.False(status.IsUsable);
@@ -120,7 +120,7 @@ public sealed class LicenseFeatureTests
     public async Task WrongProduct_Invalid()
     {
         using var keys = RsaKeyPair.Create();
-        var document = Sign(
+        LicenseDocument document = Sign(
             keys,
             CreateDocument(
                 productId: "other-product",
@@ -128,12 +128,12 @@ public sealed class LicenseFeatureTests
                 features: [FeatureCatalog.Twitch],
                 expiresAt: DateTimeOffset.UtcNow.AddDays(30)));
 
-        var service = CreateService(keys);
-        var path = WriteLicenseFile(document);
+        LocalLicenseService service = CreateService(keys);
+        string path = WriteLicenseFile(document);
 
         try
         {
-            var status = await service.ActivateAsync(path);
+            LicenseStatus status = await service.ActivateAsync(path);
 
             Assert.Equal(LicenseState.Invalid, status.State);
             Assert.Contains("anderen Produkt", status.Detail);
@@ -148,7 +148,7 @@ public sealed class LicenseFeatureTests
     public async Task FeatureGate_EditionFallback_CreatorHasTwitch()
     {
         using var keys = RsaKeyPair.Create();
-        var document = Sign(
+        LicenseDocument document = Sign(
             keys,
             CreateDocument(
                 productId: "creator-control-suite",
@@ -156,7 +156,7 @@ public sealed class LicenseFeatureTests
                 features: [],
                 expiresAt: DateTimeOffset.UtcNow.AddDays(30)));
 
-        var service = CreateService(keys);
+        LocalLicenseService service = CreateService(keys);
         await ActivateStored(service, document);
         var gate = new FeatureGate(service);
 
@@ -167,7 +167,7 @@ public sealed class LicenseFeatureTests
     public async Task FeatureGate_Require_ThrowsWhenMissing()
     {
         using var keys = RsaKeyPair.Create();
-        var document = Sign(
+        LicenseDocument document = Sign(
             keys,
             CreateDocument(
                 productId: "creator-control-suite",
@@ -175,7 +175,7 @@ public sealed class LicenseFeatureTests
                 features: [],
                 expiresAt: DateTimeOffset.UtcNow.AddDays(30)));
 
-        var service = CreateService(keys);
+        LocalLicenseService service = CreateService(keys);
         await ActivateStored(service, document);
         var gate = new FeatureGate(service);
 
@@ -200,7 +200,7 @@ public sealed class LicenseFeatureTests
     public async Task HasFeature_OnlyChecksEnabledFeaturesNotEdition()
     {
         using var keys = RsaKeyPair.Create();
-        var document = Sign(
+        LicenseDocument document = Sign(
             keys,
             CreateDocument(
                 productId: "creator-control-suite",
@@ -208,7 +208,7 @@ public sealed class LicenseFeatureTests
                 features: [],
                 expiresAt: DateTimeOffset.UtcNow.AddDays(30)));
 
-        var service = CreateService(keys);
+        LocalLicenseService service = CreateService(keys);
         await ActivateStored(service, document);
         var gate = new FeatureGate(service);
 
@@ -223,10 +223,10 @@ public sealed class LicenseFeatureTests
         LocalLicenseService service,
         LicenseDocument document)
     {
-        var path = WriteLicenseFile(document);
+        string path = WriteLicenseFile(document);
         try
         {
-            var status = await service.ActivateAsync(path);
+            LicenseStatus status = await service.ActivateAsync(path);
             Assert.True(status.IsUsable, status.Detail);
         }
         finally
@@ -253,10 +253,10 @@ public sealed class LicenseFeatureTests
 
     private static LicenseDocument Sign(RsaKeyPair keys, LicenseDocument document)
     {
-        var payload = JsonSerializer.Serialize(
+        string payload = JsonSerializer.Serialize(
             document with { Signature = "" },
             JsonOptions);
-        var signature = Convert.ToBase64String(
+        string signature = Convert.ToBase64String(
             keys.Rsa.SignData(
                 Encoding.UTF8.GetBytes(payload),
                 HashAlgorithmName.SHA256,
@@ -266,7 +266,7 @@ public sealed class LicenseFeatureTests
 
     private static string WriteLicenseFile(LicenseDocument document)
     {
-        var path = Path.Combine(
+        string path = Path.Combine(
             Path.GetTempPath(),
             "ccs-license-" + Guid.NewGuid().ToString("N") + ".json");
         File.WriteAllText(path, JsonSerializer.Serialize(document, JsonOptions));
@@ -289,13 +289,13 @@ public sealed class LicenseFeatureTests
         public static RsaKeyPair Create()
         {
             var rsa = RSA.Create(2048);
-            var directory = Path.Combine(
+            string directory = Path.Combine(
                 Path.GetTempPath(),
                 "CreatorControlSuite.Tests",
                 "licenses",
                 Guid.NewGuid().ToString("N"));
             System.IO.Directory.CreateDirectory(directory);
-            var publicKeyPath = Path.Combine(directory, "license-public.pem");
+            string publicKeyPath = Path.Combine(directory, "license-public.pem");
             File.WriteAllText(publicKeyPath, rsa.ExportSubjectPublicKeyInfoPem());
             return new RsaKeyPair(rsa, directory, publicKeyPath);
         }
@@ -312,7 +312,7 @@ public sealed class LicenseFeatureTests
 
     private sealed class MemorySecretStore : ISecretStore
     {
-        private readonly Dictionary<string, string> _values = new();
+        private readonly Dictionary<string, string> _values = [];
 
         public Task SaveAsync(
             string key,
@@ -327,7 +327,7 @@ public sealed class LicenseFeatureTests
             string key,
             CancellationToken cancellationToken = default)
         {
-            _values.TryGetValue(key, out var value);
+            _values.TryGetValue(key, out string? value);
             return Task.FromResult(value);
         }
 

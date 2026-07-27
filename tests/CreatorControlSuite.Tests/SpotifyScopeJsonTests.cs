@@ -25,7 +25,7 @@ public sealed class SpotifyScopeJsonTests
 
         Assert.NotNull(oauthType);
 
-        var tokenType =
+        Type? tokenType =
             oauthType!
                 .GetNestedType(
                     "TokenResponse",
@@ -33,7 +33,7 @@ public sealed class SpotifyScopeJsonTests
 
         Assert.NotNull(tokenType);
 
-        var token =
+        object? token =
             JsonSerializer.Deserialize(
                 json,
                 tokenType!,
@@ -44,7 +44,7 @@ public sealed class SpotifyScopeJsonTests
 
         Assert.NotNull(token);
 
-        var scope =
+        string[]? scope =
             (string[]?)tokenType!
                 .GetProperty("Scope")!
                 .GetValue(token);

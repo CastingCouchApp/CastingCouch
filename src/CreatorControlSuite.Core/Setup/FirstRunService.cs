@@ -3,7 +3,9 @@ using CreatorControlSuite.Core.Configuration;
 
 namespace CreatorControlSuite.Core.Setup;
 
-public sealed class FirstRunService : IFirstRunService
+public sealed class FirstRunService(
+    string statePath,
+    ISettingsStore settingsStore) : IFirstRunService
 {
     private const int CurrentWizardVersion = 1;
 
@@ -13,16 +15,8 @@ public sealed class FirstRunService : IFirstRunService
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly string _statePath;
-    private readonly ISettingsStore _settingsStore;
-
-    public FirstRunService(
-        string statePath,
-        ISettingsStore settingsStore)
-    {
-        _statePath = statePath;
-        _settingsStore = settingsStore;
-    }
+    private readonly string _statePath = statePath;
+    private readonly ISettingsStore _settingsStore = settingsStore;
 
     public async Task<FirstRunState> LoadStateAsync(
         CancellationToken cancellationToken = default)
@@ -32,7 +26,7 @@ public sealed class FirstRunService : IFirstRunService
             return new FirstRunState();
         }
 
-        await using var stream = File.OpenRead(_statePath);
+        await using FileStream stream = File.OpenRead(_statePath);
 
         return await JsonSerializer.DeserializeAsync<FirstRunState>(
                    stream,
@@ -47,7 +41,7 @@ public sealed class FirstRunService : IFirstRunService
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_statePath)!);
 
-        var temporaryPath = _statePath + ".tmp";
+        string temporaryPath = _statePath + ".tmp";
 
         await File.WriteAllTextAsync(
             temporaryPath,
@@ -60,7 +54,7 @@ public sealed class FirstRunService : IFirstRunService
     public async Task<bool> IsRequiredAsync(
         CancellationToken cancellationToken = default)
     {
-        var state = await LoadStateAsync(cancellationToken);
+        FirstRunState state = await LoadStateAsync(cancellationToken);
 
         return !state.Completed ||
                state.CompletedVersion < CurrentWizardVersion;
@@ -69,7 +63,7 @@ public sealed class FirstRunService : IFirstRunService
     public async Task<FirstRunSummary> BuildSummaryAsync(
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
 
         return new FirstRunSummary(
             settings.Branding.DisplayName,

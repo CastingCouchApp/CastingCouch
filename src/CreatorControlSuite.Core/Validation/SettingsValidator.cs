@@ -43,7 +43,7 @@ public sealed class SettingsValidator : ISettingsValidator
                 "Standardport 4455 verwenden."));
         }
 
-        foreach (var (name, value) in new[]
+        foreach ((string? name, string? value) in new[]
         {
             ("Startszene", settings.Obs.StartScene),
             ("Live-Szene", settings.Obs.LiveScene),
@@ -106,7 +106,7 @@ public sealed class SettingsValidator : ISettingsValidator
         if (!Uri.TryCreate(
                 settings.Spotify.RedirectUri,
                 UriKind.Absolute,
-                out var redirect) ||
+                out Uri? redirect) ||
             !string.Equals(
                 redirect.Host,
                 "127.0.0.1",
@@ -142,7 +142,7 @@ public sealed class SettingsValidator : ISettingsValidator
                 "Queue-Kapazität auf mindestens 1 setzen."));
         }
 
-        foreach (var definition in settings.Alerts.Definitions.Values)
+        foreach (AlertDefinitionSettings definition in settings.Alerts.Definitions.Values)
         {
             if (definition.DurationSeconds < 1)
             {

@@ -1,5 +1,6 @@
 using CreatorControlSuite.Core.Licensing;
 namespace CreatorControlSuite.Tests;
+
 public sealed class FeatureCatalogTests
 {
     [Fact] public void ProIncludesCommercialUse() => Assert.Contains(FeatureCatalog.CommercialUse, FeatureCatalog.ResolveEdition("Pro"));

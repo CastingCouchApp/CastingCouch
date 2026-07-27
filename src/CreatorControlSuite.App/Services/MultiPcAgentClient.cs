@@ -16,18 +16,22 @@ public sealed class MultiPcAgentClient : IMultiPcAgentClient
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         ArgumentException.ThrowIfNullOrWhiteSpace(agentKey);
 
-        var expectedFingerprint = (certFingerprint ?? string.Empty).Trim();
+        string expectedFingerprint = (certFingerprint ?? string.Empty).Trim();
         var handler = new HttpClientHandler
         {
             ServerCertificateCustomValidationCallback = (_, certificate, _, _) =>
             {
                 if (certificate is null)
+                {
                     return false;
+                }
 
                 if (string.IsNullOrWhiteSpace(expectedFingerprint))
+                {
                     return false;
+                }
 
-                var actual = Convert.ToHexString(
+                string actual = Convert.ToHexString(
                     SHA256.HashData(certificate.GetRawCertData()));
                 return string.Equals(
                     actual,
@@ -93,7 +97,7 @@ public sealed class MultiPcAgentClient : IMultiPcAgentClient
         CancellationToken cancellationToken)
     {
         using var client = CreateClient(host, port, agentKey, certFingerprint);
-        var path = relativePath.TrimStart('/');
+        string path = relativePath.TrimStart('/');
         using var request = new HttpRequestMessage(method, path)
         {
             Content = content
@@ -105,11 +109,17 @@ public sealed class MultiPcAgentClient : IMultiPcAgentClient
 
     private static string NormalizeObsPath(string obsRelativePath)
     {
-        var trimmed = (obsRelativePath ?? string.Empty).Trim().TrimStart('/');
+        string trimmed = (obsRelativePath ?? string.Empty).Trim().TrimStart('/');
         if (trimmed.StartsWith("api/obs/", StringComparison.OrdinalIgnoreCase))
+        {
             return trimmed;
+        }
+
         if (trimmed.StartsWith("obs/", StringComparison.OrdinalIgnoreCase))
+        {
             return "api/" + trimmed;
+        }
+
         return "api/obs/" + trimmed;
     }
 }

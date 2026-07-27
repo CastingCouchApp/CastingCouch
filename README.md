@@ -38,8 +38,9 @@ make publish
 | Target | Bedeutung |
 |--------|-----------|
 | `make ci` | Restore + Build + Test |
-| `make format` | C# Autoformat (`dotnet format` + `.editorconfig`) |
+| `make format` | C# Autoformat (Whitespace + Style via `.editorconfig`) |
 | `make format-check` | Format prüfen ohne Dateien zu ändern |
+| `make format-analyzers` | Optional Analyzer-Fixes (nicht Teil von `format`) |
 | `make publish` | Self-contained Publish (`win-x64`) inkl. CommandClient + Updater |
 | `make release` | Voller Release-Pfad über `build/Build-Release.ps1` (App + MSI) |
 | `make clean` | Artefakte entfernen |

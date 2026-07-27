@@ -78,20 +78,20 @@ public sealed class LocalUpdateService : IUpdateService
     public async Task<UpdateCheckResult> CheckAsync(
         CancellationToken cancellationToken = default)
     {
-        var currentVersion = _currentVersionProvider();
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var channel = NormalizeChannel(
+        string currentVersion = _currentVersionProvider();
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        string channel = NormalizeChannel(
             settings.Updates.Channel,
             settings.Product.UpdateChannel);
 
         try
         {
-            var releases = await _httpClient.GetFromJsonAsync<List<GitHubRelease>>(
+            List<GitHubRelease> releases = await _httpClient.GetFromJsonAsync<List<GitHubRelease>>(
                 $"https://api.github.com/repos/{_gitHubOwner}/{_gitHubRepo}/releases?per_page=30",
                 JsonOptions,
                 cancellationToken) ?? [];
 
-            var release = SelectRelease(releases, channel);
+            GitHubRelease? release = SelectRelease(releases, channel);
             if (release is null)
             {
                 return new UpdateCheckResult(
@@ -101,7 +101,7 @@ public sealed class LocalUpdateService : IUpdateService
                     $"Kein GitHub-Release für Kanal {channel} gefunden.");
             }
 
-            var manifestAsset = release.Assets.FirstOrDefault(asset =>
+            GitHubAsset? manifestAsset = release.Assets.FirstOrDefault(asset =>
                 string.Equals(
                     asset.Name,
                     "update-manifest.json",
@@ -117,14 +117,14 @@ public sealed class LocalUpdateService : IUpdateService
                     $"Release {release.TagName} enthält kein update-manifest.json.");
             }
 
-            using var manifestResponse = await _httpClient.GetAsync(
+            using HttpResponseMessage manifestResponse = await _httpClient.GetAsync(
                 manifestAsset.BrowserDownloadUrl,
                 cancellationToken);
             manifestResponse.EnsureSuccessStatusCode();
 
-            await using var manifestStream =
+            await using Stream manifestStream =
                 await manifestResponse.Content.ReadAsStreamAsync(cancellationToken);
-            var manifest = await JsonSerializer.DeserializeAsync<SignedUpdateManifest>(
+            SignedUpdateManifest? manifest = await JsonSerializer.DeserializeAsync<SignedUpdateManifest>(
                 manifestStream,
                 JsonOptions,
                 cancellationToken);
@@ -159,7 +159,7 @@ public sealed class LocalUpdateService : IUpdateService
                     "Update-Manifest-Signatur ist ungültig.");
             }
 
-            var packageAsset = release.Assets.FirstOrDefault(asset =>
+            GitHubAsset? packageAsset = release.Assets.FirstOrDefault(asset =>
                 string.Equals(
                     asset.Name,
                     manifest.PackageFileName,
@@ -175,8 +175,8 @@ public sealed class LocalUpdateService : IUpdateService
                     $"Paket {manifest.PackageFileName} fehlt im Release.");
             }
 
-            if (!ProductVersionInfo.TryParse(currentVersion, out var current) ||
-                !ProductVersionInfo.TryParse(manifest.Version, out var candidate))
+            if (!ProductVersionInfo.TryParse(currentVersion, out ProductVersionInfo? current) ||
+                !ProductVersionInfo.TryParse(manifest.Version, out ProductVersionInfo? candidate))
             {
                 return new UpdateCheckResult(
                     false,
@@ -195,7 +195,7 @@ public sealed class LocalUpdateService : IUpdateService
             }
 
             if (!string.IsNullOrWhiteSpace(manifest.MinimumVersion) &&
-                ProductVersionInfo.TryParse(manifest.MinimumVersion, out var minimum) &&
+                ProductVersionInfo.TryParse(manifest.MinimumVersion, out ProductVersionInfo? minimum) &&
                 current < minimum)
             {
                 return new UpdateCheckResult(
@@ -240,31 +240,31 @@ public sealed class LocalUpdateService : IUpdateService
     {
         ArgumentNullException.ThrowIfNull(package);
 
-        var target = Path.Combine(
+        string target = Path.Combine(
             _downloadRoot,
             $"CreatorControlSuite-{package.Version}.zip");
 
-        using var response = await _httpClient.GetAsync(
+        using HttpResponseMessage response = await _httpClient.GetAsync(
             package.DownloadUri,
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
 
         response.EnsureSuccessStatusCode();
 
-        var total = response.Content.Headers.ContentLength
+        long total = response.Content.Headers.ContentLength
                     ?? package.SizeBytes;
 
-        await using var source = await response.Content.ReadAsStreamAsync(
+        await using Stream source = await response.Content.ReadAsStreamAsync(
             cancellationToken);
 
-        await using (var destination = File.Create(target))
+        await using (FileStream destination = File.Create(target))
         {
-            var buffer = new byte[128 * 1024];
+            byte[] buffer = new byte[128 * 1024];
             long written = 0;
 
             while (true)
             {
-                var count = await source.ReadAsync(buffer, cancellationToken);
+                int count = await source.ReadAsync(buffer, cancellationToken);
                 if (count == 0)
                 {
                     break;
@@ -285,7 +285,7 @@ public sealed class LocalUpdateService : IUpdateService
             await destination.FlushAsync(cancellationToken);
         }
 
-        var hash = await ComputeSha256Async(target, cancellationToken);
+        string hash = await ComputeSha256Async(target, cancellationToken);
         if (!string.Equals(hash, package.Sha256, StringComparison.OrdinalIgnoreCase))
         {
             File.Delete(target);
@@ -295,7 +295,7 @@ public sealed class LocalUpdateService : IUpdateService
 
         if (package.Manifest is not null)
         {
-            var packageOk = await _signatureVerifier.VerifyPackageAsync(
+            bool packageOk = await _signatureVerifier.VerifyPackageAsync(
                 target,
                 package.Manifest,
                 cancellationToken);
@@ -324,7 +324,7 @@ public sealed class LocalUpdateService : IUpdateService
                 packageZipPath);
         }
 
-        var updaterPath = Path.Combine(_installDirectory, _updaterExeName);
+        string updaterPath = Path.Combine(_installDirectory, _updaterExeName);
         if (!File.Exists(updaterPath))
         {
             throw new FileNotFoundException(
@@ -332,13 +332,13 @@ public sealed class LocalUpdateService : IUpdateService
                 updaterPath);
         }
 
-        var installDir = Path.GetFullPath(_installDirectory.TrimEnd(
+        string installDir = Path.GetFullPath(_installDirectory.TrimEnd(
             Path.DirectorySeparatorChar,
             Path.AltDirectorySeparatorChar));
 
         try
         {
-            var probe = Path.Combine(installDir, $".ccs-write-probe-{Guid.NewGuid():N}");
+            string probe = Path.Combine(installDir, $".ccs-write-probe-{Guid.NewGuid():N}");
             File.WriteAllText(probe, "ok");
             File.Delete(probe);
         }
@@ -383,18 +383,18 @@ public sealed class LocalUpdateService : IUpdateService
         string currentVersion,
         CancellationToken cancellationToken = default)
     {
-        var id = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
-        var path = Path.Combine(
+        string id = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
+        string path = Path.Combine(
             _backupRoot,
             $"backup-{id}-{currentVersion}.zip");
 
-        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        using ZipArchive archive = ZipFile.Open(path, ZipArchiveMode.Create);
 
-        foreach (var file in EnumerateBackupFiles())
+        foreach (string file in EnumerateBackupFiles())
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var relative = Path.GetRelativePath(_dataRoot, file);
+            string relative = Path.GetRelativePath(_dataRoot, file);
             archive.CreateEntryFromFile(
                 file,
                 relative,
@@ -417,7 +417,7 @@ public sealed class LocalUpdateService : IUpdateService
         cancellationToken.ThrowIfCancellationRequested();
 
         IReadOnlyList<UpdateBackup> results =
-            Directory.GetFiles(_backupRoot, "backup-*.zip")
+            [.. Directory.GetFiles(_backupRoot, "backup-*.zip")
                 .Select(path =>
                 {
                     var info = new FileInfo(path);
@@ -428,8 +428,7 @@ public sealed class LocalUpdateService : IUpdateService
                         info.CreationTimeUtc,
                         info.Length);
                 })
-                .OrderByDescending(item => item.CreatedAt)
-                .ToList();
+                .OrderByDescending(item => item.CreatedAt)];
 
         return Task.FromResult(results);
     }
@@ -438,20 +437,20 @@ public sealed class LocalUpdateService : IUpdateService
         string backupId,
         CancellationToken cancellationToken = default)
     {
-        var backups = await ListBackupsAsync(cancellationToken);
+        IReadOnlyList<UpdateBackup> backups = await ListBackupsAsync(cancellationToken);
 
-        var backup = backups.FirstOrDefault(item =>
+        UpdateBackup backup = backups.FirstOrDefault(item =>
                 item.Id.Contains(backupId, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("Backup wurde nicht gefunden.");
 
-        using var archive = ZipFile.OpenRead(backup.Path);
+        using ZipArchive archive = ZipFile.OpenRead(backup.Path);
 
-        foreach (var entry in archive.Entries)
+        foreach (ZipArchiveEntry entry in archive.Entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var destination = Path.Combine(_dataRoot, entry.FullName);
-            var directory = Path.GetDirectoryName(destination);
+            string destination = Path.Combine(_dataRoot, entry.FullName);
+            string? directory = Path.GetDirectoryName(destination);
 
             if (!string.IsNullOrWhiteSpace(directory))
             {
@@ -471,9 +470,9 @@ public sealed class LocalUpdateService : IUpdateService
         IReadOnlyList<GitHubRelease> releases,
         string channel)
     {
-        var normalized = NormalizeChannel(channel, null);
+        string normalized = NormalizeChannel(channel, null);
 
-        foreach (var release in releases.Where(item => !item.Draft))
+        foreach (GitHubRelease? release in releases.Where(item => !item.Draft))
         {
             if (MatchesChannel(release, normalized))
             {
@@ -486,9 +485,9 @@ public sealed class LocalUpdateService : IUpdateService
 
     internal static bool MatchesChannel(GitHubRelease release, string channel)
     {
-        var tag = release.TagName ?? string.Empty;
-        var name = release.Name ?? string.Empty;
-        var haystack = $"{tag} {name}";
+        string tag = release.TagName ?? string.Empty;
+        string name = release.Name ?? string.Empty;
+        string haystack = $"{tag} {name}";
 
         return channel switch
         {
@@ -502,7 +501,7 @@ public sealed class LocalUpdateService : IUpdateService
 
     private static string NormalizeChannel(string? primary, string? fallback)
     {
-        var value = string.IsNullOrWhiteSpace(primary) ? fallback : primary;
+        string? value = string.IsNullOrWhiteSpace(primary) ? fallback : primary;
         if (string.IsNullOrWhiteSpace(value))
         {
             return "Alpha";
@@ -518,24 +517,24 @@ public sealed class LocalUpdateService : IUpdateService
 
     private IEnumerable<string> EnumerateBackupFiles()
     {
-        foreach (var name in new[] { "settings.json" })
+        foreach (string? name in new[] { "settings.json" })
         {
-            var path = Path.Combine(_dataRoot, name);
+            string path = Path.Combine(_dataRoot, name);
             if (File.Exists(path))
             {
                 yield return path;
             }
         }
 
-        foreach (var directoryName in new[] { "Profiles", "Overlay", "Secrets" })
+        foreach (string? directoryName in new[] { "Profiles", "Overlay", "Secrets" })
         {
-            var path = Path.Combine(_dataRoot, directoryName);
+            string path = Path.Combine(_dataRoot, directoryName);
             if (!Directory.Exists(path))
             {
                 continue;
             }
 
-            foreach (var file in Directory.GetFiles(
+            foreach (string file in Directory.GetFiles(
                          path,
                          "*",
                          SearchOption.AllDirectories))
@@ -549,21 +548,21 @@ public sealed class LocalUpdateService : IUpdateService
         string path,
         CancellationToken cancellationToken)
     {
-        await using var stream = File.OpenRead(path);
-        var hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        await using FileStream stream = File.OpenRead(path);
+        byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken);
         return Convert.ToHexString(hash);
     }
 
     private static string GetAssemblyVersion()
     {
-        var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-        var informational = assembly
+        Assembly assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+        string? informational = assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion;
 
         if (!string.IsNullOrWhiteSpace(informational))
         {
-            var plus = informational.IndexOf('+');
+            int plus = informational.IndexOf('+');
             return plus >= 0 ? informational[..plus] : informational;
         }
 

@@ -16,34 +16,40 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
         });
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Task _writerTask;
-    private readonly string _root;
     private readonly ConcurrentDictionary<string, CreatorIntelligenceEvent> _latestByType = new(StringComparer.OrdinalIgnoreCase);
-    private string? _sessionId;
 
     public CreatorIntelligenceService()
     {
-        _root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "CreatorIntelligence");
-        Directory.CreateDirectory(_root);
+        RootDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "CreatorIntelligence");
+        Directory.CreateDirectory(RootDirectory);
         _writerTask = Task.Run(WriterLoopAsync);
     }
 
-    public bool IsRecording => !string.IsNullOrWhiteSpace(_sessionId);
-    public string? SessionId => _sessionId;
-    public string RootDirectory => _root;
+    public bool IsRecording => !string.IsNullOrWhiteSpace(SessionId);
+    public string? SessionId { get; private set; }
+    public string RootDirectory { get; }
 
     public async Task StartSessionAsync(DateTimeOffset startedAt, string? title, string? category, CancellationToken cancellationToken = default)
     {
-        if (IsRecording) return;
-        _sessionId = $"{startedAt:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..32];
+        if (IsRecording)
+        {
+            return;
+        }
+
+        SessionId = $"{startedAt:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..32];
         await RecordAsync("session.started", new { startedAt, title, category }, cancellationToken);
     }
 
     public ValueTask RecordAsync(string type, object? payload = null, CancellationToken cancellationToken = default)
     {
-        if (!IsRecording && !string.Equals(type, "session.started", StringComparison.OrdinalIgnoreCase)) return ValueTask.CompletedTask;
+        if (!IsRecording && !string.Equals(type, "session.started", StringComparison.OrdinalIgnoreCase))
+        {
+            return ValueTask.CompletedTask;
+        }
+
         var item = new CreatorIntelligenceEvent(
             DateTimeOffset.UtcNow,
-            _sessionId ?? "unassigned",
+            SessionId ?? "unassigned",
             type,
             payload is null ? null : JsonSerializer.SerializeToElement(payload));
         _latestByType[type] = item;
@@ -52,17 +58,21 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
     public async Task<CreatorIntelligenceSummary?> CompleteSessionAsync(DateTimeOffset endedAt, CancellationToken cancellationToken = default)
     {
-        if (!IsRecording) return null;
-        var sessionId = _sessionId!;
+        if (!IsRecording)
+        {
+            return null;
+        }
+
+        string sessionId = SessionId!;
         await RecordAsync("session.ended", new { endedAt }, cancellationToken);
-        _sessionId = null;
+        SessionId = null;
         await FlushAsync(cancellationToken);
         return await AnalyzeSessionAsync(sessionId, cancellationToken);
     }
 
     public async Task FlushAsync(CancellationToken cancellationToken = default)
     {
-        var marker = Guid.NewGuid().ToString("N");
+        string marker = Guid.NewGuid().ToString("N");
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         FlushWaiters[marker] = completion;
         await _queue.Writer.WriteAsync(new CreatorIntelligenceEvent(DateTimeOffset.UtcNow, "system", "system.flush", JsonSerializer.SerializeToElement(new { marker })), cancellationToken);
@@ -75,19 +85,23 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
     {
         try
         {
-            await foreach (var item in _queue.Reader.ReadAllAsync(_shutdown.Token))
+            await foreach (CreatorIntelligenceEvent item in _queue.Reader.ReadAllAsync(_shutdown.Token))
             {
-                if (item.Type == "system.flush" && item.Payload is { } flushPayload && flushPayload.TryGetProperty("marker", out var markerElement))
+                if (item.Type == "system.flush" && item.Payload is { } flushPayload && flushPayload.TryGetProperty("marker", out JsonElement markerElement))
                 {
-                    var marker = markerElement.GetString();
-                    if (marker is not null && FlushWaiters.TryRemove(marker, out var waiter)) waiter.TrySetResult();
+                    string? marker = markerElement.GetString();
+                    if (marker is not null && FlushWaiters.TryRemove(marker, out TaskCompletionSource? waiter))
+                    {
+                        waiter.TrySetResult();
+                    }
+
                     continue;
                 }
 
-                var dayFolder = Path.Combine(_root, item.TimestampUtc.ToLocalTime().ToString("yyyy-MM"));
+                string dayFolder = Path.Combine(RootDirectory, item.TimestampUtc.ToLocalTime().ToString("yyyy-MM"));
                 Directory.CreateDirectory(dayFolder);
-                var path = Path.Combine(dayFolder, "events.jsonl");
-                var line = JsonSerializer.Serialize(item);
+                string path = Path.Combine(dayFolder, "events.jsonl");
+                string line = JsonSerializer.Serialize(item);
                 await File.AppendAllTextAsync(path, line + Environment.NewLine, new UTF8Encoding(false), _shutdown.Token);
             }
         }
@@ -96,14 +110,14 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
     public async Task<CreatorIntelligenceDashboard> AnalyzeDashboardAsync(int lookbackDays = 30, CancellationToken cancellationToken = default)
     {
-        var allEvents = await ReadAllEventsAsync(cancellationToken);
-        var cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, lookbackDays));
+        List<CreatorIntelligenceEvent> allEvents = await ReadAllEventsAsync(cancellationToken);
+        DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, lookbackDays));
         var summaries = allEvents
             .Where(x => x.Type == "session.started" && x.TimestampUtc >= cutoff)
             .Select(x => x.SessionId)
             .Distinct(StringComparer.Ordinal)
             .Where(id => allEvents.Any(x => x.SessionId == id && x.Type == "session.ended"))
-            .Select(id => BuildSummary(id, allEvents.Where(x => x.SessionId == id).ToList()))
+            .Select(id => BuildSummary(id, [.. allEvents.Where(x => x.SessionId == id)]))
             .OrderBy(x => x.StartedAt)
             .ToList();
 
@@ -114,18 +128,18 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
         var recent = summaries.TakeLast(Math.Min(5, summaries.Count)).ToList();
         var previous = summaries.Skip(Math.Max(0, summaries.Count - 10)).Take(Math.Min(5, Math.Max(0, summaries.Count - 5))).ToList();
-        var weekCutoff = DateTimeOffset.Now.AddDays(-7);
+        DateTimeOffset weekCutoff = DateTimeOffset.Now.AddDays(-7);
         var weekly = summaries.Where(x => x.StartedAt >= weekCutoff).ToList();
-        var weeklyAverageScore = weekly.Count == 0 ? 0 : weekly.Average(x => x.CreatorScore);
-        var averageScore = summaries.Average(x => x.CreatorScore);
-        var averageRetention = summaries.Average(x => x.RetentionPercent);
-        var averageEngagement = summaries.Average(x => x.ChatMessagesPerHour);
-        var averageGrowth = summaries.Average(x => x.FollowersPerHour);
-        var averageViewers = summaries.Average(x => x.AverageViewers);
-        var recentScore = recent.Average(x => x.CreatorScore);
-        var previousScore = previous.Count == 0 ? recentScore : previous.Average(x => x.CreatorScore);
-        var scoreTrend = recentScore - previousScore;
-        var viewerTrend = LinearTrend(recent.Select(x => x.AverageViewers).ToList());
+        double weeklyAverageScore = weekly.Count == 0 ? 0 : weekly.Average(x => x.CreatorScore);
+        double averageScore = summaries.Average(x => x.CreatorScore);
+        double averageRetention = summaries.Average(x => x.RetentionPercent);
+        double averageEngagement = summaries.Average(x => x.ChatMessagesPerHour);
+        double averageGrowth = summaries.Average(x => x.FollowersPerHour);
+        double averageViewers = summaries.Average(x => x.AverageViewers);
+        double recentScore = recent.Average(x => x.CreatorScore);
+        double previousScore = previous.Count == 0 ? recentScore : previous.Average(x => x.CreatorScore);
+        double scoreTrend = recentScore - previousScore;
+        double viewerTrend = LinearTrend([.. recent.Select(x => x.AverageViewers)]);
 
         var bestHour = summaries.GroupBy(x => x.StartedAt.Hour)
             .Select(g => new { Hour = g.Key, Score = g.Average(x => x.CreatorScore), Count = g.Count() })
@@ -138,23 +152,40 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
             .Select(g => new { Category = g.Key, Score = g.Average(x => x.CreatorScore), Viewers = g.Average(x => x.AverageViewers), Count = g.Count() })
             .OrderByDescending(x => x.Score).ThenByDescending(x => x.Viewers).FirstOrDefault();
 
-        var predictedViewers = Math.Max(0, recent.Average(x => x.AverageViewers) + viewerTrend);
-        var predictedScore = (int)Math.Round(Math.Clamp(recentScore + scoreTrend * .35, 0, 100));
-        var qualityIndex = (int)Math.Round(Math.Clamp(averageScore * .55 + Math.Min(averageRetention, 120) / 120 * 45, 0, 100));
-        var engagementIndex = (int)Math.Round(Math.Clamp(Math.Min(averageEngagement, 120) / 120 * 70 + Math.Min(averageGrowth, 10) / 10 * 30, 0, 100));
-        var growthIndex = (int)Math.Round(Math.Clamp(Math.Min(averageGrowth, 10) / 10 * 65 + Math.Min(Math.Max(viewerTrend, 0), 10) / 10 * 35, 0, 100));
+        double predictedViewers = Math.Max(0, recent.Average(x => x.AverageViewers) + viewerTrend);
+        int predictedScore = (int)Math.Round(Math.Clamp(recentScore + (scoreTrend * .35), 0, 100));
+        int qualityIndex = (int)Math.Round(Math.Clamp((averageScore * .55) + (Math.Min(averageRetention, 120) / 120 * 45), 0, 100));
+        int engagementIndex = (int)Math.Round(Math.Clamp((Math.Min(averageEngagement, 120) / 120 * 70) + (Math.Min(averageGrowth, 10) / 10 * 30), 0, 100));
+        int growthIndex = (int)Math.Round(Math.Clamp((Math.Min(averageGrowth, 10) / 10 * 65) + (Math.Min(Math.Max(viewerTrend, 0), 10) / 10 * 35), 0, 100));
 
-        var insights = new List<string>();
-        insights.Add(scoreTrend >= 2
+        var insights = new List<string>
+        {
+            scoreTrend >= 2
             ? $"Der Creator Score steigt aktuell um {scoreTrend:0.0} Punkte gegenüber dem vorherigen Vergleichszeitraum."
             : scoreTrend <= -2
                 ? $"Der Creator Score liegt aktuell {Math.Abs(scoreTrend):0.0} Punkte unter dem vorherigen Vergleichszeitraum."
-                : "Der Creator Score ist im Vergleichszeitraum weitgehend stabil.");
-        insights.Add($"Die stärkste Startzeit liegt aktuell bei etwa {bestHour.Hour:00}:00 Uhr ({bestDay.Day.ToGermanDayName()}).");
-        if (bestCategory is not null) insights.Add($"Die Kategorie „{bestCategory.Category}“ erzielt derzeit die beste Kombination aus Score und Zuschauerzahl.");
-        if (averageRetention < 80) insights.Add("Die durchschnittliche Zuschauerbindung ist ausbaufähig. Plane den stärksten Inhalt vor dem typischen Rückgang ein.");
-        if (averageEngagement < 12) insights.Add("Mehr direkte Chat-Interaktion könnte den Engagement-Index deutlich verbessern.");
-        if (summaries.Count < 5) insights.Add("Für belastbarere Prognosen sollten mindestens fünf vollständige Sessions aufgezeichnet werden.");
+                : "Der Creator Score ist im Vergleichszeitraum weitgehend stabil.",
+            $"Die stärkste Startzeit liegt aktuell bei etwa {bestHour.Hour:00}:00 Uhr ({bestDay.Day.ToGermanDayName()})."
+        };
+        if (bestCategory is not null)
+        {
+            insights.Add($"Die Kategorie „{bestCategory.Category}“ erzielt derzeit die beste Kombination aus Score und Zuschauerzahl.");
+        }
+
+        if (averageRetention < 80)
+        {
+            insights.Add("Die durchschnittliche Zuschauerbindung ist ausbaufähig. Plane den stärksten Inhalt vor dem typischen Rückgang ein.");
+        }
+
+        if (averageEngagement < 12)
+        {
+            insights.Add("Mehr direkte Chat-Interaktion könnte den Engagement-Index deutlich verbessern.");
+        }
+
+        if (summaries.Count < 5)
+        {
+            insights.Add("Für belastbarere Prognosen sollten mindestens fünf vollständige Sessions aufgezeichnet werden.");
+        }
 
         return new CreatorIntelligenceDashboard(
             lookbackDays,
@@ -176,15 +207,15 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
             bestCategory?.Category ?? "–",
             predictedViewers,
             predictedScore,
-            summaries.TakeLast(12).Reverse().ToList(),
+            [.. summaries.TakeLast(12).Reverse()],
             insights);
     }
 
 
     public async Task<CreatorContentPerformance> AnalyzeContentPerformanceAsync(int lookbackDays = 30, CancellationToken cancellationToken = default)
     {
-        var allEvents = await ReadAllEventsAsync(cancellationToken);
-        var cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, lookbackDays));
+        List<CreatorIntelligenceEvent> allEvents = await ReadAllEventsAsync(cancellationToken);
+        DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, lookbackDays));
         var completedSessionIds = allEvents
             .Where(x => x.Type == "session.started" && x.TimestampUtc >= cutoff)
             .Select(x => x.SessionId)
@@ -192,33 +223,44 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
             .Where(id => allEvents.Any(x => x.SessionId == id && x.Type == "session.ended"))
             .ToHashSet(StringComparer.Ordinal);
 
-        if (completedSessionIds.Count == 0) return CreatorContentPerformance.Empty(lookbackDays);
+        if (completedSessionIds.Count == 0)
+        {
+            return CreatorContentPerformance.Empty(lookbackDays);
+        }
 
         var sceneRows = new List<CreatorContentPerformanceRow>();
         var trackRows = new List<CreatorContentPerformanceRow>();
         var heatmap = new Dictionary<(DayOfWeek Day, int Hour), List<double>>();
 
-        foreach (var sessionId in completedSessionIds)
+        foreach (string? sessionId in completedSessionIds)
         {
             var events = allEvents.Where(x => x.SessionId == sessionId).OrderBy(x => x.TimestampUtc).ToList();
             var samples = events.Where(x => x.Type == "twitch.viewer.sample" && x.Payload is not null)
                 .Select(x => new ViewerPoint(x.TimestampUtc, ReadInt(x.Payload!.Value, "viewers"), ReadString(x.Payload, "scene")))
                 .ToList();
 
-            foreach (var sample in samples)
+            foreach (ViewerPoint? sample in samples)
             {
-                var local = sample.TimestampUtc.ToLocalTime();
-                var key = (local.DayOfWeek, local.Hour);
-                if (!heatmap.TryGetValue(key, out var values)) heatmap[key] = values = new List<double>();
+                DateTimeOffset local = sample.TimestampUtc.ToLocalTime();
+                (DayOfWeek DayOfWeek, int Hour) key = (local.DayOfWeek, local.Hour);
+                if (!heatmap.TryGetValue(key, out List<double>? values))
+                {
+                    heatmap[key] = values = [];
+                }
+
                 values.Add(sample.Viewers);
             }
 
             AddSegmentPerformance(sceneRows, events, samples, "obs.scene.changed", "scene", "OBS-Szene");
             AddSegmentPerformance(trackRows, events, samples, "spotify.track.changed", "track", "Spotify-Titel", payload =>
             {
-                var title = ReadString(payload, "track");
-                var artist = ReadString(payload, "artist");
-                if (string.IsNullOrWhiteSpace(title)) title = ReadString(payload, "name");
+                string title = ReadString(payload, "track");
+                string artist = ReadString(payload, "artist");
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    title = ReadString(payload, "name");
+                }
+
                 return string.IsNullOrWhiteSpace(artist) ? title : $"{title} – {artist}";
             });
         }
@@ -233,16 +275,39 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
             .ToList();
 
         var insights = new List<string>();
-        var bestScene = scenes.FirstOrDefault();
-        if (bestScene is not null) insights.Add($"Die Szene „{bestScene.Name}“ erzielt aktuell die stärkste Zuschauerentwicklung ({FormatSigned(bestScene.ViewerDelta)} Zuschauer je Einsatz).");
-        var weakScene = scenes.Where(x => x.Occurrences >= 2).OrderBy(x => x.ViewerDelta).FirstOrDefault();
-        if (weakScene is not null && weakScene.ViewerDelta < -1) insights.Add($"Bei „{weakScene.Name}“ sinkt die Zuschauerzahl im Mittel um {Math.Abs(weakScene.ViewerDelta):0.0}. Prüfe Länge, Inhalt und Übergang.");
-        var bestTrack = tracks.FirstOrDefault();
-        if (bestTrack is not null && bestTrack.ViewerDelta > 0) insights.Add($"Der Titel „{bestTrack.Name}“ war bisher mit der besten Zuschauerentwicklung verbunden.");
-        var bestHeat = heatmapRows.FirstOrDefault();
-        if (bestHeat is not null) insights.Add($"Das stärkste gemessene Zeitfenster ist {bestHeat.Day.ToGermanDayName()} um {bestHeat.Hour:00}:00 Uhr mit Ø {bestHeat.AverageViewers:0.0} Zuschauern.");
-        if (scenes.Count == 0) insights.Add("Für die Szenenanalyse müssen OBS-Szenenwechsel während vollständiger Sessions aufgezeichnet werden.");
-        if (tracks.Count == 0) insights.Add("Für die Songanalyse müssen Spotify-Titelwechsel während vollständiger Sessions aufgezeichnet werden.");
+        CreatorContentPerformanceRow? bestScene = scenes.FirstOrDefault();
+        if (bestScene is not null)
+        {
+            insights.Add($"Die Szene „{bestScene.Name}“ erzielt aktuell die stärkste Zuschauerentwicklung ({FormatSigned(bestScene.ViewerDelta)} Zuschauer je Einsatz).");
+        }
+
+        CreatorContentPerformanceRow? weakScene = scenes.Where(x => x.Occurrences >= 2).OrderBy(x => x.ViewerDelta).FirstOrDefault();
+        if (weakScene is not null && weakScene.ViewerDelta < -1)
+        {
+            insights.Add($"Bei „{weakScene.Name}“ sinkt die Zuschauerzahl im Mittel um {Math.Abs(weakScene.ViewerDelta):0.0}. Prüfe Länge, Inhalt und Übergang.");
+        }
+
+        CreatorContentPerformanceRow? bestTrack = tracks.FirstOrDefault();
+        if (bestTrack is not null && bestTrack.ViewerDelta > 0)
+        {
+            insights.Add($"Der Titel „{bestTrack.Name}“ war bisher mit der besten Zuschauerentwicklung verbunden.");
+        }
+
+        CreatorHeatmapCell? bestHeat = heatmapRows.FirstOrDefault();
+        if (bestHeat is not null)
+        {
+            insights.Add($"Das stärkste gemessene Zeitfenster ist {bestHeat.Day.ToGermanDayName()} um {bestHeat.Hour:00}:00 Uhr mit Ø {bestHeat.AverageViewers:0.0} Zuschauern.");
+        }
+
+        if (scenes.Count == 0)
+        {
+            insights.Add("Für die Szenenanalyse müssen OBS-Szenenwechsel während vollständiger Sessions aufgezeichnet werden.");
+        }
+
+        if (tracks.Count == 0)
+        {
+            insights.Add("Für die Songanalyse müssen Spotify-Titelwechsel während vollständiger Sessions aufgezeichnet werden.");
+        }
 
         return new CreatorContentPerformance(lookbackDays, completedSessionIds.Count, scenes, tracks, heatmapRows, insights);
     }
@@ -250,8 +315,8 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
     public async Task<CreatorEventCorrelationReport> AnalyzeEventCorrelationsAsync(int lookbackDays = 30, CancellationToken cancellationToken = default)
     {
-        var allEvents = await ReadAllEventsAsync(cancellationToken);
-        var cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, lookbackDays));
+        List<CreatorIntelligenceEvent> allEvents = await ReadAllEventsAsync(cancellationToken);
+        DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, lookbackDays));
         var completedSessionIds = allEvents
             .Where(x => x.Type == "session.started" && x.TimestampUtc >= cutoff)
             .Select(x => x.SessionId)
@@ -259,31 +324,45 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
             .Where(id => allEvents.Any(x => x.SessionId == id && x.Type == "session.ended"))
             .ToHashSet(StringComparer.Ordinal);
 
-        if (completedSessionIds.Count == 0) return CreatorEventCorrelationReport.Empty(lookbackDays);
+        if (completedSessionIds.Count == 0)
+        {
+            return CreatorEventCorrelationReport.Empty(lookbackDays);
+        }
 
         var rows = new List<CreatorEventCorrelationRow>();
         var raids = new List<CreatorRaidRetentionRow>();
-        foreach (var sessionId in completedSessionIds)
+        foreach (string? sessionId in completedSessionIds)
         {
             var events = allEvents.Where(x => x.SessionId == sessionId).OrderBy(x => x.TimestampUtc).ToList();
             var samples = events.Where(x => x.Type == "twitch.viewer.sample")
                 .Select(x => new ViewerPoint(x.TimestampUtc, x.Payload is { } p ? ReadInt(p, "viewers") : 0, ReadString(x.Payload, "scene")))
                 .OrderBy(x => x.TimestampUtc).ToList();
-            if (samples.Count == 0) continue;
-
-            foreach (var evt in events.Where(x => x.Type is "twitch.event" or "session.note" or "obs.scene.changed" or "spotify.track.changed"))
+            if (samples.Count == 0)
             {
-                var eventName = DescribeCorrelationEvent(evt);
-                if (string.IsNullOrWhiteSpace(eventName)) continue;
-                var before = NearestViewer(samples, evt.TimestampUtc, before: true);
-                var after5 = NearestViewer(samples, evt.TimestampUtc.AddMinutes(5), before: false);
-                var after10 = NearestViewer(samples, evt.TimestampUtc.AddMinutes(10), before: false);
-                if (before is null || after5 is null) continue;
+                continue;
+            }
+
+            foreach (CreatorIntelligenceEvent? evt in events.Where(x => x.Type is "twitch.event" or "session.note" or "obs.scene.changed" or "spotify.track.changed"))
+            {
+                string eventName = DescribeCorrelationEvent(evt);
+                if (string.IsNullOrWhiteSpace(eventName))
+                {
+                    continue;
+                }
+
+                int? before = NearestViewer(samples, evt.TimestampUtc, before: true);
+                int? after5 = NearestViewer(samples, evt.TimestampUtc.AddMinutes(5), before: false);
+                int? after10 = NearestViewer(samples, evt.TimestampUtc.AddMinutes(10), before: false);
+                if (before is null || after5 is null)
+                {
+                    continue;
+                }
+
                 rows.Add(new CreatorEventCorrelationRow(eventName, evt.Type, 1, before.Value, after5.Value - before.Value, after10 is null ? 0 : after10.Value - before.Value));
 
                 if (evt.Type == "twitch.event" && IsRaidEvent(evt.Payload))
                 {
-                    var after30 = NearestViewer(samples, evt.TimestampUtc.AddMinutes(30), before: false);
+                    int? after30 = NearestViewer(samples, evt.TimestampUtc.AddMinutes(30), before: false);
                     raids.Add(new CreatorRaidRetentionRow(
                         ReadString(evt.Payload, "summary"),
                         before.Value,
@@ -308,53 +387,86 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
             .Take(12).ToList();
 
         var actions = new List<string>();
-        var strongest = correlations.FirstOrDefault(x => x.Occurrences >= 2);
+        CreatorEventCorrelationRow? strongest = correlations.FirstOrDefault(x => x.Occurrences >= 2);
         if (strongest is not null && strongest.ViewerDelta10Minutes > 1)
+        {
             actions.Add($"„{strongest.EventName}“ ist nach zehn Minuten im Mittel mit {FormatSigned(strongest.ViewerDelta10Minutes)} Zuschauern verbunden. Diesen Ablauf gezielt wiederholen.");
-        var weakest = correlations.Where(x => x.Occurrences >= 2).OrderBy(x => x.ViewerDelta10Minutes).FirstOrDefault();
+        }
+
+        CreatorEventCorrelationRow? weakest = correlations.Where(x => x.Occurrences >= 2).OrderBy(x => x.ViewerDelta10Minutes).FirstOrDefault();
         if (weakest is not null && weakest.ViewerDelta10Minutes < -1)
+        {
             actions.Add($"Nach „{weakest.EventName}“ fehlen nach zehn Minuten durchschnittlich {Math.Abs(weakest.ViewerDelta10Minutes):0.0} Zuschauer. Übergang, Länge oder Inhalt prüfen.");
-        var bestRaid = raidRows.FirstOrDefault();
+        }
+
+        CreatorRaidRetentionRow? bestRaid = raidRows.FirstOrDefault();
         if (bestRaid is not null)
+        {
             actions.Add($"Die beste gemessene Raid-Bindung erreicht „{bestRaid.RaidSummary}“ mit {bestRaid.Retention30Percent:0}% nach 30 Minuten.");
-        if (correlations.Count == 0) actions.Add("Noch keine Ereignisse konnten mit ausreichend Zuschauer-Samples korreliert werden.");
-        if (raids.Count == 0) actions.Add("Raid-Bindung wird angezeigt, sobald Raid-Events und Zuschauer-Samples gemeinsam aufgezeichnet wurden.");
+        }
+
+        if (correlations.Count == 0)
+        {
+            actions.Add("Noch keine Ereignisse konnten mit ausreichend Zuschauer-Samples korreliert werden.");
+        }
+
+        if (raids.Count == 0)
+        {
+            actions.Add("Raid-Bindung wird angezeigt, sobald Raid-Events und Zuschauer-Samples gemeinsam aufgezeichnet wurden.");
+        }
 
         return new CreatorEventCorrelationReport(lookbackDays, completedSessionIds.Count, correlations, raidRows, actions);
     }
 
     public async Task<CreatorActionPlan> AnalyzeActionPlanAsync(CancellationToken cancellationToken = default)
     {
-        var dashboard = await AnalyzeDashboardAsync(30, cancellationToken);
-        var correlation = await AnalyzeEventCorrelationsAsync(30, cancellationToken);
-        var path = Path.Combine(_root, "action-plan.json");
+        CreatorIntelligenceDashboard dashboard = await AnalyzeDashboardAsync(30, cancellationToken);
+        CreatorEventCorrelationReport correlation = await AnalyzeEventCorrelationsAsync(30, cancellationToken);
+        string path = Path.Combine(RootDirectory, "action-plan.json");
         var stored = new List<CreatorActionItem>();
         if (File.Exists(path))
         {
-            try { stored = JsonSerializer.Deserialize<List<CreatorActionItem>>(await File.ReadAllTextAsync(path, cancellationToken)) ?? new(); }
-            catch { stored = new(); }
+            try { stored = JsonSerializer.Deserialize<List<CreatorActionItem>>(await File.ReadAllTextAsync(path, cancellationToken)) ?? []; }
+            catch { stored = []; }
         }
 
         var suggestions = new List<(string Title, string Metric, double Baseline, double Target, int Priority)>();
         if (dashboard.SessionCount > 0)
         {
             if (dashboard.AverageRetentionPercent < 90)
+            {
                 suggestions.Add(("Zuschauerbindung auf mindestens 90 % erhöhen", "retention", dashboard.AverageRetentionPercent, 90, 1));
-            if (dashboard.AverageChatMessagesPerHour < 15)
-                suggestions.Add(("Mindestens 15 Chatnachrichten pro Stunde erreichen", "engagement", dashboard.AverageChatMessagesPerHour, 15, 2));
-            if (dashboard.CreatorScoreTrend < 1)
-                suggestions.Add(("Creator Score gegenüber dem aktuellen Niveau um 5 Punkte steigern", "score", dashboard.AverageCreatorScore, Math.Min(100, dashboard.AverageCreatorScore + 5), 2));
-            if (dashboard.AverageFollowersPerHour < 1)
-                suggestions.Add(("Follower-Rate auf mindestens 1 pro Stunde erhöhen", "growth", dashboard.AverageFollowersPerHour, 1, 3));
-        }
-        foreach (var action in correlation.Actions.Take(3))
-            suggestions.Add((action, "manual", 0, 1, 3));
+            }
 
-        var now = DateTimeOffset.Now;
-        foreach (var suggestion in suggestions)
+            if (dashboard.AverageChatMessagesPerHour < 15)
+            {
+                suggestions.Add(("Mindestens 15 Chatnachrichten pro Stunde erreichen", "engagement", dashboard.AverageChatMessagesPerHour, 15, 2));
+            }
+
+            if (dashboard.CreatorScoreTrend < 1)
+            {
+                suggestions.Add(("Creator Score gegenüber dem aktuellen Niveau um 5 Punkte steigern", "score", dashboard.AverageCreatorScore, Math.Min(100, dashboard.AverageCreatorScore + 5), 2));
+            }
+
+            if (dashboard.AverageFollowersPerHour < 1)
+            {
+                suggestions.Add(("Follower-Rate auf mindestens 1 pro Stunde erhöhen", "growth", dashboard.AverageFollowersPerHour, 1, 3));
+            }
+        }
+        foreach (string? action in correlation.Actions.Take(3))
         {
-            if (stored.Any(x => string.Equals(x.Title, suggestion.Title, StringComparison.OrdinalIgnoreCase))) continue;
-            stored.Add(new CreatorActionItem(Guid.NewGuid().ToString("N"), suggestion.Title, suggestion.Metric, suggestion.Baseline, suggestion.Target, suggestion.Priority, "Offen", now, null, null));
+            suggestions.Add((action, "manual", 0, 1, 3));
+        }
+
+        DateTimeOffset now = DateTimeOffset.Now;
+        foreach ((string Title, string Metric, double Baseline, double Target, int Priority) in suggestions)
+        {
+            if (stored.Any(x => string.Equals(x.Title, Title, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            stored.Add(new CreatorActionItem(Guid.NewGuid().ToString("N"), Title, Metric, Baseline, Target, Priority, "Offen", now, null, null));
         }
 
         double Current(string metric) => metric switch
@@ -366,13 +478,17 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
             _ => 0
         };
 
-        stored = stored.Select(item =>
+        stored = [.. stored.Select(item =>
         {
-            if (item.Status == "Erledigt" || item.Metric == "manual" || dashboard.SessionCount == 0) return item;
-            var current = Current(item.Metric);
-            var status = current >= item.Target ? "Automatisch erreicht" : item.Status;
+            if (item.Status == "Erledigt" || item.Metric == "manual" || dashboard.SessionCount == 0)
+            {
+                return item;
+            }
+
+            double current = Current(item.Metric);
+            string status = current >= item.Target ? "Automatisch erreicht" : item.Status;
             return item with { CurrentValue = current, Status = status, CompletedAt = status == "Automatisch erreicht" ? now : item.CompletedAt };
-        }).OrderBy(x => x.Status is "Erledigt" or "Automatisch erreicht").ThenBy(x => x.Priority).ThenBy(x => x.CreatedAt).ToList();
+        }).OrderBy(x => x.Status is "Erledigt" or "Automatisch erreicht").ThenBy(x => x.Priority).ThenBy(x => x.CreatedAt)];
 
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(stored, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false), cancellationToken);
         return new CreatorActionPlan(stored, stored.Count(x => x.Status == "Offen"), stored.Count(x => x.Status is "Erledigt" or "Automatisch erreicht"));
@@ -380,28 +496,32 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
     public async Task CompleteActionAsync(string actionId, CancellationToken cancellationToken = default)
     {
-        var path = Path.Combine(_root, "action-plan.json");
-        if (!File.Exists(path)) return;
+        string path = Path.Combine(RootDirectory, "action-plan.json");
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
         List<CreatorActionItem> items;
-        try { items = JsonSerializer.Deserialize<List<CreatorActionItem>>(await File.ReadAllTextAsync(path, cancellationToken)) ?? new(); }
+        try { items = JsonSerializer.Deserialize<List<CreatorActionItem>>(await File.ReadAllTextAsync(path, cancellationToken)) ?? []; }
         catch { return; }
-        var now = DateTimeOffset.Now;
-        items = items.Select(x => x.Id == actionId ? x with { Status = "Erledigt", CompletedAt = now } : x).ToList();
+        DateTimeOffset now = DateTimeOffset.Now;
+        items = [.. items.Select(x => x.Id == actionId ? x with { Status = "Erledigt", CompletedAt = now } : x)];
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(items, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false), cancellationToken);
     }
 
     public async Task<CreatorActionEffectivenessReport> AnalyzeActionEffectivenessAsync(CancellationToken cancellationToken = default)
     {
-        var plan = await AnalyzeActionPlanAsync(cancellationToken);
+        CreatorActionPlan plan = await AnalyzeActionPlanAsync(cancellationToken);
         var rows = plan.Items
             .Where(x => x.Metric != "manual")
             .Select(x =>
             {
-                var current = x.CurrentValue ?? x.Baseline;
-                var required = Math.Max(0.01, x.Target - x.Baseline);
-                var improvement = current - x.Baseline;
-                var progress = Math.Clamp(improvement / required * 100, 0, 200);
-                var verdict = x.Status is "Erledigt" or "Automatisch erreicht"
+                double current = x.CurrentValue ?? x.Baseline;
+                double required = Math.Max(0.01, x.Target - x.Baseline);
+                double improvement = current - x.Baseline;
+                double progress = Math.Clamp(improvement / required * 100, 0, 200);
+                string verdict = x.Status is "Erledigt" or "Automatisch erreicht"
                     ? improvement > 0 ? "Ziel erreicht · positive Entwicklung" : "Ziel abgeschlossen · Wirkung noch nicht messbar"
                     : improvement > required * 0.5 ? "Deutliche Verbesserung"
                     : improvement > 0 ? "Leichte Verbesserung"
@@ -414,11 +534,11 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
             .ThenByDescending(x => x.Improvement)
             .ToList();
 
-        var improved = rows.Count(x => x.Improvement > 0.01);
-        var declined = rows.Count(x => x.Improvement < -0.01);
-        var reached = rows.Count(x => x.Status is "Erledigt" or "Automatisch erreicht");
-        var strongest = rows.Where(x => x.Improvement > 0.01).OrderByDescending(x => x.ProgressPercent).FirstOrDefault();
-        var summary = strongest is null
+        int improved = rows.Count(x => x.Improvement > 0.01);
+        int declined = rows.Count(x => x.Improvement < -0.01);
+        int reached = rows.Count(x => x.Status is "Erledigt" or "Automatisch erreicht");
+        CreatorActionEffectivenessRow? strongest = rows.Where(x => x.Improvement > 0.01).OrderByDescending(x => x.ProgressPercent).FirstOrDefault();
+        string summary = strongest is null
             ? "Noch keine Maßnahme zeigt eine belastbare positive Veränderung."
             : $"Stärkste beobachtete Entwicklung: {strongest.Title} ({FormatSigned(strongest.Improvement)}; {strongest.ProgressPercent:0}% des Zielwegs).";
 
@@ -428,13 +548,19 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
     public async Task StartExperimentFromActionAsync(string actionId, CancellationToken cancellationToken = default)
     {
-        var plan = await AnalyzeActionPlanAsync(cancellationToken);
-        var action = plan.Items.FirstOrDefault(x => x.Id == actionId);
-        if (action is null || action.Metric == "manual") return;
+        CreatorActionPlan plan = await AnalyzeActionPlanAsync(cancellationToken);
+        CreatorActionItem? action = plan.Items.FirstOrDefault(x => x.Id == actionId);
+        if (action is null || action.Metric == "manual")
+        {
+            return;
+        }
 
-        var path = Path.Combine(_root, "experiments.json");
-        var items = await ReadExperimentsAsync(path, cancellationToken);
-        if (items.Any(x => x.Status == "Aktiv" && string.Equals(x.ActionId, actionId, StringComparison.Ordinal))) return;
+        string path = Path.Combine(RootDirectory, "experiments.json");
+        List<CreatorExperiment> items = await ReadExperimentsAsync(path, cancellationToken);
+        if (items.Any(x => x.Status == "Aktiv" && string.Equals(x.ActionId, actionId, StringComparison.Ordinal)))
+        {
+            return;
+        }
 
         items.Add(new CreatorExperiment(
             Guid.NewGuid().ToString("N"),
@@ -451,19 +577,19 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
     public async Task<CreatorExperimentReport> AnalyzeExperimentsAsync(CancellationToken cancellationToken = default)
     {
-        var path = Path.Combine(_root, "experiments.json");
-        var experiments = await ReadExperimentsAsync(path, cancellationToken);
-        var events = await ReadAllEventsAsync(cancellationToken);
+        string path = Path.Combine(RootDirectory, "experiments.json");
+        List<CreatorExperiment> experiments = await ReadExperimentsAsync(path, cancellationToken);
+        List<CreatorIntelligenceEvent> events = await ReadAllEventsAsync(cancellationToken);
         var summaries = events
             .Where(x => x.Type == "session.started")
             .Select(x => x.SessionId)
             .Distinct(StringComparer.Ordinal)
             .Where(id => events.Any(x => x.SessionId == id && x.Type == "session.ended"))
-            .Select(id => BuildSummary(id, events.Where(x => x.SessionId == id).ToList()))
+            .Select(id => BuildSummary(id, [.. events.Where(x => x.SessionId == id)]))
             .OrderBy(x => x.StartedAt)
             .ToList();
 
-        double MetricValue(CreatorIntelligenceSummary x, string metric) => metric switch
+        static double MetricValue(CreatorIntelligenceSummary x, string metric) => metric switch
         {
             "retention" => x.RetentionPercent,
             "engagement" => x.ChatMessagesPerHour,
@@ -472,25 +598,25 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
             _ => 0
         };
 
-        var now = DateTimeOffset.Now;
+        DateTimeOffset now = DateTimeOffset.Now;
         var rows = new List<CreatorExperimentRow>();
         var updated = new List<CreatorExperiment>();
-        foreach (var experiment in experiments)
+        foreach (CreatorExperiment experiment in experiments)
         {
             var before = summaries.Where(x => x.StartedAt < experiment.StartedAt).TakeLast(3).ToList();
             var during = summaries.Where(x => x.StartedAt >= experiment.StartedAt && (experiment.CompletedAt is null || x.StartedAt <= experiment.CompletedAt.Value)).Take(experiment.TargetSessions).ToList();
-            var baseline = before.Count == 0 ? experiment.Baseline : before.Average(x => MetricValue(x, experiment.Metric));
-            var current = during.Count == 0 ? baseline : during.Average(x => MetricValue(x, experiment.Metric));
-            var delta = current - baseline;
-            var status = experiment.Status;
+            double baseline = before.Count == 0 ? experiment.Baseline : before.Average(x => MetricValue(x, experiment.Metric));
+            double current = during.Count == 0 ? baseline : during.Average(x => MetricValue(x, experiment.Metric));
+            double delta = current - baseline;
+            string status = experiment.Status;
             DateTimeOffset? completedAt = experiment.CompletedAt;
             if (status == "Aktiv" && during.Count >= experiment.TargetSessions)
             {
                 status = "Ausgewertet";
                 completedAt = now;
             }
-            var confidence = during.Count >= 3 && before.Count >= 3 ? "Mittel" : during.Count >= 2 ? "Vorläufig" : "Zu wenig Daten";
-            var verdict = during.Count == 0
+            string confidence = during.Count >= 3 && before.Count >= 3 ? "Mittel" : during.Count >= 2 ? "Vorläufig" : "Zu wenig Daten";
+            string verdict = during.Count == 0
                 ? "Noch kein vollständiger Stream seit Teststart."
                 : delta > Math.Max(0.5, Math.Abs(baseline) * 0.05)
                     ? "Positive Veränderung beobachtet."
@@ -502,20 +628,24 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
         }
         await WriteExperimentsAsync(path, updated, cancellationToken);
 
-        var completed = rows.Count(x => x.Status == "Ausgewertet");
-        var positive = rows.Count(x => x.Delta > Math.Max(0.5, Math.Abs(x.Baseline) * 0.05));
-        var active = rows.Count(x => x.Status == "Aktiv");
-        var summary = rows.Count == 0
+        int completed = rows.Count(x => x.Status == "Ausgewertet");
+        int positive = rows.Count(x => x.Delta > Math.Max(0.5, Math.Abs(x.Baseline) * 0.05));
+        int active = rows.Count(x => x.Status == "Aktiv");
+        string summary = rows.Count == 0
             ? "Noch keine Experimente gestartet. Wähle eine messbare Maßnahme aus und starte daraus einen Test."
             : $"{active} aktiv · {completed} ausgewertet · {positive} mit positiver beobachteter Veränderung.";
-        return new CreatorExperimentReport(rows.OrderByDescending(x => x.Status == "Aktiv").ThenByDescending(x => x.StartedAt).ToList(), active, completed, positive, summary);
+        return new CreatorExperimentReport([.. rows.OrderByDescending(x => x.Status == "Aktiv").ThenByDescending(x => x.StartedAt)], active, completed, positive, summary);
     }
 
     private static async Task<List<CreatorExperiment>> ReadExperimentsAsync(string path, CancellationToken cancellationToken)
     {
-        if (!File.Exists(path)) return new();
-        try { return JsonSerializer.Deserialize<List<CreatorExperiment>>(await File.ReadAllTextAsync(path, cancellationToken)) ?? new(); }
-        catch { return new(); }
+        if (!File.Exists(path))
+        {
+            return [];
+        }
+
+        try { return JsonSerializer.Deserialize<List<CreatorExperiment>>(await File.ReadAllTextAsync(path, cancellationToken)) ?? []; }
+        catch { return []; }
     }
 
     private static Task WriteExperimentsAsync(string path, List<CreatorExperiment> items, CancellationToken cancellationToken) =>
@@ -523,13 +653,13 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
     public async Task<string> GenerateWeeklyReportAsync(CancellationToken cancellationToken = default)
     {
-        var dashboard = await AnalyzeDashboardAsync(7, cancellationToken);
-        var content = await AnalyzeContentPerformanceAsync(7, cancellationToken);
-        var correlation = await AnalyzeEventCorrelationsAsync(7, cancellationToken);
-        var now = DateTimeOffset.Now;
-        var reportFolder = Path.Combine(_root, "Reports");
+        CreatorIntelligenceDashboard dashboard = await AnalyzeDashboardAsync(7, cancellationToken);
+        CreatorContentPerformance content = await AnalyzeContentPerformanceAsync(7, cancellationToken);
+        CreatorEventCorrelationReport correlation = await AnalyzeEventCorrelationsAsync(7, cancellationToken);
+        DateTimeOffset now = DateTimeOffset.Now;
+        string reportFolder = Path.Combine(RootDirectory, "Reports");
         Directory.CreateDirectory(reportFolder);
-        var path = Path.Combine(reportFolder, $"creator-weekly-{now:yyyy-MM-dd-HHmm}.html");
+        string path = Path.Combine(reportFolder, $"creator-weekly-{now:yyyy-MM-dd-HHmm}.html");
         var html = new StringBuilder();
         html.AppendLine("<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><title>Creator Intelligence Wochenbericht</title>");
         html.AppendLine("<style>body{font-family:Segoe UI,Arial;background:#0b1014;color:#eef3f6;margin:32px}section{background:#11191f;border:1px solid #29343c;border-radius:12px;padding:18px;margin:14px 0}h1,h2{margin-top:0}.metric{display:inline-block;min-width:150px;margin:8px;padding:12px;background:#172129;border-radius:8px}.muted{color:#9fb0bc}li{margin:7px 0}</style></head><body>");
@@ -537,11 +667,23 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
         html.AppendLine("<section><h2>Kennzahlen</h2>");
         html.AppendLine($"<div class=\"metric\"><b>Streams</b><br>{dashboard.SessionCount}</div><div class=\"metric\"><b>Creator Score</b><br>{dashboard.AverageCreatorScore:0.0}</div><div class=\"metric\"><b>Ø Zuschauer</b><br>{dashboard.AverageViewers:0.0}</div><div class=\"metric\"><b>Bindung</b><br>{dashboard.AverageRetentionPercent:0}%</div></section>");
         html.AppendLine("<section><h2>Empfehlungen</h2><ul>");
-        foreach (var insight in dashboard.Insights.Concat(content.Insights).Concat(correlation.Actions).Distinct()) html.AppendLine($"<li>{System.Net.WebUtility.HtmlEncode(insight)}</li>");
+        foreach (string? insight in dashboard.Insights.Concat(content.Insights).Concat(correlation.Actions).Distinct())
+        {
+            html.AppendLine($"<li>{System.Net.WebUtility.HtmlEncode(insight)}</li>");
+        }
+
         html.AppendLine("</ul></section><section><h2>Stärkste Szenen</h2><ul>");
-        foreach (var scene in content.Scenes.Take(8)) html.AppendLine($"<li>{System.Net.WebUtility.HtmlEncode(scene.Name)} · {FormatSigned(scene.ViewerDelta)} Zuschauer · Ø {scene.AverageViewers:0.0}</li>");
+        foreach (CreatorContentPerformanceRow? scene in content.Scenes.Take(8))
+        {
+            html.AppendLine($"<li>{System.Net.WebUtility.HtmlEncode(scene.Name)} · {FormatSigned(scene.ViewerDelta)} Zuschauer · Ø {scene.AverageViewers:0.0}</li>");
+        }
+
         html.AppendLine("</ul></section><section><h2>Ereigniswirkung</h2><ul>");
-        foreach (var row in correlation.Correlations.Take(10)) html.AppendLine($"<li>{System.Net.WebUtility.HtmlEncode(row.EventName)} · nach 5 Min {FormatSigned(row.ViewerDelta5Minutes)} · nach 10 Min {FormatSigned(row.ViewerDelta10Minutes)}</li>");
+        foreach (CreatorEventCorrelationRow? row in correlation.Correlations.Take(10))
+        {
+            html.AppendLine($"<li>{System.Net.WebUtility.HtmlEncode(row.EventName)} · nach 5 Min {FormatSigned(row.ViewerDelta5Minutes)} · nach 10 Min {FormatSigned(row.ViewerDelta10Minutes)}</li>");
+        }
+
         html.AppendLine("</ul></section></body></html>");
         await File.WriteAllTextAsync(path, html.ToString(), new UTF8Encoding(false), cancellationToken);
         return path;
@@ -549,30 +691,46 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
     private static string DescribeCorrelationEvent(CreatorIntelligenceEvent evt)
     {
-        if (evt.Type == "obs.scene.changed") return "OBS-Szene: " + ReadString(evt.Payload, "scene");
+        if (evt.Type == "obs.scene.changed")
+        {
+            return "OBS-Szene: " + ReadString(evt.Payload, "scene");
+        }
+
         if (evt.Type == "spotify.track.changed")
         {
-            var track = ReadString(evt.Payload, "track");
-            var artist = ReadString(evt.Payload, "artist");
+            string track = ReadString(evt.Payload, "track");
+            string artist = ReadString(evt.Payload, "artist");
             return string.IsNullOrWhiteSpace(artist) ? "Spotify: " + track : $"Spotify: {track} – {artist}";
         }
-        if (evt.Type == "session.note") return "Notiz: " + ReadString(evt.Payload, "note");
-        if (evt.Type == "twitch.event") return ReadString(evt.Payload, "summary");
+        if (evt.Type == "session.note")
+        {
+            return "Notiz: " + ReadString(evt.Payload, "note");
+        }
+
+        if (evt.Type == "twitch.event")
+        {
+            return ReadString(evt.Payload, "summary");
+        }
+
         return string.Empty;
     }
 
     private static bool IsRaidEvent(JsonElement? payload)
     {
-        var type = ReadString(payload, "type");
-        var summary = ReadString(payload, "summary");
+        string type = ReadString(payload, "type");
+        string summary = ReadString(payload, "summary");
         return type.Contains("raid", StringComparison.OrdinalIgnoreCase) || summary.Contains("raid", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int? NearestViewer(IReadOnlyList<ViewerPoint> samples, DateTimeOffset target, bool before)
     {
-        var candidates = before ? samples.Where(x => x.TimestampUtc <= target) : samples.Where(x => x.TimestampUtc >= target);
-        var selected = before ? candidates.OrderByDescending(x => x.TimestampUtc).FirstOrDefault() : candidates.OrderBy(x => x.TimestampUtc).FirstOrDefault();
-        if (selected is null || Math.Abs((selected.TimestampUtc - target).TotalMinutes) > 12) return null;
+        IEnumerable<ViewerPoint> candidates = before ? samples.Where(x => x.TimestampUtc <= target) : samples.Where(x => x.TimestampUtc >= target);
+        ViewerPoint? selected = before ? candidates.OrderByDescending(x => x.TimestampUtc).FirstOrDefault() : candidates.OrderBy(x => x.TimestampUtc).FirstOrDefault();
+        if (selected is null || Math.Abs((selected.TimestampUtc - target).TotalMinutes) > 12)
+        {
+            return null;
+        }
+
         return selected.Viewers;
     }
 
@@ -586,18 +744,26 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
         Func<JsonElement?, string>? nameSelector = null)
     {
         var changes = events.Where(x => x.Type == eventType).OrderBy(x => x.TimestampUtc).ToList();
-        for (var index = 0; index < changes.Count; index++)
+        for (int index = 0; index < changes.Count; index++)
         {
-            var current = changes[index];
-            var name = nameSelector?.Invoke(current.Payload) ?? ReadString(current.Payload, payloadName);
-            if (string.IsNullOrWhiteSpace(name)) continue;
-            var end = index + 1 < changes.Count ? changes[index + 1].TimestampUtc : events.Last().TimestampUtc;
+            CreatorIntelligenceEvent current = changes[index];
+            string name = nameSelector?.Invoke(current.Payload) ?? ReadString(current.Payload, payloadName);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            DateTimeOffset end = index + 1 < changes.Count ? changes[index + 1].TimestampUtc : events.Last().TimestampUtc;
             var segmentSamples = samples.Where(x => x.TimestampUtc >= current.TimestampUtc && x.TimestampUtc < end).ToList();
-            if (segmentSamples.Count == 0) continue;
-            var first = segmentSamples.First().Viewers;
-            var last = segmentSamples.Last().Viewers;
-            var chats = events.Count(x => x.Type == "twitch.chat.message" && x.TimestampUtc >= current.TimestampUtc && x.TimestampUtc < end);
-            var duration = Math.Max((end - current.TimestampUtc).TotalMinutes, 0.1);
+            if (segmentSamples.Count == 0)
+            {
+                continue;
+            }
+
+            int first = segmentSamples.First().Viewers;
+            int last = segmentSamples.Last().Viewers;
+            int chats = events.Count(x => x.Type == "twitch.chat.message" && x.TimestampUtc >= current.TimestampUtc && x.TimestampUtc < end);
+            double duration = Math.Max((end - current.TimestampUtc).TotalMinutes, 0.1);
             target.Add(new CreatorContentPerformanceRow(kind, name, 1, duration, segmentSamples.Average(x => x.Viewers), last - first, chats / duration));
         }
     }
@@ -620,21 +786,25 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
 
     private static double LinearTrend(IReadOnlyList<double> values)
     {
-        if (values.Count < 2) return 0;
-        var n = values.Count;
-        var sumX = (n - 1) * n / 2d;
-        var sumY = values.Sum();
-        var sumXY = values.Select((value, index) => value * index).Sum();
-        var sumXX = Enumerable.Range(0, n).Sum(index => index * index);
-        var denominator = n * sumXX - sumX * sumX;
-        return Math.Abs(denominator) < .0001 ? 0 : (n * sumXY - sumX * sumY) / denominator;
+        if (values.Count < 2)
+        {
+            return 0;
+        }
+
+        int n = values.Count;
+        double sumX = (n - 1) * n / 2d;
+        double sumY = values.Sum();
+        double sumXY = values.Select((value, index) => value * index).Sum();
+        int sumXX = Enumerable.Range(0, n).Sum(index => index * index);
+        double denominator = (n * sumXX) - (sumX * sumX);
+        return Math.Abs(denominator) < .0001 ? 0 : ((n * sumXY) - (sumX * sumY)) / denominator;
     }
 
     public async Task<CreatorIntelligenceSummary?> AnalyzeLatestSessionAsync(CancellationToken cancellationToken = default)
     {
-        var events = await ReadAllEventsAsync(cancellationToken);
-        var sessionId = events.Where(x => x.Type == "session.started").OrderByDescending(x => x.TimestampUtc).Select(x => x.SessionId).FirstOrDefault();
-        return sessionId is null ? null : BuildSummary(sessionId, events.Where(x => x.SessionId == sessionId).ToList());
+        List<CreatorIntelligenceEvent> events = await ReadAllEventsAsync(cancellationToken);
+        string? sessionId = events.Where(x => x.Type == "session.started").OrderByDescending(x => x.TimestampUtc).Select(x => x.SessionId).FirstOrDefault();
+        return sessionId is null ? null : BuildSummary(sessionId, [.. events.Where(x => x.SessionId == sessionId)]);
     }
 
     private async Task<CreatorIntelligenceSummary?> AnalyzeSessionAsync(string sessionId, CancellationToken cancellationToken)
@@ -646,15 +816,22 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
     private async Task<List<CreatorIntelligenceEvent>> ReadAllEventsAsync(CancellationToken cancellationToken)
     {
         var result = new List<CreatorIntelligenceEvent>();
-        foreach (var file in Directory.EnumerateFiles(_root, "events.jsonl", SearchOption.AllDirectories).OrderBy(x => x))
+        foreach (string? file in Directory.EnumerateFiles(RootDirectory, "events.jsonl", SearchOption.AllDirectories).OrderBy(x => x))
         {
-            foreach (var line in await File.ReadAllLinesAsync(file, cancellationToken))
+            foreach (string line in await File.ReadAllLinesAsync(file, cancellationToken))
             {
-                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
                 try
                 {
-                    var item = JsonSerializer.Deserialize<CreatorIntelligenceEvent>(line);
-                    if (item is not null) result.Add(item);
+                    CreatorIntelligenceEvent? item = JsonSerializer.Deserialize<CreatorIntelligenceEvent>(line);
+                    if (item is not null)
+                    {
+                        result.Add(item);
+                    }
                 }
                 catch { }
             }
@@ -667,39 +844,61 @@ internal sealed class CreatorIntelligenceService : IAsyncDisposable
         var ordered = events.OrderBy(x => x.TimestampUtc).ToList();
         var viewers = ordered.Where(x => x.Type == "twitch.viewer.sample" && x.Payload is not null)
             .Select(x => new { Event = x, Count = ReadInt(x.Payload!.Value, "viewers") }).ToList();
-        var chats = ordered.Count(x => x.Type == "twitch.chat.message");
-        var follows = ordered.Count(x => x.Type == "twitch.follow");
-        var scenes = ordered.Where(x => x.Type == "obs.scene.changed").Select(x => ReadString(x.Payload, "scene")).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
-        var songs = ordered.Where(x => x.Type == "spotify.track.changed").Count();
-        var start = ordered.FirstOrDefault(x => x.Type == "session.started")?.TimestampUtc ?? ordered.First().TimestampUtc;
-        var end = ordered.LastOrDefault(x => x.Type == "session.ended")?.TimestampUtc ?? ordered.Last().TimestampUtc;
-        var duration = end - start;
-        var durationHours = Math.Max(duration.TotalHours, 1d / 60d);
-        var startedPayload = ordered.FirstOrDefault(x => x.Type == "session.started")?.Payload;
-        var title = ReadString(startedPayload, "title");
-        var category = ReadString(startedPayload, "category");
-        var peak = viewers.Count == 0 ? 0 : viewers.Max(x => x.Count);
-        var average = viewers.Count == 0 ? 0 : viewers.Average(x => x.Count);
-        var first = viewers.Take(Math.Max(1, viewers.Count / 3)).Select(x => x.Count).DefaultIfEmpty(0).Average();
-        var last = viewers.TakeLast(Math.Max(1, viewers.Count / 3)).Select(x => x.Count).DefaultIfEmpty(0).Average();
-        var retention = first <= 0 ? 100 : Math.Clamp(last / first * 100, 0, 200);
-        var engagement = chats / durationHours;
-        var growth = follows / durationHours;
-        var score = (int)Math.Round(Math.Clamp(retention * .35 + Math.Min(engagement, 120) / 120 * 35 + Math.Min(growth, 10) / 10 * 20 + Math.Min(viewers.Count, 20) / 20d * 10, 0, 100));
+        int chats = ordered.Count(x => x.Type == "twitch.chat.message");
+        int follows = ordered.Count(x => x.Type == "twitch.follow");
+        int scenes = ordered.Where(x => x.Type == "obs.scene.changed").Select(x => ReadString(x.Payload, "scene")).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        int songs = ordered.Where(x => x.Type == "spotify.track.changed").Count();
+        DateTimeOffset start = ordered.FirstOrDefault(x => x.Type == "session.started")?.TimestampUtc ?? ordered.First().TimestampUtc;
+        DateTimeOffset end = ordered.LastOrDefault(x => x.Type == "session.ended")?.TimestampUtc ?? ordered.Last().TimestampUtc;
+        TimeSpan duration = end - start;
+        double durationHours = Math.Max(duration.TotalHours, 1d / 60d);
+        JsonElement? startedPayload = ordered.FirstOrDefault(x => x.Type == "session.started")?.Payload;
+        string title = ReadString(startedPayload, "title");
+        string category = ReadString(startedPayload, "category");
+        int peak = viewers.Count == 0 ? 0 : viewers.Max(x => x.Count);
+        double average = viewers.Count == 0 ? 0 : viewers.Average(x => x.Count);
+        double first = viewers.Take(Math.Max(1, viewers.Count / 3)).Select(x => x.Count).DefaultIfEmpty(0).Average();
+        double last = viewers.TakeLast(Math.Max(1, viewers.Count / 3)).Select(x => x.Count).DefaultIfEmpty(0).Average();
+        double retention = first <= 0 ? 100 : Math.Clamp(last / first * 100, 0, 200);
+        double engagement = chats / durationHours;
+        double growth = follows / durationHours;
+        int score = (int)Math.Round(Math.Clamp((retention * .35) + (Math.Min(engagement, 120) / 120 * 35) + (Math.Min(growth, 10) / 10 * 20) + (Math.Min(viewers.Count, 20) / 20d * 10), 0, 100));
 
         var recommendations = new List<string>();
-        if (viewers.Count < 3) recommendations.Add("Mehr Zuschauer-Messpunkte sammeln; für belastbare Trends werden mindestens drei Live-Samples benötigt.");
-        if (retention < 75) recommendations.Add("Die Zuschauerbindung fällt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel.");
-        else if (retention > 110) recommendations.Add("Die Zuschauerzahl wächst im letzten Streamdrittel. Der dortige Inhalt sollte künftig früher oder häufiger eingesetzt werden.");
-        if (engagement < 10) recommendations.Add("Die Chataktivität ist niedrig. Direkte Fragen, Abstimmungen oder Channel-Point-Aktionen können das Engagement erhöhen.");
-        if (scenes <= 1) recommendations.Add("Es wurde kaum zwischen OBS-Szenen gewechselt. Mehr visuelle Abwechslung kann längere Streams strukturieren.");
-        if (recommendations.Count == 0) recommendations.Add("Der Stream zeigt stabile Kennzahlen. Vergleiche als Nächstes Kategorien, Startzeiten und Szenen über mehrere Sessions.");
+        if (viewers.Count < 3)
+        {
+            recommendations.Add("Mehr Zuschauer-Messpunkte sammeln; für belastbare Trends werden mindestens drei Live-Samples benötigt.");
+        }
+
+        if (retention < 75)
+        {
+            recommendations.Add("Die Zuschauerbindung fällt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel.");
+        }
+        else if (retention > 110)
+        {
+            recommendations.Add("Die Zuschauerzahl wächst im letzten Streamdrittel. Der dortige Inhalt sollte künftig früher oder häufiger eingesetzt werden.");
+        }
+
+        if (engagement < 10)
+        {
+            recommendations.Add("Die Chataktivität ist niedrig. Direkte Fragen, Abstimmungen oder Channel-Point-Aktionen können das Engagement erhöhen.");
+        }
+
+        if (scenes <= 1)
+        {
+            recommendations.Add("Es wurde kaum zwischen OBS-Szenen gewechselt. Mehr visuelle Abwechslung kann längere Streams strukturieren.");
+        }
+
+        if (recommendations.Count == 0)
+        {
+            recommendations.Add("Der Stream zeigt stabile Kennzahlen. Vergleiche als Nächstes Kategorien, Startzeiten und Szenen über mehrere Sessions.");
+        }
 
         return new CreatorIntelligenceSummary(sessionId, start.ToLocalTime(), end.ToLocalTime(), title, category, duration, score, peak, average, retention, engagement, growth, chats, follows, scenes, songs, recommendations);
     }
 
-    private static int ReadInt(JsonElement payload, string name) => payload.TryGetProperty(name, out var value) && value.TryGetInt32(out var number) ? number : 0;
-    private static string ReadString(JsonElement? payload, string name) => payload is { } p && p.TryGetProperty(name, out var value) ? value.ToString() : string.Empty;
+    private static int ReadInt(JsonElement payload, string name) => payload.TryGetProperty(name, out JsonElement value) && value.TryGetInt32(out int number) ? number : 0;
+    private static string ReadString(JsonElement? payload, string name) => payload is { } p && p.TryGetProperty(name, out JsonElement value) ? value.ToString() : string.Empty;
 
     public async ValueTask DisposeAsync()
     {
@@ -731,10 +930,10 @@ internal sealed record CreatorContentPerformance(
 {
     public static CreatorContentPerformance Empty(int lookbackDays) => new(
         lookbackDays, 0,
-        Array.Empty<CreatorContentPerformanceRow>(),
-        Array.Empty<CreatorContentPerformanceRow>(),
-        Array.Empty<CreatorHeatmapCell>(),
-        new[] { "Noch keine vollständigen Sessions für die Inhaltsanalyse vorhanden." });
+        [],
+        [],
+        [],
+        ["Noch keine vollständigen Sessions für die Inhaltsanalyse vorhanden."]);
 }
 
 
@@ -763,9 +962,9 @@ internal sealed record CreatorEventCorrelationReport(
 {
     public static CreatorEventCorrelationReport Empty(int lookbackDays) => new(
         lookbackDays, 0,
-        Array.Empty<CreatorEventCorrelationRow>(),
-        Array.Empty<CreatorRaidRetentionRow>(),
-        new[] { "Noch keine vollständigen Sessions für die Ereigniskorrelation vorhanden." });
+        [],
+        [],
+        ["Noch keine vollständigen Sessions für die Ereigniskorrelation vorhanden."]);
 }
 
 internal sealed record CreatorActionItem(
@@ -880,8 +1079,8 @@ internal sealed record CreatorIntelligenceDashboard(
 {
     public static CreatorIntelligenceDashboard Empty(int lookbackDays) => new(
         lookbackDays, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, DayOfWeek.Monday, "–", 0, 0,
-        Array.Empty<CreatorIntelligenceSummary>(),
-        new[] { "Noch keine vollständigen Sessions im gewählten Zeitraum vorhanden." });
+        [],
+        ["Noch keine vollständigen Sessions im gewählten Zeitraum vorhanden."]);
 }
 
 internal static class CreatorIntelligenceFormattingExtensions

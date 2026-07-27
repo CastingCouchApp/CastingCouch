@@ -5,21 +5,16 @@ using CreatorControlSuite.Modules.Twitch.Models;
 
 namespace CreatorControlSuite.Modules.Twitch;
 
-public sealed class TwitchApiClient : ITwitchApiClient
+public sealed class TwitchApiClient(HttpClient httpClient) : ITwitchApiClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly HttpClient _httpClient;
+    private readonly HttpClient _httpClient = httpClient;
     private string _clientId = "";
     private string _accessToken = "";
-
-    public TwitchApiClient(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
-    }
 
     public void Configure(
         string clientId,
@@ -32,13 +27,13 @@ public sealed class TwitchApiClient : ITwitchApiClient
     public async Task<TwitchUser> GetCurrentUserAsync(
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<UserListResponse>(
+        UserListResponse response = await SendAsync<UserListResponse>(
             HttpMethod.Get,
             "users",
             body: null,
             cancellationToken);
 
-        var user = response.Data.FirstOrDefault()
+        UserData user = response.Data.FirstOrDefault()
                    ?? throw new InvalidOperationException(
                        "Twitch-Benutzer konnte nicht ermittelt werden.");
 
@@ -49,13 +44,13 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string login,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<UserListResponse>(
+        UserListResponse response = await SendAsync<UserListResponse>(
             HttpMethod.Get,
             "users?login=" + Uri.EscapeDataString(login),
             body: null,
             cancellationToken);
 
-        var user = response.Data.FirstOrDefault();
+        UserData? user = response.Data.FirstOrDefault();
 
         return user is null
             ? null
@@ -66,14 +61,14 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string broadcasterId,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<ChannelListResponse>(
+        ChannelListResponse response = await SendAsync<ChannelListResponse>(
             HttpMethod.Get,
             "channels?broadcaster_id=" +
             Uri.EscapeDataString(broadcasterId),
             body: null,
             cancellationToken);
 
-        var channel = response.Data.FirstOrDefault()
+        ChannelData channel = response.Data.FirstOrDefault()
                       ?? throw new InvalidOperationException(
                           "Twitch-Kanalinformationen fehlen.");
 
@@ -117,7 +112,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string query,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<CategoryListResponse>(
+        CategoryListResponse response = await SendAsync<CategoryListResponse>(
             HttpMethod.Get,
             "search/categories?query=" +
             Uri.EscapeDataString(query) +
@@ -125,19 +120,18 @@ public sealed class TwitchApiClient : ITwitchApiClient
             body: null,
             cancellationToken);
 
-        return response.Data
+        return [.. response.Data
             .Select(category => new TwitchCategory(
                 category.Id,
                 category.Name,
-                category.BoxArtUrl))
-            .ToList();
+                category.BoxArtUrl))];
     }
 
     public async Task<IReadOnlyList<TwitchChannelSuggestion>> SearchChannelsAsync(
         string query,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<ChannelSearchListResponse>(
+        ChannelSearchListResponse response = await SendAsync<ChannelSearchListResponse>(
             HttpMethod.Get,
             "search/channels?query=" +
             Uri.EscapeDataString(query) +
@@ -145,7 +139,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
             body: null,
             cancellationToken);
 
-        return response.Data
+        return [.. response.Data
             .OrderByDescending(channel => channel.IsLive)
             .Select(channel => new TwitchChannelSuggestion(
                 channel.BroadcasterLogin,
@@ -153,8 +147,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
                     ? channel.BroadcasterLogin
                     : channel.DisplayName,
                 channel.IsLive,
-                "Suche"))
-            .ToList();
+                "Suche"))];
     }
 
     public async Task<IReadOnlyList<TwitchChannelSuggestion>> GetFollowedChannelsAsync(
@@ -166,7 +159,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
 
         do
         {
-            var url = "channels/followed?user_id=" +
+            string url = "channels/followed?user_id=" +
                       Uri.EscapeDataString(userId) +
                       "&first=100";
             if (!string.IsNullOrWhiteSpace(cursor))
@@ -174,7 +167,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
                 url += "&after=" + Uri.EscapeDataString(cursor);
             }
 
-            var response = await SendAsync<FollowedChannelsResponse>(
+            FollowedChannelsResponse response = await SendAsync<FollowedChannelsResponse>(
                 HttpMethod.Get,
                 url,
                 body: null,
@@ -208,7 +201,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
 
         do
         {
-            var url = "streams/followed?user_id=" +
+            string url = "streams/followed?user_id=" +
                       Uri.EscapeDataString(userId) +
                       "&first=100";
             if (!string.IsNullOrWhiteSpace(cursor))
@@ -216,7 +209,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
                 url += "&after=" + Uri.EscapeDataString(cursor);
             }
 
-            var response = await SendAsync<StreamListResponse>(
+            StreamListResponse response = await SendAsync<StreamListResponse>(
                 HttpMethod.Get,
                 url,
                 body: null,
@@ -259,10 +252,10 @@ public sealed class TwitchApiClient : ITwitchApiClient
             return new Dictionary<string, TwitchChannelSuggestion>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var query = string.Join(
+        string query = string.Join(
             "&",
             unique.Select(login => "user_login=" + Uri.EscapeDataString(login)));
-        var response = await SendAsync<StreamListResponse>(
+        StreamListResponse response = await SendAsync<StreamListResponse>(
             HttpMethod.Get,
             "streams?" + query,
             body: null,
@@ -275,7 +268,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
                 group => group.Key,
                 group =>
                 {
-                    var stream = group.First();
+                    StreamData stream = group.First();
                     return new TwitchChannelSuggestion(
                         stream.UserLogin,
                         string.IsNullOrWhiteSpace(stream.UserName)
@@ -291,19 +284,19 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string login,
         CancellationToken cancellationToken = default)
     {
-        var user = await GetUserByLoginAsync(login, cancellationToken);
+        TwitchUser? user = await GetUserByLoginAsync(login, cancellationToken);
         if (user is null)
         {
             return null;
         }
 
-        var response = await SendAsync<StreamListResponse>(
+        StreamListResponse response = await SendAsync<StreamListResponse>(
             HttpMethod.Get,
             "streams?user_id=" + Uri.EscapeDataString(user.Id) + "&first=1",
             body: null,
             cancellationToken);
 
-        var stream = response.Data.FirstOrDefault();
+        StreamData? stream = response.Data.FirstOrDefault();
         return new TwitchRaidTargetStatus(
             user.Login,
             user.DisplayName,
@@ -321,7 +314,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string toBroadcasterId,
         CancellationToken cancellationToken = default)
     {
-        using var response = await SendRawAsync(
+        using HttpResponseMessage response = await SendRawAsync(
             HttpMethod.Post,
             "raids?from_broadcaster_id=" + Uri.EscapeDataString(fromBroadcasterId) +
             "&to_broadcaster_id=" + Uri.EscapeDataString(toBroadcasterId),
@@ -333,7 +326,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string broadcasterId,
         CancellationToken cancellationToken = default)
     {
-        using var response = await SendRawAsync(
+        using HttpResponseMessage response = await SendRawAsync(
             HttpMethod.Delete,
             "raids?broadcaster_id=" + Uri.EscapeDataString(broadcasterId),
             body: null,
@@ -345,7 +338,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string moderatorId,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<FollowersResponse>(
+        FollowersResponse response = await SendAsync<FollowersResponse>(
             HttpMethod.Get,
             "channels/followers?broadcaster_id=" +
             Uri.EscapeDataString(broadcasterId) +
@@ -362,7 +355,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string broadcasterId,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<SubscriptionsResponse>(
+        SubscriptionsResponse response = await SendAsync<SubscriptionsResponse>(
             HttpMethod.Get,
             "subscriptions?broadcaster_id=" +
             Uri.EscapeDataString(broadcasterId) +
@@ -378,7 +371,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string moderatorId,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<ChattersResponse>(
+        ChattersResponse response = await SendAsync<ChattersResponse>(
             HttpMethod.Get,
             "chat/chatters?broadcaster_id=" + Uri.EscapeDataString(broadcasterId) +
             "&moderator_id=" + Uri.EscapeDataString(moderatorId) +
@@ -386,11 +379,10 @@ public sealed class TwitchApiClient : ITwitchApiClient
             body: null,
             cancellationToken);
 
-        return response.Data
+        return [.. response.Data
             .Select(item => string.IsNullOrWhiteSpace(item.UserName) ? item.UserLogin : item.UserName)
             .Where(name => !string.IsNullOrWhiteSpace(name))
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)];
     }
 
     public async Task SendChatMessageAsync(
@@ -399,7 +391,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string message,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<SendChatMessageResponse>(
+        SendChatMessageResponse response = await SendAsync<SendChatMessageResponse>(
             HttpMethod.Post,
             "chat/messages",
             new
@@ -410,7 +402,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
             },
             cancellationToken);
 
-        var result = response.Data.FirstOrDefault();
+        SendChatMessageData? result = response.Data.FirstOrDefault();
 
         if (result is not null &&
             !result.IsSent)
@@ -444,7 +436,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
             data["reason"] = reason.Trim()[..Math.Min(500, reason.Trim().Length)];
         }
 
-        using var response = await SendRawAsync(
+        using HttpResponseMessage response = await SendRawAsync(
             HttpMethod.Post,
             "moderation/bans?broadcaster_id=" + Uri.EscapeDataString(broadcasterId) +
             "&moderator_id=" + Uri.EscapeDataString(moderatorId),
@@ -458,7 +450,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string userId,
         CancellationToken cancellationToken = default)
     {
-        using var response = await SendRawAsync(
+        using HttpResponseMessage response = await SendRawAsync(
             HttpMethod.Delete,
             "moderation/bans?broadcaster_id=" + Uri.EscapeDataString(broadcasterId) +
             "&moderator_id=" + Uri.EscapeDataString(moderatorId) +
@@ -472,13 +464,13 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string broadcasterId,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<RewardListResponse>(
+        RewardListResponse response = await SendAsync<RewardListResponse>(
             HttpMethod.Get,
             "channel_points/custom_rewards?broadcaster_id=" + Uri.EscapeDataString(broadcasterId),
             body: null,
             cancellationToken);
 
-        return response.Data.Select(ToReward).ToList();
+        return [.. response.Data.Select(ToReward)];
     }
 
     public async Task<TwitchChannelPointReward> CreateCustomRewardAsync(
@@ -488,7 +480,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         string? prompt,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<RewardListResponse>(
+        RewardListResponse response = await SendAsync<RewardListResponse>(
             HttpMethod.Post,
             "channel_points/custom_rewards?broadcaster_id=" + Uri.EscapeDataString(broadcasterId),
             new { title = title.Trim(), cost = Math.Max(1, cost), prompt = prompt?.Trim() ?? "", is_enabled = true },
@@ -503,14 +495,14 @@ public sealed class TwitchApiClient : ITwitchApiClient
         int durationSeconds,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<PollListResponse>(HttpMethod.Post, "polls", new
+        PollListResponse response = await SendAsync<PollListResponse>(HttpMethod.Post, "polls", new
         {
             broadcaster_id = broadcasterId,
             title = title.Trim(),
             choices = choices.Select(value => new { title = value.Trim() }).ToArray(),
             duration = Math.Clamp(durationSeconds, 15, 1800)
         }, cancellationToken);
-        var poll = response.Data.FirstOrDefault() ?? throw new InvalidOperationException("Twitch hat keine Umfrage zurückgegeben.");
+        PollData poll = response.Data.FirstOrDefault() ?? throw new InvalidOperationException("Twitch hat keine Umfrage zurückgegeben.");
         return new TwitchPoll(poll.Id, poll.Title, poll.Status, poll.EndedAt);
     }
 
@@ -521,54 +513,56 @@ public sealed class TwitchApiClient : ITwitchApiClient
         int predictionWindowSeconds,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<PredictionListResponse>(HttpMethod.Post, "predictions", new
+        PredictionListResponse response = await SendAsync<PredictionListResponse>(HttpMethod.Post, "predictions", new
         {
             broadcaster_id = broadcasterId,
             title = title.Trim(),
             outcomes = outcomes.Select(value => new { title = value.Trim() }).ToArray(),
             prediction_window = Math.Clamp(predictionWindowSeconds, 30, 1800)
         }, cancellationToken);
-        var prediction = response.Data.FirstOrDefault() ?? throw new InvalidOperationException("Twitch hat keine Vorhersage zurückgegeben.");
+        PredictionData prediction = response.Data.FirstOrDefault() ?? throw new InvalidOperationException("Twitch hat keine Vorhersage zurückgegeben.");
         return ToPrediction(prediction);
     }
 
     public async Task<TwitchPoll> EndPollAsync(string broadcasterId, string pollId, string status, CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync<PollListResponse>(HttpMethod.Patch, "polls", new
+        PollListResponse response = await SendAsync<PollListResponse>(HttpMethod.Patch, "polls", new
         {
-            broadcaster_id = broadcasterId, id = pollId, status
+            broadcaster_id = broadcasterId,
+            id = pollId,
+            status
         }, cancellationToken);
-        var poll = response.Data.FirstOrDefault() ?? throw new InvalidOperationException("Twitch hat keine Umfrage zurückgegeben.");
+        PollData poll = response.Data.FirstOrDefault() ?? throw new InvalidOperationException("Twitch hat keine Umfrage zurückgegeben.");
         return new TwitchPoll(poll.Id, poll.Title, poll.Status, poll.EndedAt);
     }
 
     public async Task<TwitchPrediction> EndPredictionAsync(string broadcasterId, string predictionId, string status, string? winningOutcomeId, CancellationToken cancellationToken = default)
     {
-        var body = status.Equals("RESOLVED", StringComparison.OrdinalIgnoreCase)
+        object body = status.Equals("RESOLVED", StringComparison.OrdinalIgnoreCase)
             ? new { broadcaster_id = broadcasterId, id = predictionId, status, winning_outcome_id = winningOutcomeId }
             : (object)new { broadcaster_id = broadcasterId, id = predictionId, status };
-        var response = await SendAsync<PredictionListResponse>(HttpMethod.Patch, "predictions", body, cancellationToken);
+        PredictionListResponse response = await SendAsync<PredictionListResponse>(HttpMethod.Patch, "predictions", body, cancellationToken);
         return ToPrediction(response.Data.FirstOrDefault() ?? throw new InvalidOperationException("Twitch hat keine Vorhersage zurückgegeben."));
     }
 
     public async Task<IReadOnlyList<TwitchRewardRedemption>> GetRewardRedemptionsAsync(string broadcasterId, string rewardId, string status, CancellationToken cancellationToken = default)
     {
-        var url = "channel_points/custom_rewards/redemptions?broadcaster_id=" + Uri.EscapeDataString(broadcasterId) +
+        string url = "channel_points/custom_rewards/redemptions?broadcaster_id=" + Uri.EscapeDataString(broadcasterId) +
                   "&reward_id=" + Uri.EscapeDataString(rewardId) + "&status=" + Uri.EscapeDataString(status) + "&sort=OLDEST";
-        var response = await SendAsync<RedemptionListResponse>(HttpMethod.Get, url, null, cancellationToken);
-        return response.Data.Select(r => new TwitchRewardRedemption(r.Id, rewardId, r.Reward.Title, r.UserLogin, r.UserName, r.UserInput, r.Status, r.RedeemedAt)).ToList();
+        RedemptionListResponse response = await SendAsync<RedemptionListResponse>(HttpMethod.Get, url, null, cancellationToken);
+        return [.. response.Data.Select(r => new TwitchRewardRedemption(r.Id, rewardId, r.Reward.Title, r.UserLogin, r.UserName, r.UserInput, r.Status, r.RedeemedAt))];
     }
 
     public async Task UpdateRewardRedemptionStatusAsync(string broadcasterId, string rewardId, string redemptionId, string status, CancellationToken cancellationToken = default)
     {
-        var url = "channel_points/custom_rewards/redemptions?broadcaster_id=" + Uri.EscapeDataString(broadcasterId) +
+        string url = "channel_points/custom_rewards/redemptions?broadcaster_id=" + Uri.EscapeDataString(broadcasterId) +
                   "&reward_id=" + Uri.EscapeDataString(rewardId) + "&id=" + Uri.EscapeDataString(redemptionId);
         _ = await SendAsync<RedemptionListResponse>(HttpMethod.Patch, url, new { status }, cancellationToken);
     }
 
     private static TwitchPrediction ToPrediction(PredictionData prediction) => new(
         prediction.Id, prediction.Title, prediction.Status, prediction.LocksAt,
-        prediction.Outcomes.Select(o => new TwitchPredictionOutcome(o.Id, o.Title, o.ChannelPoints)).ToList());
+        [.. prediction.Outcomes.Select(o => new TwitchPredictionOutcome(o.Id, o.Title, o.ChannelPoints))]);
 
     public async Task CreateEventSubSubscriptionAsync(
         string type,
@@ -600,7 +594,7 @@ public sealed class TwitchApiClient : ITwitchApiClient
         object? body,
         CancellationToken cancellationToken)
     {
-        using var response = await SendRawAsync(
+        using HttpResponseMessage response = await SendRawAsync(
             method,
             relativeUrl,
             body,
@@ -639,13 +633,13 @@ public sealed class TwitchApiClient : ITwitchApiClient
             request.Content = JsonContent.Create(body);
         }
 
-        var response = await _httpClient.SendAsync(
+        HttpResponseMessage response = await _httpClient.SendAsync(
             request,
             cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
-            var text = await response.Content.ReadAsStringAsync(
+            string text = await response.Content.ReadAsStringAsync(
                 cancellationToken);
 
             response.Dispose();

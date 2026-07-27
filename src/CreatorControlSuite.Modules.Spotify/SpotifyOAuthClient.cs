@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
@@ -5,27 +6,21 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using CreatorControlSuite.Modules.Spotify.Models;
 using CreatorControlSuite.Core.Logging;
+using CreatorControlSuite.Modules.Spotify.Models;
 
 namespace CreatorControlSuite.Modules.Spotify;
 
-public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
+public sealed class SpotifyOAuthClient(HttpClient httpClient, IAppLogger logger) : ISpotifyOAuthClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly HttpClient _httpClient;
-    private readonly IAppLogger _logger;
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly IAppLogger _logger = logger;
     private long _requestSequence;
-
-    public SpotifyOAuthClient(HttpClient httpClient, IAppLogger logger)
-    {
-        _httpClient = httpClient;
-        _logger = logger;
-    }
 
     public async Task<SpotifyTokenSet> AuthorizeAsync(
         string clientId,
@@ -36,11 +31,11 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
         ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
         ArgumentException.ThrowIfNullOrWhiteSpace(redirectUri);
 
-        var verifier = CreateCodeVerifier();
-        var challenge = CreateCodeChallenge(verifier);
-        var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        string verifier = CreateCodeVerifier();
+        string challenge = CreateCodeChallenge(verifier);
+        string state = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
 
-        var authorizationUri = BuildAuthorizationUri(
+        Uri authorizationUri = BuildAuthorizationUri(
             clientId,
             redirectUri,
             scopes,
@@ -58,7 +53,7 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
                 UseShellExecute = true
             });
 
-        using var cancellationRegistration =
+        using CancellationTokenRegistration cancellationRegistration =
             cancellationToken.Register(listener.Stop);
 
         HttpListenerContext context;
@@ -73,10 +68,10 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
             throw new OperationCanceledException(cancellationToken);
         }
 
-        var query = context.Request.QueryString;
-        var returnedState = query["state"];
-        var error = query["error"];
-        var code = query["code"];
+        NameValueCollection query = context.Request.QueryString;
+        string? returnedState = query["state"];
+        string? error = query["error"];
+        string? code = query["code"];
 
         if (!string.IsNullOrWhiteSpace(error))
         {
@@ -129,14 +124,14 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
                 ["code_verifier"] = verifier
             });
 
-        using var response = await SendTokenRequestAsync(
+        using HttpResponseMessage response = await SendTokenRequestAsync(
             "authorization_code",
             content,
             cancellationToken);
 
         await EnsureSuccessAsync(response, cancellationToken);
 
-        var token = await response.Content.ReadFromJsonAsync<TokenResponse>(
+        TokenResponse token = await response.Content.ReadFromJsonAsync<TokenResponse>(
             JsonOptions,
             cancellationToken)
             ?? throw new InvalidOperationException(
@@ -158,14 +153,14 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
                 ["refresh_token"] = refreshToken
             });
 
-        using var response = await SendTokenRequestAsync(
+        using HttpResponseMessage response = await SendTokenRequestAsync(
             "refresh_token",
             content,
             cancellationToken);
 
         await EnsureSuccessAsync(response, cancellationToken);
 
-        var token = await response.Content.ReadFromJsonAsync<TokenResponse>(
+        TokenResponse token = await response.Content.ReadFromJsonAsync<TokenResponse>(
             JsonOptions,
             cancellationToken)
             ?? throw new InvalidOperationException(
@@ -184,7 +179,7 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
 
     internal static string CreateCodeChallenge(string verifier)
     {
-        var hash = SHA256.HashData(
+        byte[] hash = SHA256.HashData(
             Encoding.ASCII.GetBytes(verifier));
 
         return Base64UrlEncode(hash);
@@ -215,7 +210,7 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
             ["show_dialog"] = "true"
         };
 
-        var query = string.Join(
+        string query = string.Join(
             "&",
             parameters.Select(pair =>
                 Uri.EscapeDataString(pair.Key) +
@@ -239,7 +234,7 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
                 "Die Spotify Redirect-URI muss 127.0.0.1 verwenden.");
         }
 
-        var path = uri.AbsolutePath.EndsWith(
+        string path = uri.AbsolutePath.EndsWith(
             "/",
             StringComparison.Ordinal)
             ? uri.AbsolutePath
@@ -253,11 +248,11 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
         string message,
         bool isSuccess)
     {
-        var color = isSuccess
+        string color = isSuccess
             ? "#5CE06E"
             : "#E05C5C";
 
-        var html =
+        string html =
             "<!doctype html><html><head><meta charset=\"utf-8\">" +
             "<title>Creator Control Suite</title></head>" +
             "<body style=\"font-family:Segoe UI;background:#101010;" +
@@ -269,7 +264,7 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
             WebUtility.HtmlEncode(message) +
             "</p></div></body></html>";
 
-        var bytes = Encoding.UTF8.GetBytes(html);
+        byte[] bytes = Encoding.UTF8.GetBytes(html);
 
         context.Response.StatusCode = 200;
         context.Response.ContentType =
@@ -285,7 +280,7 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
         HttpContent content,
         CancellationToken cancellationToken)
     {
-        var requestNumber = Interlocked.Increment(ref _requestSequence);
+        long requestNumber = Interlocked.Increment(ref _requestSequence);
         var stopwatch = Stopwatch.StartNew();
         HttpResponseMessage response;
 
@@ -317,9 +312,9 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
         }
 
         stopwatch.Stop();
-        var retryAfter = response.Headers.RetryAfter?.Delta
+        TimeSpan? retryAfter = response.Headers.RetryAfter?.Delta
             ?? (response.Headers.RetryAfter?.Date - DateTimeOffset.UtcNow);
-        var level = response.StatusCode == HttpStatusCode.TooManyRequests
+        AppLogLevel level = response.StatusCode == HttpStatusCode.TooManyRequests
             ? AppLogLevel.Warning
             : response.IsSuccessStatusCode
                 ? AppLogLevel.Information
@@ -353,12 +348,12 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
             return;
         }
 
-        var text = await response.Content.ReadAsStringAsync(
+        string text = await response.Content.ReadAsStringAsync(
             cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.TooManyRequests)
         {
-            var retryAfter = response.Headers.RetryAfter?.Delta
+            TimeSpan retryAfter = response.Headers.RetryAfter?.Delta
                 ?? (response.Headers.RetryAfter?.Date - DateTimeOffset.UtcNow)
                 ?? TimeSpan.FromSeconds(5);
 
@@ -405,7 +400,7 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
 
             if (reader.TokenType == JsonTokenType.String)
             {
-                var value = reader.GetString();
+                string? value = reader.GetString();
 
                 return string.IsNullOrWhiteSpace(value)
                     ? []
@@ -423,12 +418,12 @@ public sealed class SpotifyOAuthClient : ISpotifyOAuthClient
                 {
                     if (reader.TokenType == JsonTokenType.EndArray)
                     {
-                        return values.ToArray();
+                        return [.. values];
                     }
 
                     if (reader.TokenType == JsonTokenType.String)
                     {
-                        var value = reader.GetString();
+                        string? value = reader.GetString();
 
                         if (!string.IsNullOrWhiteSpace(value))
                         {

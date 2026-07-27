@@ -4,25 +4,19 @@ using CreatorControlSuite.Core.Validation;
 
 namespace CreatorControlSuite.Core.Diagnostics;
 
-public sealed class RuntimeHealthService
+public sealed class RuntimeHealthService(
+    ISettingsStore settingsStore,
+    ISettingsValidator validator)
 {
-    private readonly ISettingsStore _settingsStore;
-    private readonly ISettingsValidator _validator;
-
-    public RuntimeHealthService(
-        ISettingsStore settingsStore,
-        ISettingsValidator validator)
-    {
-        _settingsStore = settingsStore;
-        _validator = validator;
-    }
+    private readonly ISettingsStore _settingsStore = settingsStore;
+    private readonly ISettingsValidator _validator = validator;
 
     public async Task<IReadOnlyList<RuntimeHealthItem>> CheckAsync(
         CancellationToken cancellationToken = default)
     {
         var results = new List<RuntimeHealthItem>();
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var validation = _validator.Validate(settings);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        ValidationReport validation = _validator.Validate(settings);
 
         results.AddRange(
             validation.Issues.Select(issue =>

@@ -8,7 +8,7 @@ public sealed class FirstRunServiceTests
     [Fact]
     public async Task IsRequiredUntilCompleted()
     {
-        var root = Path.Combine(
+        string root = Path.Combine(
             Path.GetTempPath(),
             "CreatorControlSuite.FirstRunTests",
             Guid.NewGuid().ToString("N"));

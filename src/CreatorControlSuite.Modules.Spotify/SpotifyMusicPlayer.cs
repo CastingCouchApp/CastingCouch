@@ -3,14 +3,9 @@ using CreatorControlSuite.Modules.Spotify.Models;
 
 namespace CreatorControlSuite.Modules.Spotify;
 
-public sealed class SpotifyMusicPlayer : IMusicPlayer
+public sealed class SpotifyMusicPlayer(SpotifyModule spotifyModule) : IMusicPlayer
 {
-    private readonly SpotifyModule _spotifyModule;
-
-    public SpotifyMusicPlayer(SpotifyModule spotifyModule)
-    {
-        _spotifyModule = spotifyModule;
-    }
+    private readonly SpotifyModule _spotifyModule = spotifyModule;
 
     public string Id => MusicProviderIds.Spotify;
     public string DisplayName => "Spotify";
@@ -19,7 +14,7 @@ public sealed class SpotifyMusicPlayer : IMusicPlayer
 
     public Task<NowPlayingSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {
-        var snapshot = _spotifyModule.GetSnapshot();
+        SpotifySnapshot snapshot = _spotifyModule.GetSnapshot();
         return Task.FromResult(Map(snapshot));
     }
 
@@ -52,9 +47,9 @@ public sealed class SpotifyMusicPlayer : IMusicPlayer
 
     private static NowPlayingSnapshot Map(SpotifySnapshot snapshot)
     {
-        var track = snapshot.Playback.Track;
-        var connected = snapshot.Authenticated;
-        var status = !connected
+        SpotifyTrack? track = snapshot.Playback.Track;
+        bool connected = snapshot.Authenticated;
+        string status = !connected
             ? "Nicht verbunden"
             : track is null
                 ? "Verbunden · Kein Titel"

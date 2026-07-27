@@ -1,50 +1,54 @@
-﻿using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Animation;
-using System.Windows.Controls;
-using System.Windows.Input;
-using Microsoft.Win32;
-using CreatorControlSuite.Core.Configuration;
-using CreatorControlSuite.Core.Diagnostics;
-using CreatorControlSuite.Core.Logging;
-using CreatorControlSuite.Core.Validation;
-using CreatorControlSuite.Core.Security;
-using CreatorControlSuite.Core.Profiles;
-using CreatorControlSuite.Core.Updates;
-using CreatorControlSuite.Core.Migration;
-using CreatorControlSuite.Modules.OBS;
-using CreatorControlSuite.Modules.OBS.Models;
-using CreatorControlSuite.Modules.Twitch;
-using CreatorControlSuite.Modules.Twitch.Models;
-using CreatorControlSuite.Modules.Spotify;
-using CreatorControlSuite.Modules.Spotify.Models;
-using CreatorControlSuite.Modules.YouTubeMusic;
-using CreatorControlSuite.Core.Music;
-using CreatorControlSuite.Modules.Alerts;
-using CreatorControlSuite.Modules.Alerts.Models;
-using CreatorControlSuite.Modules.Overlay;
-using CreatorControlSuite.Modules.Workflow;
-using CreatorControlSuite.Modules.Workflow.Models;
-using CreatorControlSuite.Modules.StreamDeck;
-using CreatorControlSuite.App.Services;
-using CreatorControlSuite.App.Themes;
-using CreatorControlSuite.App.Hud;
-using CreatorControlSuite.App.Mvvm;
-using CreatorControlSuite.App.ViewModels;
-using CreatorControlSuite.Core.Ipc;
-using CreatorControlSuite.Core.Licensing;
-using CreatorControlSuite.Core.Legal;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.IO.Compression;
-using System.Net.Http.Json;
 using System.Diagnostics;
+using System.IO.Compression;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using CreatorControlSuite.App.Hud;
+using CreatorControlSuite.App.Mvvm;
+using CreatorControlSuite.App.Services;
+using CreatorControlSuite.App.Themes;
+using CreatorControlSuite.App.ViewModels;
+using CreatorControlSuite.Core.Configuration;
+using CreatorControlSuite.Core.Diagnostics;
+using CreatorControlSuite.Core.Ipc;
+using CreatorControlSuite.Core.Legal;
+using CreatorControlSuite.Core.Licensing;
+using CreatorControlSuite.Core.Logging;
+using CreatorControlSuite.Core.Migration;
+using CreatorControlSuite.Core.Music;
+using CreatorControlSuite.Core.Profiles;
+using CreatorControlSuite.Core.Security;
+using CreatorControlSuite.Core.Updates;
+using CreatorControlSuite.Core.Validation;
+using CreatorControlSuite.Modules.Alerts;
+using CreatorControlSuite.Modules.Alerts.Models;
+using CreatorControlSuite.Modules.OBS;
+using CreatorControlSuite.Modules.OBS.Models;
+using CreatorControlSuite.Modules.Overlay;
+using CreatorControlSuite.Modules.Spotify;
+using CreatorControlSuite.Modules.Spotify.Models;
+using CreatorControlSuite.Modules.StreamDeck;
+using CreatorControlSuite.Modules.StreamDeck.Models;
+using CreatorControlSuite.Modules.Twitch;
+using CreatorControlSuite.Modules.Twitch.Models;
+using CreatorControlSuite.Modules.Workflow;
+using CreatorControlSuite.Modules.Workflow.Models;
+using CreatorControlSuite.Modules.YouTubeMusic;
+using Microsoft.Win32;
 
 namespace CreatorControlSuite.App;
 
@@ -146,7 +150,7 @@ public partial class MainWindow : Window
     private DateTimeOffset _lastTimedAutomationObsRefresh = DateTimeOffset.MinValue;
     private bool _timedAutomationObsRefreshRunning;
     private readonly Dictionary<string, CancellationTokenSource> _activeTimedAutomationRuns = new(StringComparer.OrdinalIgnoreCase);
-    private readonly object _timedAutomationRunSync = new();
+    private readonly Lock _timedAutomationRunSync = new();
 
     private System.Windows.Point _dashboardModuleDragStart;
     private string? _dashboardDraggedModuleName;
@@ -166,7 +170,7 @@ public partial class MainWindow : Window
     private string? _lastCreatorIntelligenceTrackId;
     private CancellationTokenSource? _spotifyVolumeChangeCts;
     private CancellationTokenSource? _spotifyAutomationCts;
-    private readonly object _spotifyAutomationSync = new();
+    private readonly Lock _spotifyAutomationSync = new();
     private int _activeSpotifyAutomationPriority = int.MinValue;
     private string _activeSpotifyAutomationGroup = "";
     private bool _activeSpotifyAutomationExclusive;
@@ -221,8 +225,8 @@ public partial class MainWindow : Window
     {
         public int Compare(object? x, object? y)
         {
-            var left = x as string ?? "";
-            var right = y as string ?? "";
+            string left = x as string ?? "";
+            string right = y as string ?? "";
             return mode switch
             {
                 "oldest" => string.CompareOrdinal(ExtractTime(left), ExtractTime(right)),
@@ -234,20 +238,20 @@ public partial class MainWindow : Window
 
         private static string ExtractTime(string entry)
         {
-            var separator = entry.IndexOf(" · ", StringComparison.Ordinal);
+            int separator = entry.IndexOf(" · ", StringComparison.Ordinal);
             return separator >= 0 ? entry[..separator] : "";
         }
 
         private static string ExtractMessage(string entry)
         {
-            var separator = entry.IndexOf(" · ", StringComparison.Ordinal);
+            int separator = entry.IndexOf(" · ", StringComparison.Ordinal);
             return separator >= 0 ? entry[(separator + 3)..] : entry;
         }
 
         private static string ExtractGroup(string entry)
         {
-            var message = ExtractMessage(entry);
-            var separator = message.IndexOf(':');
+            string message = ExtractMessage(entry);
+            int separator = message.IndexOf(':');
             return separator > 0 ? message[..separator].Trim() : message;
         }
     }
@@ -260,7 +264,7 @@ public partial class MainWindow : Window
     private string _pendingSpotifyHistoryRestoreProfileImportPath = "";
     private readonly HashSet<string> _spotifySavedStateHistoryFavorites = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _spotifySavedStateHistoryNotes = new(StringComparer.Ordinal);
-    private ICollectionView? _spotifySavedStateHistoryView;
+    private readonly ICollectionView? _spotifySavedStateHistoryView;
     private int _spotifySavedStateSaveCount;
     private int _spotifySavedStateRestoreCount;
     private int _spotifySavedStateDiscardCount;
@@ -343,7 +347,7 @@ public partial class MainWindow : Window
     private readonly System.Windows.Threading.DispatcherTimer _streamDeckStateSyncTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly System.Windows.Threading.DispatcherTimer _streamDeckRuleTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly Dictionary<string, DateTimeOffset> _streamDeckRuleFirstMatch = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<string> _streamDeckRuleHistory = new();
+    private readonly List<string> _streamDeckRuleHistory = [];
     private bool _connectionWatchdogRunning;
     private readonly Dictionary<string, DateTimeOffset> _lastReconnectAttempt =
         new(StringComparer.OrdinalIgnoreCase);
@@ -352,13 +356,13 @@ public partial class MainWindow : Window
     private long _lastObsOutputBytes;
     private DateTimeOffset? _lastObsBitrateSampleAt;
     private double _currentObsBitrateKbps;
-    private IReadOnlyList<ObsSceneInfo> _servicesObsScenes = Array.Empty<ObsSceneInfo>();
-    private IReadOnlyList<ObsSceneItemInfo> _servicesObsSceneItems = Array.Empty<ObsSceneItemInfo>();
-    private IReadOnlyList<ObsInputInfo> _servicesObsInputs = Array.Empty<ObsInputInfo>();
+    private IReadOnlyList<ObsSceneInfo> _servicesObsScenes = [];
+    private IReadOnlyList<ObsSceneItemInfo> _servicesObsSceneItems = [];
+    private IReadOnlyList<ObsInputInfo> _servicesObsInputs = [];
     private readonly Dictionary<string, ObsInputVolumeMeter> _obsLiveMeters = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (double PeakDb, DateTimeOffset At)> _obsPeakHold = new(StringComparer.OrdinalIgnoreCase);
     private string _servicesObsCurrentScene = string.Empty;
-    private IReadOnlyList<string> _dashboardObsSceneNames = Array.Empty<string>();
+    private IReadOnlyList<string> _dashboardObsSceneNames = [];
     private readonly ObservableCollection<string> _multiPcDeviceItems = [];
     private readonly ObservableCollection<string> _multiPcHistoryItems = [];
     private readonly ObservableCollection<string> _multiPcRolloutItems = [];
@@ -632,7 +636,9 @@ public partial class MainWindow : Window
         DashboardOpenSpotifyServiceButton.Click += (_, _) =>
         {
             if (IsSpotifyMusicProvider())
+            {
                 NavigateToServicesTab(0, ServicesSpotifyButton);
+            }
             else
             {
                 ServicesNavigationPanel.Visibility = Visibility.Collapsed;
@@ -691,7 +697,7 @@ public partial class MainWindow : Window
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.NextAsync());
         DashboardTopMusicVolumeSlider.ValueChanged += async (_, _) =>
         {
-            var volume = (int)Math.Round(DashboardTopMusicVolumeSlider.Value);
+            int volume = (int)Math.Round(DashboardTopMusicVolumeSlider.Value);
             DashboardTopMusicVolumeText.Text = $"{volume} %";
             if (!_updatingMusicPlayerUi)
             {
@@ -709,7 +715,10 @@ public partial class MainWindow : Window
         {
             if (e.OriginalSource is System.Windows.Controls.Primitives.ButtonBase ||
                 FindVisualParent<System.Windows.Controls.Slider>(e.OriginalSource as DependencyObject) is not null)
+            {
                 return;
+            }
+
             ServicesNavigationPanel.Visibility = Visibility.Collapsed;
             ShowPage(MusicPlayerPage);
             _ = RefreshMusicPlayerUiAsync();
@@ -730,7 +739,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                var bookmarklet = await _youTubeMusicModule.GetBookmarkletAsync();
+                string bookmarklet = await _youTubeMusicModule.GetBookmarkletAsync();
                 Clipboard.SetText(bookmarklet);
                 MusicPlayerBookmarkletBox.Text = bookmarklet;
                 MusicPlayerBookmarkletBox.Visibility = Visibility.Visible;
@@ -766,17 +775,26 @@ public partial class MainWindow : Window
         MusicPlayerProgressBar.PreviewMouseLeftButtonUp += async (_, _) =>
         {
             if (!_musicPlayerRouter.ActivePlayer.SupportsSeek)
+            {
                 return;
-            var snap = await _musicPlayerRouter.GetSnapshotAsync();
+            }
+
+            NowPlayingSnapshot snap = await _musicPlayerRouter.GetSnapshotAsync();
             if (snap.DurationMs <= 0)
+            {
                 return;
-            var target = (int)(MusicPlayerProgressBar.Value * snap.DurationMs);
+            }
+
+            int target = (int)(MusicPlayerProgressBar.Value * snap.DurationMs);
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.SeekAsync(target));
         };
         MusicPlayerVolumeSlider.ValueChanged += async (_, _) =>
         {
             if (_updatingMusicPlayerUi || !_musicPlayerRouter.ActivePlayer.SupportsVolume || !_settingsUiLoaded)
+            {
                 return;
+            }
+
             MusicPlayerVolumeText.Text = $"{(int)MusicPlayerVolumeSlider.Value} %";
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.SetVolumeAsync((int)MusicPlayerVolumeSlider.Value));
         };
@@ -940,7 +958,11 @@ public partial class MainWindow : Window
         DashboardQuickStartStreamerBotButton.Click += (_, _) => LaunchConfiguredExecutable(_settings.StreamerBot.ExecutablePath, "Streamer.bot");
         DashboardQuickTestAlertButton.Click += async (_, _) =>
         {
-            if (AlertTypeBox.SelectedItem is null && AlertTypeBox.Items.Count > 0) AlertTypeBox.SelectedIndex = 0;
+            if (AlertTypeBox.SelectedItem is null && AlertTypeBox.Items.Count > 0)
+            {
+                AlertTypeBox.SelectedIndex = 0;
+            }
+
             await TestAlertInObsAsync();
         };
         DashboardQuickOpenOverlayButton.Click += async (_, _) => await OpenOverlayFolderAsync();
@@ -1068,7 +1090,7 @@ public partial class MainWindow : Window
                 "Spotify: Zufallswiedergabe",
                 () => ExecuteSpotifyAsync(async () =>
                 {
-                    var enabled = !_spotifyModule.GetSnapshot().Playback.ShuffleEnabled;
+                    bool enabled = !_spotifyModule.GetSnapshot().Playback.ShuffleEnabled;
                     await _spotifyModule.SetShuffleAsync(enabled);
                     await RefreshSpotifyAsync();
                     AddDashboardNotification(
@@ -1077,9 +1099,12 @@ public partial class MainWindow : Window
                 }));
         DashboardSpotifyProgressBar.PreviewMouseLeftButtonUp += async (_, _) =>
         {
-            if (_updatingSpotifyUi || !DashboardSpotifyProgressBar.IsEnabled) return;
+            if (_updatingSpotifyUi || !DashboardSpotifyProgressBar.IsEnabled)
+            {
+                return;
+            }
 
-            var targetMs = (int)Math.Round(DashboardSpotifyProgressBar.Value);
+            int targetMs = (int)Math.Round(DashboardSpotifyProgressBar.Value);
             DashboardSpotifyProgressBar.IsEnabled = false;
             try
             {
@@ -1096,8 +1121,8 @@ public partial class MainWindow : Window
                 "Spotify: Wiederholung",
                 () => ExecuteSpotifyAsync(async () =>
                 {
-                    var current = _spotifyModule.GetSnapshot().Playback.RepeatMode;
-                    var next = current?.ToLowerInvariant() switch
+                    string current = _spotifyModule.GetSnapshot().Playback.RepeatMode;
+                    string next = current?.ToLowerInvariant() switch
                     {
                         "off" => "context",
                         "context" => "track",
@@ -1105,7 +1130,7 @@ public partial class MainWindow : Window
                     };
                     await _spotifyModule.SetRepeatAsync(next);
                     await RefreshSpotifyAsync();
-                    var label = next switch
+                    string label = next switch
                     {
                         "context" => "Playlist",
                         "track" => "Titel",
@@ -1233,7 +1258,7 @@ public partial class MainWindow : Window
         DashboardOpenObsMixerButton.Click += (_, _) => ShowPage(ServicesPage);
         DashboardRefreshRaidAssistantButton.Click += async (_, _) =>
         {
-            var channel = DashboardRaidChannelBox.SelectedItem as string ?? _settings.Twitch.SelectedRaidChannel;
+            string channel = DashboardRaidChannelBox.SelectedItem as string ?? _settings.Twitch.SelectedRaidChannel;
             if (!string.IsNullOrWhiteSpace(channel))
             {
                 await RefreshRaidTargetStatusAsync(channel);
@@ -1251,7 +1276,7 @@ public partial class MainWindow : Window
         };
         DashboardMarkNotificationsReadButton.Click += async (_, _) =>
         {
-            foreach (var item in _dashboardNotifications)
+            foreach (DashboardNotificationEntry item in _dashboardNotifications)
             {
                 item.IsRead = true;
             }
@@ -1275,7 +1300,7 @@ public partial class MainWindow : Window
         DashboardModuleMoveDownButton.Click += (_, _) => MoveDashboardModuleEditorItem(1);
         DashboardModuleOrderResetButton.Click += (_, _) =>
         {
-            _settings.Dashboard.ModuleOrder = GetDefaultDashboardModuleOrder().ToList();
+            _settings.Dashboard.ModuleOrder = [.. GetDefaultDashboardModuleOrder()];
             LoadDashboardModuleOrderEditor();
             ApplyDashboardModuleOrder();
         };
@@ -1298,7 +1323,7 @@ public partial class MainWindow : Window
             DashboardShowAdvancedToolsBox.IsChecked = true;
             DashboardShowNotificationsBox.IsChecked = true;
             DashboardShowStreamHistoryBox.IsChecked = true;
-            _settings.Dashboard.ModuleOrder = GetDefaultDashboardModuleOrder().ToList();
+            _settings.Dashboard.ModuleOrder = [.. GetDefaultDashboardModuleOrder()];
             LoadDashboardModuleOrderEditor();
             ApplyDashboardCheckboxesToSettings();
             ApplyDashboardModuleOrder();
@@ -1445,7 +1470,7 @@ public partial class MainWindow : Window
                 _automationCurrentScene = sceneName;
                 _automationSceneActivatedAt = DateTimeOffset.UtcNow;
                 HighlightDashboardSceneButtons(sceneName);
-                foreach (var sceneRule in _settings.Workflow.TimedAutomations
+                foreach (TimedAutomationRuleSettings? sceneRule in _settings.Workflow.TimedAutomations
                              .Where(rule => string.Equals(rule.TriggerType, "SceneElapsed", StringComparison.OrdinalIgnoreCase)
                                             && !rule.OncePerStream
                                             && string.Equals(rule.TriggerScene, sceneName, StringComparison.OrdinalIgnoreCase)))
@@ -1511,11 +1536,11 @@ public partial class MainWindow : Window
                 RefreshTwitchProfessionalUi();
                 _ = _creatorIntelligence.RecordAsync("twitch.chat.message", new { user = message.ChatterName, scene = _servicesObsCurrentScene, viewers = _currentLiveViewerCount });
 
-                var role =
+                string role =
                     GetTwitchRoleLabel(
                         message);
 
-                var chatLine =
+                string chatLine =
                     $"{message.ReceivedAt:HH:mm:ss} · {role}{message.ChatterName}: {message.MessageText}";
 
                 AddLimitedItem(
@@ -1542,7 +1567,11 @@ public partial class MainWindow : Window
                 _twitchSessionObservedAt ??= DateTimeOffset.Now;
                 RefreshTwitchProfessionalUi();
                 _ = _creatorIntelligence.RecordAsync("twitch.event", new { type = twitchEvent.Type, summary = twitchEvent.Summary, viewers = _currentLiveViewerCount, scene = _servicesObsCurrentScene });
-                if (twitchEvent.Type == "channel.follow") _ = _creatorIntelligence.RecordAsync("twitch.follow", new { twitchEvent.Summary });
+                if (twitchEvent.Type == "channel.follow")
+                {
+                    _ = _creatorIntelligence.RecordAsync("twitch.follow", new { twitchEvent.Summary });
+                }
+
                 AddLimitedItem(
                     _twitchEventItems,
                     $"{twitchEvent.ReceivedAt:HH:mm:ss} · " +
@@ -1551,7 +1580,7 @@ public partial class MainWindow : Window
 
                 if (twitchEvent.Type == "channel.guest_star_guest.update")
                 {
-                    var state = twitchEvent.Data.TryGetValue("state", out var guestState)
+                    string state = twitchEvent.Data.TryGetValue("state", out string? guestState)
                         ? guestState
                         : "";
                     DashboardJoinStreamTogetherButton.Visibility =
@@ -1574,7 +1603,7 @@ public partial class MainWindow : Window
                 await RefreshTwitchGoalsAsync();
             }
 
-            var alertType = twitchEvent.Type switch
+            string alertType = twitchEvent.Type switch
             {
                 "channel.follow" => "Follow",
                 "channel.subscribe" => "Sub",
@@ -1585,7 +1614,7 @@ public partial class MainWindow : Window
                 _ => ""
             };
 
-            var eventCount = GetTwitchEventCount(twitchEvent);
+            int eventCount = GetTwitchEventCount(twitchEvent);
             await _workflowModule.Service.RegisterTwitchEventAsync(
                 twitchEvent.Type,
                 eventCount);
@@ -1597,13 +1626,13 @@ public partial class MainWindow : Window
                 // auch wenn Streamer.bot keine expliziten Start/Ende-Befehle sendet.
                 _ = PulseExternalAlertAsync("streamerbot", $"{alertType}-{Guid.NewGuid():N}", TimeSpan.FromSeconds(10));
 
-                var user = twitchEvent.Data.TryGetValue(
+                string user = twitchEvent.Data.TryGetValue(
                     "user_name",
-                    out var userName)
+                    out string? userName)
                     ? userName
                     : twitchEvent.Data.TryGetValue(
                         "from_broadcaster_user_name",
-                        out var raidUser)
+                        out string? raidUser)
                         ? raidUser
                         : "Twitch";
 
@@ -1660,15 +1689,15 @@ public partial class MainWindow : Window
         ServicesSpotifyShuffleButton.Click += async (_, _) =>
             await ExecuteSpotifyAsync(async () =>
             {
-                var enabled = !_spotifyModule.GetSnapshot().Playback.ShuffleEnabled;
+                bool enabled = !_spotifyModule.GetSnapshot().Playback.ShuffleEnabled;
                 await _spotifyModule.SetShuffleAsync(enabled);
                 await RefreshSpotifyAsync();
             });
         ServicesSpotifyRepeatButton.Click += async (_, _) =>
             await ExecuteSpotifyAsync(async () =>
             {
-                var current = _spotifyModule.GetSnapshot().Playback.RepeatMode;
-                var next = current?.ToLowerInvariant() switch
+                string current = _spotifyModule.GetSnapshot().Playback.RepeatMode;
+                string next = current?.ToLowerInvariant() switch
                 {
                     "off" => "context",
                     "context" => "track",
@@ -1681,9 +1710,12 @@ public partial class MainWindow : Window
             await RefreshSpotifyAsync();
         ServicesSpotifyProgressBar.PreviewMouseLeftButtonUp += async (_, _) =>
         {
-            if (_updatingSpotifyUi || !ServicesSpotifyProgressBar.IsEnabled) return;
+            if (_updatingSpotifyUi || !ServicesSpotifyProgressBar.IsEnabled)
+            {
+                return;
+            }
 
-            var targetMs = (int)Math.Round(ServicesSpotifyProgressBar.Value);
+            int targetMs = (int)Math.Round(ServicesSpotifyProgressBar.Value);
             ServicesSpotifyProgressBar.IsEnabled = false;
             try
             {
@@ -1863,7 +1895,11 @@ public partial class MainWindow : Window
         };
         ServicesSpotifyResetStatisticsButton.Click += (_, _) =>
         {
-            if (MessageBox.Show("Spotify-Statistik wirklich zurücksetzen?", "Spotify-Statistik", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            if (MessageBox.Show("Spotify-Statistik wirklich zurücksetzen?", "Spotify-Statistik", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
             _spotifyListeningStatistics.Reset();
             RefreshSpotifyStatisticsUi();
         };
@@ -1918,7 +1954,7 @@ public partial class MainWindow : Window
         };
         ServicesSpotifyToggleCurrentSavedButton.Click += async (_, _) =>
         {
-            var track = _spotifyModule.GetSnapshot().Playback.Track;
+            SpotifyTrack? track = _spotifyModule.GetSnapshot().Playback.Track;
             if (track is null)
             {
                 ServicesSpotifySavedTracksStatusText.Text = "Aktuell läuft kein Spotify-Titel.";
@@ -1930,7 +1966,7 @@ public partial class MainWindow : Window
                 "Spotify-Gefällt-mir-Status ändern",
                 async () =>
                 {
-                    var isSaved = await _spotifyModule.IsTrackSavedAsync(track);
+                    bool isSaved = await _spotifyModule.IsTrackSavedAsync(track);
                     await _spotifyModule.SetTrackSavedAsync(track, !isSaved);
                     ServicesSpotifySavedTracksStatusText.Text = !isSaved
                         ? $"Zu Favoriten hinzugefügt: {track.Artist} – {track.Name}"
@@ -2117,7 +2153,7 @@ public partial class MainWindow : Window
         ServicesSpotifyAlertFadeInMsBox.LostFocus += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
         ServicesSpotifyVolumeSlider.ValueChanged += async (_, _) =>
         {
-            var volume = (int)Math.Round(ServicesSpotifyVolumeSlider.Value);
+            int volume = (int)Math.Round(ServicesSpotifyVolumeSlider.Value);
             ServicesSpotifyVolumeText.Text = $"{volume} %";
 
             if (!_updatingSpotifyUi)
@@ -2186,7 +2222,9 @@ public partial class MainWindow : Window
         _alertAudioPreviewTimer.Tick += (_, _) =>
         {
             if (AlertAudioPreviewMedia.Position.TotalSeconds >= AlertAudioEndSlider.Value)
+            {
                 StopAlertAudioPreview();
+            }
         };
         SpotifyVolumeSlider.ValueChanged += async (_, _) =>
             await QueueSpotifyVolumeUpdateAsync();
@@ -2264,7 +2302,7 @@ public partial class MainWindow : Window
                     : "BEREIT";
             });
 
-            var alertJustStarted = state.IsRunning && !_suiteAlertRunning;
+            bool alertJustStarted = state.IsRunning && !_suiteAlertRunning;
             _suiteAlertRunning = state.IsRunning;
             _suiteAlertQueueLength = state.QueueLength;
             await ApplyCombinedAlertDuckingAsync();
@@ -2376,7 +2414,10 @@ public partial class MainWindow : Window
         SearchRunOfShowTwitchCategoryButton.Click += async (_, _) => await SearchRunOfShowTwitchCategoriesAsync();
         RunOfShowTwitchCategorySearchBox.KeyDown += async (_, e) =>
         {
-            if (e.Key == Key.Enter) await SearchRunOfShowTwitchCategoriesAsync();
+            if (e.Key == Key.Enter)
+            {
+                await SearchRunOfShowTwitchCategoriesAsync();
+            }
         };
         ExecuteRunOfShowStepButton.Click += async (_, _) => await ExecuteSelectedRunOfShowStepAsync();
         ExecuteNextRunOfShowStepButton.Click += async (_, _) => await ExecuteNextRunOfShowStepAsync();
@@ -2466,7 +2507,10 @@ public partial class MainWindow : Window
             await RunStartupStepSafelyAsync("Spotify-Zustände bereinigen", () =>
             {
                 if (SpotifySavedStateCleanupOnStartupBox.IsChecked == true)
+                {
                     DiscardExpiredSpotifySavedStates("Programmstart", onlyLogWhenRemoved: true);
+                }
+
                 UpdateSpotifySavedStateCleanupTimer();
                 return Task.CompletedTask;
             });
@@ -2673,7 +2717,7 @@ public partial class MainWindow : Window
             DiagnosticsButton
         };
 
-        foreach (var button in navigationButtons)
+        foreach (Button button in navigationButtons)
         {
             button.ClearValue(Control.BackgroundProperty);
             button.ClearValue(Control.ForegroundProperty);
@@ -2712,7 +2756,7 @@ public partial class MainWindow : Window
             AboutPage
         };
 
-        foreach (var candidate in pages)
+        foreach (UIElement candidate in pages)
         {
             candidate.Visibility = Visibility.Collapsed;
             Panel.SetZIndex(candidate, 0);
@@ -2721,7 +2765,7 @@ public partial class MainWindow : Window
         page.Visibility = Visibility.Visible;
         Panel.SetZIndex(page, 1);
 
-        var pageKey =
+        string pageKey =
             ReferenceEquals(page, DashboardPage) ? "dashboard" :
             ReferenceEquals(page, MusicPlayerPage) ? "music" :
             ReferenceEquals(page, ServicesPage) ? "services" :
@@ -2787,9 +2831,13 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (!File.Exists(MultiPcRegistryPath)) return;
-            var json = File.ReadAllText(MultiPcRegistryPath);
-            var devices = System.Text.Json.JsonSerializer.Deserialize<List<MultiPcDeviceRecord>>(json) ?? [];
+            if (!File.Exists(MultiPcRegistryPath))
+            {
+                return;
+            }
+
+            string json = File.ReadAllText(MultiPcRegistryPath);
+            List<MultiPcDeviceRecord> devices = System.Text.Json.JsonSerializer.Deserialize<List<MultiPcDeviceRecord>>(json) ?? [];
             _multiPcDevices.Clear();
             _multiPcDevices.AddRange(devices);
         }
@@ -2802,7 +2850,7 @@ public partial class MainWindow : Window
     private async Task SaveMultiPcRegistryAsync()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(MultiPcRegistryPath)!);
-        var json = System.Text.Json.JsonSerializer.Serialize(_multiPcDevices, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        string json = System.Text.Json.JsonSerializer.Serialize(_multiPcDevices, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(MultiPcRegistryPath, json);
     }
 
@@ -2816,9 +2864,9 @@ public partial class MainWindow : Window
 
     private async Task AddMultiPcDeviceAsync()
     {
-        var name = MultiPcDeviceNameBox.Text.Trim();
-        var host = MultiPcHostBox.Text.Trim();
-        var code = MultiPcPairingInputBox.Text.Trim();
+        string name = MultiPcDeviceNameBox.Text.Trim();
+        string host = MultiPcHostBox.Text.Trim();
+        string code = MultiPcPairingInputBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(host))
         {
             MultiPcStatusText.Text = "Gerätename und Host dürfen nicht leer sein.";
@@ -2832,7 +2880,7 @@ public partial class MainWindow : Window
         string agentKey;
         try
         {
-            var pairUri = $"https://{host}:{GetMultiPcAgentPort()}/api/pair?code={Uri.EscapeDataString(code)}";
+            string pairUri = $"https://{host}:{GetMultiPcAgentPort()}/api/pair?code={Uri.EscapeDataString(code)}";
             string? observedFingerprint = null;
             using var pairHandler = new System.Net.Http.HttpClientHandler
             {
@@ -2843,7 +2891,7 @@ public partial class MainWindow : Window
                 }
             };
             using var pairClient = new System.Net.Http.HttpClient(pairHandler) { Timeout = TimeSpan.FromSeconds(5) };
-            var pairing = await pairClient.GetFromJsonAsync<MultiPcPairingResponse>(pairUri);
+            MultiPcPairingResponse? pairing = await pairClient.GetFromJsonAsync<MultiPcPairingResponse>(pairUri);
             if (pairing is null || string.IsNullOrWhiteSpace(pairing.AgentKey))
             {
                 MultiPcStatusText.Text = "Der Remote-Agent hat keine gültigen Kopplungsdaten geliefert.";
@@ -2870,13 +2918,13 @@ public partial class MainWindow : Window
 
     private async Task RemoveSelectedMultiPcDeviceAsync()
     {
-        var index = MultiPcDevicesList.SelectedIndex - 1;
+        int index = MultiPcDevicesList.SelectedIndex - 1;
         if (index < 0 || index >= _multiPcDevices.Count)
         {
             MultiPcStatusText.Text = "Bitte zuerst ein Gerät auswählen.";
             return;
         }
-        var removed = _multiPcDevices[index];
+        MultiPcDeviceRecord removed = _multiPcDevices[index];
         _multiPcDevices.RemoveAt(index);
         await SaveMultiPcRegistryAsync();
         await RefreshMultiPcPageAsync();
@@ -2887,26 +2935,34 @@ public partial class MainWindow : Window
     {
         MultiPcLocalAgentStatusText.Text = $"AKTIV · {Environment.MachineName}";
         MultiPcDeviceCountText.Text = (_multiPcDevices.Count + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var online = 1;
+        int online = 1;
         _multiPcDeviceItems.Clear();
         _multiPcDeviceItems.Add($"●  {Environment.MachineName} · Lokaler Hauptrechner · Online · {Environment.OSVersion.VersionString}");
-        foreach (var device in _multiPcDevices)
+        foreach (MultiPcDeviceRecord device in _multiPcDevices)
         {
-            var reachable = false;
+            bool reachable = false;
             try
             {
                 using var ping = new System.Net.NetworkInformation.Ping();
-                var reply = await ping.SendPingAsync(device.Host, 650);
+                PingReply reply = await ping.SendPingAsync(device.Host, 650);
                 reachable = reply.Status == System.Net.NetworkInformation.IPStatus.Success;
             }
             catch
             {
                 reachable = false;
             }
-            var agent = await TryGetMultiPcAgentStatusAsync(device);
-            if (agent is not null) reachable = true;
-            if (reachable) online++;
-            var agentInfo = agent is null ? (reachable ? "Ping erreichbar · TLS-Agent antwortet nicht" : "Offline/Agent fehlt") : $"TLS-Agent online · CPU {agent.CpuPercent:0}% · RAM {agent.MemoryMb:0} MB · {agent.MachineName}";
+            MultiPcAgentStatus? agent = await TryGetMultiPcAgentStatusAsync(device);
+            if (agent is not null)
+            {
+                reachable = true;
+            }
+
+            if (reachable)
+            {
+                online++;
+            }
+
+            string agentInfo = agent is null ? (reachable ? "Ping erreichbar · TLS-Agent antwortet nicht" : "Offline/Agent fehlt") : $"TLS-Agent online · CPU {agent.CpuPercent:0}% · RAM {agent.MemoryMb:0} MB · {agent.MachineName}";
             _multiPcDeviceItems.Add($"{(reachable ? "●" : "○")}  {device.Name} · {device.Host} · {agentInfo} · gekoppelt {device.PairedAt.LocalDateTime:g}");
         }
         MultiPcOnlineCountText.Text = online.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -2914,7 +2970,7 @@ public partial class MainWindow : Window
 
     private void UpdateSelectedMultiPcDeviceText()
     {
-        var index = MultiPcDevicesList.SelectedIndex - 1;
+        int index = MultiPcDevicesList.SelectedIndex - 1;
         MultiPcSelectedDeviceText.Text = index >= 0 && index < _multiPcDevices.Count
             ? $"Ausgewählt: {_multiPcDevices[index].Name} · {_multiPcDevices[index].Host}"
             : "Kein Remote-Gerät ausgewählt.";
@@ -2923,13 +2979,13 @@ public partial class MainWindow : Window
             : "TLS-Vertrauen: kein Gerät ausgewählt";
     }
 
-    private int GetMultiPcAgentPort() => int.TryParse(MultiPcAgentPortBox.Text, out var port) && port is > 0 and <= 65535 ? port : 47631;
+    private int GetMultiPcAgentPort() => int.TryParse(MultiPcAgentPortBox.Text, out int port) && port is > 0 and <= 65535 ? port : 47631;
 
     private int GetMultiPcAgentPort(MultiPcDeviceRecord device) => device.AgentPort is > 0 and <= 65535 ? device.AgentPort : GetMultiPcAgentPort();
 
     private MultiPcDeviceRecord? GetSelectedRemoteDevice()
     {
-        var index = MultiPcDevicesList.SelectedIndex - 1;
+        int index = MultiPcDevicesList.SelectedIndex - 1;
         return index >= 0 && index < _multiPcDevices.Count ? _multiPcDevices[index] : null;
     }
 
@@ -2937,11 +2993,15 @@ public partial class MainWindow : Window
     {
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/status");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            using var response = await client.SendAsync(request);
-            if (!response.IsSuccessStatusCode) return null;
+            using HttpResponseMessage response = await client.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
             return await response.Content.ReadFromJsonAsync<MultiPcAgentStatus>();
         }
         catch { return null; }
@@ -2949,7 +3009,7 @@ public partial class MainWindow : Window
 
     private async Task SendMultiPcCommandAsync(string command)
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         try
         {
@@ -2958,12 +3018,12 @@ public partial class MainWindow : Window
                 MultiPcStatusText.Text = $"{device.Name}: Der Agent hat den Befehl ‘{command}’ nicht freigegeben. Berechtigungen werden in agent-permissions.json auf dem Ziel-PC verwaltet.";
                 return;
             }
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/command");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { command });
-            using var response = await client.SendAsync(request);
-            var result = await response.Content.ReadAsStringAsync();
+            using HttpResponseMessage response = await client.SendAsync(request);
+            string result = await response.Content.ReadAsStringAsync();
             MultiPcStatusText.Text = response.IsSuccessStatusCode ? $"{device.Name}: {command} wurde angenommen." : $"Agentfehler: {result}";
             AddMultiPcHistory(device.Name, command, response.IsSuccessStatusCode ? "angenommen" : "Fehler");
         }
@@ -2973,23 +3033,31 @@ public partial class MainWindow : Window
 
     private async Task RefreshRemoteObsStateAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/state");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            using var response = await client.SendAsync(request);
-            var json = await response.Content.ReadAsStringAsync();
+            using HttpResponseMessage response = await client.SendAsync(request);
+            string json = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode) { MultiPcStatusText.Text = "Remote-OBS konnte nicht geladen werden: " + json; return; }
-            var state = System.Text.Json.JsonSerializer.Deserialize<RemoteObsState>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            RemoteObsState? state = System.Text.Json.JsonSerializer.Deserialize<RemoteObsState>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             MultiPcObsScenesBox.ItemsSource = state?.Scenes ?? [];
             MultiPcObsAudioInputsBox.ItemsSource = state?.AudioInputs?.Select(x => x.Name + (x.Muted ? " · gemutet" : $" · {x.VolumeDb:0.0} dB")).ToArray() ?? [];
             MultiPcObsSceneItemsBox.ItemsSource = state?.SceneItems?.Select(x => x.SourceName + (x.Enabled ? " · sichtbar" : " · ausgeblendet")).ToArray() ?? [];
             MultiPcObsScenesBox.SelectedItem = state?.CurrentScene;
-            if (MultiPcObsAudioInputsBox.SelectedIndex < 0 && MultiPcObsAudioInputsBox.Items.Count > 0) MultiPcObsAudioInputsBox.SelectedIndex = 0;
-            if (MultiPcObsSceneItemsBox.SelectedIndex < 0 && MultiPcObsSceneItemsBox.Items.Count > 0) MultiPcObsSceneItemsBox.SelectedIndex = 0;
+            if (MultiPcObsAudioInputsBox.SelectedIndex < 0 && MultiPcObsAudioInputsBox.Items.Count > 0)
+            {
+                MultiPcObsAudioInputsBox.SelectedIndex = 0;
+            }
+
+            if (MultiPcObsSceneItemsBox.SelectedIndex < 0 && MultiPcObsSceneItemsBox.Items.Count > 0)
+            {
+                MultiPcObsSceneItemsBox.SelectedIndex = 0;
+            }
+
             MultiPcStatusText.Text = $"Remote-OBS verbunden · aktuelle Szene: {state?.CurrentScene ?? "unbekannt"}.";
         }
         catch (Exception ex) { MultiPcStatusText.Text = "Remote-OBS-Fehler: " + ex.Message; }
@@ -2997,7 +3065,7 @@ public partial class MainWindow : Window
 
     private async Task SwitchRemoteObsSceneAsync()
     {
-        var scene = MultiPcObsScenesBox.SelectedItem?.ToString();
+        string? scene = MultiPcObsScenesBox.SelectedItem?.ToString();
         if (string.IsNullOrWhiteSpace(scene)) { MultiPcStatusText.Text = "Bitte eine Remote-Szene auswählen."; return; }
         await PostRemoteObsAsync("scene", new { sceneName = scene }, $"Szene {scene} aktiviert");
         await RefreshRemoteObsStateAsync();
@@ -3005,8 +3073,8 @@ public partial class MainWindow : Window
 
     private async Task SetRemoteObsMuteAsync(bool muted)
     {
-        var raw = MultiPcObsAudioInputsBox.SelectedItem?.ToString();
-        var input = raw?.Split(" · ", StringSplitOptions.None)[0];
+        string? raw = MultiPcObsAudioInputsBox.SelectedItem?.ToString();
+        string? input = raw?.Split(" · ", StringSplitOptions.None)[0];
         if (string.IsNullOrWhiteSpace(input)) { MultiPcStatusText.Text = "Bitte eine Remote-Audioquelle auswählen."; return; }
         await PostRemoteObsAsync("mute", new { inputName = input, muted }, $"{input} {(muted ? "gemutet" : "entmutet")}");
         await RefreshRemoteObsStateAsync();
@@ -3014,10 +3082,10 @@ public partial class MainWindow : Window
 
     private async Task SetRemoteObsVolumeAsync()
     {
-        var raw = MultiPcObsAudioInputsBox.SelectedItem?.ToString();
-        var input = raw?.Split(" · ", StringSplitOptions.None)[0];
+        string? raw = MultiPcObsAudioInputsBox.SelectedItem?.ToString();
+        string? input = raw?.Split(" · ", StringSplitOptions.None)[0];
         if (string.IsNullOrWhiteSpace(input)) { MultiPcStatusText.Text = "Bitte eine Remote-Audioquelle auswählen."; return; }
-        if (!double.TryParse(MultiPcObsVolumeBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var volumeDb))
+        if (!double.TryParse(MultiPcObsVolumeBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double volumeDb))
         {
             MultiPcStatusText.Text = "Lautstärke bitte als dB-Wert eingeben, zum Beispiel -10."; return;
         }
@@ -3028,41 +3096,45 @@ public partial class MainWindow : Window
 
     private async Task FadeRemoteObsVolumeAsync()
     {
-        var input = MultiPcObsAudioInputsBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0];
+        string? input = MultiPcObsAudioInputsBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0];
         if (string.IsNullOrWhiteSpace(input)) { MultiPcStatusText.Text = "Bitte eine Remote-Audioquelle auswählen."; return; }
-        if (!double.TryParse(MultiPcObsVolumeBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var targetDb)) { MultiPcStatusText.Text = "Ungültiger dB-Wert."; return; }
-        var duration = int.TryParse(MultiPcObsFadeDurationBox.Text, out var ms) ? Math.Clamp(ms, 100, 30000) : 1000;
+        if (!double.TryParse(MultiPcObsVolumeBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double targetDb)) { MultiPcStatusText.Text = "Ungültiger dB-Wert."; return; }
+        int duration = int.TryParse(MultiPcObsFadeDurationBox.Text, out int ms) ? Math.Clamp(ms, 100, 30000) : 1000;
         await PostRemoteObsAsync("volume-fade", new { inputName = input, targetVolumeDb = Math.Clamp(targetDb, -100, 26), durationMilliseconds = duration }, $"Lautstärke von {input} wird gefadet");
     }
 
     private async Task RefreshRemoteObsFiltersAsync()
     {
-        var device = GetSelectedRemoteDevice();
-        var source = MultiPcObsAudioInputsBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0];
-        if (device is null || string.IsNullOrWhiteSpace(source)) return;
-        try { using var client = CreateTrustedMultiPcClient(device); using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/filters?sourceName={Uri.EscapeDataString(source)}"); request.Headers.Add("X-CCS-Agent-Key", device.AgentKey); using var response = await client.SendAsync(request); if (!response.IsSuccessStatusCode) return; var filters = await response.Content.ReadFromJsonAsync<RemoteObsFilter[]>(); MultiPcObsFiltersBox.ItemsSource = filters?.Select(x => x.Name + (x.Enabled ? " · aktiv" : " · aus")).ToArray() ?? []; if (MultiPcObsFiltersBox.Items.Count > 0) MultiPcObsFiltersBox.SelectedIndex = 0; } catch { }
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
+        string? source = MultiPcObsAudioInputsBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0];
+        if (device is null || string.IsNullOrWhiteSpace(source))
+        {
+            return;
+        }
+
+        try { using HttpClient client = CreateTrustedMultiPcClient(device); using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/filters?sourceName={Uri.EscapeDataString(source)}"); request.Headers.Add("X-CCS-Agent-Key", device.AgentKey); using HttpResponseMessage response = await client.SendAsync(request); if (!response.IsSuccessStatusCode) { return; } RemoteObsFilter[]? filters = await response.Content.ReadFromJsonAsync<RemoteObsFilter[]>(); MultiPcObsFiltersBox.ItemsSource = filters?.Select(x => x.Name + (x.Enabled ? " · aktiv" : " · aus")).ToArray() ?? []; if (MultiPcObsFiltersBox.Items.Count > 0) { MultiPcObsFiltersBox.SelectedIndex = 0; } } catch { }
     }
 
     private async Task SetRemoteObsFilterAsync(bool enabled)
     {
-        var source = MultiPcObsAudioInputsBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0]; var filter = MultiPcObsFiltersBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0];
+        string? source = MultiPcObsAudioInputsBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0]; string? filter = MultiPcObsFiltersBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0];
         if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(filter)) { MultiPcStatusText.Text = "Bitte Quelle und Filter auswählen."; return; }
         await PostRemoteObsAsync("filter", new { sourceName = source, filterName = filter, enabled }, $"Filter {filter} {(enabled ? "aktiviert" : "deaktiviert")}"); await RefreshRemoteObsFiltersAsync();
     }
 
     private async Task ApplyRemoteObsTransformAsync(bool reset)
     {
-        var scene = MultiPcObsScenesBox.SelectedItem?.ToString(); var source = MultiPcObsSceneItemsBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0];
+        string? scene = MultiPcObsScenesBox.SelectedItem?.ToString(); string? source = MultiPcObsSceneItemsBox.SelectedItem?.ToString()?.Split(" · ", StringSplitOptions.None)[0];
         if (string.IsNullOrWhiteSpace(scene) || string.IsNullOrWhiteSpace(source)) { MultiPcStatusText.Text = "Bitte Szene und Quelle auswählen."; return; }
-        double Parse(string text, double fallback) => double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : fallback;
+        static double Parse(string text, double fallback) => double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value) ? value : fallback;
         await PostRemoteObsAsync("transform", new { sceneName = scene, sourceName = source, reset, x = Parse(MultiPcObsPosXBox.Text, 0), y = Parse(MultiPcObsPosYBox.Text, 0), width = Math.Max(1, Parse(MultiPcObsWidthBox.Text, 640)), height = Math.Max(1, Parse(MultiPcObsHeightBox.Text, 360)), rotation = Parse(MultiPcObsRotationBox.Text, 0) }, reset ? $"Transform von {source} zurückgesetzt" : $"Transform von {source} gesetzt");
     }
 
     private async Task SetRemoteObsSceneItemVisibilityAsync(bool enabled)
     {
-        var scene = MultiPcObsScenesBox.SelectedItem?.ToString();
-        var raw = MultiPcObsSceneItemsBox.SelectedItem?.ToString();
-        var source = raw?.Split(" · ", StringSplitOptions.None)[0];
+        string? scene = MultiPcObsScenesBox.SelectedItem?.ToString();
+        string? raw = MultiPcObsSceneItemsBox.SelectedItem?.ToString();
+        string? source = raw?.Split(" · ", StringSplitOptions.None)[0];
         if (string.IsNullOrWhiteSpace(scene) || string.IsNullOrWhiteSpace(source))
         {
             MultiPcStatusText.Text = "Bitte eine Szene und eine Szenen-Quelle auswählen."; return;
@@ -3073,16 +3145,16 @@ public partial class MainWindow : Window
 
     private async Task PostRemoteObsAsync(string endpoint, object payload, string successText)
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/{endpoint}");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(payload);
-            using var response = await client.SendAsync(request);
-            var result = await response.Content.ReadAsStringAsync();
+            using HttpResponseMessage response = await client.SendAsync(request);
+            string result = await response.Content.ReadAsStringAsync();
             MultiPcStatusText.Text = response.IsSuccessStatusCode ? successText : "Remote-OBS-Fehler: " + result;
             AddMultiPcHistory(device.Name, "obs." + endpoint, response.IsSuccessStatusCode ? "angenommen" : "Fehler");
         }
@@ -3093,36 +3165,47 @@ public partial class MainWindow : Window
 
     private async Task RefreshRemoteObsOutputStateAsync()
     {
-        var device = GetSelectedRemoteDevice();
-        if (device is null) return;
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
+        if (device is null)
+        {
+            return;
+        }
+
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/output");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            using var response = await client.SendAsync(request);
+            using HttpResponseMessage response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
             _remoteObsOutputState = await response.Content.ReadFromJsonAsync<RemoteObsOutputState>();
-            if (_remoteObsOutputState is null) return;
+            if (_remoteObsOutputState is null)
+            {
+                return;
+            }
+
             MultiPcObsOutputStatusText.Text = $"Stream: {(_remoteObsOutputState.StreamActive ? "LIVE" : "offline")} · Aufnahme: {(_remoteObsOutputState.RecordActive ? (_remoteObsOutputState.RecordPaused ? "pausiert" : "läuft") : "aus")}";
             MultiPcObsTransitionsBox.ItemsSource = _remoteObsOutputState.Transitions;
-            if (MultiPcObsTransitionsBox.SelectedIndex < 0 && _remoteObsOutputState.Transitions.Length > 0) MultiPcObsTransitionsBox.SelectedIndex = 0;
+            if (MultiPcObsTransitionsBox.SelectedIndex < 0 && _remoteObsOutputState.Transitions.Length > 0)
+            {
+                MultiPcObsTransitionsBox.SelectedIndex = 0;
+            }
         }
         catch (Exception ex) { MultiPcObsOutputStatusText.Text = "OBS-Ausgabestatus nicht verfügbar: " + ex.Message; }
     }
 
     private async Task SendRemoteObsOutputActionAsync(string action)
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/output");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { action });
-            using var response = await client.SendAsync(request);
-            var ok = response.IsSuccessStatusCode;
+            using HttpResponseMessage response = await client.SendAsync(request);
+            bool ok = response.IsSuccessStatusCode;
             MultiPcStatusText.Text = ok ? $"OBS-Aktion {action} wurde ausgeführt." : $"OBS-Aktion {action} wurde abgelehnt.";
             AddMultiPcHistory(device.Name, action, ok ? "ausgeführt" : "fehlgeschlagen");
             await RefreshRemoteObsOutputStateAsync();
@@ -3139,17 +3222,17 @@ public partial class MainWindow : Window
 
     private async Task ApplyRemoteObsTransitionAsync()
     {
-        var device = GetSelectedRemoteDevice();
-        var transition = MultiPcObsTransitionsBox.SelectedItem?.ToString();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
+        string? transition = MultiPcObsTransitionsBox.SelectedItem?.ToString();
         if (device is null || string.IsNullOrWhiteSpace(transition)) { MultiPcStatusText.Text = "Bitte Gerät und Übergang auswählen."; return; }
-        var duration = int.TryParse(MultiPcObsTransitionDurationBox.Text, out var value) ? Math.Clamp(value, 50, 20000) : 300;
+        int duration = int.TryParse(MultiPcObsTransitionDurationBox.Text, out int value) ? Math.Clamp(value, 50, 20000) : 300;
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/transition");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { transitionName = transition, durationMilliseconds = duration });
-            using var response = await client.SendAsync(request);
+            using HttpResponseMessage response = await client.SendAsync(request);
             MultiPcStatusText.Text = response.IsSuccessStatusCode ? $"Übergang {transition} ({duration} ms) gesetzt." : "Übergang konnte nicht gesetzt werden.";
         }
         catch (Exception ex) { MultiPcStatusText.Text = "Remote-Übergang fehlgeschlagen: " + ex.Message; }
@@ -3157,16 +3240,16 @@ public partial class MainWindow : Window
 
     private async Task RefreshRemoteObsPreviewAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/preview");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            using var response = await client.SendAsync(request);
+            using HttpResponseMessage response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
-            var bytes = await response.Content.ReadAsByteArrayAsync();
+            byte[] bytes = await response.Content.ReadAsByteArrayAsync();
             var image = new System.Windows.Media.Imaging.BitmapImage();
             using var stream = new MemoryStream(bytes);
             image.BeginInit(); image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad; image.StreamSource = stream; image.EndInit(); image.Freeze();
@@ -3178,16 +3261,16 @@ public partial class MainWindow : Window
 
     private async Task SaveRemoteAgentSettingsAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
-        if (!int.TryParse(MultiPcRemoteObsPortBox.Text, out var obsPort) || obsPort is <= 0 or > 65535) { MultiPcStatusText.Text = "Ungültiger OBS-WebSocket-Port."; return; }
+        if (!int.TryParse(MultiPcRemoteObsPortBox.Text, out int obsPort) || obsPort is <= 0 or > 65535) { MultiPcStatusText.Text = "Ungültiger OBS-WebSocket-Port."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/settings");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { obsPath = "", streamerBotPath = "", obsWebSocketHost = MultiPcRemoteObsHostBox.Text.Trim(), obsWebSocketPort = obsPort, obsWebSocketPassword = MultiPcRemoteObsPasswordBox.Password });
-            using var response = await client.SendAsync(request);
+            using HttpResponseMessage response = await client.SendAsync(request);
             MultiPcStatusText.Text = response.IsSuccessStatusCode ? "Agent-Einstellungen gespeichert." : "Agent-Einstellungen konnten nicht gespeichert werden.";
         }
         catch (Exception ex) { MultiPcStatusText.Text = "Agent-Einstellungen fehlgeschlagen: " + ex.Message; }
@@ -3195,9 +3278,9 @@ public partial class MainWindow : Window
 
     private async Task FetchMultiPcDiagnosticsAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
-        var status = await TryGetMultiPcAgentStatusAsync(device);
+        MultiPcAgentStatus? status = await TryGetMultiPcAgentStatusAsync(device);
         MultiPcStatusText.Text = status is null ? "Der Agent antwortet nicht oder der Schlüssel stimmt nicht." : $"{status.MachineName}: CPU {status.CpuPercent:0}% · RAM {status.MemoryMb:0} MB · Uptime {status.UptimeMinutes:0} Min. · OBS {(status.ObsRunning ? "läuft" : "aus")} · Spotify {(status.SpotifyRunning ? "läuft" : "aus")}.";
     }
 
@@ -3214,9 +3297,13 @@ public partial class MainWindow : Window
 
     private void AddMultiPcHistory(string device, string action, string result)
     {
-        var timestamp = DateTimeOffset.Now;
+        DateTimeOffset timestamp = DateTimeOffset.Now;
         _multiPcHistoryItems.Insert(0, $"{timestamp:HH:mm:ss} · {device} · {action} · {result}");
-        while (_multiPcHistoryItems.Count > 50) _multiPcHistoryItems.RemoveAt(_multiPcHistoryItems.Count - 1);
+        while (_multiPcHistoryItems.Count > 50)
+        {
+            _multiPcHistoryItems.RemoveAt(_multiPcHistoryItems.Count - 1);
+        }
+
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(MultiPcRolloutAuditPath)!);
@@ -3236,10 +3323,13 @@ public partial class MainWindow : Window
                 MultiPcStatusText.Text = "Es ist noch kein dauerhaftes Rollout-Auditprotokoll vorhanden.";
                 return;
             }
-            foreach (var line in File.ReadLines(MultiPcRolloutAuditPath).Where(line => !string.IsNullOrWhiteSpace(line)).TakeLast(200).Reverse())
+            foreach (string? line in File.ReadLines(MultiPcRolloutAuditPath).Where(line => !string.IsNullOrWhiteSpace(line)).TakeLast(200).Reverse())
             {
-                var entry = System.Text.Json.JsonSerializer.Deserialize<MultiPcRolloutAuditEntry>(line);
-                if (entry is not null) _multiPcHistoryItems.Add($"{entry.Timestamp.LocalDateTime:g} · {entry.Device} · {entry.Action} · {entry.Result}");
+                MultiPcRolloutAuditEntry? entry = System.Text.Json.JsonSerializer.Deserialize<MultiPcRolloutAuditEntry>(line);
+                if (entry is not null)
+                {
+                    _multiPcHistoryItems.Add($"{entry.Timestamp.LocalDateTime:g} · {entry.Device} · {entry.Action} · {entry.Result}");
+                }
             }
             MultiPcStatusText.Text = $"Auditprotokoll geladen: {_multiPcHistoryItems.Count} Einträge.";
         }
@@ -3248,14 +3338,18 @@ public partial class MainWindow : Window
 
     private async Task WakeSelectedMultiPcDeviceAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
-        var raw = (device.MacAddress ?? "").Replace(":", "").Replace("-", "").Replace(".", "");
+        string raw = (device.MacAddress ?? "").Replace(":", "").Replace("-", "").Replace(".", "");
         if (raw.Length != 12 || !raw.All(Uri.IsHexDigit)) { MultiPcStatusText.Text = "Für dieses Gerät ist keine gültige MAC-Adresse gespeichert."; return; }
-        var mac = Convert.FromHexString(raw);
-        var packet = new byte[6 + 16 * 6];
+        byte[] mac = Convert.FromHexString(raw);
+        byte[] packet = new byte[6 + (16 * 6)];
         Array.Fill(packet, (byte)0xFF, 0, 6);
-        for (var i = 0; i < 16; i++) Buffer.BlockCopy(mac, 0, packet, 6 + i * 6, 6);
+        for (int i = 0; i < 16; i++)
+        {
+            Buffer.BlockCopy(mac, 0, packet, 6 + (i * 6), 6);
+        }
+
         using var udp = new System.Net.Sockets.UdpClient();
         udp.EnableBroadcast = true;
         await udp.SendAsync(packet, packet.Length, new System.Net.IPEndPoint(System.Net.IPAddress.Broadcast, 9));
@@ -3271,24 +3365,27 @@ public partial class MainWindow : Window
         {
             using var udp = new System.Net.Sockets.UdpClient(0);
             udp.EnableBroadcast = true;
-            var request = System.Text.Encoding.UTF8.GetBytes("CCS_DISCOVER_V1");
+            byte[] request = System.Text.Encoding.UTF8.GetBytes("CCS_DISCOVER_V1");
             await udp.SendAsync(request, request.Length, new System.Net.IPEndPoint(System.Net.IPAddress.Broadcast, 47632));
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
             while (!cts.IsCancellationRequested)
             {
                 try
                 {
-                    var response = await udp.ReceiveAsync(cts.Token);
-                    var json = System.Text.Encoding.UTF8.GetString(response.Buffer);
-                    var item = System.Text.Json.JsonSerializer.Deserialize<MultiPcDiscoveryResponse>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                    if (item is not null && found.All(x => !string.Equals(x.Host, item.Host, StringComparison.OrdinalIgnoreCase))) found.Add(item with { Host = response.RemoteEndPoint.Address.ToString() });
+                    UdpReceiveResult response = await udp.ReceiveAsync(cts.Token);
+                    string json = System.Text.Encoding.UTF8.GetString(response.Buffer);
+                    MultiPcDiscoveryResponse? item = System.Text.Json.JsonSerializer.Deserialize<MultiPcDiscoveryResponse>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (item is not null && found.All(x => !string.Equals(x.Host, item.Host, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        found.Add(item with { Host = response.RemoteEndPoint.Address.ToString() });
+                    }
                 }
                 catch (OperationCanceledException) { break; }
             }
         }
         catch (Exception ex) { MultiPcStatusText.Text = $"LAN-Suche fehlgeschlagen: {ex.Message}"; return; }
         if (found.Count == 0) { MultiPcStatusText.Text = "Keine Agents gefunden. Prüfe Windows-Firewall und ob der Agent läuft."; return; }
-        var first = found[0];
+        MultiPcDiscoveryResponse first = found[0];
         MultiPcDeviceNameBox.Text = first.MachineName;
         MultiPcHostBox.Text = first.Host;
         MultiPcAgentPortBox.Text = first.Port.ToString();
@@ -3350,7 +3447,7 @@ public partial class MainWindow : Window
         }
 
         e.Cancel = true;
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             this,
             "Der Stream läuft noch. Die Anwendung kann erst geschlossen werden, wenn der Stream beendet ist.\n\nStreamende-Dialog öffnen?",
             "Creator Control Suite",
@@ -3385,7 +3482,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var maximized = WindowState == WindowState.Maximized;
+        bool maximized = WindowState == WindowState.Maximized;
         TitleBarMaximizeIcon.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
         TitleBarRestoreIcon.Visibility = maximized ? Visibility.Visible : Visibility.Collapsed;
         TitleBarMaximizeButton.ToolTip = maximized ? "Wiederherstellen" : "Maximieren";
@@ -3403,7 +3500,7 @@ public partial class MainWindow : Window
         DashboardConnectionSummaryChip?.ClearValue(Border.BorderBrushProperty);
         DashboardServiceStatusSection?.ClearValue(Border.BackgroundProperty);
 
-        var active = new Button?[]
+        Button? active = new Button?[]
         {
             DashboardButton, ServicesButton, WorkflowButton, StatisticsButton,
             OverlaysButton, AlertsButton, SettingsButton, DiagnosticsButton,
@@ -3418,18 +3515,18 @@ public partial class MainWindow : Window
 
     private async Task RefreshThemePickerAsync()
     {
-        var premiumEnabled = await _featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes);
-        var desiredId = string.IsNullOrWhiteSpace(_settings.General.ThemeId)
+        bool premiumEnabled = await _featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes);
+        string desiredId = string.IsNullOrWhiteSpace(_settings.General.ThemeId)
             ? ThemeCatalog.ClassicId
             : _settings.General.ThemeId;
-        var desired = ThemeCatalog.Resolve(desiredId);
+        ThemeDefinition desired = ThemeCatalog.Resolve(desiredId);
         if (desired.IsPremium && !premiumEnabled)
         {
             desired = ThemeCatalog.Classic;
             _settings.General.ThemeId = ThemeCatalog.ClassicId;
         }
 
-        var previousLoading = _loadingSettingsIntoUi;
+        bool previousLoading = _loadingSettingsIntoUi;
         _loadingSettingsIntoUi = true;
         try
         {
@@ -3455,7 +3552,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var premiumEnabled = await _featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes);
+        bool premiumEnabled = await _featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes);
         if (selected.IsPremium && !premiumEnabled)
         {
             ThemeLicenseHintText.Text =
@@ -3488,7 +3585,7 @@ public partial class MainWindow : Window
         }
 
         // Re-apply active nav highlight with new brushes.
-        var active = new Button?[]
+        Button? active = new Button?[]
         {
             DashboardButton, ServicesButton, WorkflowButton, StatisticsButton,
             OverlaysButton, AlertsButton, SettingsButton, DiagnosticsButton
@@ -3547,12 +3644,12 @@ public partial class MainWindow : Window
         _settings.YouTubeMusic ??= new YouTubeMusicSettings();
         _settings.Dashboard ??= new DashboardSettings();
         _settings.Dashboard.SceneButtons ??= [];
-        var disabledLegacyAlertAutoCreate = _settings.Alerts.AutoCreateObsSources;
+        bool disabledLegacyAlertAutoCreate = _settings.Alerts.AutoCreateObsSources;
         // Eine alte Einstellung darf beim Start niemals OBS-Alertquellen erzeugen.
         // Das Anlegen bleibt ausschließlich der expliziten OBS-Übertragung im Alert-Bereich vorbehalten.
         _settings.Alerts.AutoCreateObsSources = false;
         _settings.Twitch.Scopes ??= [];
-        var addedGuestStarScope = !_settings.Twitch.Scopes.Contains(
+        bool addedGuestStarScope = !_settings.Twitch.Scopes.Contains(
             "channel:read:guest_star",
             StringComparer.Ordinal);
         if (addedGuestStarScope)
@@ -3564,8 +3661,11 @@ public partial class MainWindow : Window
             ];
         }
         if (string.IsNullOrWhiteSpace(_settings.MusicPlayer.ProviderId))
+        {
             _settings.MusicPlayer.ProviderId = MusicProviderIds.Spotify;
-        var migratedSceneAutomation = MigrateLegacyStartToGameAutomation();
+        }
+
+        bool migratedSceneAutomation = MigrateLegacyStartToGameAutomation();
         if (migratedSceneAutomation || addedGuestStarScope || disabledLegacyAlertAutoCreate)
         {
             await _settingsStore.SaveAsync(_settings);
@@ -3698,7 +3798,7 @@ public partial class MainWindow : Window
         ServicesTwitchStopStreamAfterRaidBox.IsChecked = _settings.Twitch.StopStreamAfterRaid;
         ServicesTwitchStopSpotifyAfterRaidBox.IsChecked = _settings.Twitch.StopSpotifyAfterRaid;
         ServicesTwitchRaidChannelsBox.Text = string.Join(Environment.NewLine, _settings.Twitch.RaidChannels);
-        var endSceneSeconds = Math.Max(0, _settings.Twitch.EndSceneDurationSeconds > 0
+        int endSceneSeconds = Math.Max(0, _settings.Twitch.EndSceneDurationSeconds > 0
             ? _settings.Twitch.EndSceneDurationSeconds
             : _settings.Workflow.EndSceneSeconds);
         _settings.Twitch.EndSceneDurationSeconds = endSceneSeconds;
@@ -3860,8 +3960,8 @@ public partial class MainWindow : Window
 
     private bool MigrateLegacyStartToGameAutomation()
     {
-        var changed = false;
-        foreach (var rule in _settings.Workflow.TimedAutomations.Where(rule =>
+        bool changed = false;
+        foreach (TimedAutomationRuleSettings? rule in _settings.Workflow.TimedAutomations.Where(rule =>
                      (rule.Name.StartsWith("Streamstart – Initialisierung", StringComparison.OrdinalIgnoreCase) ||
                       rule.Name.StartsWith("Streamstart – Intro ausblenden", StringComparison.OrdinalIgnoreCase)) &&
                      !string.IsNullOrWhiteSpace(rule.NextRuleId)))
@@ -3872,7 +3972,7 @@ public partial class MainWindow : Window
             changed = true;
         }
 
-        foreach (var rule in _settings.Workflow.TimedAutomations.Where(rule =>
+        foreach (TimedAutomationRuleSettings? rule in _settings.Workflow.TimedAutomations.Where(rule =>
                      rule.Name.StartsWith("Streamstart – Game wechseln", StringComparison.OrdinalIgnoreCase) &&
                      string.Equals(rule.TriggerType, "StreamElapsed", StringComparison.OrdinalIgnoreCase) &&
                      string.Equals(rule.ActionType, "SwitchScene", StringComparison.OrdinalIgnoreCase) &&
@@ -3901,8 +4001,11 @@ public partial class MainWindow : Window
             _settings.General.ThemeId = ResolveSelectedThemeId();
             _settings.General.OverlayManifestPath = OverlayManifestPathBox.Text.Trim();
             _settings.General.ConnectionWatchdogEnabled = ConnectionWatchdogEnabledBox.IsChecked == true;
-            if (int.TryParse(ConnectionWatchdogSecondsBox.Text.Trim(), out var watchdogSeconds))
+            if (int.TryParse(ConnectionWatchdogSecondsBox.Text.Trim(), out int watchdogSeconds))
+            {
                 _settings.General.ConnectionWatchdogSeconds = Math.Clamp(watchdogSeconds, 5, 300);
+            }
+
             _settings.General.ReconnectObs = ReconnectObsBox.IsChecked == true;
             _settings.General.ReconnectTwitch = ReconnectTwitchBox.IsChecked == true;
             _settings.General.ReconnectSpotify = ReconnectSpotifyBox.IsChecked == true;
@@ -3935,8 +4038,11 @@ public partial class MainWindow : Window
             _settings.MusicPlayer ??= new MusicPlayerSettings();
             _settings.YouTubeMusic ??= new YouTubeMusicSettings();
             _settings.MusicPlayer.ProviderId = GetSelectedMusicPlayerProviderId();
-            if (!int.TryParse(YouTubeMusicBridgePortBox.Text.Trim(), out var ytPort) || ytPort is <= 0 or > 65535)
+            if (!int.TryParse(YouTubeMusicBridgePortBox.Text.Trim(), out int ytPort) || ytPort is <= 0 or > 65535)
+            {
                 throw new InvalidOperationException("Ungültiger YouTube-Music-Bridge-Port.");
+            }
+
             _settings.YouTubeMusic.BridgePort = ytPort;
             _settings.YouTubeMusic.AutoConnect = YouTubeMusicAutoConnectBox.IsChecked == true;
             _settings.YouTubeMusic.ConnectOnPrepare = YouTubeMusicConnectOnPrepareBox.IsChecked == true;
@@ -3944,12 +4050,15 @@ public partial class MainWindow : Window
             // Der im Spotify-Bereich eingetragene Laufzeit-JSON-Pfad muss auch beim
             // allgemeinen Speichern erhalten bleiben. Sonst schreibt der laufende
             // Spotify-Refresh weiter in die zuvor konfigurierte Standarddatei.
-            var spotifyDataPath = ServicesSpotifyDataJsonPathBox.Text?.Trim();
+            string? spotifyDataPath = ServicesSpotifyDataJsonPathBox.Text?.Trim();
             if (!string.IsNullOrWhiteSpace(spotifyDataPath))
             {
                 spotifyDataPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(spotifyDataPath));
                 if (!string.Equals(Path.GetExtension(spotifyDataPath), ".json", StringComparison.OrdinalIgnoreCase))
+                {
                     spotifyDataPath += ".json";
+                }
+
                 _settings.Overlay.DataFilePath = spotifyDataPath;
                 _settings.Overlay.DataFileName = Path.GetFileName(spotifyDataPath);
             }
@@ -4048,11 +4157,11 @@ public partial class MainWindow : Window
             _settings.Product.UpdateChannel = _settings.Updates.Channel;
             _settings.Product.Version = GetCurrentProductVersion();
 
-            var validation = _settingsValidator.Validate(_settings);
+            ValidationReport validation = _settingsValidator.Validate(_settings);
 
             if (!validation.IsValid)
             {
-                var firstError = validation.Issues.First(
+                ValidationIssue firstError = validation.Issues.First(
                     issue =>
                         issue.Severity ==
                         ValidationSeverity.Error);
@@ -4159,7 +4268,7 @@ public partial class MainWindow : Window
 
     private void NormalizeDashboardModuleOrder()
     {
-        var validKeys = GetDefaultDashboardModuleOrder();
+        IReadOnlyList<string> validKeys = GetDefaultDashboardModuleOrder();
         var normalized = (_settings.Dashboard.ModuleOrder ?? [])
             .Select(key => string.Equals(key, "StreamStatistics", StringComparison.Ordinal)
                 ? "Community"
@@ -4168,7 +4277,7 @@ public partial class MainWindow : Window
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        foreach (var key in validKeys)
+        foreach (string key in validKeys)
         {
             if (!normalized.Contains(key, StringComparer.Ordinal))
             {
@@ -4207,7 +4316,7 @@ public partial class MainWindow : Window
         _settings.Dashboard.ModuleHeights ??=
             new Dictionary<string, double>(StringComparer.Ordinal);
 
-        foreach (var key in validKeys)
+        foreach (string key in validKeys)
         {
             if (!_settings.Dashboard.ModuleWidths.ContainsKey(key))
             {
@@ -4226,7 +4335,7 @@ public partial class MainWindow : Window
         string fromKey,
         string toKey)
     {
-        if (map is null || !map.Remove(fromKey, out var value))
+        if (map is null || !map.Remove(fromKey, out T? value))
         {
             return;
         }
@@ -4239,7 +4348,7 @@ public partial class MainWindow : Window
         NormalizeDashboardModuleOrder();
         _dashboardModuleOrderItems.Clear();
 
-        foreach (var key in _settings.Dashboard.ModuleOrder)
+        foreach (string key in _settings.Dashboard.ModuleOrder)
         {
             _dashboardModuleOrderItems.Add(GetDashboardModuleDisplayName(key));
         }
@@ -4259,7 +4368,7 @@ public partial class MainWindow : Window
 
     private string? GetDashboardModuleKey(FrameworkElement element)
     {
-        foreach (var key in GetDefaultDashboardModuleOrder())
+        foreach (string key in GetDefaultDashboardModuleOrder())
         {
             if (ReferenceEquals(GetDashboardModuleElement(key), element))
             {
@@ -4316,19 +4425,19 @@ public partial class MainWindow : Window
 
     private void MoveDashboardModuleEditorItem(int direction)
     {
-        var index = DashboardModuleOrderList.SelectedIndex;
+        int index = DashboardModuleOrderList.SelectedIndex;
         if (index < 0)
         {
             return;
         }
 
-        var targetIndex = index + direction;
+        int targetIndex = index + direction;
         if (targetIndex < 0 || targetIndex >= _dashboardModuleOrderItems.Count)
         {
             return;
         }
 
-        var item = _dashboardModuleOrderItems[index];
+        string item = _dashboardModuleOrderItems[index];
         _dashboardModuleOrderItems.RemoveAt(index);
         _dashboardModuleOrderItems.Insert(targetIndex, item);
         DashboardModuleOrderList.SelectedIndex = targetIndex;
@@ -4356,7 +4465,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var current = e.GetPosition(DashboardModuleOrderList);
+        Point current = e.GetPosition(DashboardModuleOrderList);
         if (Math.Abs(current.X - _dashboardModuleDragStart.X) <
                 SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(current.Y - _dashboardModuleDragStart.Y) <
@@ -4380,19 +4489,19 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dragged = e.Data.GetData(DataFormats.StringFormat) as string;
+        string? dragged = e.Data.GetData(DataFormats.StringFormat) as string;
         if (string.IsNullOrWhiteSpace(dragged))
         {
             return;
         }
 
-        var target =
+        string? target =
             FindListBoxItemTextFromPoint(
                 DashboardModuleOrderList,
                 e.GetPosition(DashboardModuleOrderList));
 
-        var oldIndex = _dashboardModuleOrderItems.IndexOf(dragged);
-        var targetIndex = string.IsNullOrWhiteSpace(target)
+        int oldIndex = _dashboardModuleOrderItems.IndexOf(dragged);
+        int targetIndex = string.IsNullOrWhiteSpace(target)
             ? _dashboardModuleOrderItems.Count - 1
             : _dashboardModuleOrderItems.IndexOf(target);
 
@@ -4527,7 +4636,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var current = e.GetPosition(DashboardContentStack);
+        Point current = e.GetPosition(DashboardContentStack);
 
         if (Math.Abs(current.X - _dashboardDirectDragStart.X) <
                 SystemParameters.MinimumHorizontalDragDistance &&
@@ -4551,17 +4660,17 @@ public partial class MainWindow : Window
             return;
         }
 
-        var currentIndex =
+        int currentIndex =
             DashboardContentStack.Children.IndexOf(dragged);
 
-        var pointerPosition =
+        Point pointerPosition =
             System.Windows.Input.Mouse.GetPosition(
                 DashboardContentStack);
 
-        var targetIndex = currentIndex;
-        var bestDistance = double.MaxValue;
+        int targetIndex = currentIndex;
+        double bestDistance = double.MaxValue;
 
-        for (var index = 0;
+        for (int index = 0;
              index < DashboardContentStack.Children.Count;
              index++)
         {
@@ -4573,20 +4682,20 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            var topLeft =
+            Point topLeft =
                 candidate.TranslatePoint(
                     new Point(0, 0),
                     DashboardContentStack);
 
-            var centerX =
-                topLeft.X + candidate.ActualWidth / 2;
-            var centerY =
-                topLeft.Y + candidate.ActualHeight / 2;
+            double centerX =
+                topLeft.X + (candidate.ActualWidth / 2);
+            double centerY =
+                topLeft.Y + (candidate.ActualHeight / 2);
 
-            var deltaX = pointerPosition.X - centerX;
-            var deltaY = pointerPosition.Y - centerY;
-            var distance =
-                deltaX * deltaX + deltaY * deltaY;
+            double deltaX = pointerPosition.X - centerX;
+            double deltaY = pointerPosition.Y - centerY;
+            double distance =
+                (deltaX * deltaX) + (deltaY * deltaY);
 
             if (distance < bestDistance)
             {
@@ -4620,7 +4729,7 @@ public partial class MainWindow : Window
 
     private void SyncDashboardContentStackRows()
     {
-        for (var index = 0; index < DashboardContentStack.Children.Count; index++)
+        for (int index = 0; index < DashboardContentStack.Children.Count; index++)
         {
             if (DashboardContentStack.Children[index] is UIElement child)
             {
@@ -4690,11 +4799,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dragged =
-            e.Data.GetData(typeof(FrameworkElement))
-                as FrameworkElement;
 
-        if (dragged is null ||
+        if (e.Data.GetData(typeof(FrameworkElement)) is not FrameworkElement dragged ||
             !DashboardContentStack.Children.Contains(dragged))
         {
             return;
@@ -4714,14 +4820,14 @@ public partial class MainWindow : Window
     {
         var order = new List<string>();
 
-        foreach (var child in DashboardContentStack.Children)
+        foreach (object? child in DashboardContentStack.Children)
         {
             if (child is not FrameworkElement element)
             {
                 continue;
             }
 
-            var key = GetDashboardModuleKey(element);
+            string? key = GetDashboardModuleKey(element);
             if (string.IsNullOrWhiteSpace(key))
             {
                 continue;
@@ -4730,7 +4836,7 @@ public partial class MainWindow : Window
             order.Add(key);
         }
 
-        foreach (var key in GetDefaultDashboardModuleOrder())
+        foreach (string key in GetDefaultDashboardModuleOrder())
         {
             if (!order.Contains(key, StringComparer.Ordinal))
             {
@@ -4752,7 +4858,7 @@ public partial class MainWindow : Window
         NormalizeDashboardModuleSizes();
 
         _dashboardPreFocusOrder =
-            _settings.Dashboard.ModuleOrder.ToList();
+            [.. _settings.Dashboard.ModuleOrder];
         _dashboardPreFocusSizes =
             new Dictionary<string, string>(
                 _settings.Dashboard.ModuleSizes,
@@ -4819,7 +4925,7 @@ public partial class MainWindow : Window
         if (_dashboardPreFocusOrder is not null)
         {
             _settings.Dashboard.ModuleOrder =
-                _dashboardPreFocusOrder.ToList();
+                [.. _dashboardPreFocusOrder];
         }
 
         if (_dashboardPreFocusSizes is not null)
@@ -4870,7 +4976,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var preset = item.Content?.ToString() ?? "Command Center";
+        string preset = item.Content?.ToString() ?? "Command Center";
         ApplyDashboardPreset(preset);
 
         DashboardPresetBox.SelectedIndex = source.SelectedIndex;
@@ -4889,7 +4995,7 @@ public partial class MainWindow : Window
     private void ApplyDashboardPreset(string preset)
     {
         _settings.Dashboard.ModuleOrder =
-            GetDefaultDashboardModuleOrder().ToList();
+            [.. GetDefaultDashboardModuleOrder()];
 
         _settings.Dashboard.ShowServiceStatus = true;
         _settings.Dashboard.ShowStreamControls = true;
@@ -4905,7 +5011,7 @@ public partial class MainWindow : Window
         switch (preset)
         {
             case "Kompakt":
-                foreach (var key in GetDefaultDashboardModuleOrder())
+                foreach (string key in GetDefaultDashboardModuleOrder())
                 {
                     _settings.Dashboard.ModuleSizes[key] = "Kompakt";
                 }
@@ -4995,9 +5101,9 @@ public partial class MainWindow : Window
         _settings.Dashboard.ModuleSizes ??=
             new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var key in GetDefaultDashboardModuleOrder())
+        foreach (string key in GetDefaultDashboardModuleOrder())
         {
-            if (!_settings.Dashboard.ModuleSizes.TryGetValue(key, out var size) ||
+            if (!_settings.Dashboard.ModuleSizes.TryGetValue(key, out string? size) ||
                 size is not ("Kompakt" or "Standard" or "Groß"))
             {
                 _settings.Dashboard.ModuleSizes[key] =
@@ -5012,9 +5118,9 @@ public partial class MainWindow : Window
     {
         NormalizeDashboardModuleSizes();
 
-        foreach (var key in GetDefaultDashboardModuleOrder())
+        foreach (string key in GetDefaultDashboardModuleOrder())
         {
-            var element = GetDashboardModuleElement(key);
+            FrameworkElement? element = GetDashboardModuleElement(key);
             if (element is null)
             {
                 continue;
@@ -5063,24 +5169,24 @@ public partial class MainWindow : Window
 
     private (double Width, double Height) GetDashboardObsScenePreviewSize(string size)
     {
-        var width = GetDashboardObsScenePreviewWidth(size);
-        var aspect = _dashboardObsPreviewAspect > 0
+        double width = GetDashboardObsScenePreviewWidth(size);
+        double aspect = _dashboardObsPreviewAspect > 0
             ? _dashboardObsPreviewAspect
             : DashboardObsPreviewDefaultAspect;
-        var height = Math.Round(width / aspect);
+        double height = Math.Round(width / aspect);
         return (width, height);
     }
 
     private void ApplyDashboardObsScenePreviewSize()
     {
-        var size = _settings.Dashboard.ObsScenePreviewSize;
+        string size = _settings.Dashboard.ObsScenePreviewSize;
         if (size is not ("Kompakt" or "Standard" or "Groß"))
         {
             size = "Standard";
             _settings.Dashboard.ObsScenePreviewSize = size;
         }
 
-        var (width, height) = GetDashboardObsScenePreviewSize(size);
+        (double width, double height) = GetDashboardObsScenePreviewSize(size);
         DashboardObsScenePreviewBorder.Width = width;
         DashboardObsScenePreviewBorder.MinWidth = width;
         DashboardObsScenePreviewBorder.MaxWidth = width;
@@ -5090,7 +5196,7 @@ public partial class MainWindow : Window
         DashboardObsSceneControlContent.MaxWidth = width;
         DashboardSceneButtonsPanel.MaxWidth = width;
 
-        var useWidePreviewLayout = string.Equals(size, "Groß", StringComparison.Ordinal);
+        bool useWidePreviewLayout = string.Equals(size, "Groß", StringComparison.Ordinal);
         // Events/User/Chat brauchen eine *-Zeile mit definierter Höhe, sonst bleiben sie auf MinHeight.
         DashboardPrimaryRow.RowDefinitions[0].Height = useWidePreviewLayout
             ? GridLength.Auto
@@ -5108,7 +5214,7 @@ public partial class MainWindow : Window
             ? new Thickness(0, 0, 0, 10)
             : new Thickness(0, 0, 8, 0);
 
-        foreach (var item in DashboardObsScenePreviewSizeBox.Items
+        foreach (ComboBoxItem item in DashboardObsScenePreviewSizeBox.Items
                      .OfType<System.Windows.Controls.ComboBoxItem>())
         {
             if (string.Equals(item.Tag?.ToString() ?? item.Content?.ToString(), size, StringComparison.Ordinal))
@@ -5127,7 +5233,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var size = sizeItem.Tag?.ToString() ?? sizeItem.Content?.ToString();
+        string? size = sizeItem.Tag?.ToString() ?? sizeItem.Content?.ToString();
         if (size is not ("Kompakt" or "Standard" or "Groß"))
         {
             return;
@@ -5152,7 +5258,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var key = GetDashboardModuleKeyFromDisplayName(displayName);
+        string? key = GetDashboardModuleKeyFromDisplayName(displayName);
         if (string.IsNullOrWhiteSpace(key))
         {
             DashboardModuleSizeBox.SelectedIndex = -1;
@@ -5160,9 +5266,9 @@ public partial class MainWindow : Window
         }
 
         NormalizeDashboardModuleSizes();
-        var size = _settings.Dashboard.ModuleSizes[key];
+        string size = _settings.Dashboard.ModuleSizes[key];
 
-        foreach (var item in DashboardModuleSizeBox.Items
+        foreach (ComboBoxItem item in DashboardModuleSizeBox.Items
                      .OfType<System.Windows.Controls.ComboBoxItem>())
         {
             if (string.Equals(
@@ -5184,8 +5290,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var key = GetDashboardModuleKeyFromDisplayName(displayName);
-        var size = sizeItem.Content?.ToString();
+        string? key = GetDashboardModuleKeyFromDisplayName(displayName);
+        string? size = sizeItem.Content?.ToString();
 
         if (string.IsNullOrWhiteSpace(key) ||
             size is not ("Kompakt" or "Standard" or "Groß"))
@@ -5206,7 +5312,7 @@ public partial class MainWindow : Window
     {
         _dashboardSelectedSection = element;
 
-        var key = GetDefaultDashboardModuleOrder()
+        string? key = GetDefaultDashboardModuleOrder()
             .FirstOrDefault(candidate =>
                 ReferenceEquals(
                     GetDashboardModuleElement(candidate),
@@ -5218,9 +5324,9 @@ public partial class MainWindow : Window
         }
 
         NormalizeDashboardModuleSizes();
-        var size = _settings.Dashboard.ModuleSizes[key];
+        string size = _settings.Dashboard.ModuleSizes[key];
 
-        foreach (var item in DashboardDirectSizeBox.Items
+        foreach (ComboBoxItem item in DashboardDirectSizeBox.Items
                      .OfType<System.Windows.Controls.ComboBoxItem>())
         {
             if (string.Equals(
@@ -5246,13 +5352,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var key = GetDefaultDashboardModuleOrder()
+        string? key = GetDefaultDashboardModuleOrder()
             .FirstOrDefault(candidate =>
                 ReferenceEquals(
                     GetDashboardModuleElement(candidate),
                     _dashboardSelectedSection));
 
-        var size = sizeItem.Content?.ToString();
+        string? size = sizeItem.Content?.ToString();
 
         if (string.IsNullOrWhiteSpace(key) ||
             size is not ("Kompakt" or "Standard" or "Groß"))
@@ -5311,34 +5417,45 @@ public partial class MainWindow : Window
 
     private async Task RefreshLicenseAsync()
     {
-        var status = await _licenseService.GetStatusAsync();
+        LicenseStatus status = await _licenseService.GetStatusAsync();
         LicenseStatusText.Text = $"Status: {status.State}\n" + status.Detail + (status.License is null ? "" : "\nEdition: " + status.License.Edition + "\nLizenznehmer: " + status.License.CustomerName + "\nLizenz-ID: " + status.License.LicenseId);
         LicenseStatusText.Foreground = status.IsUsable ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
 
-        var features = await _featureGate.SnapshotAsync();
+        IReadOnlyDictionary<string, bool> features = await _featureGate.SnapshotAsync();
         FeatureGateGrid.ItemsSource = features.OrderBy(x => x.Key).Select(x => new { Feature = x.Key, Aktiv = x.Value }).ToList();
     }
 
     private async Task ActivateLicenseAsync()
     {
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Creator Control Suite Lizenz (*.ccslicense)|*.ccslicense|JSON (*.json)|*.json" };
-        if (dialog.ShowDialog() != true) return;
-        var status = await _licenseService.ActivateAsync(dialog.FileName);
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        LicenseStatus status = await _licenseService.ActivateAsync(dialog.FileName);
         await RefreshLicenseAsync();
-        if (!status.IsUsable) MessageBox.Show(status.Detail,"Lizenz konnte nicht aktiviert werden",MessageBoxButton.OK,MessageBoxImage.Error);
+        if (!status.IsUsable)
+        {
+            MessageBox.Show(status.Detail, "Lizenz konnte nicht aktiviert werden", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private async Task DeactivateLicenseAsync()
     {
-        if (MessageBox.Show("Lokale Lizenz wirklich deaktivieren?","Lizenz",MessageBoxButton.YesNo,MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show("Lokale Lizenz wirklich deaktivieren?", "Lizenz", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
         await _licenseService.DeactivateAsync(); await RefreshLicenseAsync();
     }
 
     private void OpenLegalDocument(string id)
     {
-        var document = _legalConsentService.GetDocuments().FirstOrDefault(x => string.Equals(x.Id,id,StringComparison.OrdinalIgnoreCase));
-        var documentPath = document?.FilePath;
-        if (string.IsNullOrWhiteSpace(documentPath) || !File.Exists(documentPath)) { MessageBox.Show("Dokument wurde nicht gefunden.","Creator Control Suite",MessageBoxButton.OK,MessageBoxImage.Warning); return; }
+        LegalDocumentInfo? document = _legalConsentService.GetDocuments().FirstOrDefault(x => string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase));
+        string? documentPath = document?.FilePath;
+        if (string.IsNullOrWhiteSpace(documentPath) || !File.Exists(documentPath)) { MessageBox.Show("Dokument wurde nicht gefunden.", "Creator Control Suite", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
         Process.Start(new ProcessStartInfo { FileName = documentPath, UseShellExecute = true });
     }
 
@@ -5349,10 +5466,14 @@ public partial class MainWindow : Window
             Filter = "Creator Control Suite Supportpaket (*.ccssupport)|*.ccssupport",
             FileName = "CreatorControlSuite-Support-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".ccssupport"
         };
-        if (dialog.ShowDialog() != true) return;
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
         try
         {
-            var result = await _supportPackageService.CreateAsync(dialog.FileName, new SupportPackageOptions(true, true, true, true, true, true));
+            SupportPackageResult result = await _supportPackageService.CreateAsync(dialog.FileName, new SupportPackageOptions(true, true, true, true, true, true));
             MessageBox.Show("Supportpaket erstellt:\n\n" + result.PackagePath + (result.Warnings.Count == 0 ? "" : "\n\nHinweise:\n" + string.Join("\n", result.Warnings.Select(x => "• " + x))), "Creator Control Suite", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception exception)
@@ -5364,7 +5485,7 @@ public partial class MainWindow : Window
 
     private async Task RunReleaseCheckAsync()
     {
-        var report = await _releaseReadinessService.CheckAsync();
+        ReleaseReadinessReport report = await _releaseReadinessService.CheckAsync();
         ReleaseReadinessGrid.ItemsSource = report.Items;
         MessageBox.Show(report.Ready ? "Der technische Release-Check ist bestanden." : "Der Release-Check enthält blockierende Punkte.", "Release-Check", MessageBoxButton.OK, report.Ready ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
@@ -5373,15 +5494,15 @@ public partial class MainWindow : Window
     {
         try
         {
-            var report=await _installerSelfTestService.RunAsync();
-            InstallerSelfTestGrid.ItemsSource=report.Items;
-            MessageBox.Show(report.Passed?"Installer-Selbsttest bestanden.":"Installer-Selbsttest enthält Fehler.",
-                "Installer-Selbsttest",MessageBoxButton.OK,report.Passed?MessageBoxImage.Information:MessageBoxImage.Warning);
+            InstallerSelfTestReport report = await _installerSelfTestService.RunAsync();
+            InstallerSelfTestGrid.ItemsSource = report.Items;
+            MessageBox.Show(report.Passed ? "Installer-Selbsttest bestanden." : "Installer-Selbsttest enthält Fehler.",
+                "Installer-Selbsttest", MessageBoxButton.OK, report.Passed ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            _appLogger.Write(AppLogLevel.Error,"InstallerSelfTest","Installer-Selbsttest ist fehlgeschlagen.",ex);
-            MessageBox.Show(ex.Message,"Installer-Selbsttest",MessageBoxButton.OK,MessageBoxImage.Error);
+            _appLogger.Write(AppLogLevel.Error, "InstallerSelfTest", "Installer-Selbsttest ist fehlgeschlagen.", ex);
+            MessageBox.Show(ex.Message, "Installer-Selbsttest", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -5389,26 +5510,30 @@ public partial class MainWindow : Window
     {
         try
         {
-            var d=await _betaReadinessService.BuildAsync();
-            BetaReadinessGrid.ItemsSource=d.Areas;BetaReadinessScoreText.Text=d.OverallScorePercent+" %";
-            BetaReadinessStatusText.Text=d.BetaReady?"Beta technisch bereit":"Noch nicht Beta-bereit";
-            BetaReadinessStatusText.Foreground=d.BetaReady?System.Windows.Media.Brushes.LightGreen:System.Windows.Media.Brushes.IndianRed;
-            BetaBlockersTextBox.Text=d.Blockers.Count==0?"Keine technischen Blocker erkannt.":
-                string.Join(Environment.NewLine,d.Blockers.Select(x=>"• "+x));
+            BetaReadinessDashboard d = await _betaReadinessService.BuildAsync();
+            BetaReadinessGrid.ItemsSource = d.Areas; BetaReadinessScoreText.Text = d.OverallScorePercent + " %";
+            BetaReadinessStatusText.Text = d.BetaReady ? "Beta technisch bereit" : "Noch nicht Beta-bereit";
+            BetaReadinessStatusText.Foreground = d.BetaReady ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
+            BetaBlockersTextBox.Text = d.Blockers.Count == 0 ? "Keine technischen Blocker erkannt." :
+                string.Join(Environment.NewLine, d.Blockers.Select(x => "• " + x));
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            _appLogger.Write(AppLogLevel.Error,"BetaReadiness","Beta-Readiness konnte nicht ermittelt werden.",ex);
-            MessageBox.Show(ex.Message,"Beta-Readiness",MessageBoxButton.OK,MessageBoxImage.Error);
+            _appLogger.Write(AppLogLevel.Error, "BetaReadiness", "Beta-Readiness konnte nicht ermittelt werden.", ex);
+            MessageBox.Show(ex.Message, "Beta-Readiness", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private async Task RunWorkflowE2eAsync()
     {
-        if (MessageBox.Show("Der Test führt den echten Workflow Vorbereiten → Live → Pause → Fortsetzen → Ende aus. OBS und konfigurierte Dienste können gesteuert werden. Jetzt starten?", "Workflow E2E-Test", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show("Der Test führt den echten Workflow Vorbereiten → Live → Pause → Fortsetzen → Ende aus. OBS und konfigurierte Dienste können gesteuert werden. Jetzt starten?", "Workflow E2E-Test", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
         try
         {
-            var report = await _workflowE2eService.RunAsync();
+            WorkflowE2eReport report = await _workflowE2eService.RunAsync();
             WorkflowE2eGrid.ItemsSource = report.Steps;
             MessageBox.Show(report.Success ? "Workflow E2E-Test erfolgreich." : "Workflow E2E-Test enthält Fehler.", "Workflow E2E-Test");
         }
@@ -5421,7 +5546,7 @@ public partial class MainWindow : Window
 
     private async Task RefreshProfilesAsync()
     {
-        var profiles = await _profileService.ListAsync();
+        IReadOnlyList<ProfileSummary> profiles = await _profileService.ListAsync();
         ProfilesList.ItemsSource = profiles;
         DashboardProfileBox.ItemsSource = profiles;
 
@@ -5438,7 +5563,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var profile = await _profileService.LoadAsync(summary.Id);
+        CreatorProfile profile = await _profileService.LoadAsync(summary.Id);
         ProfileNameBox.Text = profile.Name;
         ProfileDescriptionBox.Text = profile.Description;
         ProfileStatusText.Text =
@@ -5449,14 +5574,14 @@ public partial class MainWindow : Window
     {
         try
         {
-            var name = ProfileNameBox.Text.Trim();
+            string name = ProfileNameBox.Text.Trim();
 
             if (string.IsNullOrWhiteSpace(name))
             {
                 name = "Profil " + DateTime.Now.ToString("dd.MM.yyyy HH:mm");
             }
 
-            var profile =
+            CreatorProfile profile =
                 await _profileService.CreateFromCurrentSettingsAsync(
                     name,
                     ProfileDescriptionBox.Text.Trim());
@@ -5486,7 +5611,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             $"Profil „{summary.Name}“ anwenden?\n\n" +
             "Die aktuellen Einstellungen werden ersetzt.",
             "Profil anwenden",
@@ -5560,7 +5685,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             $"Profil „{summary.Name}“ löschen?",
             "Profil löschen",
             MessageBoxButton.YesNo,
@@ -5595,8 +5720,8 @@ public partial class MainWindow : Window
             .ThenBy(entry => entry.Title)
             .ToList();
 
-        var selectedProfile = (StreamDeckProfileFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
-        var selectedPage = (StreamDeckPageFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
+        string selectedProfile = (StreamDeckProfileFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
+        string selectedPage = (StreamDeckPageFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
 
         RebuildStreamDeckFilter(StreamDeckProfileFilterBox, entries.Select(entry => entry.Profile), "Alle Profile", selectedProfile);
         RebuildStreamDeckFilter(StreamDeckPageFilterBox, entries
@@ -5607,11 +5732,11 @@ public partial class MainWindow : Window
         selectedPage = (StreamDeckPageFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
 
         StreamDeckCreatedActionsList.Items.Clear();
-        foreach (var entry in entries.Where(entry =>
+        foreach ((string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry in entries.Where(entry =>
                      (string.IsNullOrWhiteSpace(selectedProfile) || entry.Profile == selectedProfile) &&
                      (string.IsNullOrWhiteSpace(selectedPage) || entry.Page == selectedPage)))
         {
-            var displayTitle = ResolveStreamDeckDisplayTitle(entry);
+            string displayTitle = ResolveStreamDeckDisplayTitle(entry);
             StreamDeckCreatedActionsList.Items.Add(new ListBoxItem
             {
                 Content = $"{(entry.Locked ? "🔒 " : string.Empty)}[{entry.Profile} / {entry.Page} / {entry.Slot}] {displayTitle}",
@@ -5619,8 +5744,8 @@ public partial class MainWindow : Window
             });
         }
 
-        var occupied = entries.Select(entry => $"{entry.Profile}|{entry.Page}|{entry.Slot}").Distinct(StringComparer.OrdinalIgnoreCase).Count();
-        var conflicts = entries.GroupBy(entry => $"{entry.Profile}|{entry.Page}|{entry.Slot}", StringComparer.OrdinalIgnoreCase).Count(group => group.Count() > 1);
+        int occupied = entries.Select(entry => $"{entry.Profile}|{entry.Page}|{entry.Slot}").Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        int conflicts = entries.GroupBy(entry => $"{entry.Profile}|{entry.Page}|{entry.Slot}", StringComparer.OrdinalIgnoreCase).Count(group => group.Count() > 1);
         StreamDeckOccupancyText.Text = conflicts == 0 ? $"{occupied} Positionen belegt" : $"{occupied} belegt · {conflicts} Konflikte";
         StreamDeckOccupancyText.Foreground = conflicts == 0 ? Brushes.LightGreen : Brushes.OrangeRed;
         RebuildStreamDeckSlotGrid(entries, selectedProfile, selectedPage);
@@ -5631,17 +5756,24 @@ public partial class MainWindow : Window
     private void RebuildStreamDeckSlotGrid(IEnumerable<(string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)> entries, string selectedProfile, string selectedPage)
     {
         StreamDeckSlotGrid.Children.Clear();
-        var profile = string.IsNullOrWhiteSpace(selectedProfile) ? "Standard" : selectedProfile;
-        var page = string.IsNullOrWhiteSpace(selectedPage) ? "Hauptseite" : selectedPage;
+        string profile = string.IsNullOrWhiteSpace(selectedProfile) ? "Standard" : selectedProfile;
+        string page = string.IsNullOrWhiteSpace(selectedPage) ? "Hauptseite" : selectedPage;
         var lookup = entries.Where(e => string.Equals(e.Profile, profile, StringComparison.OrdinalIgnoreCase) && string.Equals(e.Page, page, StringComparison.OrdinalIgnoreCase) && e.Slot is >= 1 and <= 32)
             .GroupBy(e => e.Slot).ToDictionary(g => g.Key, g => g.ToList());
-        for (var slot = 1; slot <= 32; slot++)
+        for (int slot = 1; slot <= 32; slot++)
         {
-            var currentSlot = slot;
-            lookup.TryGetValue(slot, out var assigned);
+            int currentSlot = slot;
+            lookup.TryGetValue(slot, out List<(string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)>? assigned);
             var button = new Button { Margin = new Thickness(2), MinHeight = 44, Tag = currentSlot, Content = assigned is null ? slot.ToString() : $"{slot}\n{ResolveStreamDeckDisplayTitle(assigned[0])}", ToolTip = assigned is null ? "Frei" : string.Join("\n", assigned.Select(e => e.Title)) };
-            if (assigned is { Count: > 1 }) button.Background = Brushes.OrangeRed;
-            else if (assigned is { Count: 1 }) button.Background = Brushes.DarkSlateGray;
+            if (assigned is { Count: > 1 })
+            {
+                button.Background = Brushes.OrangeRed;
+            }
+            else if (assigned is { Count: 1 })
+            {
+                button.Background = Brushes.DarkSlateGray;
+            }
+
             button.Click += async (_, _) => await MoveSelectedStreamDeckActionToSlotAsync(currentSlot, profile, page);
             StreamDeckSlotGrid.Children.Add(button);
         }
@@ -5654,13 +5786,21 @@ public partial class MainWindow : Window
             StreamDeckActionCreateStatusText.Text = "Bitte zuerst eine Taste auswählen.";
             return;
         }
-        var metadataPath = Path.ChangeExtension(file, ".json");
-        if (!File.Exists(metadataPath)) return;
+        string metadataPath = Path.ChangeExtension(file, ".json");
+        if (!File.Exists(metadataPath))
+        {
+            return;
+        }
+
         if (ReadStreamDeckMetadata(file).Locked) { StreamDeckActionCreateStatusText.Text = "Die Taste ist gesperrt. Bitte zuerst entsperren."; return; }
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
         var values = document.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone());
         var output = new Dictionary<string, object?>();
-        foreach (var pair in values) output[pair.Key] = pair.Value;
+        foreach (KeyValuePair<string, JsonElement> pair in values)
+        {
+            output[pair.Key] = pair.Value;
+        }
+
         output["profile"] = profile; output["page"] = page; output["slot"] = slot;
         await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteIndented = true }));
         StreamDeckActionCreateStatusText.Text = $"Taste auf {profile} / {page} / Position {slot} verschoben.";
@@ -5670,17 +5810,21 @@ public partial class MainWindow : Window
 
     private async Task DuplicateSelectedStreamDeckProfileAsync()
     {
-        var selectedProfile = (StreamDeckProfileFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+        string? selectedProfile = (StreamDeckProfileFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
         if (string.IsNullOrWhiteSpace(selectedProfile)) { StreamDeckActionCreateStatusText.Text = "Bitte zuerst ein Profil filtern."; return; }
-        var targetProfile = selectedProfile + " - Kopie";
+        string targetProfile = selectedProfile + " - Kopie";
         var files = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Where(f => string.Equals(ReadStreamDeckMetadata(f).Profile, selectedProfile, StringComparison.OrdinalIgnoreCase)).ToList();
-        foreach (var file in files)
+        foreach (string? file in files)
         {
-            var entry = ReadStreamDeckMetadata(file);
-            var target = Path.Combine(StreamDeckActionsDirectory, Path.GetFileNameWithoutExtension(file) + " - " + targetProfile + ".cmd");
+            (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
+            string target = Path.Combine(StreamDeckActionsDirectory, Path.GetFileNameWithoutExtension(file) + " - " + targetProfile + ".cmd");
             File.Copy(file, target, true);
-            var metaPath = Path.ChangeExtension(file, ".json");
-            if (!File.Exists(metaPath)) continue;
+            string metaPath = Path.ChangeExtension(file, ".json");
+            if (!File.Exists(metaPath))
+            {
+                continue;
+            }
+
             using var document = JsonDocument.Parse(await File.ReadAllTextAsync(metaPath));
             var output = document.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
             output["profile"] = targetProfile;
@@ -5694,19 +5838,23 @@ public partial class MainWindow : Window
     private async Task ResolveStreamDeckConflictsAsync()
     {
         var entries = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Select(ReadStreamDeckMetadata).OrderBy(e => e.Profile).ThenBy(e => e.Page).ThenBy(e => e.Slot).ToList();
-        var changed = 0;
-        foreach (var group in entries.GroupBy(e => (e.Profile.ToLowerInvariant(), e.Page.ToLowerInvariant())))
+        int changed = 0;
+        foreach (IGrouping<(string, string), (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)> group in entries.GroupBy(e => (e.Profile.ToLowerInvariant(), e.Page.ToLowerInvariant())))
         {
             var used = new HashSet<int>();
-            foreach (var entry in group)
+            foreach ((string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry in group)
             {
-                var slot = entry.Slot;
+                int slot = entry.Slot;
                 if (slot is < 1 or > 32 || !used.Add(slot))
                 {
                     slot = Enumerable.Range(1, 32).FirstOrDefault(candidate => !used.Contains(candidate));
-                    if (slot == 0) continue;
+                    if (slot == 0)
+                    {
+                        continue;
+                    }
+
                     used.Add(slot);
-                    var metaPath = Path.ChangeExtension(entry.File, ".json");
+                    string metaPath = Path.ChangeExtension(entry.File, ".json");
                     using var document = JsonDocument.Parse(await File.ReadAllTextAsync(metaPath));
                     var output = document.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
                     output["slot"] = slot;
@@ -5725,7 +5873,11 @@ public partial class MainWindow : Window
         var distinct = values.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value).ToList();
         box.Items.Clear();
         box.Items.Add(new ComboBoxItem { Content = allText, Tag = string.Empty });
-        foreach (var value in distinct) box.Items.Add(new ComboBoxItem { Content = value, Tag = value });
+        foreach (string? value in distinct)
+        {
+            box.Items.Add(new ComboBoxItem { Content = value, Tag = value });
+        }
+
         box.SelectedItem = box.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), selected, StringComparison.OrdinalIgnoreCase)) ?? box.Items[0];
     }
 
@@ -5733,14 +5885,18 @@ public partial class MainWindow : Window
     {
         try
         {
-            var metadataPath = Path.ChangeExtension(file, ".json");
-            if (!File.Exists(metadataPath)) return (file, Path.GetFileNameWithoutExtension(file), "–", "", "Standard", "Hauptseite", 0, 1, false, "", "", "");
+            string metadataPath = Path.ChangeExtension(file, ".json");
+            if (!File.Exists(metadataPath))
+            {
+                return (file, Path.GetFileNameWithoutExtension(file), "–", "", "Standard", "Hauptseite", 0, 1, false, "", "", "");
+            }
+
             using var document = JsonDocument.Parse(File.ReadAllText(metadataPath));
-            var root = document.RootElement;
-            string GetString(string name, string fallback) => root.TryGetProperty(name, out var node) ? node.GetString() ?? fallback : fallback;
-            var slot = root.TryGetProperty("slot", out var slotNode) && slotNode.TryGetInt32(out var slotValue) ? slotValue : 0;
-            var steps = root.TryGetProperty("steps", out var stepsNode) && stepsNode.ValueKind == JsonValueKind.Array ? stepsNode.GetArrayLength() : 1;
-            var locked = root.TryGetProperty("locked", out var lockedNode) && lockedNode.ValueKind == JsonValueKind.True;
+            JsonElement root = document.RootElement;
+            string GetString(string name, string fallback) => root.TryGetProperty(name, out JsonElement node) ? node.GetString() ?? fallback : fallback;
+            int slot = root.TryGetProperty("slot", out JsonElement slotNode) && slotNode.TryGetInt32(out int slotValue) ? slotValue : 0;
+            int steps = root.TryGetProperty("steps", out JsonElement stepsNode) && stepsNode.ValueKind == JsonValueKind.Array ? stepsNode.GetArrayLength() : 1;
+            bool locked = root.TryGetProperty("locked", out JsonElement lockedNode) && lockedNode.ValueKind == JsonValueKind.True;
             return (file, GetString("title", Path.GetFileNameWithoutExtension(file)), GetString("command", "–"), GetString("parameter", ""), GetString("profile", "Standard"), GetString("page", "Hauptseite"), slot, Math.Max(1, steps), locked, GetString("condition", ""), GetString("trueLabel", ""), GetString("falseLabel", ""));
         }
         catch
@@ -5753,13 +5909,17 @@ public partial class MainWindow : Window
     {
         try
         {
-            var metadataPath = Path.ChangeExtension(file, ".json");
-            if (!File.Exists(metadataPath)) return (false, "", "");
+            string metadataPath = Path.ChangeExtension(file, ".json");
+            if (!File.Exists(metadataPath))
+            {
+                return (false, "", "");
+            }
+
             using var document = JsonDocument.Parse(File.ReadAllText(metadataPath));
-            var root = document.RootElement;
-            var toggle = root.TryGetProperty("toggleMode", out var toggleNode) && toggleNode.ValueKind == JsonValueKind.True;
-            var command = root.TryGetProperty("alternateCommand", out var commandNode) ? commandNode.GetString() ?? "" : "";
-            var parameter = root.TryGetProperty("alternateParameter", out var parameterNode) ? parameterNode.GetString() ?? "" : "";
+            JsonElement root = document.RootElement;
+            bool toggle = root.TryGetProperty("toggleMode", out JsonElement toggleNode) && toggleNode.ValueKind == JsonValueKind.True;
+            string command = root.TryGetProperty("alternateCommand", out JsonElement commandNode) ? commandNode.GetString() ?? "" : "";
+            string parameter = root.TryGetProperty("alternateParameter", out JsonElement parameterNode) ? parameterNode.GetString() ?? "" : "";
             return (toggle, command, parameter);
         }
         catch { return (false, "", ""); }
@@ -5770,25 +5930,48 @@ public partial class MainWindow : Window
         Directory.CreateDirectory(StreamDeckActionsDirectory);
         var issues = new List<string>();
         var cmdFiles = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").ToList();
-        var clientPath = Path.Combine(AppContext.BaseDirectory, "CreatorControlSuite.CommandClient.exe");
-        if (!File.Exists(clientPath)) issues.Add("• CommandClient.exe wurde im Programmordner nicht gefunden.");
-        foreach (var file in cmdFiles)
+        string clientPath = Path.Combine(AppContext.BaseDirectory, "CreatorControlSuite.CommandClient.exe");
+        if (!File.Exists(clientPath))
         {
-            var metadataPath = Path.ChangeExtension(file, ".json");
+            issues.Add("• CommandClient.exe wurde im Programmordner nicht gefunden.");
+        }
+
+        foreach (string? file in cmdFiles)
+        {
+            string metadataPath = Path.ChangeExtension(file, ".json");
             if (!File.Exists(metadataPath)) { issues.Add($"• {Path.GetFileName(file)}: Metadatendatei fehlt."); continue; }
             try
             {
-                var entry = ReadStreamDeckMetadata(file);
-                var toggle = ReadStreamDeckToggleMetadata(file);
-                if (entry.Slot is < 1 or > 32) issues.Add($"• {entry.Title}: ungültige Position {entry.Slot}.");
-                if (string.IsNullOrWhiteSpace(entry.Command) || entry.Command == "–") issues.Add($"• {entry.Title}: Hauptbefehl fehlt.");
-                if (toggle.ToggleMode && string.IsNullOrWhiteSpace(entry.Condition)) issues.Add($"• {entry.Title}: Toggle aktiv, aber keine Zustandsbindung gesetzt.");
-                if (toggle.ToggleMode && string.IsNullOrWhiteSpace(toggle.AlternateCommand)) issues.Add($"• {entry.Title}: zweiter Toggle-Befehl fehlt.");
+                (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
+                (bool ToggleMode, string AlternateCommand, string AlternateParameter) = ReadStreamDeckToggleMetadata(file);
+                if (entry.Slot is < 1 or > 32)
+                {
+                    issues.Add($"• {entry.Title}: ungültige Position {entry.Slot}.");
+                }
+
+                if (string.IsNullOrWhiteSpace(entry.Command) || entry.Command == "–")
+                {
+                    issues.Add($"• {entry.Title}: Hauptbefehl fehlt.");
+                }
+
+                if (ToggleMode && string.IsNullOrWhiteSpace(entry.Condition))
+                {
+                    issues.Add($"• {entry.Title}: Toggle aktiv, aber keine Zustandsbindung gesetzt.");
+                }
+
+                if (ToggleMode && string.IsNullOrWhiteSpace(AlternateCommand))
+                {
+                    issues.Add($"• {entry.Title}: zweiter Toggle-Befehl fehlt.");
+                }
             }
             catch (Exception ex) { issues.Add($"• {Path.GetFileName(metadataPath)}: {ex.Message}"); }
         }
-        var duplicates = cmdFiles.Select(ReadStreamDeckMetadata).GroupBy(e => $"{e.Profile}|{e.Page}|{e.Slot}", StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1);
-        foreach (var group in duplicates) issues.Add($"• Doppelbelegung {group.Key}: {string.Join(", ", group.Select(e => e.Title))}");
+        IEnumerable<IGrouping<string, (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)>> duplicates = cmdFiles.Select(ReadStreamDeckMetadata).GroupBy(e => $"{e.Profile}|{e.Page}|{e.Slot}", StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1);
+        foreach (IGrouping<string, (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)>? group in duplicates)
+        {
+            issues.Add($"• Doppelbelegung {group.Key}: {string.Join(", ", group.Select(e => e.Title))}");
+        }
+
         StreamDeckDiagnosticsBox.Text = issues.Count == 0 ? $"OK – {cmdFiles.Count} Aktion(en) geprüft. Keine Fehler gefunden." : $"{issues.Count} Problem(e) gefunden:\n" + string.Join("\n", issues);
         StreamDeckDiagnosticsBox.Foreground = issues.Count == 0 ? Brushes.LightGreen : Brushes.OrangeRed;
         StreamDeckActionCreateStatusText.Text = issues.Count == 0 ? "Stream-Deck-Diagnose erfolgreich." : "Stream-Deck-Diagnose hat Probleme gefunden.";
@@ -5802,10 +5985,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        var entry = ReadStreamDeckMetadata(file);
-        var alternate = ReadStreamDeckToggleMetadata(file);
-        var policy = ReadStreamDeckExecutionPolicy(file);
-        StreamDeckSelectedActionDetailsText.Text = $"{entry.Title}\nProfil: {entry.Profile} · Seite: {entry.Page} · Position: {entry.Slot}\nStatus: {(entry.Locked ? "Gesperrt" : "Bearbeitbar")}\nBefehl AUS: {entry.Command}\nParameter AUS: {(string.IsNullOrWhiteSpace(entry.Parameter) ? "–" : entry.Parameter)}\nBefehl AN: {(alternate.ToggleMode ? alternate.AlternateCommand : "–")}\nParameter AN: {(string.IsNullOrWhiteSpace(alternate.AlternateParameter) ? "–" : alternate.AlternateParameter)}\nSchritte: {entry.Steps} · Verzögerung: {policy.DelayMs} ms · Wiederholungen: {policy.RetryCount} · Cooldown: {policy.CooldownMs} ms\nZustandsbindung: {(string.IsNullOrWhiteSpace(entry.Condition) ? "–" : entry.Condition)}\nAktuelle Beschriftung: {ResolveStreamDeckDisplayTitle(entry)}";
+        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
+        (bool ToggleMode, string AlternateCommand, string AlternateParameter) = ReadStreamDeckToggleMetadata(file);
+        (int DelayMs, int RetryCount, int CooldownMs) = ReadStreamDeckExecutionPolicy(file);
+        StreamDeckSelectedActionDetailsText.Text = $"{entry.Title}\nProfil: {entry.Profile} · Seite: {entry.Page} · Position: {entry.Slot}\nStatus: {(entry.Locked ? "Gesperrt" : "Bearbeitbar")}\nBefehl AUS: {entry.Command}\nParameter AUS: {(string.IsNullOrWhiteSpace(entry.Parameter) ? "–" : entry.Parameter)}\nBefehl AN: {(ToggleMode ? AlternateCommand : "–")}\nParameter AN: {(string.IsNullOrWhiteSpace(AlternateParameter) ? "–" : AlternateParameter)}\nSchritte: {entry.Steps} · Verzögerung: {DelayMs} ms · Wiederholungen: {RetryCount} · Cooldown: {CooldownMs} ms\nZustandsbindung: {(string.IsNullOrWhiteSpace(entry.Condition) ? "–" : entry.Condition)}\nAktuelle Beschriftung: {ResolveStreamDeckDisplayTitle(entry)}";
         LockStreamDeckActionButton.Content = entry.Locked ? "TASTE ENTSPERREN" : "TASTE SPERREN";
     }
 
@@ -5813,7 +5996,7 @@ public partial class MainWindow : Window
 
     private static bool IsStatusLampActive(System.Windows.Shapes.Ellipse lamp)
     {
-        var value = lamp.Fill?.ToString() ?? string.Empty;
+        string value = lamp.Fill?.ToString() ?? string.Empty;
         return value.Contains("LightGreen", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("#FF90EE90", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("#FF5CB85C", StringComparison.OrdinalIgnoreCase);
@@ -5828,10 +6011,18 @@ public partial class MainWindow : Window
 
     private string ResolveStreamDeckDisplayTitle((string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry)
     {
-        if (string.IsNullOrWhiteSpace(entry.Condition)) return entry.Title;
-        var states = GetStreamDeckRuntimeStates();
-        if (!states.TryGetValue(entry.Condition, out var active)) return entry.Title;
-        var label = active ? entry.TrueLabel : entry.FalseLabel;
+        if (string.IsNullOrWhiteSpace(entry.Condition))
+        {
+            return entry.Title;
+        }
+
+        Dictionary<string, bool> states = GetStreamDeckRuntimeStates();
+        if (!states.TryGetValue(entry.Condition, out bool active))
+        {
+            return entry.Title;
+        }
+
+        string label = active ? entry.TrueLabel : entry.FalseLabel;
         return string.IsNullOrWhiteSpace(label) ? entry.Title : label;
     }
 
@@ -5840,7 +6031,7 @@ public partial class MainWindow : Window
         try
         {
             Directory.CreateDirectory(StreamDeckActionsDirectory);
-            var states = GetStreamDeckRuntimeStates();
+            Dictionary<string, bool> states = GetStreamDeckRuntimeStates();
             var payload = new
             {
                 updatedAt = DateTimeOffset.Now,
@@ -5871,11 +6062,15 @@ public partial class MainWindow : Window
     {
         try
         {
-            var metadataPath = Path.ChangeExtension(file, ".json");
-            if (!File.Exists(metadataPath)) return (250, 1, 1000);
+            string metadataPath = Path.ChangeExtension(file, ".json");
+            if (!File.Exists(metadataPath))
+            {
+                return (250, 1, 1000);
+            }
+
             using var document = JsonDocument.Parse(File.ReadAllText(metadataPath));
-            var root = document.RootElement;
-            int ReadInt(string name, int fallback) => root.TryGetProperty(name, out var node) && node.TryGetInt32(out var value) ? value : fallback;
+            JsonElement root = document.RootElement;
+            int ReadInt(string name, int fallback) => root.TryGetProperty(name, out JsonElement node) && node.TryGetInt32(out int value) ? value : fallback;
             return (Math.Clamp(ReadInt("stepDelayMs", 250), 0, 10000), Math.Clamp(ReadInt("retryCount", 1), 0, 5), Math.Clamp(ReadInt("cooldownMs", 1000), 0, 60000));
         }
         catch { return (250, 1, 1000); }
@@ -5884,7 +6079,7 @@ public partial class MainWindow : Window
     private async Task AppendStreamDeckExecutionLogAsync(string action, string mode, bool success, long durationMs, string message)
     {
         Directory.CreateDirectory(StreamDeckActionsDirectory);
-        var line = JsonSerializer.Serialize(new { timestamp = DateTimeOffset.Now, action, mode, success, durationMs, message });
+        string line = JsonSerializer.Serialize(new { timestamp = DateTimeOffset.Now, action, mode, success, durationMs, message });
         await File.AppendAllTextAsync(StreamDeckExecutionLogFile, line + Environment.NewLine);
         RefreshStreamDeckExecutionLog();
     }
@@ -5892,13 +6087,13 @@ public partial class MainWindow : Window
     private void RefreshStreamDeckExecutionLog()
     {
         if (!File.Exists(StreamDeckExecutionLogFile)) { StreamDeckExecutionLogBox.Text = "Noch keine Aktion ausgeführt."; return; }
-        var lines = File.ReadLines(StreamDeckExecutionLogFile).TakeLast(25).Reverse().Select(line =>
+        IEnumerable<string> lines = File.ReadLines(StreamDeckExecutionLogFile).TakeLast(25).Reverse().Select(line =>
         {
             try
             {
                 using var doc = JsonDocument.Parse(line);
-                var r = doc.RootElement;
-                var time = r.GetProperty("timestamp").GetDateTimeOffset().ToLocalTime().ToString("HH:mm:ss");
+                JsonElement r = doc.RootElement;
+                string time = r.GetProperty("timestamp").GetDateTimeOffset().ToLocalTime().ToString("HH:mm:ss");
                 return $"{time} · {(r.GetProperty("success").GetBoolean() ? "OK" : "FEHLER")} · {r.GetProperty("action").GetString()} · {r.GetProperty("mode").GetString()} · {r.GetProperty("durationMs").GetInt64()} ms · {r.GetProperty("message").GetString()}";
             }
             catch { return line; }
@@ -5908,7 +6103,11 @@ public partial class MainWindow : Window
 
     private void ClearStreamDeckExecutionLog()
     {
-        if (File.Exists(StreamDeckExecutionLogFile)) File.Delete(StreamDeckExecutionLogFile);
+        if (File.Exists(StreamDeckExecutionLogFile))
+        {
+            File.Delete(StreamDeckExecutionLogFile);
+        }
+
         StreamDeckExecutionLogBox.Text = "Protokoll wurde geleert.";
         StreamDeckActionCreateStatusText.Text = "Stream-Deck-Ausführungsprotokoll geleert.";
     }
@@ -5920,10 +6119,10 @@ public partial class MainWindow : Window
             StreamDeckActionCreateStatusText.Text = "Bitte zuerst eine erstellte Taste auswählen.";
             return;
         }
-        var entry = ReadStreamDeckMetadata(file);
-        var policy = ReadStreamDeckExecutionPolicy(file);
-        var simulatedDuration = Math.Max(1, entry.Steps) * policy.DelayMs;
-        await AppendStreamDeckExecutionLogAsync(entry.Title, "Simulation", true, simulatedDuration, $"{entry.Steps} Schritt(e), {policy.RetryCount} Wiederholung(en), Cooldown {policy.CooldownMs} ms");
+        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
+        (int DelayMs, int RetryCount, int CooldownMs) = ReadStreamDeckExecutionPolicy(file);
+        int simulatedDuration = Math.Max(1, entry.Steps) * DelayMs;
+        await AppendStreamDeckExecutionLogAsync(entry.Title, "Simulation", true, simulatedDuration, $"{entry.Steps} Schritt(e), {RetryCount} Wiederholung(en), Cooldown {CooldownMs} ms");
         StreamDeckActionCreateStatusText.Text = $"Simulation erfolgreich: {entry.Title}";
         StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
     }
@@ -5935,31 +6134,34 @@ public partial class MainWindow : Window
             StreamDeckActionCreateStatusText.Text = "Bitte zuerst eine erstellte Taste auswählen.";
             return;
         }
-        var entry = ReadStreamDeckMetadata(file);
-        var policy = ReadStreamDeckExecutionPolicy(file);
+        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
+        (int DelayMs, int RetryCount, _) = ReadStreamDeckExecutionPolicy(file);
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            var simulation = StreamDeckSimulationModeBox.IsChecked == true;
-            var success = false;
+            bool simulation = StreamDeckSimulationModeBox.IsChecked == true;
+            bool success = false;
             string message;
             if (simulation)
             {
-                await Task.Delay(Math.Min(1000, Math.Max(20, entry.Steps * policy.DelayMs)));
+                await Task.Delay(Math.Min(1000, Math.Max(20, entry.Steps * DelayMs)));
                 success = true;
                 message = "Testsimulation – keine externen Befehle ausgeführt.";
             }
             else
             {
-                for (var attempt = 0; attempt <= policy.RetryCount && !success; attempt++)
+                for (int attempt = 0; attempt <= RetryCount && !success; attempt++)
                 {
                     success = Process.Start(new ProcessStartInfo(file) { UseShellExecute = true, WindowStyle = ProcessWindowStyle.Hidden }) is not null;
-                    if (!success && attempt < policy.RetryCount) await Task.Delay(250);
+                    if (!success && attempt < RetryCount)
+                    {
+                        await Task.Delay(250);
+                    }
                 }
                 message = success ? "Befehl gestartet; Rückmeldung gespeichert." : "Prozess konnte nicht gestartet werden.";
             }
             stopwatch.Stop();
-            var feedbackPath = Path.Combine(StreamDeckActionsDirectory, "streamdeck-execution-feedback.json");
+            string feedbackPath = Path.Combine(StreamDeckActionsDirectory, "streamdeck-execution-feedback.json");
             await File.WriteAllTextAsync(feedbackPath, JsonSerializer.Serialize(new { action = entry.Title, success, durationMs = stopwatch.ElapsedMilliseconds, executedAt = DateTimeOffset.Now, message }, new JsonSerializerOptions { WriteIndented = true }));
             await AppendStreamDeckExecutionLogAsync(entry.Title, simulation ? "Simulation" : "Test", success, stopwatch.ElapsedMilliseconds, message);
             StreamDeckActionCreateStatusText.Text = success ? $"Test abgeschlossen: {entry.Title} · {stopwatch.ElapsedMilliseconds} ms" : "Test konnte nicht gestartet werden.";
@@ -5976,16 +6178,24 @@ public partial class MainWindow : Window
 
     private async Task DuplicateSelectedStreamDeckActionAsync()
     {
-        if (StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file || !File.Exists(file)) return;
-        var baseName = Path.GetFileNameWithoutExtension(file) + " - Kopie";
-        var target = Path.Combine(StreamDeckActionsDirectory, baseName + ".cmd");
-        var counter = 2;
-        while (File.Exists(target)) target = Path.Combine(StreamDeckActionsDirectory, $"{baseName} {counter++}.cmd");
+        if (StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file || !File.Exists(file))
+        {
+            return;
+        }
+
+        string baseName = Path.GetFileNameWithoutExtension(file) + " - Kopie";
+        string target = Path.Combine(StreamDeckActionsDirectory, baseName + ".cmd");
+        int counter = 2;
+        while (File.Exists(target))
+        {
+            target = Path.Combine(StreamDeckActionsDirectory, $"{baseName} {counter++}.cmd");
+        }
+
         File.Copy(file, target);
-        var metadata = Path.ChangeExtension(file, ".json");
+        string metadata = Path.ChangeExtension(file, ".json");
         if (File.Exists(metadata))
         {
-            var json = await File.ReadAllTextAsync(metadata);
+            string json = await File.ReadAllTextAsync(metadata);
             await File.WriteAllTextAsync(Path.ChangeExtension(target, ".json"), json);
         }
         RefreshStreamDeckActionsList();
@@ -5997,8 +6207,8 @@ public partial class MainWindow : Window
 
     private void ActivateSelectedStreamDeckView()
     {
-        var profile = (StreamDeckProfileFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
-        var page = (StreamDeckPageFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+        string? profile = (StreamDeckProfileFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+        string? page = (StreamDeckPageFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
         if (string.IsNullOrWhiteSpace(profile) || string.IsNullOrWhiteSpace(page))
         {
             StreamDeckActionCreateStatusText.Text = "Bitte zuerst ein Profil und eine Seite auswählen.";
@@ -6012,10 +6222,18 @@ public partial class MainWindow : Window
 
     private async Task ToggleSelectedStreamDeckActionLockAsync()
     {
-        if (StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file) return;
-        var metadataPath = Path.ChangeExtension(file, ".json");
-        if (!File.Exists(metadataPath)) return;
-        var entry = ReadStreamDeckMetadata(file);
+        if (StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file)
+        {
+            return;
+        }
+
+        string metadataPath = Path.ChangeExtension(file, ".json");
+        if (!File.Exists(metadataPath))
+        {
+            return;
+        }
+
+        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
         var output = document.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
         output["locked"] = !entry.Locked;
@@ -6029,8 +6247,16 @@ public partial class MainWindow : Window
     {
         Directory.CreateDirectory(StreamDeckActionsDirectory);
         var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "Stream-Deck-Komplettbackup (*.zip)|*.zip", FileName = $"CreatorControlSuite-StreamDeck-Backup-{DateTime.Now:yyyyMMdd-HHmm}.zip" };
-        if (dialog.ShowDialog(this) != true) return;
-        if (File.Exists(dialog.FileName)) File.Delete(dialog.FileName);
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        if (File.Exists(dialog.FileName))
+        {
+            File.Delete(dialog.FileName);
+        }
+
         System.IO.Compression.ZipFile.CreateFromDirectory(StreamDeckActionsDirectory, dialog.FileName);
         StreamDeckActionCreateStatusText.Text = "Komplettbackup erstellt: " + dialog.FileName;
         StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
@@ -6039,9 +6265,17 @@ public partial class MainWindow : Window
     private void RestoreStreamDeckConfiguration()
     {
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Stream-Deck-Komplettbackup (*.zip)|*.zip" };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
         Directory.CreateDirectory(StreamDeckActionsDirectory);
-        foreach (var file in Directory.EnumerateFiles(StreamDeckActionsDirectory)) File.Delete(file);
+        foreach (string file in Directory.EnumerateFiles(StreamDeckActionsDirectory))
+        {
+            File.Delete(file);
+        }
+
         System.IO.Compression.ZipFile.ExtractToDirectory(dialog.FileName, StreamDeckActionsDirectory, true);
         RefreshStreamDeckActionsList();
         StreamDeckActionCreateStatusText.Text = "Stream-Deck-Konfiguration wiederhergestellt.";
@@ -6056,8 +6290,16 @@ public partial class MainWindow : Window
             Filter = "Stream-Deck-Aktionskatalog (*.zip)|*.zip",
             FileName = $"CreatorControlSuite-StreamDeck-Actions-{DateTime.Now:yyyyMMdd-HHmm}.zip"
         };
-        if (dialog.ShowDialog(this) != true) return;
-        if (File.Exists(dialog.FileName)) File.Delete(dialog.FileName);
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        if (File.Exists(dialog.FileName))
+        {
+            File.Delete(dialog.FileName);
+        }
+
         System.IO.Compression.ZipFile.CreateFromDirectory(StreamDeckActionsDirectory, dialog.FileName);
         StreamDeckActionCreateStatusText.Text = "Aktionskatalog exportiert: " + dialog.FileName;
         StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
@@ -6066,7 +6308,11 @@ public partial class MainWindow : Window
     private void ImportStreamDeckActionCatalog()
     {
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Stream-Deck-Aktionskatalog (*.zip)|*.zip" };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
         Directory.CreateDirectory(StreamDeckActionsDirectory);
         System.IO.Compression.ZipFile.ExtractToDirectory(dialog.FileName, StreamDeckActionsDirectory, overwriteFiles: true);
         RefreshStreamDeckActionsList();
@@ -6092,9 +6338,9 @@ public partial class MainWindow : Window
 
     private async Task SaveStreamDeckTemplateAsync()
     {
-        var name = string.IsNullOrWhiteSpace(StreamDeckTemplateNameBox.Text) ? StreamDeckActionTitleBox.Text.Trim() : StreamDeckTemplateNameBox.Text.Trim();
+        string name = string.IsNullOrWhiteSpace(StreamDeckTemplateNameBox.Text) ? StreamDeckActionTitleBox.Text.Trim() : StreamDeckTemplateNameBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(name)) { StreamDeckActionCreateStatusText.Text = "Bitte einen Vorlagennamen eingeben."; return; }
-        var safe = string.Concat(name.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+        string safe = string.Concat(name.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
         Directory.CreateDirectory(StreamDeckTemplatesDirectory);
         var data = new
         {
@@ -6123,8 +6369,8 @@ public partial class MainWindow : Window
     {
         if (StreamDeckTemplateBox.SelectedItem is not StreamDeckTemplateItem item || !File.Exists(item.Path)) { StreamDeckActionCreateStatusText.Text = "Bitte eine Vorlage auswählen."; return; }
         using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(item.Path));
-        var r = doc.RootElement;
-        StreamDeckActionTitleBox.Text = r.TryGetProperty("title", out var v) ? v.GetString() ?? item.Name : item.Name;
+        JsonElement r = doc.RootElement;
+        StreamDeckActionTitleBox.Text = r.TryGetProperty("title", out JsonElement v) ? v.GetString() ?? item.Name : item.Name;
         SelectComboBoxByTag(StreamDeckActionCommandBox, r.TryGetProperty("command", out v) ? v.GetString() : null);
         StreamDeckActionParameterBox.Text = r.TryGetProperty("parameter", out v) ? v.GetString() ?? "" : "";
         StreamDeckMultiActionBox.Text = r.TryGetProperty("multiAction", out v) ? v.GetString() ?? "" : "";
@@ -6143,14 +6389,24 @@ public partial class MainWindow : Window
 
     private static void SelectComboBoxByTag(ComboBox box, string? tag)
     {
-        foreach (var entry in box.Items.OfType<ComboBoxItem>())
+        foreach (ComboBoxItem entry in box.Items.OfType<ComboBoxItem>())
+        {
             if (string.Equals(entry.Tag?.ToString(), tag ?? string.Empty, StringComparison.OrdinalIgnoreCase)) { box.SelectedItem = entry; return; }
+        }
     }
 
     private void DeleteSelectedStreamDeckTemplate()
     {
-        if (StreamDeckTemplateBox.SelectedItem is not StreamDeckTemplateItem item) return;
-        if (File.Exists(item.Path)) File.Delete(item.Path);
+        if (StreamDeckTemplateBox.SelectedItem is not StreamDeckTemplateItem item)
+        {
+            return;
+        }
+
+        if (File.Exists(item.Path))
+        {
+            File.Delete(item.Path);
+        }
+
         RefreshStreamDeckTemplates();
         StreamDeckActionCreateStatusText.Text = $"Vorlage gelöscht: {item.Name}";
     }
@@ -6159,10 +6415,18 @@ public partial class MainWindow : Window
     {
         if (StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file) { StreamDeckActionCreateStatusText.Text = "Bitte zuerst eine Taste auswählen."; return; }
         var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "Stream-Deck-Taste (*.sdaction)|*.sdaction", FileName = Path.GetFileNameWithoutExtension(file) + ".sdaction" };
-        if (dialog.ShowDialog(this) != true) return;
-        using var archive = System.IO.Compression.ZipFile.Open(dialog.FileName, System.IO.Compression.ZipArchiveMode.Create);
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        using ZipArchive archive = System.IO.Compression.ZipFile.Open(dialog.FileName, System.IO.Compression.ZipArchiveMode.Create);
         archive.CreateEntryFromFile(file, Path.GetFileName(file));
-        var meta = Path.ChangeExtension(file, ".json"); if (File.Exists(meta)) archive.CreateEntryFromFile(meta, Path.GetFileName(meta));
+        string meta = Path.ChangeExtension(file, ".json"); if (File.Exists(meta))
+        {
+            archive.CreateEntryFromFile(meta, Path.GetFileName(meta));
+        }
+
         StreamDeckActionCreateStatusText.Text = "Taste exportiert: " + dialog.FileName;
         StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
     }
@@ -6170,7 +6434,11 @@ public partial class MainWindow : Window
     private void ImportSingleStreamDeckAction()
     {
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Stream-Deck-Taste (*.sdaction)|*.sdaction" };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
         Directory.CreateDirectory(StreamDeckActionsDirectory);
         System.IO.Compression.ZipFile.ExtractToDirectory(dialog.FileName, StreamDeckActionsDirectory, true);
         RefreshStreamDeckActionsList();
@@ -6181,12 +6449,12 @@ public partial class MainWindow : Window
     private async Task QuickAssignSelectedStreamDeckActionAsync()
     {
         if (StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file) { StreamDeckActionCreateStatusText.Text = "Bitte zuerst eine Taste auswählen."; return; }
-        var selected = ReadStreamDeckMetadata(file);
+        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) selected = ReadStreamDeckMetadata(file);
         if (selected.Locked) { StreamDeckActionCreateStatusText.Text = "Die Taste ist gesperrt."; return; }
         var used = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Select(ReadStreamDeckMetadata)
             .Where(e => e.File != file && string.Equals(e.Profile, selected.Profile, StringComparison.OrdinalIgnoreCase) && string.Equals(e.Page, selected.Page, StringComparison.OrdinalIgnoreCase))
             .Select(e => e.Slot).ToHashSet();
-        var free = Enumerable.Range(1, 32).FirstOrDefault(slot => !used.Contains(slot));
+        int free = Enumerable.Range(1, 32).FirstOrDefault(slot => !used.Contains(slot));
         if (free == 0) { StreamDeckActionCreateStatusText.Text = "Auf dieser Seite ist kein freier Platz vorhanden."; return; }
         await MoveSelectedStreamDeckActionToSlotAsync(free, selected.Profile, selected.Page);
     }
@@ -6196,10 +6464,10 @@ public partial class MainWindow : Window
         var entries = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Select(ReadStreamDeckMetadata).ToList();
         var profiles = entries.Select(e => e.Profile).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToList();
         if (profiles.Count < 2) { StreamDeckDiagnosticsBox.Text = "Für einen Vergleich werden mindestens zwei Profile benötigt."; return; }
-        var baseline = profiles[0];
+        string baseline = profiles[0];
         var baseKeys = entries.Where(e => e.Profile == baseline).Select(e => $"{e.Page}|{e.Slot}|{e.Command}|{e.Parameter}").ToHashSet(StringComparer.OrdinalIgnoreCase);
         var lines = new List<string> { $"Vergleichsbasis: {baseline}" };
-        foreach (var profile in profiles.Skip(1))
+        foreach (string? profile in profiles.Skip(1))
         {
             var keys = entries.Where(e => e.Profile == profile).Select(e => $"{e.Page}|{e.Slot}|{e.Command}|{e.Parameter}").ToHashSet(StringComparer.OrdinalIgnoreCase);
             lines.Add($"{profile}: {keys.Count} Tasten · +{keys.Except(baseKeys).Count()} hinzugefügt · -{baseKeys.Except(keys).Count()} fehlend");
@@ -6242,10 +6510,14 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (!File.Exists(StreamDeckAutomationRulesFile)) return new List<StreamDeckAutomationRule>();
-            return JsonSerializer.Deserialize<List<StreamDeckAutomationRule>>(File.ReadAllText(StreamDeckAutomationRulesFile)) ?? new List<StreamDeckAutomationRule>();
+            if (!File.Exists(StreamDeckAutomationRulesFile))
+            {
+                return [];
+            }
+
+            return JsonSerializer.Deserialize<List<StreamDeckAutomationRule>>(File.ReadAllText(StreamDeckAutomationRulesFile)) ?? [];
         }
-        catch { return new List<StreamDeckAutomationRule>(); }
+        catch { return []; }
     }
 
     private async Task SaveStreamDeckAutomationRulesAsync(List<StreamDeckAutomationRule> rules)
@@ -6257,15 +6529,15 @@ public partial class MainWindow : Window
     private void RefreshStreamDeckAutomationRules()
     {
         StreamDeckRulesList.Items.Clear();
-        foreach (var rule in LoadStreamDeckAutomationRules().OrderByDescending(r => r.Priority))
+        foreach (StreamDeckAutomationRule? rule in LoadStreamDeckAutomationRules().OrderByDescending(r => r.Priority))
         {
-            var delay = rule.DelaySeconds > 0 ? $" · +{rule.DelaySeconds}s" : string.Empty;
-            var fallback = rule.IsFallback ? " · Fallback" : string.Empty;
-            var health = rule.Enabled ? $" · OK {rule.SuccessCount}/F {rule.FailureCount}" : $" · DEAKTIVIERT{(string.IsNullOrWhiteSpace(rule.DisabledReason) ? string.Empty : $": {rule.DisabledReason}")}";
-            var group = string.IsNullOrWhiteSpace(rule.Group) ? "Standard" : rule.Group;
-            var second = string.IsNullOrWhiteSpace(rule.Condition2) ? string.Empty : $" {rule.LogicalOperator.ToUpperInvariant()} {rule.Condition2}";
-            var hold = rule.HoldSeconds > 0 ? $" · Sperre {rule.HoldSeconds}s" : string.Empty;
-            var time = rule.Condition == "time.reached" ? $" · {rule.Time}" : string.Empty;
+            string delay = rule.DelaySeconds > 0 ? $" · +{rule.DelaySeconds}s" : string.Empty;
+            string fallback = rule.IsFallback ? " · Fallback" : string.Empty;
+            string health = rule.Enabled ? $" · OK {rule.SuccessCount}/F {rule.FailureCount}" : $" · DEAKTIVIERT{(string.IsNullOrWhiteSpace(rule.DisabledReason) ? string.Empty : $": {rule.DisabledReason}")}";
+            string group = string.IsNullOrWhiteSpace(rule.Group) ? "Standard" : rule.Group;
+            string second = string.IsNullOrWhiteSpace(rule.Condition2) ? string.Empty : $" {rule.LogicalOperator.ToUpperInvariant()} {rule.Condition2}";
+            string hold = rule.HoldSeconds > 0 ? $" · Sperre {rule.HoldSeconds}s" : string.Empty;
+            string time = rule.Condition == "time.reached" ? $" · {rule.Time}" : string.Empty;
             StreamDeckRulesList.Items.Add(new ListBoxItem
             {
                 Tag = rule.Id,
@@ -6278,20 +6550,40 @@ public partial class MainWindow : Window
     {
         try
         {
-            var condition = (StreamDeckRuleConditionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "stream.live";
-            var condition2 = (StreamDeckRuleCondition2Box.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
-            var logicalOperator = (StreamDeckRuleOperatorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "and";
-            var profile = string.IsNullOrWhiteSpace(StreamDeckRuleProfileBox.Text) ? "Standard" : StreamDeckRuleProfileBox.Text.Trim();
-            var page = string.IsNullOrWhiteSpace(StreamDeckRulePageBox.Text) ? "Hauptseite" : StreamDeckRulePageBox.Text.Trim();
-            if (!int.TryParse(StreamDeckRulePriorityBox.Text, out var priority) || priority is < 0 or > 1000) throw new InvalidOperationException("Die Regelpriorität muss zwischen 0 und 1000 liegen.");
-            if (!int.TryParse(StreamDeckRuleDelayBox.Text, out var delay) || delay is < 0 or > 3600) throw new InvalidOperationException("Die Verzögerung muss zwischen 0 und 3600 Sekunden liegen.");
-            if (!int.TryParse(StreamDeckRuleHoldBox.Text, out var hold) || hold is < 0 or > 3600) throw new InvalidOperationException("Die Sperrzeit muss zwischen 0 und 3600 Sekunden liegen.");
-            if (condition == "time.reached" && !TimeOnly.TryParse(StreamDeckRuleTimeBox.Text.Trim(), out _)) throw new InvalidOperationException("Die Uhrzeit muss im Format HH:mm eingetragen werden.");
-            var rules = LoadStreamDeckAutomationRules();
-            var group = string.IsNullOrWhiteSpace(StreamDeckRuleGroupBox.Text) ? "Standard" : StreamDeckRuleGroupBox.Text.Trim();
-            var days = string.IsNullOrWhiteSpace(StreamDeckRuleDaysBox.Text) ? "Mo,Di,Mi,Do,Fr,Sa,So" : StreamDeckRuleDaysBox.Text.Trim();
-            var window = string.IsNullOrWhiteSpace(StreamDeckRuleWindowBox.Text) ? "00:00-23:59" : StreamDeckRuleWindowBox.Text.Trim();
-            if (!IsValidStreamDeckRuleWindow(window)) throw new InvalidOperationException("Der Aktivitätszeitraum muss im Format HH:mm-HH:mm eingetragen werden.");
+            string condition = (StreamDeckRuleConditionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "stream.live";
+            string condition2 = (StreamDeckRuleCondition2Box.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
+            string logicalOperator = (StreamDeckRuleOperatorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "and";
+            string profile = string.IsNullOrWhiteSpace(StreamDeckRuleProfileBox.Text) ? "Standard" : StreamDeckRuleProfileBox.Text.Trim();
+            string page = string.IsNullOrWhiteSpace(StreamDeckRulePageBox.Text) ? "Hauptseite" : StreamDeckRulePageBox.Text.Trim();
+            if (!int.TryParse(StreamDeckRulePriorityBox.Text, out int priority) || priority is < 0 or > 1000)
+            {
+                throw new InvalidOperationException("Die Regelpriorität muss zwischen 0 und 1000 liegen.");
+            }
+
+            if (!int.TryParse(StreamDeckRuleDelayBox.Text, out int delay) || delay is < 0 or > 3600)
+            {
+                throw new InvalidOperationException("Die Verzögerung muss zwischen 0 und 3600 Sekunden liegen.");
+            }
+
+            if (!int.TryParse(StreamDeckRuleHoldBox.Text, out int hold) || hold is < 0 or > 3600)
+            {
+                throw new InvalidOperationException("Die Sperrzeit muss zwischen 0 und 3600 Sekunden liegen.");
+            }
+
+            if (condition == "time.reached" && !TimeOnly.TryParse(StreamDeckRuleTimeBox.Text.Trim(), out _))
+            {
+                throw new InvalidOperationException("Die Uhrzeit muss im Format HH:mm eingetragen werden.");
+            }
+
+            List<StreamDeckAutomationRule> rules = LoadStreamDeckAutomationRules();
+            string group = string.IsNullOrWhiteSpace(StreamDeckRuleGroupBox.Text) ? "Standard" : StreamDeckRuleGroupBox.Text.Trim();
+            string days = string.IsNullOrWhiteSpace(StreamDeckRuleDaysBox.Text) ? "Mo,Di,Mi,Do,Fr,Sa,So" : StreamDeckRuleDaysBox.Text.Trim();
+            string window = string.IsNullOrWhiteSpace(StreamDeckRuleWindowBox.Text) ? "00:00-23:59" : StreamDeckRuleWindowBox.Text.Trim();
+            if (!IsValidStreamDeckRuleWindow(window))
+            {
+                throw new InvalidOperationException("Der Aktivitätszeitraum muss im Format HH:mm-HH:mm eingetragen werden.");
+            }
+
             rules.Add(new StreamDeckAutomationRule { Condition = condition, Condition2 = condition2, LogicalOperator = logicalOperator, Profile = profile, Page = page, Priority = priority, DelaySeconds = delay, HoldSeconds = hold, Time = StreamDeckRuleTimeBox.Text.Trim(), IsFallback = StreamDeckRuleFallbackBox.IsChecked == true, Group = group, ActiveDays = days, ActiveWindow = window });
             await SaveStreamDeckAutomationRulesAsync(rules);
             RefreshStreamDeckAutomationRules();
@@ -6308,7 +6600,7 @@ public partial class MainWindow : Window
     private void DeleteSelectedStreamDeckAutomationRule()
     {
         if (StreamDeckRulesList.SelectedItem is not ListBoxItem item || item.Tag is not string id) { StreamDeckRuleStatusText.Text = "Bitte zuerst eine Regel auswählen."; return; }
-        var rules = LoadStreamDeckAutomationRules();
+        List<StreamDeckAutomationRule> rules = LoadStreamDeckAutomationRules();
         rules.RemoveAll(rule => string.Equals(rule.Id, id, StringComparison.OrdinalIgnoreCase));
         SaveStreamDeckAutomationRulesAsync(rules).GetAwaiter().GetResult();
         _streamDeckRuleFirstMatch.Remove(id);
@@ -6326,32 +6618,44 @@ public partial class MainWindow : Window
             "obs.disconnected" => !states.GetValueOrDefault("obs.connected"),
             "spotify.playing" => states.GetValueOrDefault("spotify.playing"),
             "spotify.paused" => !states.GetValueOrDefault("spotify.playing"),
-            "time.reached" => TimeOnly.TryParse(rule.Time, out var target) && TimeOnly.FromDateTime(DateTime.Now).Hour == target.Hour && TimeOnly.FromDateTime(DateTime.Now).Minute == target.Minute,
+            "time.reached" => TimeOnly.TryParse(rule.Time, out TimeOnly target) && TimeOnly.FromDateTime(DateTime.Now).Hour == target.Hour && TimeOnly.FromDateTime(DateTime.Now).Minute == target.Minute,
             _ => false
         };
     }
 
     private bool IsStreamDeckRuleMatch(StreamDeckAutomationRule rule, Dictionary<string, bool> states)
     {
-        var first = IsStreamDeckConditionMatch(rule.Condition, rule, states);
-        if (string.IsNullOrWhiteSpace(rule.Condition2)) return first;
-        var second = IsStreamDeckConditionMatch(rule.Condition2, rule, states);
+        bool first = IsStreamDeckConditionMatch(rule.Condition, rule, states);
+        if (string.IsNullOrWhiteSpace(rule.Condition2))
+        {
+            return first;
+        }
+
+        bool second = IsStreamDeckConditionMatch(rule.Condition2, rule, states);
         return string.Equals(rule.LogicalOperator, "or", StringComparison.OrdinalIgnoreCase) ? first || second : first && second;
     }
 
     private static bool IsValidStreamDeckRuleWindow(string value)
     {
-        var parts = value.Split('-', StringSplitOptions.TrimEntries);
+        string[] parts = value.Split('-', StringSplitOptions.TrimEntries);
         return parts.Length == 2 && TimeOnly.TryParse(parts[0], out _) && TimeOnly.TryParse(parts[1], out _);
     }
 
     private static bool IsStreamDeckRuleScheduleActive(StreamDeckAutomationRule rule, DateTime now)
     {
-        var day = now.DayOfWeek switch { DayOfWeek.Monday => "Mo", DayOfWeek.Tuesday => "Di", DayOfWeek.Wednesday => "Mi", DayOfWeek.Thursday => "Do", DayOfWeek.Friday => "Fr", DayOfWeek.Saturday => "Sa", _ => "So" };
-        var days = (rule.ActiveDays ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (days.Length > 0 && !days.Contains(day, StringComparer.OrdinalIgnoreCase)) return false;
-        var parts = (rule.ActiveWindow ?? "00:00-23:59").Split('-', StringSplitOptions.TrimEntries);
-        if (parts.Length != 2 || !TimeOnly.TryParse(parts[0], out var start) || !TimeOnly.TryParse(parts[1], out var end)) return true;
+        string day = now.DayOfWeek switch { DayOfWeek.Monday => "Mo", DayOfWeek.Tuesday => "Di", DayOfWeek.Wednesday => "Mi", DayOfWeek.Thursday => "Do", DayOfWeek.Friday => "Fr", DayOfWeek.Saturday => "Sa", _ => "So" };
+        string[] days = (rule.ActiveDays ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (days.Length > 0 && !days.Contains(day, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string[] parts = (rule.ActiveWindow ?? "00:00-23:59").Split('-', StringSplitOptions.TrimEntries);
+        if (parts.Length != 2 || !TimeOnly.TryParse(parts[0], out TimeOnly start) || !TimeOnly.TryParse(parts[1], out TimeOnly end))
+        {
+            return true;
+        }
+
         var current = TimeOnly.FromDateTime(now);
         return start <= end ? current >= start && current <= end : current >= start || current <= end;
     }
@@ -6359,22 +6663,49 @@ public partial class MainWindow : Window
     private void AddStreamDeckRuleHistory(string message)
     {
         _streamDeckRuleHistory.Insert(0, $"{DateTime.Now:HH:mm:ss} · {message}");
-        if (_streamDeckRuleHistory.Count > 30) _streamDeckRuleHistory.RemoveRange(30, _streamDeckRuleHistory.Count - 30);
-        if (StreamDeckRuleHistoryBox is not null) StreamDeckRuleHistoryBox.Text = string.Join(Environment.NewLine, _streamDeckRuleHistory);
+        if (_streamDeckRuleHistory.Count > 30)
+        {
+            _streamDeckRuleHistory.RemoveRange(30, _streamDeckRuleHistory.Count - 30);
+        }
+
+        StreamDeckRuleHistoryBox?.Text = string.Join(Environment.NewLine, _streamDeckRuleHistory);
     }
 
     private void TestStreamDeckAutomationRules()
     {
-        var rules = LoadStreamDeckAutomationRules();
+        List<StreamDeckAutomationRule> rules = LoadStreamDeckAutomationRules();
         var issues = new List<string>();
-        foreach (var rule in rules)
+        foreach (StreamDeckAutomationRule rule in rules)
         {
-            if (string.IsNullOrWhiteSpace(rule.Profile) || string.IsNullOrWhiteSpace(rule.Page)) issues.Add($"{rule.Id}: Zielprofil oder Zielseite fehlt.");
-            if (rule.Priority is < 0 or > 1000) issues.Add($"{rule.Id}: Priorität außerhalb 0–1000.");
-            if (rule.DelaySeconds is < 0 or > 3600 || rule.HoldSeconds is < 0 or > 3600) issues.Add($"{rule.Id}: Verzögerung oder Sperrzeit ungültig.");
-            if (rule.Condition == "time.reached" && !TimeOnly.TryParse(rule.Time, out _)) issues.Add($"{rule.Id}: Uhrzeit ungültig.");
-            if (!IsValidStreamDeckRuleWindow(rule.ActiveWindow)) issues.Add($"{rule.Id}: Aktivitätszeitraum ungültig.");
-            if (string.IsNullOrWhiteSpace(rule.Group)) issues.Add($"{rule.Id}: Regelgruppe fehlt.");
+            if (string.IsNullOrWhiteSpace(rule.Profile) || string.IsNullOrWhiteSpace(rule.Page))
+            {
+                issues.Add($"{rule.Id}: Zielprofil oder Zielseite fehlt.");
+            }
+
+            if (rule.Priority is < 0 or > 1000)
+            {
+                issues.Add($"{rule.Id}: Priorität außerhalb 0–1000.");
+            }
+
+            if (rule.DelaySeconds is < 0 or > 3600 || rule.HoldSeconds is < 0 or > 3600)
+            {
+                issues.Add($"{rule.Id}: Verzögerung oder Sperrzeit ungültig.");
+            }
+
+            if (rule.Condition == "time.reached" && !TimeOnly.TryParse(rule.Time, out _))
+            {
+                issues.Add($"{rule.Id}: Uhrzeit ungültig.");
+            }
+
+            if (!IsValidStreamDeckRuleWindow(rule.ActiveWindow))
+            {
+                issues.Add($"{rule.Id}: Aktivitätszeitraum ungültig.");
+            }
+
+            if (string.IsNullOrWhiteSpace(rule.Group))
+            {
+                issues.Add($"{rule.Id}: Regelgruppe fehlt.");
+            }
         }
         StreamDeckRuleStatusText.Text = issues.Count == 0 ? $"Regeltest erfolgreich: {rules.Count} Regel(n) sind formal gültig." : string.Join(Environment.NewLine, issues);
         StreamDeckRuleStatusText.Foreground = issues.Count == 0 ? Brushes.LightGreen : Brushes.IndianRed;
@@ -6384,25 +6715,33 @@ public partial class MainWindow : Window
     {
         if (StreamDeckAutomationManualLockBox?.IsChecked == true)
         {
-            if (showConfirmation) StreamDeckRuleStatusText.Text = "Automatische Umschaltung ist manuell gesperrt.";
+            if (showConfirmation)
+            {
+                StreamDeckRuleStatusText.Text = "Automatische Umschaltung ist manuell gesperrt.";
+            }
+
             AddStreamDeckRuleHistory("Auswertung übersprungen: manuelle Sperre aktiv");
             return;
         }
 
-        var allRules = LoadStreamDeckAutomationRules();
+        List<StreamDeckAutomationRule> allRules = LoadStreamDeckAutomationRules();
         var rules = allRules.Where(r => r.Enabled && IsStreamDeckRuleScheduleActive(r, DateTime.Now)).OrderByDescending(r => r.Priority).ToList();
-        if (rules.Count == 0) { if (showConfirmation) StreamDeckRuleStatusText.Text = "Es sind keine aktuell aktiven Automatikregeln vorhanden."; return; }
-        var states = GetStreamDeckRuntimeStates();
-        var now = DateTimeOffset.Now;
+        if (rules.Count == 0) { if (showConfirmation) { StreamDeckRuleStatusText.Text = "Es sind keine aktuell aktiven Automatikregeln vorhanden."; } return; }
+        Dictionary<string, bool> states = GetStreamDeckRuntimeStates();
+        DateTimeOffset now = DateTimeOffset.Now;
         StreamDeckAutomationRule? winner = null;
-        foreach (var rule in rules)
+        foreach (StreamDeckAutomationRule? rule in rules)
         {
             rule.LastEvaluatedAt = now;
-            var matched = IsStreamDeckRuleMatch(rule, states);
+            bool matched = IsStreamDeckRuleMatch(rule, states);
             if (!matched) { _streamDeckRuleFirstMatch.Remove(rule.Id); continue; }
             rule.MatchCount++;
-            if (!_streamDeckRuleFirstMatch.TryGetValue(rule.Id, out var firstMatch)) { _streamDeckRuleFirstMatch[rule.Id] = now; firstMatch = now; }
-            if ((now - firstMatch).TotalSeconds < rule.DelaySeconds) continue;
+            if (!_streamDeckRuleFirstMatch.TryGetValue(rule.Id, out DateTimeOffset firstMatch)) { _streamDeckRuleFirstMatch[rule.Id] = now; firstMatch = now; }
+            if ((now - firstMatch).TotalSeconds < rule.DelaySeconds)
+            {
+                continue;
+            }
+
             winner = rule;
             break;
         }
@@ -6410,15 +6749,23 @@ public partial class MainWindow : Window
         if (winner is null)
         {
             await SaveStreamDeckAutomationRulesAsync(allRules);
-            if (showConfirmation) StreamDeckRuleStatusText.Text = "Keine Regel trifft aktuell zu.";
+            if (showConfirmation)
+            {
+                StreamDeckRuleStatusText.Text = "Keine Regel trifft aktuell zu.";
+            }
+
             AddStreamDeckRuleHistory("Keine passende Regel");
             return;
         }
-        var lastApplied = allRules.Where(r => r.LastAppliedAt.HasValue).MaxBy(r => r.LastAppliedAt);
+        StreamDeckAutomationRule? lastApplied = allRules.Where(r => r.LastAppliedAt.HasValue).MaxBy(r => r.LastAppliedAt);
         if (lastApplied?.LastAppliedAt is DateTimeOffset last && (now - last).TotalSeconds < lastApplied.HoldSeconds && !string.Equals(lastApplied.Id, winner.Id, StringComparison.OrdinalIgnoreCase))
         {
             await SaveStreamDeckAutomationRulesAsync(allRules);
-            if (showConfirmation) StreamDeckRuleStatusText.Text = $"Regelwechsel gesperrt: {lastApplied.Profile} / {lastApplied.Page} bleibt noch {Math.Ceiling(lastApplied.HoldSeconds - (now - last).TotalSeconds)} Sekunden aktiv.";
+            if (showConfirmation)
+            {
+                StreamDeckRuleStatusText.Text = $"Regelwechsel gesperrt: {lastApplied.Profile} / {lastApplied.Page} bleibt noch {Math.Ceiling(lastApplied.HoldSeconds - (now - last).TotalSeconds)} Sekunden aktiv.";
+            }
+
             return;
         }
         if (previewOnly)
@@ -6431,17 +6778,25 @@ public partial class MainWindow : Window
         }
         try
         {
-            var stateFile = StreamDeckStateFile;
-            var current = File.Exists(stateFile) ? File.ReadAllText(stateFile) : string.Empty;
+            string stateFile = StreamDeckStateFile;
+            string current = File.Exists(stateFile) ? File.ReadAllText(stateFile) : string.Empty;
             if (current.Contains($"\"activeProfile\": \"{winner.Profile}\"", StringComparison.OrdinalIgnoreCase) && current.Contains($"\"activePage\": \"{winner.Page}\"", StringComparison.OrdinalIgnoreCase))
             {
                 winner.ConsecutiveFailures = 0;
                 winner.LastError = string.Empty;
                 await SaveStreamDeckAutomationRulesAsync(allRules);
-                if (showConfirmation) StreamDeckRuleStatusText.Text = $"Bereits aktiv: {winner.Profile} / {winner.Page}";
+                if (showConfirmation)
+                {
+                    StreamDeckRuleStatusText.Text = $"Bereits aktiv: {winner.Profile} / {winner.Page}";
+                }
+
                 return;
             }
-            if (File.Exists(stateFile)) File.Copy(stateFile, StreamDeckStableStateFile, true);
+            if (File.Exists(stateFile))
+            {
+                File.Copy(stateFile, StreamDeckStableStateFile, true);
+            }
+
             Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
             File.WriteAllText(stateFile, JsonSerializer.Serialize(new { activeProfile = winner.Profile, activePage = winner.Page, changedAt = now, changedBy = "automation", ruleId = winner.Id }, new JsonSerializerOptions { WriteIndented = true }));
             winner.LastAppliedAt = now;
@@ -6449,18 +6804,21 @@ public partial class MainWindow : Window
             winner.ConsecutiveFailures = 0;
             winner.LastError = string.Empty;
             await SaveStreamDeckAutomationRulesAsync(allRules);
-            var message = $"Automatisch aktiviert: {winner.Profile} / {winner.Page} ({winner.Condition}, Priorität {winner.Priority})";
+            string message = $"Automatisch aktiviert: {winner.Profile} / {winner.Page} ({winner.Condition}, Priorität {winner.Priority})";
             StreamDeckRuleStatusText.Text = message;
             StreamDeckRuleStatusText.Foreground = Brushes.LightGreen;
             AddStreamDeckRuleHistory($"Aktiviert: [{winner.Group}] {winner.Profile} / {winner.Page}");
-            if (showConfirmation || StreamDeckRuleNotifyOnSwitchBox?.IsChecked == true) StreamDeckActionCreateStatusText.Text = message;
+            if (showConfirmation || StreamDeckRuleNotifyOnSwitchBox?.IsChecked == true)
+            {
+                StreamDeckActionCreateStatusText.Text = message;
+            }
         }
         catch (Exception ex)
         {
             winner.FailureCount++;
             winner.ConsecutiveFailures++;
             winner.LastError = ex.Message;
-            var threshold = int.TryParse(StreamDeckRuleFailureThresholdBox?.Text, out var parsed) ? Math.Clamp(parsed, 1, 100) : 3;
+            int threshold = int.TryParse(StreamDeckRuleFailureThresholdBox?.Text, out int parsed) ? Math.Clamp(parsed, 1, 100) : 3;
             if (StreamDeckRuleAutoDisableBox?.IsChecked == true && winner.ConsecutiveFailures >= threshold)
             {
                 winner.Enabled = false;
@@ -6477,10 +6835,14 @@ public partial class MainWindow : Window
     private async Task SaveSelectedStreamDeckRuleTemplateAsync()
     {
         if (StreamDeckRulesList.SelectedItem is not ListBoxItem item || item.Tag is not string id) { StreamDeckRuleStatusText.Text = "Bitte zuerst eine Regel auswählen."; return; }
-        var rule = LoadStreamDeckAutomationRules().FirstOrDefault(r => string.Equals(r.Id, id, StringComparison.OrdinalIgnoreCase));
-        if (rule is null) return;
-        var templates = LoadStreamDeckRuleTemplates();
-        var clone = JsonSerializer.Deserialize<StreamDeckAutomationRule>(JsonSerializer.Serialize(rule)) ?? new StreamDeckAutomationRule();
+        StreamDeckAutomationRule? rule = LoadStreamDeckAutomationRules().FirstOrDefault(r => string.Equals(r.Id, id, StringComparison.OrdinalIgnoreCase));
+        if (rule is null)
+        {
+            return;
+        }
+
+        List<StreamDeckAutomationRule> templates = LoadStreamDeckRuleTemplates();
+        StreamDeckAutomationRule clone = JsonSerializer.Deserialize<StreamDeckAutomationRule>(JsonSerializer.Serialize(rule)) ?? new StreamDeckAutomationRule();
         clone.Id = Guid.NewGuid().ToString("N");
         clone.LastAppliedAt = null;
         templates.Add(clone);
@@ -6496,9 +6858,9 @@ public partial class MainWindow : Window
 
     private async Task LoadStreamDeckRuleTemplateAsync()
     {
-        var template = LoadStreamDeckRuleTemplates().LastOrDefault();
+        StreamDeckAutomationRule? template = LoadStreamDeckRuleTemplates().LastOrDefault();
         if (template is null) { StreamDeckRuleStatusText.Text = "Es ist noch keine Regelvorlage gespeichert."; return; }
-        var rules = LoadStreamDeckAutomationRules();
+        List<StreamDeckAutomationRule> rules = LoadStreamDeckAutomationRules();
         template.Id = Guid.NewGuid().ToString("N"); template.LastAppliedAt = null;
         rules.Add(template); await SaveStreamDeckAutomationRulesAsync(rules); RefreshStreamDeckAutomationRules();
         StreamDeckRuleStatusText.Text = $"Letzte Regelvorlage geladen: {template.Profile} / {template.Page}";
@@ -6507,7 +6869,11 @@ public partial class MainWindow : Window
     private void ExportStreamDeckRuleSet()
     {
         var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "Stream-Deck-Regelset (*.sdrules)|*.sdrules", FileName = "streamdeck-regelset.sdrules" };
-        if (dialog.ShowDialog() != true) return;
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
         File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(LoadStreamDeckAutomationRules(), new JsonSerializerOptions { WriteIndented = true }));
         StreamDeckRuleStatusText.Text = $"Regelset exportiert: {dialog.FileName}";
     }
@@ -6515,12 +6881,16 @@ public partial class MainWindow : Window
     private async Task ImportStreamDeckRuleSetAsync()
     {
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Stream-Deck-Regelset (*.sdrules)|*.sdrules|JSON (*.json)|*.json" };
-        if (dialog.ShowDialog() != true) return;
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
         try
         {
-            var imported = JsonSerializer.Deserialize<List<StreamDeckAutomationRule>>(File.ReadAllText(dialog.FileName)) ?? [];
-            foreach (var rule in imported) { rule.Id = Guid.NewGuid().ToString("N"); rule.LastAppliedAt = null; }
-            var rules = LoadStreamDeckAutomationRules(); rules.AddRange(imported); await SaveStreamDeckAutomationRulesAsync(rules); RefreshStreamDeckAutomationRules();
+            List<StreamDeckAutomationRule> imported = JsonSerializer.Deserialize<List<StreamDeckAutomationRule>>(File.ReadAllText(dialog.FileName)) ?? [];
+            foreach (StreamDeckAutomationRule rule in imported) { rule.Id = Guid.NewGuid().ToString("N"); rule.LastAppliedAt = null; }
+            List<StreamDeckAutomationRule> rules = LoadStreamDeckAutomationRules(); rules.AddRange(imported); await SaveStreamDeckAutomationRulesAsync(rules); RefreshStreamDeckAutomationRules();
             StreamDeckRuleStatusText.Text = $"{imported.Count} Regel(n) importiert.";
         }
         catch (Exception ex) { StreamDeckRuleStatusText.Text = $"Import fehlgeschlagen: {ex.Message}"; StreamDeckRuleStatusText.Foreground = Brushes.IndianRed; }
@@ -6530,14 +6900,24 @@ public partial class MainWindow : Window
     {
         var rules = LoadStreamDeckAutomationRules().Where(r => r.Enabled).ToList();
         var conflicts = new List<string>();
-        for (var i = 0; i < rules.Count; i++) for (var j = i + 1; j < rules.Count; j++)
+        for (int i = 0; i < rules.Count; i++)
         {
-            var a = rules[i]; var b = rules[j];
-            if (a.Priority != b.Priority || a.IsFallback || b.IsFallback) continue;
-            var sameCondition = string.Equals(a.Condition, b.Condition, StringComparison.OrdinalIgnoreCase) && string.Equals(a.Condition2, b.Condition2, StringComparison.OrdinalIgnoreCase) && string.Equals(a.LogicalOperator, b.LogicalOperator, StringComparison.OrdinalIgnoreCase);
-            if (sameCondition && (!string.Equals(a.Profile, b.Profile, StringComparison.OrdinalIgnoreCase) || !string.Equals(a.Page, b.Page, StringComparison.OrdinalIgnoreCase)))
-                conflicts.Add($"P{a.Priority}: [{a.Group}] {a.Profile}/{a.Page} kollidiert mit [{b.Group}] {b.Profile}/{b.Page}.");
+            for (int j = i + 1; j < rules.Count; j++)
+            {
+                StreamDeckAutomationRule a = rules[i]; StreamDeckAutomationRule b = rules[j];
+                if (a.Priority != b.Priority || a.IsFallback || b.IsFallback)
+                {
+                    continue;
+                }
+
+                bool sameCondition = string.Equals(a.Condition, b.Condition, StringComparison.OrdinalIgnoreCase) && string.Equals(a.Condition2, b.Condition2, StringComparison.OrdinalIgnoreCase) && string.Equals(a.LogicalOperator, b.LogicalOperator, StringComparison.OrdinalIgnoreCase);
+                if (sameCondition && (!string.Equals(a.Profile, b.Profile, StringComparison.OrdinalIgnoreCase) || !string.Equals(a.Page, b.Page, StringComparison.OrdinalIgnoreCase)))
+                {
+                    conflicts.Add($"P{a.Priority}: [{a.Group}] {a.Profile}/{a.Page} kollidiert mit [{b.Group}] {b.Profile}/{b.Page}.");
+                }
+            }
         }
+
         StreamDeckRuleStatusText.Text = conflicts.Count == 0 ? "Konfliktanalyse abgeschlossen: keine direkten Prioritätskonflikte gefunden." : string.Join(Environment.NewLine, conflicts);
         StreamDeckRuleStatusText.Foreground = conflicts.Count == 0 ? Brushes.LightGreen : Brushes.Orange;
     }
@@ -6554,13 +6934,13 @@ public partial class MainWindow : Window
 
     private void ShowStreamDeckRuleStatistics()
     {
-        var rules = LoadStreamDeckAutomationRules();
+        List<StreamDeckAutomationRule> rules = LoadStreamDeckAutomationRules();
         if (rules.Count == 0) { StreamDeckRuleStatusText.Text = "Keine Regeln für eine Statistik vorhanden."; return; }
-        var enabled = rules.Count(r => r.Enabled);
-        var matches = rules.Sum(r => r.MatchCount);
-        var successes = rules.Sum(r => r.SuccessCount);
-        var failures = rules.Sum(r => r.FailureCount);
-        var mostUsed = rules.OrderByDescending(r => r.SuccessCount).FirstOrDefault();
+        int enabled = rules.Count(r => r.Enabled);
+        int matches = rules.Sum(r => r.MatchCount);
+        int successes = rules.Sum(r => r.SuccessCount);
+        int failures = rules.Sum(r => r.FailureCount);
+        StreamDeckAutomationRule? mostUsed = rules.OrderByDescending(r => r.SuccessCount).FirstOrDefault();
         StreamDeckRuleStatusText.Text = $"Regelstatistik: {enabled}/{rules.Count} aktiv · Treffer {matches} · Umschaltungen {successes} · Fehler {failures}" +
             (mostUsed is null ? string.Empty : $" · Häufigste Regel: [{mostUsed.Group}] {mostUsed.Profile}/{mostUsed.Page} ({mostUsed.SuccessCount})");
         StreamDeckRuleStatusText.Foreground = failures == 0 ? Brushes.LightGreen : Brushes.Orange;
@@ -6568,8 +6948,8 @@ public partial class MainWindow : Window
 
     private async Task ResetStreamDeckRuleStatisticsAsync()
     {
-        var rules = LoadStreamDeckAutomationRules();
-        foreach (var rule in rules)
+        List<StreamDeckAutomationRule> rules = LoadStreamDeckAutomationRules();
+        foreach (StreamDeckAutomationRule rule in rules)
         {
             rule.MatchCount = 0; rule.SuccessCount = 0; rule.FailureCount = 0; rule.ConsecutiveFailures = 0;
             rule.LastError = string.Empty; rule.LastEvaluatedAt = null;
@@ -6582,8 +6962,12 @@ public partial class MainWindow : Window
     private void ExportStreamDeckRuleDiagnostics()
     {
         var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "Diagnosebericht (*.json)|*.json", FileName = $"streamdeck-regeldiagnose-{DateTime.Now:yyyyMMdd-HHmmss}.json" };
-        if (dialog.ShowDialog() != true) return;
-        var rules = LoadStreamDeckAutomationRules();
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        List<StreamDeckAutomationRule> rules = LoadStreamDeckAutomationRules();
         var report = new
         {
             generatedAt = DateTimeOffset.Now,
@@ -6602,43 +6986,78 @@ public partial class MainWindow : Window
     {
         try
         {
-            var title = string.IsNullOrWhiteSpace(StreamDeckActionTitleBox.Text) ? "Neue Aktion" : StreamDeckActionTitleBox.Text.Trim();
+            string title = string.IsNullOrWhiteSpace(StreamDeckActionTitleBox.Text) ? "Neue Aktion" : StreamDeckActionTitleBox.Text.Trim();
             var item = StreamDeckActionCommandBox.SelectedItem as ComboBoxItem;
-            var command = item?.Tag?.ToString() ?? "workflow.prepare";
-            var parameter = StreamDeckActionParameterBox.Text.Trim();
-            var profile = string.IsNullOrWhiteSpace(StreamDeckProfileNameBox.Text) ? "Standard" : StreamDeckProfileNameBox.Text.Trim();
-            var page = string.IsNullOrWhiteSpace(StreamDeckPageNameBox.Text) ? "Hauptseite" : StreamDeckPageNameBox.Text.Trim();
-            var condition = (StreamDeckStateConditionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
-            var trueLabel = StreamDeckTrueLabelBox.Text.Trim();
-            var falseLabel = StreamDeckFalseLabelBox.Text.Trim();
-            var toggleMode = StreamDeckToggleModeBox.IsChecked == true;
-            var alternateCommand = (StreamDeckAlternateCommandBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
-            var alternateParameter = StreamDeckAlternateParameterBox.Text.Trim();
-            if (!int.TryParse(StreamDeckStepDelayBox.Text, out var stepDelayMs) || stepDelayMs < 0 || stepDelayMs > 10000) throw new InvalidOperationException("Die Schrittverzögerung muss zwischen 0 und 10000 ms liegen.");
-            if (!int.TryParse(StreamDeckRetryCountBox.Text, out var retryCount) || retryCount < 0 || retryCount > 5) throw new InvalidOperationException("Die Wiederholungszahl muss zwischen 0 und 5 liegen.");
-            if (!int.TryParse(StreamDeckCooldownBox.Text, out var cooldownMs) || cooldownMs < 0 || cooldownMs > 60000) throw new InvalidOperationException("Die Tastensperre muss zwischen 0 und 60000 ms liegen.");
-            if (toggleMode && string.IsNullOrWhiteSpace(condition)) throw new InvalidOperationException("Für eine Toggle-Taste muss eine Zustandsbindung ausgewählt werden.");
-            if (!int.TryParse(StreamDeckSlotBox.Text, out var slot) || slot < 1 || slot > 32) throw new InvalidOperationException("Die Position muss zwischen 1 und 32 liegen.");
-            var steps = new List<(string Command, string Parameter)>();
-            foreach (var line in StreamDeckMultiActionBox.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            string command = item?.Tag?.ToString() ?? "workflow.prepare";
+            string parameter = StreamDeckActionParameterBox.Text.Trim();
+            string profile = string.IsNullOrWhiteSpace(StreamDeckProfileNameBox.Text) ? "Standard" : StreamDeckProfileNameBox.Text.Trim();
+            string page = string.IsNullOrWhiteSpace(StreamDeckPageNameBox.Text) ? "Hauptseite" : StreamDeckPageNameBox.Text.Trim();
+            string condition = (StreamDeckStateConditionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
+            string trueLabel = StreamDeckTrueLabelBox.Text.Trim();
+            string falseLabel = StreamDeckFalseLabelBox.Text.Trim();
+            bool toggleMode = StreamDeckToggleModeBox.IsChecked == true;
+            string alternateCommand = (StreamDeckAlternateCommandBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
+            string alternateParameter = StreamDeckAlternateParameterBox.Text.Trim();
+            if (!int.TryParse(StreamDeckStepDelayBox.Text, out int stepDelayMs) || stepDelayMs < 0 || stepDelayMs > 10000)
             {
-                var parts = line.Split('|', 2);
-                var stepCommand = parts[0].Trim();
-                if (string.IsNullOrWhiteSpace(stepCommand)) continue;
+                throw new InvalidOperationException("Die Schrittverzögerung muss zwischen 0 und 10000 ms liegen.");
+            }
+
+            if (!int.TryParse(StreamDeckRetryCountBox.Text, out int retryCount) || retryCount < 0 || retryCount > 5)
+            {
+                throw new InvalidOperationException("Die Wiederholungszahl muss zwischen 0 und 5 liegen.");
+            }
+
+            if (!int.TryParse(StreamDeckCooldownBox.Text, out int cooldownMs) || cooldownMs < 0 || cooldownMs > 60000)
+            {
+                throw new InvalidOperationException("Die Tastensperre muss zwischen 0 und 60000 ms liegen.");
+            }
+
+            if (toggleMode && string.IsNullOrWhiteSpace(condition))
+            {
+                throw new InvalidOperationException("Für eine Toggle-Taste muss eine Zustandsbindung ausgewählt werden.");
+            }
+
+            if (!int.TryParse(StreamDeckSlotBox.Text, out int slot) || slot < 1 || slot > 32)
+            {
+                throw new InvalidOperationException("Die Position muss zwischen 1 und 32 liegen.");
+            }
+
+            var steps = new List<(string Command, string Parameter)>();
+            foreach (string line in StreamDeckMultiActionBox.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] parts = line.Split('|', 2);
+                string stepCommand = parts[0].Trim();
+                if (string.IsNullOrWhiteSpace(stepCommand))
+                {
+                    continue;
+                }
+
                 steps.Add((stepCommand, parts.Length > 1 ? parts[1].Trim() : string.Empty));
             }
-            if (steps.Count == 0) steps.Add((command, parameter));
-            if (steps.Count > 20) throw new InvalidOperationException("Eine Mehrfachaktion darf höchstens 20 Schritte enthalten.");
+            if (steps.Count == 0)
+            {
+                steps.Add((command, parameter));
+            }
 
-            var safeName = string.Concat(title.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)).Trim();
-            if (string.IsNullOrWhiteSpace(safeName)) safeName = "Neue Aktion";
+            if (steps.Count > 20)
+            {
+                throw new InvalidOperationException("Eine Mehrfachaktion darf höchstens 20 Schritte enthalten.");
+            }
+
+            string safeName = string.Concat(title.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)).Trim();
+            if (string.IsNullOrWhiteSpace(safeName))
+            {
+                safeName = "Neue Aktion";
+            }
+
             Directory.CreateDirectory(StreamDeckActionsDirectory);
-            var clientPath = Path.Combine(AppContext.BaseDirectory, "CreatorControlSuite.CommandClient.exe");
-            var cmdPath = Path.Combine(StreamDeckActionsDirectory, safeName + ".cmd");
+            string clientPath = Path.Combine(AppContext.BaseDirectory, "CreatorControlSuite.CommandClient.exe");
+            string cmdPath = Path.Combine(StreamDeckActionsDirectory, safeName + ".cmd");
             var content = new StringBuilder("@echo off\r\n");
             if (toggleMode)
             {
-                var stateExpression = condition switch
+                string stateExpression = condition switch
                 {
                     "stream.live" => "$s.stream.isLive",
                     "obs.connected" => "$s.obs.connected",
@@ -6647,29 +7066,40 @@ public partial class MainWindow : Window
                 };
                 content.AppendLine($"powershell -NoProfile -ExecutionPolicy Bypass -Command \"$s=Get-Content -Raw '{StreamDeckRuntimeStateFile.Replace("'", "''")}'|ConvertFrom-Json; if({stateExpression}){{exit 0}}else{{exit 1}}\"");
                 content.AppendLine("if errorlevel 1 goto stateoff");
-                var alternateArgs = string.IsNullOrWhiteSpace(alternateParameter)
+                string alternateArgs = string.IsNullOrWhiteSpace(alternateParameter)
                     ? alternateCommand
                     : FormatStreamDeckCommandArgs(alternateCommand, alternateParameter);
                 content.AppendLine($"start \"\" /wait /min \"{clientPath}\" {alternateArgs}");
                 content.AppendLine("goto end");
                 content.AppendLine(":stateoff");
             }
-            var stepNumber = 0;
-            foreach (var step in steps)
+            int stepNumber = 0;
+            foreach ((string Command, string Parameter) in steps)
             {
                 stepNumber++;
-                var args = FormatStreamDeckCommandArgs(step.Command, step.Parameter);
-                var successLabel = $"step_{stepNumber}_ok";
-                for (var attempt = 0; attempt <= retryCount; attempt++)
+                string args = FormatStreamDeckCommandArgs(Command, Parameter);
+                string successLabel = $"step_{stepNumber}_ok";
+                for (int attempt = 0; attempt <= retryCount; attempt++)
                 {
                     content.AppendLine($"start \"\" /wait /min \"{clientPath}\" {args}");
                     content.AppendLine($"if not errorlevel 1 goto {successLabel}");
                 }
                 content.AppendLine($":{successLabel}");
-                if (stepDelayMs > 0) content.AppendLine($"powershell -NoProfile -Command \"Start-Sleep -Milliseconds {stepDelayMs}\"");
+                if (stepDelayMs > 0)
+                {
+                    content.AppendLine($"powershell -NoProfile -Command \"Start-Sleep -Milliseconds {stepDelayMs}\"");
+                }
             }
-            if (toggleMode) content.AppendLine(":end");
-            if (cooldownMs > 0) content.AppendLine($"powershell -NoProfile -Command \"Start-Sleep -Milliseconds {cooldownMs}\"");
+            if (toggleMode)
+            {
+                content.AppendLine(":end");
+            }
+
+            if (cooldownMs > 0)
+            {
+                content.AppendLine($"powershell -NoProfile -Command \"Start-Sleep -Milliseconds {cooldownMs}\"");
+            }
+
             await File.WriteAllTextAsync(cmdPath, content.ToString());
             var meta = new { title, command = steps[0].Command, parameter = steps[0].Parameter, profile, page, slot, steps = steps.Select(step => new { command = step.Command, parameter = step.Parameter }).ToArray(), locked = false, condition, trueLabel, falseLabel, toggleMode, alternateCommand, alternateParameter, stepDelayMs, retryCount, cooldownMs, createdAt = DateTimeOffset.Now };
             await File.WriteAllTextAsync(Path.ChangeExtension(cmdPath, ".json"), System.Text.Json.JsonSerializer.Serialize(meta, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
@@ -6687,9 +7117,11 @@ public partial class MainWindow : Window
     private static string FormatStreamDeckCommandArgs(string command, string parameter)
     {
         if (string.IsNullOrWhiteSpace(parameter))
+        {
             return command;
+        }
 
-        var key = command switch
+        string key = command switch
         {
             "spotify.volume" => "volume",
             "spotify.playlist" => "uri",
@@ -6710,10 +7142,22 @@ public partial class MainWindow : Window
 
     private void DeleteSelectedStreamDeckAction()
     {
-        if (StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file) return;
-        if (File.Exists(file)) File.Delete(file);
-        var json = Path.ChangeExtension(file, ".json");
-        if (File.Exists(json)) File.Delete(json);
+        if (StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file)
+        {
+            return;
+        }
+
+        if (File.Exists(file))
+        {
+            File.Delete(file);
+        }
+
+        string json = Path.ChangeExtension(file, ".json");
+        if (File.Exists(json))
+        {
+            File.Delete(json);
+        }
+
         RefreshStreamDeckActionsList();
     }
 
@@ -6721,7 +7165,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            var package =
+            StreamDeckProfilePackage package =
                 await _streamDeckModule.BuildDefaultProfileAsync();
 
             StreamDeckStatusText.Text =
@@ -6740,7 +7184,7 @@ public partial class MainWindow : Window
 
     private void OpenLocalDataFolder(string child)
     {
-        var path = Path.Combine(
+        string path = Path.Combine(
             Environment.GetFolderPath(
                 Environment.SpecialFolder.LocalApplicationData),
             "CreatorControlSuite",
@@ -6769,13 +7213,13 @@ public partial class MainWindow : Window
                 UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
             }
 
-            var result = await _updateService.CheckAsync();
+            UpdateCheckResult result = await _updateService.CheckAsync();
             _pendingUpdatePackage = result.Package;
             InstallUpdateButton.IsEnabled = result.UpdateAvailable && result.Package is not null;
 
             if (result.UpdateAvailable && result.Package is not null)
             {
-                var notes = string.IsNullOrWhiteSpace(result.Package.ReleaseNotes)
+                string notes = string.IsNullOrWhiteSpace(result.Package.ReleaseNotes)
                     ? string.Empty
                     : " — " + Truncate(result.Package.ReleaseNotes, 160);
                 UpdateStatusText.Text =
@@ -6819,7 +7263,7 @@ public partial class MainWindow : Window
                     $"Update wird heruntergeladen … {value:P0}";
             });
 
-            var packagePath = await _updateService.DownloadAsync(
+            string packagePath = await _updateService.DownloadAsync(
                 _pendingUpdatePackage,
                 progress);
 
@@ -6846,7 +7290,7 @@ public partial class MainWindow : Window
 
     private static string Truncate(string value, int maxLength)
     {
-        var normalized = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        string normalized = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
         if (normalized.Length <= maxLength)
         {
             return normalized;
@@ -6857,8 +7301,8 @@ public partial class MainWindow : Window
 
     private void SelectUpdateChannelBox(string channel)
     {
-        var normalized = string.IsNullOrWhiteSpace(channel) ? "Alpha" : channel.Trim();
-        foreach (var item in UpdateChannelBox.Items.OfType<ComboBoxItem>())
+        string normalized = string.IsNullOrWhiteSpace(channel) ? "Alpha" : channel.Trim();
+        foreach (ComboBoxItem item in UpdateChannelBox.Items.OfType<ComboBoxItem>())
         {
             if (string.Equals(
                     item.Content?.ToString(),
@@ -6888,13 +7332,13 @@ public partial class MainWindow : Window
     private static string GetCurrentProductVersion()
     {
         var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-        var informationalVersion = assembly
+        string? informationalVersion = assembly
             .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?
             .InformationalVersion;
 
         if (!string.IsNullOrWhiteSpace(informationalVersion))
         {
-            var metadataSeparator = informationalVersion.IndexOf('+');
+            int metadataSeparator = informationalVersion.IndexOf('+');
             return metadataSeparator >= 0
                 ? informationalVersion[..metadataSeparator]
                 : informationalVersion;
@@ -6907,7 +7351,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            var backup = await _updateService.CreateBackupAsync(
+            UpdateBackup backup = await _updateService.CreateBackupAsync(
                 GetCurrentProductVersion());
 
             BackupsList.ItemsSource =
@@ -6942,7 +7386,7 @@ public partial class MainWindow : Window
             (_settings.Obs.EndScene, "🏁"),
         };
 
-        foreach (var (scene, emoji) in defaults)
+        foreach ((string? scene, string? emoji) in defaults)
         {
             if (string.IsNullOrWhiteSpace(scene))
             {
@@ -6971,9 +7415,9 @@ public partial class MainWindow : Window
     {
         DashboardSceneButtonsPanel.Children.Clear();
 
-        foreach (var settings in _settings.Dashboard.SceneButtons.ToList())
+        foreach (DashboardSceneButtonSettings? settings in _settings.Dashboard.SceneButtons.ToList())
         {
-            var button = CreateDashboardSceneButton(settings);
+            Button button = CreateDashboardSceneButton(settings);
             DashboardSceneButtonsPanel.Children.Add(button);
         }
 
@@ -6988,7 +7432,7 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center
         };
 
-        var iconElement = CreateDashboardSceneButtonIcon(settings);
+        FrameworkElement? iconElement = CreateDashboardSceneButtonIcon(settings);
         if (iconElement is not null)
         {
             content.Children.Add(iconElement);
@@ -7031,7 +7475,7 @@ public partial class MainWindow : Window
 
     private static FrameworkElement? CreateDashboardSceneButtonIcon(DashboardSceneButtonSettings settings)
     {
-        var kind = settings.IconKind?.Trim() ?? "Emoji";
+        string kind = settings.IconKind?.Trim() ?? "Emoji";
         if (string.Equals(kind, "Image", StringComparison.OrdinalIgnoreCase))
         {
             try
@@ -7083,18 +7527,18 @@ public partial class MainWindow : Window
 
     private void HighlightDashboardSceneButtons(string? currentScene)
     {
-        var accent = _themeService.GetBrush("AccentBrush")
+        Brush accent = _themeService.GetBrush("AccentBrush")
             ?? new SolidColorBrush(Color.FromRgb(255, 140, 0));
-        var transparent = Brushes.Transparent;
+        SolidColorBrush transparent = Brushes.Transparent;
 
-        foreach (var child in DashboardSceneButtonsPanel.Children)
+        foreach (object? child in DashboardSceneButtonsPanel.Children)
         {
             if (child is not Button button || button.Tag is not DashboardSceneButtonSettings settings)
             {
                 continue;
             }
 
-            var isActive = !string.IsNullOrWhiteSpace(currentScene) &&
+            bool isActive = !string.IsNullOrWhiteSpace(currentScene) &&
                 string.Equals(settings.SceneName, currentScene, StringComparison.OrdinalIgnoreCase);
             button.BorderBrush = isActive ? accent : transparent;
             button.BorderThickness = new Thickness(isActive ? 2 : 1);
@@ -7104,7 +7548,7 @@ public partial class MainWindow : Window
 
     private async Task AddDashboardSceneButtonAsync()
     {
-        var scenes = await GetDashboardSceneChoicesAsync();
+        IReadOnlyList<string> scenes = await GetDashboardSceneChoicesAsync();
         if (scenes.Count == 0)
         {
             AddDashboardNotification(
@@ -7163,7 +7607,7 @@ public partial class MainWindow : Window
 
     private async Task DeleteDashboardSceneButtonAsync(DashboardSceneButtonSettings settings)
     {
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             $"Button „{settings.Title}“ wirklich löschen?",
             "Szenen-Button",
             MessageBoxButton.YesNo,
@@ -7185,7 +7629,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                var scenes = await _obsClient.GetSceneListAsync();
+                IReadOnlyList<ObsSceneInfo> scenes = await _obsClient.GetSceneListAsync();
                 var names = scenes
                     .Select(scene => scene.Name)
                     .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -7212,7 +7656,7 @@ public partial class MainWindow : Window
             return _dashboardObsSceneNames;
         }
 
-        return new[]
+        return [.. new[]
             {
                 _settings.Obs.StartScene,
                 _settings.Obs.LiveScene,
@@ -7221,8 +7665,7 @@ public partial class MainWindow : Window
             }
             .Concat(_settings.AdditionalScenes)
             .Where(scene => !string.IsNullOrWhiteSpace(scene))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     private async Task SwitchDashboardSceneByNameAsync(string sceneName)
@@ -7253,7 +7696,7 @@ public partial class MainWindow : Window
         }
 
         DashboardViewerTrendLine.Points.Clear();
-        var samples = _dashboardViewerTrendSamples.ToArray();
+        int[] samples = [.. _dashboardViewerTrendSamples];
 
         if (samples.Length == 0)
         {
@@ -7262,22 +7705,22 @@ public partial class MainWindow : Window
 
         const double width = 260;
         const double height = 28;
-        var maximum = Math.Max(1, samples.Max());
+        int maximum = Math.Max(1, samples.Max());
 
-        for (var index = 0; index < samples.Length; index++)
+        for (int index = 0; index < samples.Length; index++)
         {
-            var x = samples.Length == 1
+            double x = samples.Length == 1
                 ? 0
                 : width * index / (samples.Length - 1);
-            var y = height - height * samples[index] / maximum;
+            double y = height - (height * samples[index] / maximum);
             DashboardViewerTrendLine.Points.Add(new Point(x, y));
         }
     }
 
     private void OpenDashboardTwitchChat()
     {
-        var twitchSnapshot = _twitchModule.GetSnapshot();
-        var channel = twitchSnapshot.ChannelLogin;
+        TwitchConnectionSnapshot twitchSnapshot = _twitchModule.GetSnapshot();
+        string channel = twitchSnapshot.ChannelLogin;
 
         if (string.IsNullOrWhiteSpace(channel))
         {
@@ -7311,8 +7754,8 @@ public partial class MainWindow : Window
 
         try
         {
-            var followerTask = _twitchModule.GetFollowerCountAsync();
-            var subscriptionTask = _twitchModule.GetActiveSubscriptionCountAsync();
+            Task<int> followerTask = _twitchModule.GetFollowerCountAsync();
+            Task<int> subscriptionTask = _twitchModule.GetActiveSubscriptionCountAsync();
 
             await Task.WhenAll(followerTask, subscriptionTask);
 
@@ -7384,7 +7827,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var followerCount =
+            int followerCount =
                 await _twitchModule.GetFollowerCountAsync();
 
             _currentFollowerCount = Math.Max(0, followerCount);
@@ -7399,7 +7842,7 @@ public partial class MainWindow : Window
                 RefreshTwitchProfessionalUi();
             }
 
-            var baseline = _streamFollowerBaseline > 0
+            int baseline = _streamFollowerBaseline > 0
                 ? _streamFollowerBaseline
                 : _currentFollowerCount;
 
@@ -7421,10 +7864,10 @@ public partial class MainWindow : Window
             });
             await UpdateActiveOverlayJsonAsync(root =>
             {
-                var twitch = root["twitch"] as JsonObject ?? new JsonObject();
+                JsonObject twitch = root["twitch"] as JsonObject ?? [];
                 twitch["followers"] = _currentFollowerCount;
                 twitch["followerGoal"] = _settings.Twitch.FollowerGoal.Target;
-                var goal = twitch["followerGoalState"] as JsonObject ?? new JsonObject();
+                JsonObject goal = twitch["followerGoalState"] as JsonObject ?? [];
                 goal["title"] = _settings.Twitch.FollowerGoal.Title;
                 goal["current"] = _currentFollowerCount;
                 goal["target"] = _settings.Twitch.FollowerGoal.Target;
@@ -7454,7 +7897,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var twitchSnapshot = _twitchModule.GetSnapshot();
+        TwitchConnectionSnapshot twitchSnapshot = _twitchModule.GetSnapshot();
         if (!twitchSnapshot.Authenticated)
         {
             _currentLiveViewerCount = 0;
@@ -7467,7 +7910,7 @@ public partial class MainWindow : Window
         // Helix' `login` parameter expects the canonical login, not the
         // user-facing display name (which may contain different casing or
         // localized characters).
-        var channel = !string.IsNullOrWhiteSpace(twitchSnapshot.ChannelLogin)
+        string channel = !string.IsNullOrWhiteSpace(twitchSnapshot.ChannelLogin)
             ? twitchSnapshot.ChannelLogin
             : twitchSnapshot.Login;
 
@@ -7480,7 +7923,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var status = await _twitchModule.GetRaidTargetStatusAsync(channel);
+            TwitchRaidTargetStatus? status = await _twitchModule.GetRaidTargetStatusAsync(channel);
 
             if (status is null || !status.IsOnline)
             {
@@ -7505,7 +7948,7 @@ public partial class MainWindow : Window
             });
             await UpdateActiveOverlayJsonAsync(root =>
             {
-                var stream = root["stream"] as JsonObject ?? new JsonObject();
+                JsonObject stream = root["stream"] as JsonObject ?? [];
                 stream["viewerCount"] = _currentLiveViewerCount;
                 stream["isLive"] = true;
                 stream["startedAt"] = _streamSessionStartedAt;
@@ -7546,7 +7989,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var status = await _twitchModule.GetRaidTargetStatusAsync(channel.Trim());
+            TwitchRaidTargetStatus? status = await _twitchModule.GetRaidTargetStatusAsync(channel.Trim());
             if (status is null)
             {
                 _raidTargetIsOnline = false;
@@ -7556,11 +7999,11 @@ public partial class MainWindow : Window
             }
 
             _raidTargetIsOnline = status.IsOnline;
-            var liveDuration = status.IsOnline && status.StartedAt is not null
+            TimeSpan liveDuration = status.IsOnline && status.StartedAt is not null
                 ? DateTimeOffset.Now - status.StartedAt.Value
                 : TimeSpan.Zero;
 
-            var text = status.IsOnline
+            string text = status.IsOnline
                 ? $"{status.DisplayName} ist ONLINE · {status.ViewerCount} Zuschauer · {status.GameName}" +
                   (string.IsNullOrWhiteSpace(status.StreamTitle) ? "" : $" · {status.StreamTitle}")
                 : $"{status.DisplayName} ist OFFLINE";
@@ -7593,7 +8036,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var bytes = await RaidProfileHttpClient.GetByteArrayAsync(imageUrl);
+            byte[] bytes = await RaidProfileHttpClient.GetByteArrayAsync(imageUrl);
             await Dispatcher.InvokeAsync(() =>
             {
                 using var stream = new MemoryStream(bytes);
@@ -7634,7 +8077,7 @@ public partial class MainWindow : Window
 
     private void OpenSelectedRaidChannel()
     {
-        var channel = DashboardRaidChannelBox.SelectedItem as string
+        string channel = DashboardRaidChannelBox.SelectedItem as string
                       ?? ServicesTwitchRaidTargetBox.SelectedItem as string
                       ?? _settings.Twitch.SelectedRaidChannel;
 
@@ -7644,7 +8087,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var url = "https://www.twitch.tv/" + Uri.EscapeDataString(channel.Trim().TrimStart('@'));
+        string url = "https://www.twitch.tv/" + Uri.EscapeDataString(channel.Trim().TrimStart('@'));
         Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 
@@ -7748,7 +8191,7 @@ public partial class MainWindow : Window
                 .ToList();
             if (loginsToCheck.Count > 0)
             {
-                foreach (var pair in await _twitchModule.GetLiveChannelsByLoginsAsync(loginsToCheck, cancellationToken))
+                foreach (KeyValuePair<string, TwitchChannelSuggestion> pair in await _twitchModule.GetLiveChannelsByLoginsAsync(loginsToCheck, cancellationToken))
                 {
                     liveByLogin[pair.Key] = pair.Value;
                 }
@@ -7763,7 +8206,7 @@ public partial class MainWindow : Window
             // Live-Status optional
         }
 
-        foreach (var live in followedLive.Concat(searched.Where(item => item.IsLive)))
+        foreach (TwitchChannelSuggestion? live in followedLive.Concat(searched.Where(item => item.IsLive)))
         {
             liveByLogin.TryAdd(live.Login, live with { IsLive = true, SourceLabel = "Live" });
         }
@@ -7775,14 +8218,14 @@ public partial class MainWindow : Window
         var recentSuggestions = recentLogins
             .Select(login =>
             {
-                var isLive = liveByLogin.TryGetValue(login, out var liveInfo);
-                var display = isLive ? liveInfo!.DisplayName : login;
+                bool isLive = liveByLogin.TryGetValue(login, out TwitchChannelSuggestion? liveInfo);
+                string display = isLive ? liveInfo!.DisplayName : login;
                 return new TwitchChannelSuggestion(login, display, isLive, "Zuletzt");
             })
             .OrderByDescending(item => item.IsLive)
             .ToList();
 
-        foreach (var item in recentSuggestions)
+        foreach (TwitchChannelSuggestion? item in recentSuggestions)
         {
             if (!seen.Add(item.Login))
             {
@@ -7793,7 +8236,7 @@ public partial class MainWindow : Window
         }
 
         // 2) Weitere Live-Kanäle (Follows + Suche)
-        foreach (var item in followedLive
+        foreach (TwitchChannelSuggestion? item in followedLive
                      .Concat(searched.Where(x => x.IsLive))
                      .Concat(liveByLogin.Values)
                      .Where(item => MatchesRaidQuery(item.Login, item.DisplayName, query)))
@@ -7811,7 +8254,7 @@ public partial class MainWindow : Window
         }
 
         // 3) Offline: gefolgte, dann Suche
-        foreach (var item in followed
+        foreach (TwitchChannelSuggestion? item in followed
                      .Where(item => MatchesRaidQuery(item.Login, item.DisplayName, query))
                      .Concat(searched.Where(item => !item.IsLive)))
         {
@@ -7839,7 +8282,7 @@ public partial class MainWindow : Window
             return _followedRaidTargetCache;
         }
 
-        var followed = await _twitchModule.GetFollowedChannelsAsync(cancellationToken);
+        IReadOnlyList<TwitchChannelSuggestion> followed = await _twitchModule.GetFollowedChannelsAsync(cancellationToken);
         _followedRaidTargetCache = followed;
         _followedRaidTargetCacheAt = DateTimeOffset.UtcNow;
         return followed;
@@ -7854,7 +8297,7 @@ public partial class MainWindow : Window
             return _followedLiveRaidTargetCache;
         }
 
-        var live = await _twitchModule.GetFollowedLiveStreamsAsync(cancellationToken);
+        IReadOnlyList<TwitchChannelSuggestion> live = await _twitchModule.GetFollowedLiveStreamsAsync(cancellationToken);
         _followedLiveRaidTargetCache = live;
         _followedLiveRaidTargetCacheAt = DateTimeOffset.UtcNow;
         return live;
@@ -7876,7 +8319,7 @@ public partial class MainWindow : Window
         _raidTargetSuggestStatusCts?.Cancel();
         _raidTargetSuggestStatusCts?.Dispose();
         _raidTargetSuggestStatusCts = new CancellationTokenSource();
-        var token = _raidTargetSuggestStatusCts.Token;
+        CancellationToken token = _raidTargetSuggestStatusCts.Token;
         _ = Dispatcher.InvokeAsync(async () =>
         {
             try
@@ -7897,7 +8340,7 @@ public partial class MainWindow : Window
 
     private void UpdateDashboardRaidControlsVisibility()
     {
-        var visibility = _settings.Twitch.RaidOnStreamEnd
+        Visibility visibility = _settings.Twitch.RaidOnStreamEnd
             ? Visibility.Visible
             : Visibility.Collapsed;
         DashboardRaidSelectionPanel.Visibility = visibility;
@@ -7920,8 +8363,8 @@ public partial class MainWindow : Window
 
     private void UpdateDashboardRaidActionButtons()
     {
-        var hasTarget = !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel);
-        var raidReady = hasTarget && _raidTargetIsOnline && !_raidCountdownActive
+        bool hasTarget = !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel);
+        bool raidReady = hasTarget && _raidTargetIsOnline && !_raidCountdownActive
             && (_awaitingManualRaid || _streamEndFlowActive);
         DashboardStartRaidButton.IsEnabled = raidReady;
         DashboardStartRaidButton.Visibility = raidReady ? Visibility.Visible : Visibility.Collapsed;
@@ -7937,7 +8380,7 @@ public partial class MainWindow : Window
 
     private async Task AddRaidChannelAsync()
     {
-        var channel = ServicesTwitchNewRaidChannelBox.Text.Trim().TrimStart('@');
+        string channel = ServicesTwitchNewRaidChannelBox.Text.Trim().TrimStart('@');
         if (string.IsNullOrWhiteSpace(channel))
         {
             return;
@@ -7973,18 +8416,18 @@ public partial class MainWindow : Window
         _settings.Workflow.AutoPlayEndMusic = ServicesSpotifyEndMusicBox.IsChecked == true;
         _settings.Workflow.PauseSpotifyOnStreamEnd = ServicesSpotifyPauseOnStreamEndBox.IsChecked == true;
         _settings.Spotify.SetVolumeOnLiveTransition = ServicesSpotifySetLiveVolumeBox.IsChecked == true;
-        _settings.Spotify.LiveVolumePercent = int.TryParse(ServicesSpotifyLiveVolumeBox.Text, out var liveVolume)
+        _settings.Spotify.LiveVolumePercent = int.TryParse(ServicesSpotifyLiveVolumeBox.Text, out int liveVolume)
             ? Math.Clamp(liveVolume, 0, 100)
             : 75;
         _settings.Spotify.MuteDuringAlerts = ServicesSpotifyMuteDuringAlertsBox.IsChecked == true;
         _settings.Spotify.AlertDuckingMode = _settings.Spotify.MuteDuringAlerts ? "Reduce" : "None";
-        _settings.Spotify.AlertMuteVolumePercent = int.TryParse(ServicesSpotifyAlertVolumeBox.Text, out var alertVolume)
+        _settings.Spotify.AlertMuteVolumePercent = int.TryParse(ServicesSpotifyAlertVolumeBox.Text, out int alertVolume)
             ? Math.Clamp(alertVolume, 0, 100)
             : 50;
-        _settings.Spotify.AlertFadeOutMilliseconds = int.TryParse(ServicesSpotifyAlertFadeOutMsBox.Text, out var fadeOutMs)
+        _settings.Spotify.AlertFadeOutMilliseconds = int.TryParse(ServicesSpotifyAlertFadeOutMsBox.Text, out int fadeOutMs)
             ? Math.Clamp(fadeOutMs, 0, 10000)
             : 500;
-        _settings.Spotify.AlertFadeInMilliseconds = int.TryParse(ServicesSpotifyAlertFadeInMsBox.Text, out var fadeInMs)
+        _settings.Spotify.AlertFadeInMilliseconds = int.TryParse(ServicesSpotifyAlertFadeInMsBox.Text, out int fadeInMs)
             ? Math.Clamp(fadeInMs, 0, 10000)
             : 500;
         _settings.Spotify.ShuffleSelectedPlaylist = ServicesSpotifyShufflePlaylistBox.IsChecked == true;
@@ -7996,7 +8439,11 @@ public partial class MainWindow : Window
 
     private async Task SaveSpotifyAutomationSettingsAsync()
     {
-        if (_loadingSettingsIntoUi) return;
+        if (_loadingSettingsIntoUi)
+        {
+            return;
+        }
+
         ApplySpotifyAutomationFieldsToSettings();
         await _settingsStore.SaveAsync(_settings);
         ServicesSpotifyAutomationStatusText.Text = "Spotify-Automatik gespeichert.";
@@ -8005,15 +8452,14 @@ public partial class MainWindow : Window
     private void ApplyTwitchEndFieldsToSettings()
     {
         _settings.Twitch.RaidOnStreamEnd = ServicesTwitchRaidEnabledBox.IsChecked == true;
-        _settings.Twitch.RaidCountdownSeconds = int.TryParse(ServicesTwitchRaidCountdownSecondsBox.Text, out var raidSeconds)
+        _settings.Twitch.RaidCountdownSeconds = int.TryParse(ServicesTwitchRaidCountdownSecondsBox.Text, out int raidSeconds)
             ? Math.Clamp(raidSeconds, 5, 300)
             : 90;
         _settings.Twitch.StopStreamAfterRaid = ServicesTwitchStopStreamAfterRaidBox.IsChecked != false;
         _settings.Twitch.StopSpotifyAfterRaid = ServicesTwitchStopSpotifyAfterRaidBox.IsChecked != false;
-        _settings.Twitch.RaidChannels = ServicesTwitchRaidChannelsBox.Text
-            .Split(new[] { '\r', '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        _settings.Twitch.RaidChannels = [.. ServicesTwitchRaidChannelsBox.Text
+            .Split(['\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
         if (ServicesTwitchRaidTargetBox.SelectedItem is string raidTarget)
         {
             _settings.Twitch.SelectedRaidChannel = raidTarget;
@@ -8022,13 +8468,13 @@ public partial class MainWindow : Window
         {
             _settings.Twitch.SelectedRaidChannel = _settings.Twitch.RaidChannels.FirstOrDefault() ?? "";
         }
-        _settings.Workflow.EndSceneSeconds = int.TryParse(ServicesTwitchEndSceneSecondsBox.Text, out var seconds) ? Math.Max(0, seconds) : 60;
+        _settings.Workflow.EndSceneSeconds = int.TryParse(ServicesTwitchEndSceneSecondsBox.Text, out int seconds) ? Math.Max(0, seconds) : 60;
         _settings.Twitch.EndSceneDurationSeconds = _settings.Workflow.EndSceneSeconds;
 
         if (double.TryParse(ServicesTwitchEndFollowerGoalTargetBox.Text.Replace(',', '.'),
                 System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture,
-                out var followerTarget))
+                out double followerTarget))
         {
             _settings.Twitch.FollowerGoal.Target = Math.Max(1, followerTarget);
         }
@@ -8042,8 +8488,8 @@ public partial class MainWindow : Window
     {
         try
         {
-            var rewards = await _twitchModule.GetCustomRewardsAsync();
-            ServicesRewardsList.ItemsSource = rewards.Select(reward => $"{reward.Title} · {reward.Cost:N0} Punkte" ).ToList();
+            IReadOnlyList<TwitchChannelPointReward> rewards = await _twitchModule.GetCustomRewardsAsync();
+            ServicesRewardsList.ItemsSource = rewards.Select(reward => $"{reward.Title} · {reward.Cost:N0} Punkte").ToList();
         }
         catch (Exception exception)
         {
@@ -8055,10 +8501,18 @@ public partial class MainWindow : Window
     {
         try
         {
-            var title = ServicesRewardTitleBox.Text.Trim();
-            if (string.IsNullOrWhiteSpace(title)) throw new InvalidOperationException("Bitte einen Titel für die Belohnung eingeben.");
-            if (!int.TryParse(ServicesRewardCostBox.Text, out var cost) || cost < 1) throw new InvalidOperationException("Die Punktekosten müssen mindestens 1 betragen.");
-            var reward = await _twitchModule.CreateCustomRewardAsync(title, cost, ServicesRewardPromptBox.Text);
+            string title = ServicesRewardTitleBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                throw new InvalidOperationException("Bitte einen Titel für die Belohnung eingeben.");
+            }
+
+            if (!int.TryParse(ServicesRewardCostBox.Text, out int cost) || cost < 1)
+            {
+                throw new InvalidOperationException("Die Punktekosten müssen mindestens 1 betragen.");
+            }
+
+            TwitchChannelPointReward reward = await _twitchModule.CreateCustomRewardAsync(title, cost, ServicesRewardPromptBox.Text);
             ServicesRewardTitleBox.Clear();
             ServicesRewardPromptBox.Clear();
             await RefreshTwitchRewardsAsync();
@@ -8074,11 +8528,19 @@ public partial class MainWindow : Window
     {
         try
         {
-            var choices = ServicesPollChoicesBox.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (string.IsNullOrWhiteSpace(ServicesPollTitleBox.Text)) throw new InvalidOperationException("Bitte eine Umfragefrage eingeben.");
-            if (choices.Count < 2 || choices.Count > 5) throw new InvalidOperationException("Eine Umfrage benötigt zwei bis fünf Antworten.");
-            var duration = int.TryParse(ServicesPollDurationBox.Text, out var parsed) ? Math.Clamp(parsed, 15, 1800) : 60;
-            var poll = await _twitchModule.CreatePollAsync(ServicesPollTitleBox.Text, choices, duration);
+            var choices = ServicesPollChoicesBox.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (string.IsNullOrWhiteSpace(ServicesPollTitleBox.Text))
+            {
+                throw new InvalidOperationException("Bitte eine Umfragefrage eingeben.");
+            }
+
+            if (choices.Count < 2 || choices.Count > 5)
+            {
+                throw new InvalidOperationException("Eine Umfrage benötigt zwei bis fünf Antworten.");
+            }
+
+            int duration = int.TryParse(ServicesPollDurationBox.Text, out int parsed) ? Math.Clamp(parsed, 15, 1800) : 60;
+            TwitchPoll poll = await _twitchModule.CreatePollAsync(ServicesPollTitleBox.Text, choices, duration);
             _activeTwitchPollId = poll.Id;
             ServicesPollStatusText.Text = $"Aktiv: {poll.Title} · {duration} Sekunden";
         }
@@ -8092,10 +8554,17 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(_activeTwitchPollId)) throw new InvalidOperationException("Es ist keine in dieser Sitzung gestartete Umfrage vorhanden.");
-            var poll = await _twitchModule.EndPollAsync(_activeTwitchPollId, status);
+            if (string.IsNullOrWhiteSpace(_activeTwitchPollId))
+            {
+                throw new InvalidOperationException("Es ist keine in dieser Sitzung gestartete Umfrage vorhanden.");
+            }
+
+            TwitchPoll poll = await _twitchModule.EndPollAsync(_activeTwitchPollId, status);
             ServicesPollStatusText.Text = $"{poll.Status}: {poll.Title}";
-            if (!status.Equals("TERMINATED", StringComparison.OrdinalIgnoreCase)) _activeTwitchPollId = null;
+            if (!status.Equals("TERMINATED", StringComparison.OrdinalIgnoreCase))
+            {
+                _activeTwitchPollId = null;
+            }
         }
         catch (Exception ex) { ShowError("Umfrage konnte nicht aktualisiert werden", ex); }
     }
@@ -8104,7 +8573,11 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (_activeTwitchPrediction is null) throw new InvalidOperationException("Es ist keine in dieser Sitzung gestartete Vorhersage vorhanden.");
+            if (_activeTwitchPrediction is null)
+            {
+                throw new InvalidOperationException("Es ist keine in dieser Sitzung gestartete Vorhersage vorhanden.");
+            }
+
             _activeTwitchPrediction = await _twitchModule.EndPredictionAsync(_activeTwitchPrediction.Id, status, null);
             ServicesPredictionWinnerBox.ItemsSource = _activeTwitchPrediction.Outcomes;
             ServicesPredictionStatusText.Text = $"{_activeTwitchPrediction.Status}: {_activeTwitchPrediction.Title}";
@@ -8116,8 +8589,16 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (_activeTwitchPrediction is null) throw new InvalidOperationException("Es ist keine in dieser Sitzung gestartete Vorhersage vorhanden.");
-            if (ServicesPredictionWinnerBox.SelectedItem is not TwitchPredictionOutcome winner) throw new InvalidOperationException("Bitte das Gewinnergebnis auswählen.");
+            if (_activeTwitchPrediction is null)
+            {
+                throw new InvalidOperationException("Es ist keine in dieser Sitzung gestartete Vorhersage vorhanden.");
+            }
+
+            if (ServicesPredictionWinnerBox.SelectedItem is not TwitchPredictionOutcome winner)
+            {
+                throw new InvalidOperationException("Bitte das Gewinnergebnis auswählen.");
+            }
+
             _activeTwitchPrediction = await _twitchModule.EndPredictionAsync(_activeTwitchPrediction.Id, "RESOLVED", winner.Id);
             ServicesPredictionStatusText.Text = $"Aufgelöst: {winner.Title}";
         }
@@ -8128,10 +8609,17 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (ServicesRewardsList.SelectedItem is not TwitchChannelPointReward reward) throw new InvalidOperationException("Bitte zuerst eine Channel-Point-Belohnung auswählen.");
-            var redemptions = await _twitchModule.GetRewardRedemptionsAsync(reward.Id);
+            if (ServicesRewardsList.SelectedItem is not TwitchChannelPointReward reward)
+            {
+                throw new InvalidOperationException("Bitte zuerst eine Channel-Point-Belohnung auswählen.");
+            }
+
+            IReadOnlyList<TwitchRewardRedemption> redemptions = await _twitchModule.GetRewardRedemptionsAsync(reward.Id);
             _twitchRedemptionItems.Clear();
-            foreach (var redemption in redemptions) _twitchRedemptionItems.Add(new TwitchRewardRedemptionItem(redemption));
+            foreach (TwitchRewardRedemption redemption in redemptions)
+            {
+                _twitchRedemptionItems.Add(new TwitchRewardRedemptionItem(redemption));
+            }
         }
         catch (Exception ex) { ShowError("Einlösungen konnten nicht geladen werden", ex); }
     }
@@ -8140,7 +8628,11 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (ServicesRedemptionsList.SelectedItem is not TwitchRewardRedemptionItem selected) throw new InvalidOperationException("Bitte eine offene Einlösung auswählen.");
+            if (ServicesRedemptionsList.SelectedItem is not TwitchRewardRedemptionItem selected)
+            {
+                throw new InvalidOperationException("Bitte eine offene Einlösung auswählen.");
+            }
+
             await _twitchModule.UpdateRewardRedemptionStatusAsync(selected.Redemption.RewardId, selected.Redemption.Id, status);
             _twitchRedemptionItems.Remove(selected);
         }
@@ -8151,11 +8643,19 @@ public partial class MainWindow : Window
     {
         try
         {
-            var outcomes = ServicesPredictionOutcomesBox.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (string.IsNullOrWhiteSpace(ServicesPredictionTitleBox.Text)) throw new InvalidOperationException("Bitte eine Vorhersagefrage eingeben.");
-            if (outcomes.Count < 2 || outcomes.Count > 10) throw new InvalidOperationException("Eine Vorhersage benötigt zwei bis zehn Ergebnisse.");
-            var window = int.TryParse(ServicesPredictionWindowBox.Text, out var parsed) ? Math.Clamp(parsed, 30, 1800) : 120;
-            var prediction = await _twitchModule.CreatePredictionAsync(ServicesPredictionTitleBox.Text, outcomes, window);
+            var outcomes = ServicesPredictionOutcomesBox.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (string.IsNullOrWhiteSpace(ServicesPredictionTitleBox.Text))
+            {
+                throw new InvalidOperationException("Bitte eine Vorhersagefrage eingeben.");
+            }
+
+            if (outcomes.Count < 2 || outcomes.Count > 10)
+            {
+                throw new InvalidOperationException("Eine Vorhersage benötigt zwei bis zehn Ergebnisse.");
+            }
+
+            int window = int.TryParse(ServicesPredictionWindowBox.Text, out int parsed) ? Math.Clamp(parsed, 30, 1800) : 120;
+            TwitchPrediction prediction = await _twitchModule.CreatePredictionAsync(ServicesPredictionTitleBox.Text, outcomes, window);
             _activeTwitchPrediction = prediction;
             ServicesPredictionWinnerBox.ItemsSource = prediction.Outcomes;
             ServicesPredictionStatusText.Text = $"Aktiv: {prediction.Title} · {window} Sekunden";
@@ -8184,7 +8684,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             "Backup wirklich wiederherstellen?\n\n" +
             "Die aktuellen Einstellungen und Profildaten werden überschrieben.",
             "Backup wiederherstellen",
@@ -8207,7 +8707,7 @@ public partial class MainWindow : Window
 
     private async Task DetectLegacyAsync()
     {
-        var candidates =
+        IReadOnlyList<MigrationCandidate> candidates =
             await _migrationService.DetectAsync();
 
         LegacyCandidatesList.ItemsSource = candidates;
@@ -8225,7 +8725,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = await _migrationService.ImportAsync(
+        MigrationResult result = await _migrationService.ImportAsync(
             candidate.SourcePath);
 
         await LoadSettingsAsync();
@@ -8247,9 +8747,13 @@ public partial class MainWindow : Window
 
     private async Task LoadOverlayProjectsAsync()
     {
-        var selectedId = (OverlayProjectList.SelectedItem as OverlayProjectDefinition)?.Id;
+        string? selectedId = (OverlayProjectList.SelectedItem as OverlayProjectDefinition)?.Id;
         _overlayProjects.Clear();
-        foreach (var project in await _overlayProjectService.LoadAsync()) _overlayProjects.Add(project);
+        foreach (OverlayProjectDefinition project in await _overlayProjectService.LoadAsync())
+        {
+            _overlayProjects.Add(project);
+        }
+
         OverlayProjectList.SelectedItem = _overlayProjects.FirstOrDefault(x => x.Id == selectedId) ?? _overlayProjects.FirstOrDefault();
         if (_obsClient.IsConnected)
         {
@@ -8270,14 +8774,22 @@ public partial class MainWindow : Window
         }
         OverlayProjectTitleText.Text = $"{project.Name} · Version {project.Version}";
         OverlayProjectPathText.Text = string.IsNullOrWhiteSpace(project.RootPath) ? "Quelle: OBS" : project.RootPath;
-        foreach (var item in project.Items) _overlayProjectItems.Add(item);
+        foreach (OverlayProjectItem item in project.Items)
+        {
+            _overlayProjectItems.Add(item);
+        }
+
         OverlayProjectStatusText.Text = project.Status;
         OverlayProjectItemsList.SelectedIndex = project.Items.Count > 0 ? 0 : -1;
     }
 
     private void RefreshSelectedOverlayProjectItem()
     {
-        if (OverlayProjectItemsList.SelectedItem is not OverlayProjectItem item) return;
+        if (OverlayProjectItemsList.SelectedItem is not OverlayProjectItem item)
+        {
+            return;
+        }
+
         OverlayProjectObsSceneBox.SelectedItem = item.ObsScene;
         OverlayProjectObsSourceBox.Text = item.ObsSource;
     }
@@ -8290,7 +8802,11 @@ public partial class MainWindow : Window
             Filter = "Overlay-Projektdatei (overlay.json)|overlay.json|JSON-Dateien (*.json)|*.json|Alle Dateien (*.*)|*.*",
             CheckFileExists = true
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
         OverlayManifestPathBox.Text = dialog.FileName;
         _settings.General.OverlayManifestPath = dialog.FileName;
         UpdateOverlayManifestStatus();
@@ -8307,8 +8823,12 @@ public partial class MainWindow : Window
                 DefaultExt = ".json",
                 Filter = "Overlay-Projektdatei (overlay.json)|overlay.json|JSON-Dateien (*.json)|*.json"
             };
-            if (dialog.ShowDialog(this) != true) return;
-            var path = await _overlayProjectService.CreateManifestAsync(dialog.FileName);
+            if (dialog.ShowDialog(this) != true)
+            {
+                return;
+            }
+
+            string path = await _overlayProjectService.CreateManifestAsync(dialog.FileName);
             OverlayManifestPathBox.Text = path;
             _settings.General.OverlayManifestPath = path;
             await _settingsStore.SaveAsync(_settings);
@@ -8322,8 +8842,8 @@ public partial class MainWindow : Window
 
     private void OpenOverlayManifestFolder()
     {
-        var path = OverlayManifestPathBox.Text.Trim();
-        var folder = string.IsNullOrWhiteSpace(path) ? "" : Path.GetDirectoryName(Path.GetFullPath(path));
+        string path = OverlayManifestPathBox.Text.Trim();
+        string? folder = string.IsNullOrWhiteSpace(path) ? "" : Path.GetDirectoryName(Path.GetFullPath(path));
         if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
         {
             UpdateOverlayManifestStatus("Der Ordner der overlay.json wurde nicht gefunden.", Brushes.IndianRed);
@@ -8334,8 +8854,12 @@ public partial class MainWindow : Window
 
     private void UpdateOverlayManifestStatus(string? message = null, Brush? brush = null)
     {
-        if (OverlayManifestStatusText is null || OverlayManifestPathBox is null) return;
-        var path = OverlayManifestPathBox.Text.Trim();
+        if (OverlayManifestStatusText is null || OverlayManifestPathBox is null)
+        {
+            return;
+        }
+
+        string path = OverlayManifestPathBox.Text.Trim();
         OverlayManifestStatusText.Text = message ?? (string.IsNullOrWhiteSpace(path)
             ? "Noch keine overlay.json ausgewählt. Beim nächsten Overlay-Import wird sie automatisch im Projektordner angelegt."
             : File.Exists(path) ? $"Aktive Datei: {path}" : $"Die Datei wird beim Erstellen/Importieren angelegt: {path}");
@@ -8348,24 +8872,31 @@ public partial class MainWindow : Window
         {
             Title = "Vorhandenen Overlay-Hauptordner auswählen"
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
 
         try
         {
-            var overlayRoot = Path.GetFullPath(dialog.FolderName);
-            var manifestPath = Path.Combine(overlayRoot, "overlay.json");
-            var rootDataPath = Path.Combine(overlayRoot, "data", "overlay-data.json");
-            var nestedDataPath = Path.Combine(overlayRoot, "Overlay", "data", "overlay-data.json");
+            string overlayRoot = Path.GetFullPath(dialog.FolderName);
+            string manifestPath = Path.Combine(overlayRoot, "overlay.json");
+            string rootDataPath = Path.Combine(overlayRoot, "data", "overlay-data.json");
+            string nestedDataPath = Path.Combine(overlayRoot, "Overlay", "data", "overlay-data.json");
             // Ältere DenverJohn-Overlays enthalten die tatsächlich von den HTML-Szenen
             // geladene Laufzeitdatei im Unterordner Overlay\data. Diese Datei hat
             // Vorrang vor einer zusätzlich vorhandenen, veralteten Kopie in data.
-            var dataPath = File.Exists(nestedDataPath) ? nestedDataPath : rootDataPath;
+            string dataPath = File.Exists(nestedDataPath) ? nestedDataPath : rootDataPath;
 
             if (!File.Exists(manifestPath))
+            {
                 throw new InvalidOperationException("Im ausgewählten Ordner wurde keine overlay.json gefunden.");
+            }
 
             if (!File.Exists(dataPath))
+            {
                 throw new InvalidOperationException(@"Im ausgewählten Ordner wurde weder Overlay\data\overlay-data.json noch data\overlay-data.json gefunden.");
+            }
 
             await DisableLegacyOverlayWriterAsync(overlayRoot);
 
@@ -8391,11 +8922,18 @@ public partial class MainWindow : Window
                 data.Spotify.Cover = data.Spotify.CoverUrl;
             });
 
-            var project = await _overlayProjectService.ImportFolderAsync(overlayRoot);
-            var existing = _overlayProjects.FirstOrDefault(x => string.Equals(x.RootPath, overlayRoot, StringComparison.OrdinalIgnoreCase));
-            if (existing is not null) _overlayProjects.Remove(existing);
+            OverlayProjectDefinition project = await _overlayProjectService.ImportFolderAsync(overlayRoot);
+            OverlayProjectDefinition? existing = _overlayProjects.FirstOrDefault(x => string.Equals(x.RootPath, overlayRoot, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                _overlayProjects.Remove(existing);
+            }
+
             if (_overlayProjects.Any(x => string.Equals(x.Id, project.Id, StringComparison.OrdinalIgnoreCase)))
+            {
                 project.Id = Guid.NewGuid().ToString("N");
+            }
+
             _overlayProjects.Add(project);
             await _overlayProjectService.SaveAsync(_overlayProjects);
 
@@ -8421,15 +8959,15 @@ public partial class MainWindow : Window
     private static void CopyOverlayDirectory(string sourceRoot, string targetRoot)
     {
         Directory.CreateDirectory(targetRoot);
-        foreach (var directory in Directory.GetDirectories(sourceRoot, "*", SearchOption.AllDirectories))
+        foreach (string directory in Directory.GetDirectories(sourceRoot, "*", SearchOption.AllDirectories))
         {
-            var relative = Path.GetRelativePath(sourceRoot, directory);
+            string relative = Path.GetRelativePath(sourceRoot, directory);
             Directory.CreateDirectory(Path.Combine(targetRoot, relative));
         }
-        foreach (var file in Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories))
+        foreach (string file in Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories))
         {
-            var relative = Path.GetRelativePath(sourceRoot, file);
-            var target = Path.Combine(targetRoot, relative);
+            string relative = Path.GetRelativePath(sourceRoot, file);
+            string target = Path.Combine(targetRoot, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(file, target, true);
         }
@@ -8438,12 +8976,19 @@ public partial class MainWindow : Window
     private async Task ImportOverlayProjectAsync()
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Ordner des HTML-Overlay-Projekts auswählen" };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
         try
         {
-            var project = await _overlayProjectService.ImportFolderAsync(dialog.FolderName);
-            var existing = _overlayProjects.FirstOrDefault(x => string.Equals(x.RootPath, project.RootPath, StringComparison.OrdinalIgnoreCase));
-            if (existing is not null) _overlayProjects.Remove(existing);
+            OverlayProjectDefinition project = await _overlayProjectService.ImportFolderAsync(dialog.FolderName);
+            OverlayProjectDefinition? existing = _overlayProjects.FirstOrDefault(x => string.Equals(x.RootPath, project.RootPath, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                _overlayProjects.Remove(existing);
+            }
 
             // Ein aus einem anderen Ordner kopiertes overlay.json darf nicht dazu führen,
             // dass zwei unterschiedliche Overlay-Projekte dieselbe interne ID besitzen.
@@ -8475,7 +9020,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            var project = await _overlayProjectService.ImportFromObsAsync("OBS Szenensammlung " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+            OverlayProjectDefinition project = await _overlayProjectService.ImportFromObsAsync("OBS Szenensammlung " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
             _overlayProjects.Add(project);
             await _overlayProjectService.SaveAsync(_overlayProjects);
             OverlayProjectList.SelectedItem = project;
@@ -8541,7 +9086,10 @@ public partial class MainWindow : Window
             }
             dialog.DialogResult = true;
         };
-        if (dialog.ShowDialog() != true) return;
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
 
         var filesDialog = new Microsoft.Win32.OpenFileDialog
         {
@@ -8550,14 +9098,21 @@ public partial class MainWindow : Window
             CheckFileExists = true,
             Filter = "Geeignete Overlay-Dateien|*.html;*.htm;*.css;*.js;*.json;*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg;*.bmp;*.mp4;*.webm;*.mov;*.mkv;*.mp3;*.wav;*.ogg;*.m4a;*.woff;*.woff2;*.ttf;*.otf|HTML-Dateien|*.html;*.htm|Bilder|*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg;*.bmp|Video und Audio|*.mp4;*.webm;*.mov;*.mkv;*.mp3;*.wav;*.ogg;*.m4a|Web-Assets|*.css;*.js;*.json;*.woff;*.woff2;*.ttf;*.otf|Alle Dateien|*.*"
         };
-        if (filesDialog.ShowDialog(this) != true || filesDialog.FileNames.Length == 0) return;
+        if (filesDialog.ShowDialog(this) != true || filesDialog.FileNames.Length == 0)
+        {
+            return;
+        }
 
         try
         {
-            var added = await _overlayProjectService.AddSceneAsync(project, sceneNameBox.Text.Trim(), filesDialog.FileNames);
+            List<OverlayProjectItem> added = await _overlayProjectService.AddSceneAsync(project, sceneNameBox.Text.Trim(), filesDialog.FileNames);
             await _overlayProjectService.SaveAsync(_overlayProjects);
             _overlayProjectItems.Clear();
-            foreach (var item in project.Items) _overlayProjectItems.Add(item);
+            foreach (OverlayProjectItem item in project.Items)
+            {
+                _overlayProjectItems.Add(item);
+            }
+
             OverlayProjectItemsList.Items.Refresh();
             OverlayProjectList.Items.Refresh();
             OverlayProjectItemsList.SelectedItem = added.FirstOrDefault();
@@ -8576,8 +9131,16 @@ public partial class MainWindow : Window
 
     private async Task DeleteOverlayProjectAsync()
     {
-        if (OverlayProjectList.SelectedItem is not OverlayProjectDefinition project) return;
-        if (MessageBox.Show($"Overlay-Projekt '{project.Name}' aus der Suite entfernen? Die Originaldateien werden nicht gelöscht.", "Overlay-Projekt", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (OverlayProjectList.SelectedItem is not OverlayProjectDefinition project)
+        {
+            return;
+        }
+
+        if (MessageBox.Show($"Overlay-Projekt '{project.Name}' aus der Suite entfernen? Die Originaldateien werden nicht gelöscht.", "Overlay-Projekt", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
         _overlayProjects.Remove(project);
         await _overlayProjectService.SaveAsync(_overlayProjects);
         RefreshSelectedOverlayProject();
@@ -8585,12 +9148,19 @@ public partial class MainWindow : Window
 
     private async Task SaveOverlayProjectMappingAsync()
     {
-        if (OverlayProjectItemsList.SelectedItem is not OverlayProjectItem item) return;
+        if (OverlayProjectItemsList.SelectedItem is not OverlayProjectItem item)
+        {
+            return;
+        }
+
         item.ObsScene = OverlayProjectObsSceneBox.SelectedItem?.ToString() ?? "";
         item.ObsSource = OverlayProjectObsSourceBox.Text.Trim();
         await _overlayProjectService.SaveAsync(_overlayProjects);
         if (OverlayProjectList.SelectedItem is OverlayProjectDefinition project)
+        {
             await _overlayProjectService.WriteManifestAsync(project);
+        }
+
         OverlayProjectItemsList.Items.Refresh();
         OverlayProjectStatusText.Text = "OBS-Zuordnung und overlay.json gespeichert.";
         OverlayProjectStatusText.Foreground = Brushes.LightGreen;
@@ -8598,7 +9168,11 @@ public partial class MainWindow : Window
 
     private async Task SynchronizeOverlayProjectAsync()
     {
-        if (OverlayProjectList.SelectedItem is not OverlayProjectDefinition project) return;
+        if (OverlayProjectList.SelectedItem is not OverlayProjectDefinition project)
+        {
+            return;
+        }
+
         try
         {
             await SaveOverlayProjectMappingAsync();
@@ -8647,7 +9221,7 @@ public partial class MainWindow : Window
 
     private async Task OpenOverlayFolderAsync()
     {
-        var root = await _overlayModule.Service.GetOverlayRootAsync();
+        string root = await _overlayModule.Service.GetOverlayRootAsync();
         Directory.CreateDirectory(root);
 
         Process.Start(
@@ -8662,11 +9236,11 @@ public partial class MainWindow : Window
     {
         try
         {
-            var root = await _overlayModule.Service.GetOverlayRootAsync();
-            var data = await _overlayModule.Service.GetDataFilePathAsync();
+            string root = await _overlayModule.Service.GetOverlayRootAsync();
+            string data = await _overlayModule.Service.GetDataFilePathAsync();
 
-            var required = new[]
-            {
+            string[] required =
+            [
                 Path.Combine(root, "assets", "base.css"),
                 Path.Combine(root, "assets", "data-client.js"),
                 Path.Combine(root, "modules", "content-name.html"),
@@ -8688,7 +9262,7 @@ public partial class MainWindow : Window
                 Path.Combine(root, "scenes", "reactions.html"),
                 Path.Combine(root, "scenes", "ende.html"),
                 data
-            };
+            ];
 
             var missing = required.Where(path => !File.Exists(path)).ToList();
 
@@ -8712,7 +9286,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            var installed = await _obsBrowserSourceInstaller.InstallAsync();
+            IReadOnlyList<string> installed = await _obsBrowserSourceInstaller.InstallAsync();
 
             OverlayStatusText.Text =
                 "Eigene Overlay-Szenen aus dem ausgewählten Pfad wurden in OBS eingerichtet:\n" +
@@ -8754,7 +9328,7 @@ public partial class MainWindow : Window
 
     private async Task AddViewerSampleAsync()
     {
-        if (!int.TryParse(WorkflowViewerSampleBox.Text.Trim(), out var viewers))
+        if (!int.TryParse(WorkflowViewerSampleBox.Text.Trim(), out int viewers))
         {
             return;
         }
@@ -8783,7 +9357,7 @@ public partial class MainWindow : Window
             TimeSpan.FromSeconds(Math.Max(0, state.CountdownRemainingSeconds))
                 .ToString(@"mm\:ss");
 
-        var stats = _workflowModule.Service.SessionStats;
+        StreamSessionStats stats = _workflowModule.Service.SessionStats;
         WorkflowPeakViewersText.Text = stats.PeakViewers.ToString();
         WorkflowAverageViewersText.Text = stats.AverageViewers.ToString("0.0");
         WorkflowFollowersText.Text = stats.FollowersGained.ToString();
@@ -8793,8 +9367,8 @@ public partial class MainWindow : Window
         // The dashboard must reflect the actual OBS output as well as streams
         // started through the suite workflow. Otherwise a stream started
         // directly in OBS (or through another controller) remains "OFFLINE".
-        var isLive = state.Phase == StreamPhase.Live || _lastObsStreamActive;
-        var liveDetail = _lastObsStreamActive && _streamSessionStartedAt.HasValue
+        bool isLive = state.Phase == StreamPhase.Live || _lastObsStreamActive;
+        string liveDetail = _lastObsStreamActive && _streamSessionStartedAt.HasValue
             ? (DateTimeOffset.Now - _streamSessionStartedAt.Value).ToString(@"hh\:mm\:ss")
             : state.Detail;
 
@@ -8821,7 +9395,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var stats = _workflowModule.Service.SessionStats;
+        StreamSessionStats stats = _workflowModule.Service.SessionStats;
         DashboardHeroViewerText.Text = _currentLiveViewerCount.ToString();
         DashboardHeroFollowerText.Text = _currentFollowerCount.ToString();
         DashboardChatAlertsText.Text = _currentActiveSubscriptionCount.ToString();
@@ -8934,7 +9508,7 @@ public partial class MainWindow : Window
             await RefreshMusicPlayerUiAsync();
 
             // Streamer.bot top status
-            var streamerBotConnected =
+            bool streamerBotConnected =
                 _streamerBotClient.IsConnected;
 
             StreamerBotDashboardStatus.Text =
@@ -8959,13 +9533,13 @@ public partial class MainWindow : Window
     {
         try
         {
-            var stream = await _obsClient.GetStreamStatusAsync();
-            var stats = await _obsClient.GetStatsAsync();
-            var now = DateTimeOffset.Now;
+            ObsStreamStatus stream = await _obsClient.GetStreamStatusAsync();
+            ObsStats stats = await _obsClient.GetStatsAsync();
+            DateTimeOffset now = DateTimeOffset.Now;
 
             if (_lastObsBitrateSampleAt.HasValue && stream.OutputBytes >= _lastObsOutputBytes)
             {
-                var seconds = Math.Max(0.25, (now - _lastObsBitrateSampleAt.Value).TotalSeconds);
+                double seconds = Math.Max(0.25, (now - _lastObsBitrateSampleAt.Value).TotalSeconds);
                 _currentObsBitrateKbps = (stream.OutputBytes - _lastObsOutputBytes) * 8d / seconds / 1000d;
             }
             else if (!stream.OutputActive)
@@ -8976,10 +9550,10 @@ public partial class MainWindow : Window
             _lastObsOutputBytes = stream.OutputBytes;
             _lastObsBitrateSampleAt = now;
 
-            var outputDropped = Math.Max(stream.OutputSkippedFrames, stats.OutputSkippedFrames);
-            var outputTotal = Math.Max(stream.OutputTotalFrames, stats.OutputTotalFrames);
-            var droppedPercent = outputTotal > 0 ? outputDropped * 100d / outputTotal : 0d;
-            var renderPercent = stats.RenderTotalFrames > 0 ? stats.RenderSkippedFrames * 100d / stats.RenderTotalFrames : 0d;
+            int outputDropped = Math.Max(stream.OutputSkippedFrames, stats.OutputSkippedFrames);
+            int outputTotal = Math.Max(stream.OutputTotalFrames, stats.OutputTotalFrames);
+            double droppedPercent = outputTotal > 0 ? outputDropped * 100d / outputTotal : 0d;
+            double renderPercent = stats.RenderTotalFrames > 0 ? stats.RenderSkippedFrames * 100d / stats.RenderTotalFrames : 0d;
 
             DashboardStreamBitrateText.Text = $"{_currentObsBitrateKbps:0} kbps";
             DashboardStreamFpsText.Text = $"{stats.ActiveFps:0.0} / 60";
@@ -9038,7 +9612,7 @@ public partial class MainWindow : Window
     private void RefreshDashboardAutomationSummary()
     {
         var items = new List<string>();
-        var state = _workflowModule.Service.State;
+        WorkflowState state = _workflowModule.Service.State;
 
         items.Add(
             $"Workflow · {state.Phase} · {state.Detail}");
@@ -9050,7 +9624,7 @@ public partial class MainWindow : Window
 
         if (_settings.Twitch.RaidOnStreamEnd)
         {
-            var raidTarget = string.IsNullOrWhiteSpace(
+            string raidTarget = string.IsNullOrWhiteSpace(
                     _settings.Twitch.SelectedRaidChannel)
                 ? "kein Ziel"
                 : _settings.Twitch.SelectedRaidChannel;
@@ -9077,17 +9651,17 @@ public partial class MainWindow : Window
         try
         {
             using var process = Process.GetCurrentProcess();
-            var now = DateTimeOffset.Now;
-            var cpuNow = process.TotalProcessorTime;
-            var elapsedMs = Math.Max(1, (now - _lastDashboardResourceSample).TotalMilliseconds);
-            var cpuMs = Math.Max(0, (cpuNow - _lastDashboardCpuTime).TotalMilliseconds);
-            var cpu = Math.Clamp(cpuMs / elapsedMs / Math.Max(1, Environment.ProcessorCount) * 100.0, 0, 100);
+            DateTimeOffset now = DateTimeOffset.Now;
+            TimeSpan cpuNow = process.TotalProcessorTime;
+            double elapsedMs = Math.Max(1, (now - _lastDashboardResourceSample).TotalMilliseconds);
+            double cpuMs = Math.Max(0, (cpuNow - _lastDashboardCpuTime).TotalMilliseconds);
+            double cpu = Math.Clamp(cpuMs / elapsedMs / Math.Max(1, Environment.ProcessorCount) * 100.0, 0, 100);
             _lastDashboardCpuTime = cpuNow;
             _lastDashboardResourceSample = now;
 
-            var ramMb = process.WorkingSet64 / 1024d / 1024d;
-            var available = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
-            var ramPercent = available > 0 ? Math.Clamp(process.WorkingSet64 / (double)available * 100.0, 0, 100) : 0;
+            double ramMb = process.WorkingSet64 / 1024d / 1024d;
+            long available = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+            double ramPercent = available > 0 ? Math.Clamp(process.WorkingSet64 / (double)available * 100.0, 0, 100) : 0;
 
             DashboardCpuText.Text = $"CPU: {cpu:0}%";
             DashboardCpuBar.Value = cpu;
@@ -9132,19 +9706,19 @@ public partial class MainWindow : Window
     {
         try
         {
-            var selected = AlertAudioOutputDeviceBox.SelectedValue?.ToString();
+            string? selected = AlertAudioOutputDeviceBox.SelectedValue?.ToString();
             var devices = new List<AlertAudioOutputDevice>
             {
                 new("default", "Windows-Standardausgabe")
             };
 
-            var deviceCount = waveOutGetNumDevs();
-            var capsSize = (uint)Marshal.SizeOf<WaveOutCaps>();
+            uint deviceCount = waveOutGetNumDevs();
+            uint capsSize = (uint)Marshal.SizeOf<WaveOutCaps>();
             for (uint index = 0; index < deviceCount; index++)
             {
-                if (waveOutGetDevCaps((UIntPtr)index, out var capabilities, capsSize) == 0)
+                if (waveOutGetDevCaps((UIntPtr)index, out WaveOutCaps capabilities, capsSize) == 0)
                 {
-                    var name = string.IsNullOrWhiteSpace(capabilities.ProductName)
+                    string name = string.IsNullOrWhiteSpace(capabilities.ProductName)
                         ? $"Audioausgabe {index + 1}"
                         : capabilities.ProductName.Trim();
                     devices.Add(new AlertAudioOutputDevice($"waveout:{index}", name));
@@ -9153,9 +9727,14 @@ public partial class MainWindow : Window
 
             AlertAudioOutputDeviceBox.ItemsSource = devices;
             if (!string.IsNullOrWhiteSpace(selected))
+            {
                 AlertAudioOutputDeviceBox.SelectedValue = selected;
+            }
+
             if (AlertAudioOutputDeviceBox.SelectedIndex < 0)
+            {
                 AlertAudioOutputDeviceBox.SelectedIndex = 0;
+            }
         }
         catch (Exception ex)
         {
@@ -9171,20 +9750,28 @@ public partial class MainWindow : Window
     private void LoadAlertAudioPreviewSource()
     {
         StopAlertAudioPreview();
-        var path = AlertSoundPathBox.Text.Trim();
-        if (!File.Exists(path)) return;
+        string path = AlertSoundPathBox.Text.Trim();
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
         AlertAudioPreviewMedia.Source = new Uri(path, UriKind.Absolute);
     }
 
     private void PlaySelectedAlertAudioRange()
     {
-        var path = AlertSoundPathBox.Text.Trim();
+        string path = AlertSoundPathBox.Text.Trim();
         if (!File.Exists(path))
         {
             AlertPreviewStatusText.Text = "Bitte zuerst eine vorhandene Audiodatei auswählen.";
             return;
         }
-        if (AlertAudioPreviewMedia.Source is null) LoadAlertAudioPreviewSource();
+        if (AlertAudioPreviewMedia.Source is null)
+        {
+            LoadAlertAudioPreviewSource();
+        }
+
         AlertAudioPreviewMedia.Position = TimeSpan.FromSeconds(AlertAudioStartSlider.Value);
         AlertAudioPreviewMedia.Volume = 1.0;
         AlertAudioPreviewMedia.Play();
@@ -9219,25 +9806,42 @@ public partial class MainWindow : Window
 
     private void AlertAudioPreviewMedia_OnMediaOpened(object sender, RoutedEventArgs e)
     {
-        if (!AlertAudioPreviewMedia.NaturalDuration.HasTimeSpan) return;
-        var duration = Math.Max(0.1, AlertAudioPreviewMedia.NaturalDuration.TimeSpan.TotalSeconds);
+        if (!AlertAudioPreviewMedia.NaturalDuration.HasTimeSpan)
+        {
+            return;
+        }
+
+        double duration = Math.Max(0.1, AlertAudioPreviewMedia.NaturalDuration.TimeSpan.TotalSeconds);
         _updatingAlertAudioTrimUi = true;
         AlertAudioStartSlider.Maximum = duration;
         AlertAudioEndSlider.Maximum = duration;
         if (AlertAudioEndSlider.Value <= AlertAudioStartSlider.Value || AlertAudioEndSlider.Value <= 1)
+        {
             AlertAudioEndSlider.Value = duration;
+        }
+
         _updatingAlertAudioTrimUi = false;
         UpdateAlertAudioTrimLabels();
     }
 
     private void AlertAudioTrimSlider_OnValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_updatingAlertAudioTrimUi || AlertAudioStartSlider is null || AlertAudioEndSlider is null) return;
+        if (_updatingAlertAudioTrimUi || AlertAudioStartSlider is null || AlertAudioEndSlider is null)
+        {
+            return;
+        }
+
         _updatingAlertAudioTrimUi = true;
         if (AlertAudioStartSlider.Value > AlertAudioEndSlider.Value)
         {
-            if (ReferenceEquals(sender, AlertAudioStartSlider)) AlertAudioEndSlider.Value = AlertAudioStartSlider.Value;
-            else AlertAudioStartSlider.Value = AlertAudioEndSlider.Value;
+            if (ReferenceEquals(sender, AlertAudioStartSlider))
+            {
+                AlertAudioEndSlider.Value = AlertAudioStartSlider.Value;
+            }
+            else
+            {
+                AlertAudioStartSlider.Value = AlertAudioEndSlider.Value;
+            }
         }
         _updatingAlertAudioTrimUi = false;
         UpdateAlertAudioTrimLabels();
@@ -9253,44 +9857,64 @@ public partial class MainWindow : Window
         // During InitializeComponent the alert controls may not have been created yet.
         // ValueChanged/SelectionChanged handlers can call this method while XAML is still loading.
         if (AlertTypeBox is null || AlertLibraryList is null)
+        {
             return;
+        }
 
         selectType ??= AlertTypeBox.SelectedItem as string;
         var keys = _settings.Alerts.Definitions.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
         AlertTypeBox.ItemsSource = keys;
         AlertLibraryList.ItemsSource = keys.Select(key => new AlertLibraryItem(key, _settings.Alerts.Definitions[key].Enabled)).ToList();
         if (!string.IsNullOrWhiteSpace(selectType) && _settings.Alerts.Definitions.ContainsKey(selectType))
+        {
             AlertTypeBox.SelectedItem = selectType;
+        }
         else if (keys.Count > 0)
+        {
             AlertTypeBox.SelectedIndex = 0;
+        }
+
         SyncAlertLibrarySelection();
     }
 
     private void SyncAlertLibrarySelection()
     {
-        if (AlertLibraryList is null || AlertTypeBox?.SelectedItem is not string type) return;
+        if (AlertLibraryList is null || AlertTypeBox?.SelectedItem is not string type)
+        {
+            return;
+        }
+
         AlertLibraryList.SelectedItem = AlertLibraryList.Items.Cast<AlertLibraryItem>()
             .FirstOrDefault(item => string.Equals(item.Type, type, StringComparison.OrdinalIgnoreCase));
     }
 
     private string CreateUniqueAlertType(string baseName)
     {
-        var cleaned = string.IsNullOrWhiteSpace(baseName) ? "Eigener Alert" : baseName.Trim();
-        if (!_settings.Alerts.Definitions.ContainsKey(cleaned)) return cleaned;
-        for (var i = 2; i < 1000; i++)
+        string cleaned = string.IsNullOrWhiteSpace(baseName) ? "Eigener Alert" : baseName.Trim();
+        if (!_settings.Alerts.Definitions.ContainsKey(cleaned))
         {
-            var candidate = $"{cleaned} {i}";
-            if (!_settings.Alerts.Definitions.ContainsKey(candidate)) return candidate;
+            return cleaned;
+        }
+
+        for (int i = 2; i < 1000; i++)
+        {
+            string candidate = $"{cleaned} {i}";
+            if (!_settings.Alerts.Definitions.ContainsKey(candidate))
+            {
+                return candidate;
+            }
         }
         return cleaned + " " + Guid.NewGuid().ToString("N")[..6];
     }
 
     private async Task CreateAlertDefinitionAsync()
     {
-        var type = CreateUniqueAlertType("Eigener Alert");
+        string type = CreateUniqueAlertType("Eigener Alert");
         _settings.Alerts.Definitions[type] = new AlertDefinitionSettings
         {
-            Type = type, Enabled = true, TextTemplate = "{user} hat einen Alert ausgelöst!"
+            Type = type,
+            Enabled = true,
+            TextTemplate = "{user} hat einen Alert ausgelöst!"
         };
         await _settingsStore.SaveAsync(_settings);
         RefreshAlertLibrary(type);
@@ -9299,16 +9923,33 @@ public partial class MainWindow : Window
 
     private async Task DuplicateAlertDefinitionAsync()
     {
-        if (AlertTypeBox.SelectedItem is not string sourceType || !_settings.Alerts.Definitions.TryGetValue(sourceType, out var source)) return;
+        if (AlertTypeBox.SelectedItem is not string sourceType || !_settings.Alerts.Definitions.TryGetValue(sourceType, out AlertDefinitionSettings? source))
+        {
+            return;
+        }
+
         SaveAlertDefinitionToSettings();
-        var type = CreateUniqueAlertType(sourceType + " Kopie");
+        string type = CreateUniqueAlertType(sourceType + " Kopie");
         _settings.Alerts.Definitions[type] = new AlertDefinitionSettings
         {
-            Type = type, Enabled = source.Enabled, TextTemplate = source.TextTemplate, MediaPath = source.MediaPath,
-            SoundPath = source.SoundPath, DurationSeconds = source.DurationSeconds, Priority = source.Priority,
-            FontFace = source.FontFace, FontSize = source.FontSize, FontColor = source.FontColor, Animation = source.Animation,
-            X = source.X, Y = source.Y, Width = source.Width, Height = source.Height, VolumePercent = source.VolumePercent,
-            SoundStartSeconds = source.SoundStartSeconds, SoundEndSeconds = source.SoundEndSeconds,
+            Type = type,
+            Enabled = source.Enabled,
+            TextTemplate = source.TextTemplate,
+            MediaPath = source.MediaPath,
+            SoundPath = source.SoundPath,
+            DurationSeconds = source.DurationSeconds,
+            Priority = source.Priority,
+            FontFace = source.FontFace,
+            FontSize = source.FontSize,
+            FontColor = source.FontColor,
+            Animation = source.Animation,
+            X = source.X,
+            Y = source.Y,
+            Width = source.Width,
+            Height = source.Height,
+            VolumePercent = source.VolumePercent,
+            SoundStartSeconds = source.SoundStartSeconds,
+            SoundEndSeconds = source.SoundEndSeconds,
             AudioOutputDeviceId = source.AudioOutputDeviceId
         };
         await _settingsStore.SaveAsync(_settings);
@@ -9318,7 +9959,11 @@ public partial class MainWindow : Window
 
     private async Task ToggleAlertDefinitionAsync()
     {
-        if (AlertTypeBox.SelectedItem is not string type || !_settings.Alerts.Definitions.TryGetValue(type, out var definition)) return;
+        if (AlertTypeBox.SelectedItem is not string type || !_settings.Alerts.Definitions.TryGetValue(type, out AlertDefinitionSettings? definition))
+        {
+            return;
+        }
+
         definition.Enabled = !definition.Enabled;
         await _settingsStore.SaveAsync(_settings);
         RefreshAlertLibrary(type);
@@ -9327,14 +9972,22 @@ public partial class MainWindow : Window
 
     private async Task DeleteAlertDefinitionAsync()
     {
-        if (AlertTypeBox.SelectedItem is not string type) return;
+        if (AlertTypeBox.SelectedItem is not string type)
+        {
+            return;
+        }
+
         if (_settings.Alerts.Definitions.Count <= 1)
         {
             AlertLibraryStatusText.Text = "Mindestens ein Alert muss erhalten bleiben.";
             return;
         }
-        var answer = MessageBox.Show($"Alert '{type}' wirklich löschen?", "Alert löschen", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (answer != MessageBoxResult.Yes) return;
+        MessageBoxResult answer = MessageBox.Show($"Alert '{type}' wirklich löschen?", "Alert löschen", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
         _settings.Alerts.Definitions.Remove(type);
         await _settingsStore.SaveAsync(_settings);
         RefreshAlertLibrary();
@@ -9346,7 +9999,7 @@ public partial class MainWindow : Window
         if (AlertTypeBox.SelectedItem is not string type ||
             !_settings.Alerts.Definitions.TryGetValue(
                 type,
-                out var definition))
+                out AlertDefinitionSettings? definition))
         {
             return;
         }
@@ -9364,7 +10017,10 @@ public partial class MainWindow : Window
         AlertAudioOutputDeviceBox.SelectedValue = definition.AudioOutputDeviceId;
         LoadAlertAudioPreviewSource();
         AlertAudioStartSlider.Value = Math.Max(0, definition.SoundStartSeconds);
-        if (definition.SoundEndSeconds > 0) AlertAudioEndSlider.Value = definition.SoundEndSeconds;
+        if (definition.SoundEndSeconds > 0)
+        {
+            AlertAudioEndSlider.Value = definition.SoundEndSeconds;
+        }
 
         AlertDurationBox.Text =
             definition.DurationSeconds.ToString();
@@ -9381,7 +10037,7 @@ public partial class MainWindow : Window
         AlertFontColorBox.Text =
             definition.FontColor;
 
-        foreach (var item in AlertAnimationBox.Items)
+        foreach (object? item in AlertAnimationBox.Items)
         {
             if (item is System.Windows.Controls.ComboBoxItem comboItem &&
                 string.Equals(
@@ -9427,7 +10083,7 @@ public partial class MainWindow : Window
         if (AlertTypeBox.SelectedItem is not string type ||
             !_settings.Alerts.Definitions.TryGetValue(
                 type,
-                out var definition))
+                out AlertDefinitionSettings? definition))
         {
             return;
         }
@@ -9479,9 +10135,9 @@ public partial class MainWindow : Window
         {
             SaveAlertDefinitionToSettings();
 
-            var variables = CreateAlertTestVariables(type);
+            IReadOnlyDictionary<string, string> variables = CreateAlertTestVariables(type);
 
-            var preview = await _alertsModule.BuildPreviewAsync(
+            AlertPreview preview = await _alertsModule.BuildPreviewAsync(
                 type,
                 AlertTestUserBox.Text.Trim(),
                 variables);
@@ -9552,7 +10208,7 @@ public partial class MainWindow : Window
             SaveAlertDefinitionToSettings();
             await _settingsStore.SaveAsync(_settings);
 
-            var variables = CreateAlertTestVariables(type);
+            IReadOnlyDictionary<string, string> variables = CreateAlertTestVariables(type);
 
             await _alertsModule.EnqueueAsync(
                 type,
@@ -9584,7 +10240,7 @@ public partial class MainWindow : Window
 
     private async Task InstallObsAlertSceneAsync()
     {
-        var type = AlertTypeBox.SelectedItem as string
+        string? type = AlertTypeBox.SelectedItem as string
                    ?? _settings.Alerts.Definitions.Keys.FirstOrDefault();
 
         if (string.IsNullOrWhiteSpace(type))
@@ -9608,8 +10264,8 @@ public partial class MainWindow : Window
                 AlertObsTextSourceBox.Text.Trim();
             await _settingsStore.SaveAsync(_settings);
 
-            var variables = CreateAlertTestVariables(type);
-            var user = string.IsNullOrWhiteSpace(AlertTestUserBox.Text)
+            IReadOnlyDictionary<string, string> variables = CreateAlertTestVariables(type);
+            string user = string.IsNullOrWhiteSpace(AlertTestUserBox.Text)
                 ? "TestUser"
                 : AlertTestUserBox.Text.Trim();
 
@@ -9755,7 +10411,7 @@ public partial class MainWindow : Window
         {
             await UpdateActiveOverlayJsonAsync(root =>
             {
-                var spotify = root["spotify"] as JsonObject ?? new JsonObject();
+                JsonObject spotify = root["spotify"] as JsonObject ?? [];
                 spotify["connected"] = false;
                 spotify["isPlaying"] = false;
                 spotify["showInOverlay"] = false;
@@ -9777,17 +10433,17 @@ public partial class MainWindow : Window
         SpotifyTrackText.Text = "Kein Titel";
         SpotifyPlaybackDetailText.Text =
             "Playerstatus unbekannt";
-    
+
         RefreshDashboardServiceActionButtons();
-}
+    }
 
 
-private Task ApplyCombinedAlertDuckingAsync()
+    private Task ApplyCombinedAlertDuckingAsync()
     {
-        var externalCount = _externalAlertActivity.ActiveCount;
-        var isRunning = _suiteAlertRunning || externalCount > 0;
-        var pending = _suiteAlertQueueLength + Math.Max(0, externalCount - (isRunning ? 1 : 0));
-        var detail = externalCount > 0 ? $"Streamer.bot/externe Alerts aktiv: {externalCount}" : "Suite-Alertstatus";
+        int externalCount = _externalAlertActivity.ActiveCount;
+        bool isRunning = _suiteAlertRunning || externalCount > 0;
+        int pending = _suiteAlertQueueLength + Math.Max(0, externalCount - (isRunning ? 1 : 0));
+        string detail = externalCount > 0 ? $"Streamer.bot/externe Alerts aktiv: {externalCount}" : "Suite-Alertstatus";
         return HandleSpotifyAlertMuteAsync(new AlertPlaybackState(isRunning, null, pending, isRunning ? DateTimeOffset.Now : null, detail));
     }
 
@@ -9812,8 +10468,8 @@ private Task ApplyCombinedAlertDuckingAsync()
                     return;
                 }
 
-                var snapshot = _spotifyModule.GetSnapshot();
-                var playback = snapshot.Playback;
+                SpotifySnapshot snapshot = _spotifyModule.GetSnapshot();
+                SpotifyPlaybackState playback = snapshot.Playback;
                 if (!snapshot.Authenticated || !playback.IsPlaying || playback.Device is null)
                 {
                     Dispatcher.Invoke(() =>
@@ -9825,7 +10481,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 _spotifyWasPlayingBeforeAlert = playback.IsPlaying;
                 _spotifyAlertMuteActive = true;
 
-                    var alertVolume = Math.Clamp(_settings.Spotify.AlertMuteVolumePercent, 0, 100);
+                int alertVolume = Math.Clamp(_settings.Spotify.AlertMuteVolumePercent, 0, 100);
                 await FadeSpotifyVolumeAsync(_spotifyVolumeBeforeAlert.Value, alertVolume, _settings.Spotify.AlertFadeOutMilliseconds);
 
                 Dispatcher.Invoke(() =>
@@ -9862,8 +10518,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RestoreSpotifyVolumeAfterAlertAsync()
     {
-        var restoreVolume = _spotifyVolumeBeforeAlert;
-        var shouldRestore = _spotifyWasPlayingBeforeAlert && restoreVolume.HasValue;
+        int? restoreVolume = _spotifyVolumeBeforeAlert;
+        bool shouldRestore = _spotifyWasPlayingBeforeAlert && restoreVolume.HasValue;
 
         _spotifyAlertMuteActive = false;
         _spotifyVolumeBeforeAlert = null;
@@ -9874,7 +10530,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var currentVolume = Math.Clamp(_spotifyModule.GetSnapshot().Playback.Device?.VolumePercent ?? 0, 0, 100);
+        int currentVolume = Math.Clamp(_spotifyModule.GetSnapshot().Playback.Device?.VolumePercent ?? 0, 0, 100);
         await FadeSpotifyVolumeAsync(currentVolume, restoreVolume!.Value, _settings.Spotify.AlertFadeInMilliseconds);
 
         Dispatcher.Invoke(() =>
@@ -9887,10 +10543,14 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static void SelectMillisecondsComboItem(ComboBox comboBox, int milliseconds)
     {
-        if (comboBox is null) return;
-        foreach (var item in comboBox.Items.OfType<ComboBoxItem>())
+        if (comboBox is null)
         {
-            if (int.TryParse(item.Tag?.ToString(), out var value) && value == milliseconds)
+            return;
+        }
+
+        foreach (ComboBoxItem item in comboBox.Items.OfType<ComboBoxItem>())
+        {
+            if (int.TryParse(item.Tag?.ToString(), out int value) && value == milliseconds)
             {
                 comboBox.SelectedItem = item;
                 return;
@@ -9901,7 +10561,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static int GetMillisecondsComboValue(ComboBox comboBox, int fallback)
     {
-        return comboBox?.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag?.ToString(), out var value)
+        return comboBox?.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag?.ToString(), out int value)
             ? value
             : fallback;
     }
@@ -9917,13 +10577,16 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var steps = Math.Clamp(durationMilliseconds / 100, 2, 10);
-        var delay = Math.Max(50, durationMilliseconds / steps);
-        for (var step = 1; step <= steps; step++)
+        int steps = Math.Clamp(durationMilliseconds / 100, 2, 10);
+        int delay = Math.Max(50, durationMilliseconds / steps);
+        for (int step = 1; step <= steps; step++)
         {
-            var volume = (int)Math.Round(fromVolume + ((toVolume - fromVolume) * (step / (double)steps)));
+            int volume = (int)Math.Round(fromVolume + ((toVolume - fromVolume) * (step / (double)steps)));
             await SetSpotifyVolumeTrackedAsync(Math.Clamp(volume, 0, 100));
-            if (step < steps) await Task.Delay(delay);
+            if (step < steps)
+            {
+                await Task.Delay(delay);
+            }
         }
     }
 
@@ -9943,12 +10606,12 @@ private Task ApplyCombinedAlertDuckingAsync()
         _spotifyVolumeChangeCts =
             new CancellationTokenSource();
 
-        var cancellationToken =
+        CancellationToken cancellationToken =
             _spotifyVolumeChangeCts.Token;
 
         try
         {
-            var volume = explicitVolume ??
+            int volume = explicitVolume ??
                 (int)Math.Round(
                     SpotifyVolumeSlider.Value);
 
@@ -9982,7 +10645,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshSpotifyStatisticsUi()
     {
-        var statistics = _spotifyListeningStatistics.GetSnapshot();
+        SpotifyListeningStatisticsSnapshot statistics = _spotifyListeningStatistics.GetSnapshot();
         ServicesSpotifyStatisticsSummaryText.Text = $"{statistics.TotalPlays} erkannte Titelstarts · {statistics.TotalListeningTime:hh\\:mm\\:ss} Wiedergabezeit";
         ServicesSpotifyTopTracksList.ItemsSource = statistics.TopTracks;
         ServicesSpotifyTopArtistsList.ItemsSource = statistics.TopArtists;
@@ -10014,7 +10677,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task TestSpotifyFadeAsync()
     {
-        var seconds = int.Parse(
+        int seconds = int.Parse(
             SpotifyFadeOutSecondsBox.Text.Trim());
 
         await ExecuteSpotifyAsync(
@@ -10059,7 +10722,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void BeginSpotifyRateLimitCooldown(TimeSpan retryAfter)
     {
-        var effectiveDelay = retryAfter <= TimeSpan.Zero
+        TimeSpan effectiveDelay = retryAfter <= TimeSpan.Zero
             ? TimeSpan.FromSeconds(5)
             : retryAfter;
 
@@ -10089,7 +10752,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             while (DateTimeOffset.Now < _spotifyRateLimitUntil)
             {
                 await Dispatcher.InvokeAsync(UpdateSpotifyRateLimitStatus);
-                var remaining = _spotifyRateLimitUntil - DateTimeOffset.Now;
+                TimeSpan remaining = _spotifyRateLimitUntil - DateTimeOffset.Now;
                 await Task.Delay(
                     remaining > TimeSpan.FromSeconds(1)
                         ? TimeSpan.FromSeconds(1)
@@ -10106,8 +10769,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void UpdateSpotifyRateLimitStatus()
     {
-        var remaining = Math.Max(1, (int)Math.Ceiling((_spotifyRateLimitUntil - DateTimeOffset.Now).TotalSeconds));
-        var message = $"Spotify-Limit erreicht – Steuerung in etwa {remaining} Sek. wieder verfügbar.";
+        int remaining = Math.Max(1, (int)Math.Ceiling((_spotifyRateLimitUntil - DateTimeOffset.Now).TotalSeconds));
+        string message = $"Spotify-Limit erreicht – Steuerung in etwa {remaining} Sek. wieder verfügbar.";
 
         ServicesSpotifyNowPlayingText.Text = message;
         ServicesSpotifyNowPlayingText.Foreground = System.Windows.Media.Brushes.Orange;
@@ -10125,20 +10788,27 @@ private Task ApplyCombinedAlertDuckingAsync()
     private void BrowseExecutable(System.Windows.Controls.TextBox target, string filter)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = filter, CheckFileExists = true };
-        if (dialog.ShowDialog(this) == true) target.Text = dialog.FileName;
+        if (dialog.ShowDialog(this) == true)
+        {
+            target.Text = dialog.FileName;
+        }
     }
 
     private void LaunchConfiguredExecutable(string? path, string displayName, bool showMissingMessage = true)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
-            if (showMissingMessage) MessageBox.Show($"Bitte zuerst unter Einstellungen den Programmpfad für {displayName} hinterlegen.", $"{displayName} starten", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (showMissingMessage)
+            {
+                MessageBox.Show($"Bitte zuerst unter Einstellungen den Programmpfad für {displayName} hinterlegen.", $"{displayName} starten", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+
             return;
         }
 
         try
         {
-            var processName = Path.GetFileNameWithoutExtension(path);
+            string processName = Path.GetFileNameWithoutExtension(path);
             if (!string.IsNullOrWhiteSpace(processName) && Process.GetProcessesByName(processName).Length > 0)
             {
                 return;
@@ -10164,7 +10834,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             Multiselect = false
         };
 
-        var currentPath = OverlayRootBox.Text.Trim();
+        string currentPath = OverlayRootBox.Text.Trim();
         if (!string.IsNullOrWhiteSpace(currentPath) && Directory.Exists(currentPath))
         {
             dialog.InitialDirectory = currentPath;
@@ -10180,7 +10850,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         if (string.IsNullOrWhiteSpace(target))
         {
-            if (showMissingMessage) MessageBox.Show($"Bitte zuerst unter Einstellungen die URL für {displayName} hinterlegen.", displayName, MessageBoxButton.OK, MessageBoxImage.Information);
+            if (showMissingMessage)
+            {
+                MessageBox.Show($"Bitte zuerst unter Einstellungen die URL für {displayName} hinterlegen.", displayName, MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+
             return;
         }
         try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }); }
@@ -10194,10 +10868,25 @@ private Task ApplyCombinedAlertDuckingAsync()
         try
         {
             SetPrepareProgress(5, "Programme werden gestartet …", true);
-            if (_settings.Obs.ConnectOnPrepare) LaunchConfiguredExecutable(_settings.Obs.ExecutablePath, "OBS", showMissingMessage: false);
-            if (_settings.Spotify.ConnectOnPrepare) LaunchConfiguredExecutable(_settings.Spotify.ExecutablePath, "Spotify", showMissingMessage: false);
-            if (_settings.StreamerBot.ConnectOnPrepare) LaunchConfiguredExecutable(_settings.StreamerBot.ExecutablePath, "Streamer.bot", showMissingMessage: false);
-            if (_settings.Twitch.ConnectOnPrepare && !string.IsNullOrWhiteSpace(_settings.Twitch.CreatorDashboardUrl)) OpenConfiguredTarget(_settings.Twitch.CreatorDashboardUrl, "Twitch Creator Dashboard", showMissingMessage: false);
+            if (_settings.Obs.ConnectOnPrepare)
+            {
+                LaunchConfiguredExecutable(_settings.Obs.ExecutablePath, "OBS", showMissingMessage: false);
+            }
+
+            if (_settings.Spotify.ConnectOnPrepare)
+            {
+                LaunchConfiguredExecutable(_settings.Spotify.ExecutablePath, "Spotify", showMissingMessage: false);
+            }
+
+            if (_settings.StreamerBot.ConnectOnPrepare)
+            {
+                LaunchConfiguredExecutable(_settings.StreamerBot.ExecutablePath, "Streamer.bot", showMissingMessage: false);
+            }
+
+            if (_settings.Twitch.ConnectOnPrepare && !string.IsNullOrWhiteSpace(_settings.Twitch.CreatorDashboardUrl))
+            {
+                OpenConfiguredTarget(_settings.Twitch.CreatorDashboardUrl, "Twitch Creator Dashboard", showMissingMessage: false);
+            }
 
             SetPrepareProgress(20, "Warte auf gestartete Dienste …", true);
             await Task.Delay(1500);
@@ -10209,7 +10898,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             }
 
             SetPrepareProgress(50, "Twitch wird verbunden …", true);
-            if (_settings.Twitch.ConnectOnPrepare && !_twitchModule.GetSnapshot().Authenticated) await ConnectTwitchAsync(showErrorDialog: false);
+            if (_settings.Twitch.ConnectOnPrepare && !_twitchModule.GetSnapshot().Authenticated)
+            {
+                await ConnectTwitchAsync(showErrorDialog: false);
+            }
 
             SetPrepareProgress(65, "Music Player wird verbunden …", true);
             if (IsSpotifyMusicProvider() &&
@@ -10227,7 +10919,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             }
 
             SetPrepareProgress(78, "Streamer.bot wird verbunden …", true);
-            if (_settings.StreamerBot.ConnectOnPrepare && (!_streamerBotClient.IsConnected)) await ConnectStreamerBotAsync();
+            if (_settings.StreamerBot.ConnectOnPrepare && (!_streamerBotClient.IsConnected))
+            {
+                await ConnectStreamerBotAsync();
+            }
 
             SetPrepareProgress(88, "Workflow und Startszene werden vorbereitet …", true);
             await ExecuteWorkflowAsync(() => _workflowModule.Service.PrepareAsync());
@@ -10253,7 +10948,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         const int maximumAttempts = 25;
         Exception? lastException = null;
 
-        for (var attempt = 1; attempt <= maximumAttempts; attempt++)
+        for (int attempt = 1; attempt <= maximumAttempts; attempt++)
         {
             if (!_obsClient.IsConnected)
             {
@@ -10292,7 +10987,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         void Apply()
         {
-            var normalizedValue = Math.Clamp(value, 0, 100);
+            double normalizedValue = Math.Clamp(value, 0, 100);
             DashboardPrepareProgressBar.Value = normalizedValue;
             DashboardPrepareProgressPanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             DashboardPrepareProgressText.Text = message;
@@ -10300,8 +10995,14 @@ private Task ApplyCombinedAlertDuckingAsync()
             DashboardCommandCenterSummaryText.Text = message;
         }
 
-        if (Dispatcher.CheckAccess()) Apply();
-        else Dispatcher.BeginInvoke(Apply);
+        if (Dispatcher.CheckAccess())
+        {
+            Apply();
+        }
+        else
+        {
+            Dispatcher.BeginInvoke(Apply);
+        }
     }
 
     private async Task LoadSpotifyAlbumCoverAsync(string? imageUrl)
@@ -10321,7 +11022,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
         try
         {
-            var bytes = await AlbumCoverHttpClient.GetByteArrayAsync(imageUrl);
+            byte[] bytes = await AlbumCoverHttpClient.GetByteArrayAsync(imageUrl);
             await Dispatcher.InvokeAsync(() =>
             {
                 using var stream = new System.IO.MemoryStream(bytes);
@@ -10349,7 +11050,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task SearchSpotifyTracksAsync()
     {
-        var query = ServicesSpotifyTrackSearchBox.Text?.Trim() ?? "";
+        string query = ServicesSpotifyTrackSearchBox.Text?.Trim() ?? "";
         if (string.IsNullOrWhiteSpace(query))
         {
             ServicesSpotifyTrackSearchResultsList.ItemsSource = null;
@@ -10362,7 +11063,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             "Spotify-Titel suchen",
             async () =>
             {
-                var tracks = await _spotifyModule.SearchTracksAsync(query);
+                IReadOnlyList<SpotifyTrack> tracks = await _spotifyModule.SearchTracksAsync(query);
                 var items = tracks.Select(track => new SpotifyTrackSearchItem(track)).ToList();
                 ServicesSpotifyTrackSearchResultsList.ItemsSource = items;
                 ServicesSpotifyTrackSearchStatusText.Text = items.Count == 0
@@ -10435,7 +11136,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var existing = _settings.Spotify.FavoritePlaylistUris.FirstOrDefault(uri =>
+        string? existing = _settings.Spotify.FavoritePlaylistUris.FirstOrDefault(uri =>
             string.Equals(uri, playlist.Uri, StringComparison.OrdinalIgnoreCase));
         if (existing is null)
         {
@@ -10461,7 +11162,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var isFavorite = _settings.Spotify.FavoritePlaylistUris.Any(uri =>
+        bool isFavorite = _settings.Spotify.FavoritePlaylistUris.Any(uri =>
             string.Equals(uri, playlist.Uri, StringComparison.OrdinalIgnoreCase));
         ServicesSpotifyToggleFavoritePlaylistButton.Content = isFavorite
             ? "★ FAVORIT ENTFERNEN"
@@ -10470,13 +11171,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshSpotifyQuickPlaylists()
     {
-        var playlists = _spotifyModule.GetSnapshot().Playlists;
+        IReadOnlyList<SpotifyPlaylist> playlists = _spotifyModule.GetSnapshot().Playlists;
         var byUri = playlists
             .Where(playlist => !string.IsNullOrWhiteSpace(playlist.Uri))
             .GroupBy(playlist => playlist.Uri, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
-        var orderedUris = _settings.Spotify.FavoritePlaylistUris
+        IEnumerable<string> orderedUris = _settings.Spotify.FavoritePlaylistUris
             .Concat(_settings.Spotify.RecentPlaylistUris)
             .Distinct(StringComparer.OrdinalIgnoreCase);
         var quickPlaylists = orderedUris
@@ -10484,12 +11185,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             .Select(uri => byUri[uri])
             .ToList();
 
-        var selectedUri = (ServicesSpotifyQuickPlaylistBox.SelectedItem as SpotifyPlaylist)?.Uri
+        string? selectedUri = (ServicesSpotifyQuickPlaylistBox.SelectedItem as SpotifyPlaylist)?.Uri
                           ?? (DashboardSpotifyQuickPlaylistBox.SelectedItem as SpotifyPlaylist)?.Uri;
         ServicesSpotifyQuickPlaylistBox.ItemsSource = quickPlaylists;
         DashboardSpotifyQuickPlaylistBox.ItemsSource = quickPlaylists;
 
-        var selected = !string.IsNullOrWhiteSpace(selectedUri)
+        SpotifyPlaylist? selected = !string.IsNullOrWhiteSpace(selectedUri)
             ? quickPlaylists.FirstOrDefault(playlist =>
                 string.Equals(playlist.Uri, selectedUri, StringComparison.OrdinalIgnoreCase))
             : quickPlaylists.FirstOrDefault();
@@ -10499,16 +11200,15 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ApplySpotifyPlaylistFilter()
     {
-        var playlists = _spotifyModule.GetSnapshot().Playlists;
-        var filter = ServicesSpotifyPlaylistFilterBox.Text?.Trim() ?? "";
-        var filtered = string.IsNullOrWhiteSpace(filter)
+        IReadOnlyList<SpotifyPlaylist> playlists = _spotifyModule.GetSnapshot().Playlists;
+        string filter = ServicesSpotifyPlaylistFilterBox.Text?.Trim() ?? "";
+        IReadOnlyList<SpotifyPlaylist> filtered = string.IsNullOrWhiteSpace(filter)
             ? playlists
-            : playlists.Where(playlist =>
+            : [.. playlists.Where(playlist =>
                     playlist.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                    playlist.OwnerName.Contains(filter, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+                    playlist.OwnerName.Contains(filter, StringComparison.OrdinalIgnoreCase))];
 
-        var selectedUri = (ServicesSpotifyPlaylistBox.SelectedItem as SpotifyPlaylist)?.Uri;
+        string? selectedUri = (ServicesSpotifyPlaylistBox.SelectedItem as SpotifyPlaylist)?.Uri;
         ServicesSpotifyPlaylistBox.ItemsSource = filtered;
         if (!string.IsNullOrWhiteSpace(selectedUri))
         {
@@ -10530,7 +11230,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             "Spotify-Playlisttitel laden",
             async () =>
             {
-                var tracks = await _spotifyModule.GetPlaylistTracksAsync(playlist);
+                IReadOnlyList<SpotifyTrack> tracks = await _spotifyModule.GetPlaylistTracksAsync(playlist);
                 ServicesSpotifyPlaylistTracksList.ItemsSource = tracks
                     .Select(track => new SpotifyPlaylistTrackItem(track))
                     .ToList();
@@ -10548,7 +11248,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var button = playImmediately
+        Button button = playImmediately
             ? ServicesSpotifyPlayPlaylistTrackButton
             : ServicesSpotifyQueuePlaylistTrackButton;
         await ExecuteUiActionAsync(
@@ -10580,17 +11280,17 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var active = device.IsActive ? "aktiv" : "inaktiv";
-        var volume = device.SupportsVolume ? $" · Lautstärke {device.VolumePercent} %" : " · Lautstärke nicht steuerbar";
-        var restricted = device.IsRestricted ? " · eingeschränkt" : string.Empty;
-        var preferred = string.Equals(
+        string active = device.IsActive ? "aktiv" : "inaktiv";
+        string volume = device.SupportsVolume ? $" · Lautstärke {device.VolumePercent} %" : " · Lautstärke nicht steuerbar";
+        string restricted = device.IsRestricted ? " · eingeschränkt" : string.Empty;
+        string preferred = string.Equals(
             _settings.Spotify.PreferredDeviceId,
             device.Id,
             StringComparison.Ordinal)
             ? " · Standardgerät"
             : string.Empty;
 
-        var automatic = _settings.Spotify.AutoTransferToPreferredDevice
+        string automatic = _settings.Spotify.AutoTransferToPreferredDevice
             ? " · automatische Übernahme aktiv"
             : string.Empty;
         ServicesSpotifyDeviceStatusText.Text =
@@ -10621,7 +11321,11 @@ private Task ApplyCombinedAlertDuckingAsync()
                 {
                     device = await _spotifyModule.ActivatePreferredDeviceAsync(play: false);
                 });
-                if (device is null) return;
+                if (device is null)
+                {
+                    return;
+                }
+
                 ServicesSpotifyDeviceBox.SelectedItem = device;
                 SpotifyDeviceBox.SelectedItem = device;
                 ServicesSpotifyDeviceStatusText.Text = $"{device.Name} wurde als Wiedergabegerät aktiviert.";
@@ -10677,11 +11381,20 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         var rules = new List<SpotifyAutomationRuleSettings>();
         if (!string.IsNullOrWhiteSpace(_settings.Obs.StartScene))
+        {
             rules.Add(new() { Name = "Startszene-Musik", TriggerValue = _settings.Obs.StartScene, ActionType = "StartPlaylist", PlaylistUri = _settings.Spotify.StartPlaylistUri, Shuffle = _settings.Spotify.ShuffleSelectedPlaylist });
+        }
+
         if (!string.IsNullOrWhiteSpace(_settings.Obs.LiveScene))
+        {
             rules.Add(new() { Name = "Live-Szene fortsetzen", TriggerValue = _settings.Obs.LiveScene, ActionType = "Resume" });
+        }
+
         if (!string.IsNullOrWhiteSpace(_settings.Obs.EndScene))
+        {
             rules.Add(new() { Name = "Endszene-Musik", TriggerValue = _settings.Obs.EndScene, ActionType = "StartPlaylist", PlaylistUri = _settings.Spotify.StartPlaylistUri, Shuffle = true });
+        }
+
         _settings.Spotify.AutomationRules = rules;
         await _settingsStore.SaveAsync(_settings);
         _spotifyAutomationLog.Add("Regeln", $"{rules.Count} Standardregeln aus den OBS-Szenen erstellt.");
@@ -10690,19 +11403,31 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ExecuteSpotifySceneAutomationAsync(string sceneName, bool force = false)
     {
-        if ((!_settings.Spotify.SmartAutomationEnabled && !force) || string.IsNullOrWhiteSpace(sceneName)) return;
-        if (!await _spotifyAutomationLock.WaitAsync(0)) return;
+        if ((!_settings.Spotify.SmartAutomationEnabled && !force) || string.IsNullOrWhiteSpace(sceneName))
+        {
+            return;
+        }
+
+        if (!await _spotifyAutomationLock.WaitAsync(0))
+        {
+            return;
+        }
+
         try
         {
             var rules = _settings.Spotify.AutomationRules
                 .Where(r => r.Enabled && string.Equals(r.TriggerType, "ObsSceneChanged", StringComparison.OrdinalIgnoreCase)
                     && string.Equals(r.TriggerValue, sceneName, StringComparison.OrdinalIgnoreCase)).ToList();
-            foreach (var rule in rules)
+            foreach (SpotifyAutomationRuleSettings? rule in rules)
             {
                 try
                 {
-                    if (rule.DelaySeconds > 0) await Task.Delay(TimeSpan.FromSeconds(rule.DelaySeconds));
-                    var isConfiguredLiveScene = string.Equals(
+                    if (rule.DelaySeconds > 0)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(rule.DelaySeconds));
+                    }
+
+                    bool isConfiguredLiveScene = string.Equals(
                         sceneName,
                         string.IsNullOrWhiteSpace(_settings.Obs.LiveScene) ? "Game" : _settings.Obs.LiveScene.Trim(),
                         StringComparison.OrdinalIgnoreCase);
@@ -10711,7 +11436,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                         _settings.Spotify.SetVolumeOnLiveTransition &&
                         !_settings.Spotify.MuteOnLiveTransition)
                     {
-                        var liveVolume = Math.Clamp(_settings.Spotify.LiveVolumePercent, 0, 100);
+                        int liveVolume = Math.Clamp(_settings.Spotify.LiveVolumePercent, 0, 100);
                         await _spotifyModule.SetVolumeImmediateAsync(liveVolume);
                         _spotifyAutomationLog.Add(rule.Name,
                             $"Live-Lautstärke gesetzt: {liveVolume} % (veraltete Pause-Regel übersprungen).");
@@ -10721,7 +11446,11 @@ private Task ApplyCombinedAlertDuckingAsync()
                     switch (rule.ActionType)
                     {
                         case "StartPlaylist":
-                            if (string.IsNullOrWhiteSpace(rule.PlaylistUri)) throw new InvalidOperationException("Keine Playlist in der Regel hinterlegt.");
+                            if (string.IsNullOrWhiteSpace(rule.PlaylistUri))
+                            {
+                                throw new InvalidOperationException("Keine Playlist in der Regel hinterlegt.");
+                            }
+
                             await _spotifyModule.StartPlaylistAsync(
                                 rule.PlaylistUri,
                                 applyConfiguredStartVolume: false,
@@ -10748,14 +11477,22 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RunSpotifyHealthMonitorAsync(SpotifySnapshot snapshot)
     {
-        if (!_settings.Spotify.HealthMonitorEnabled || !snapshot.Authenticated) return;
-        var status = snapshot.Playback.Device is null ? "Kein aktives Gerät" : snapshot.Playback.Device.IsRestricted ? "Gerät nicht steuerbar" : snapshot.Playback.IsPlaying ? "Wiedergabe aktiv" : "Bereit / pausiert";
+        if (!_settings.Spotify.HealthMonitorEnabled || !snapshot.Authenticated)
+        {
+            return;
+        }
+
+        string status = snapshot.Playback.Device is null ? "Kein aktives Gerät" : snapshot.Playback.Device.IsRestricted ? "Gerät nicht steuerbar" : snapshot.Playback.IsPlaying ? "Wiedergabe aktiv" : "Bereit / pausiert";
         ServicesSpotifyHealthStatusText.Text = status;
-        if (!_settings.Spotify.AutoRecoverPlayback || snapshot.Playback.Device is not null || DateTimeOffset.UtcNow - _lastSpotifyHealthRecoveryAt < TimeSpan.FromMinutes(2)) return;
+        if (!_settings.Spotify.AutoRecoverPlayback || snapshot.Playback.Device is not null || DateTimeOffset.UtcNow - _lastSpotifyHealthRecoveryAt < TimeSpan.FromMinutes(2))
+        {
+            return;
+        }
+
         _lastSpotifyHealthRecoveryAt = DateTimeOffset.UtcNow;
         try
         {
-            var device = await _spotifyModule.ActivatePreferredDeviceAsync(play: false);
+            SpotifyDevice device = await _spotifyModule.ActivatePreferredDeviceAsync(play: false);
             _spotifyAutomationLog.Add("Health Monitor", $"Wiedergabegerät '{device.Name}' automatisch wieder aktiviert.");
         }
         catch (Exception ex)
@@ -10790,7 +11527,9 @@ private Task ApplyCombinedAlertDuckingAsync()
     private bool GetActiveMusicConnected()
     {
         if (IsYouTubeMusicProvider())
+        {
             return _youTubeMusicModule.IsBridgeRunning;
+        }
 
         return _spotifyModule.GetSnapshot().Authenticated;
     }
@@ -10798,32 +11537,34 @@ private Task ApplyCombinedAlertDuckingAsync()
     private string GetSelectedMusicPlayerProviderId()
     {
         if (MusicProviderYouTubeMusicRadio.IsChecked == true)
+        {
             return MusicProviderIds.YouTubeMusic;
+        }
 
         return MusicProviderIds.Spotify;
     }
 
     private void SelectMusicPlayerProviderRadio(string? providerId)
     {
-        var normalized = MusicProviderIds.Normalize(providerId);
-        var isYouTube = string.Equals(normalized, MusicProviderIds.YouTubeMusic, StringComparison.OrdinalIgnoreCase);
+        string normalized = MusicProviderIds.Normalize(providerId);
+        bool isYouTube = string.Equals(normalized, MusicProviderIds.YouTubeMusic, StringComparison.OrdinalIgnoreCase);
         MusicProviderYouTubeMusicRadio.IsChecked = isYouTube;
         MusicProviderSpotifyRadio.IsChecked = !isYouTube;
     }
 
     private void UpdateMusicPlayerSettingsVisibility()
     {
-        var providerId = GetSelectedMusicPlayerProviderId();
-        var isYouTube = string.Equals(providerId, MusicProviderIds.YouTubeMusic, StringComparison.OrdinalIgnoreCase);
+        string providerId = GetSelectedMusicPlayerProviderId();
+        bool isYouTube = string.Equals(providerId, MusicProviderIds.YouTubeMusic, StringComparison.OrdinalIgnoreCase);
         SpotifyMusicSettingsPanel.Visibility = isYouTube ? Visibility.Collapsed : Visibility.Visible;
         YouTubeMusicSettingsPanel.Visibility = isYouTube ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ApplyMusicProviderUiState()
     {
-        var providerId = MusicProviderIds.Normalize(_settings.MusicPlayer?.ProviderId);
-        var displayName = MusicProviderIds.DisplayName(providerId);
-        var isSpotify = string.Equals(providerId, MusicProviderIds.Spotify, StringComparison.OrdinalIgnoreCase);
+        string providerId = MusicProviderIds.Normalize(_settings.MusicPlayer?.ProviderId);
+        string displayName = MusicProviderIds.DisplayName(providerId);
+        bool isSpotify = string.Equals(providerId, MusicProviderIds.Spotify, StringComparison.OrdinalIgnoreCase);
 
         DashboardMusicModuleProvider.Text = displayName;
         DashboardTopMusicProviderText.Text = displayName.ToUpperInvariant();
@@ -10850,7 +11591,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             : Visibility.Collapsed;
         MusicPlayerProgressBar.IsEnabled = isSpotify;
         // YouTube Music liefert praktisch kein Album – Zeile ausblenden.
-        var albumVisibility = isSpotify ? Visibility.Visible : Visibility.Collapsed;
+        Visibility albumVisibility = isSpotify ? Visibility.Visible : Visibility.Collapsed;
         DashboardTopMusicAlbumText.Visibility = albumVisibility;
         MusicPlayerAlbumText.Visibility = albumVisibility;
     }
@@ -10862,10 +11603,15 @@ private Task ApplyCombinedAlertDuckingAsync()
             await action();
             await Task.Delay(350);
             if (IsSpotifyMusicProvider() && _spotifyModule.GetSnapshot().Authenticated)
+            {
                 await _spotifyModule.RefreshPlaybackAsync();
+            }
+
             await RefreshMusicPlayerUiAsync();
             if (IsSpotifyMusicProvider())
+            {
                 RefreshSpotifyUi();
+            }
         }
         catch (Exception ex)
         {
@@ -10898,15 +11644,19 @@ private Task ApplyCombinedAlertDuckingAsync()
         translate.X = 0;
 
         if (viewport.ActualWidth <= 0 || string.IsNullOrWhiteSpace(textBlock.Text))
+        {
             return;
+        }
 
         textBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var overflow = textBlock.DesiredSize.Width - viewport.ActualWidth;
+        double overflow = textBlock.DesiredSize.Width - viewport.ActualWidth;
         if (overflow <= 2)
+        {
             return;
+        }
 
-        var pixelsPerSecond = 28.0;
-        var scrollSeconds = Math.Max(3.0, overflow / pixelsPerSecond);
+        double pixelsPerSecond = 28.0;
+        double scrollSeconds = Math.Max(3.0, overflow / pixelsPerSecond);
         var animation = new DoubleAnimation
         {
             From = 0,
@@ -10930,9 +11680,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async void MusicPlayerBookmarkletDragChip_PreviewMouseMove(object sender, MouseEventArgs e)
     {
         if (!_musicBookmarkletDragPending || e.LeftButton != MouseButtonState.Pressed)
+        {
             return;
+        }
 
-        var position = e.GetPosition(null);
+        Point position = e.GetPosition(null);
         if (Math.Abs(position.X - _musicBookmarkletDragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(position.Y - _musicBookmarkletDragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
         {
@@ -10948,8 +11700,8 @@ private Task ApplyCombinedAlertDuckingAsync()
                 await RefreshMusicPlayerUiAsync();
             }
 
-            var bookmarklet = await _youTubeMusicModule.GetBookmarkletAsync();
-            var title = _youTubeMusicModule.GetBookmarkletDisplayName();
+            string bookmarklet = await _youTubeMusicModule.GetBookmarkletAsync();
+            string title = _youTubeMusicModule.GetBookmarkletDisplayName();
             MusicPlayerBookmarkletDragLabel.Text = title;
             StartYouTubeMusicBookmarkletDrag(bookmarklet, title);
         }
@@ -10973,10 +11725,10 @@ private Task ApplyCombinedAlertDuckingAsync()
         data.SetData("text/x-moz-url", bookmarklet + "\n" + title);
 
         // HTML-Format, damit Browser den Link inkl. Titel besser als Lesezeichen übernehmen.
-        var href = System.Net.WebUtility.HtmlEncode(bookmarklet);
-        var label = System.Net.WebUtility.HtmlEncode(title);
-        var fragment = $"<a href=\"{href}\">{label}</a>";
-        var html =
+        string href = System.Net.WebUtility.HtmlEncode(bookmarklet);
+        string label = System.Net.WebUtility.HtmlEncode(title);
+        string fragment = $"<a href=\"{href}\">{label}</a>";
+        _ =
             "Version:0.9\r\n" +
             "StartHTML:00000097\r\n" +
             "EndHTML:00000100\r\n" +
@@ -10986,15 +11738,15 @@ private Task ApplyCombinedAlertDuckingAsync()
         // Korrekte Offsets für das CF_HTML-Format berechnen.
         const string prefixTemplate =
             "Version:0.9\r\nStartHTML:{0:D8}\r\nEndHTML:{1:D8}\r\nStartFragment:{2:D8}\r\nEndFragment:{3:D8}\r\n";
-        var headerLength = string.Format(
+        int headerLength = string.Format(
             System.Globalization.CultureInfo.InvariantCulture,
             prefixTemplate,
             0, 0, 0, 0).Length;
-        var startHtml = headerLength;
-        var startFragment = headerLength;
-        var endFragment = startFragment + Encoding.UTF8.GetByteCount(fragment);
-        var endHtml = endFragment;
-        html = string.Format(
+        int startHtml = headerLength;
+        int startFragment = headerLength;
+        int endFragment = startFragment + Encoding.UTF8.GetByteCount(fragment);
+        int endHtml = endFragment;
+        string? html = string.Format(
                   System.Globalization.CultureInfo.InvariantCulture,
                   prefixTemplate,
                   startHtml,
@@ -11020,7 +11772,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 await RefreshMusicPlayerUiAsync();
             }
 
-            var url = await _youTubeMusicModule.GetBookmarkletInstallPageUrlAsync();
+            string url = await _youTubeMusicModule.GetBookmarkletInstallPageUrlAsync();
             Process.Start(new ProcessStartInfo
             {
                 FileName = url,
@@ -11037,9 +11789,9 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task RefreshMusicPlayerUiAsync()
     {
         ApplyMusicProviderUiState();
-        var uiState = await _musicPlayerUiPresenter.GetStateAsync();
+        MusicPlayerUiState uiState = await _musicPlayerUiPresenter.GetStateAsync();
         MusicNowPlayingWidget.SetState(uiState);
-        var trackLabel = uiState.TrackLabel;
+        string trackLabel = uiState.TrackLabel;
         var snapshot = new NowPlayingSnapshot(
             uiState.ProviderId,
             uiState.Connected,
@@ -11060,7 +11812,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             TitleBarMusicPlayPauseButton.Content = uiState.IsPlaying ? "Ⅱ" : "▶";
             DashboardTopMusicTitleText.Text = string.IsNullOrWhiteSpace(uiState.Title) ? "Kein Titel" : uiState.Title;
             DashboardTopMusicArtistText.Text = string.IsNullOrWhiteSpace(uiState.Artist) ? "-" : uiState.Artist;
-            var showAlbum = !IsYouTubeMusicProvider();
+            bool showAlbum = !IsYouTubeMusicProvider();
             DashboardTopMusicAlbumText.Visibility = showAlbum ? Visibility.Visible : Visibility.Collapsed;
             MusicPlayerAlbumText.Visibility = showAlbum ? Visibility.Visible : Visibility.Collapsed;
             if (showAlbum)
@@ -11088,8 +11840,8 @@ private Task ApplyCombinedAlertDuckingAsync()
                     : System.Windows.Media.Brushes.IndianRed;
             }
 
-            var duration = Math.Max(1, uiState.DurationMs);
-            var progress = Math.Clamp(uiState.PositionMs, 0, duration);
+            int duration = Math.Max(1, uiState.DurationMs);
+            int progress = Math.Clamp(uiState.PositionMs, 0, duration);
             MusicPlayerProgressBar.Value = uiState.DurationMs <= 0 ? 0 : (double)progress / duration;
             MusicPlayerProgressText.Text = TimeSpan.FromMilliseconds(progress).ToString(@"mm\:ss");
             MusicPlayerDurationText.Text = TimeSpan.FromMilliseconds(Math.Max(0, uiState.DurationMs)).ToString(@"mm\:ss");
@@ -11142,7 +11894,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         try
         {
             using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            var bytes = await client.GetByteArrayAsync(coverUrl);
+            byte[] bytes = await client.GetByteArrayAsync(coverUrl);
             var image = new System.Windows.Media.Imaging.BitmapImage();
             using var stream = new MemoryStream(bytes);
             image.BeginInit();
@@ -11163,7 +11915,9 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task WriteMusicOverlayRuntimeDataAsync(NowPlayingSnapshot snapshot)
     {
         if (!_settings.Spotify.OverlayEnabled)
+        {
             return;
+        }
 
         string targetPath;
         try
@@ -11179,32 +11933,36 @@ private Task ApplyCombinedAlertDuckingAsync()
         await OverlayDataWriteCoordinator.Lock.WaitAsync();
         try
         {
-            var directory = Path.GetDirectoryName(targetPath);
+            string? directory = Path.GetDirectoryName(targetPath);
             if (!string.IsNullOrWhiteSpace(directory))
+            {
                 Directory.CreateDirectory(directory);
+            }
 
             JsonObject rootObject;
             if (File.Exists(targetPath))
             {
                 try
                 {
-                    var existingJson = await File.ReadAllTextAsync(targetPath);
-                    rootObject = JsonNode.Parse(existingJson) as JsonObject ?? new JsonObject();
+                    string existingJson = await File.ReadAllTextAsync(targetPath);
+                    rootObject = JsonNode.Parse(existingJson) as JsonObject ?? [];
                 }
                 catch (JsonException)
                 {
-                    rootObject = new JsonObject();
+                    rootObject = [];
                 }
             }
             else
             {
-                rootObject = new JsonObject();
+                rootObject = [];
             }
 
-            var spotify = rootObject["spotify"] as JsonObject ?? new JsonObject();
-            var connected = snapshot.Connected;
+            JsonObject spotify = rootObject["spotify"] as JsonObject ?? [];
+            bool connected = snapshot.Connected;
             if (connected)
+            {
                 _spotifyOverlayConnectionLatched = true;
+            }
 
             spotify["provider"] = snapshot.ProviderId;
             spotify["connected"] = connected;
@@ -11227,7 +11985,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             spotify["statusText"] = snapshot.StatusText;
             rootObject["spotify"] = spotify;
 
-            var json = rootObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            string json = rootObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(targetPath, json);
         }
         catch (Exception exception)
@@ -11251,13 +12009,18 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshSpotifyUi()
     {
-        var snapshot = _spotifyModule.GetSnapshot();
+        SpotifySnapshot snapshot = _spotifyModule.GetSnapshot();
         if (IsSpotifyMusicProvider())
+        {
             _spotifyListeningStatistics.Observe(snapshot.Playback);
+        }
+
         RefreshSpotifyStatisticsUi();
         RefreshSpotifyAutomationUi(snapshot);
         if (IsSpotifyMusicProvider())
+        {
             _ = RunSpotifyHealthMonitorAsync(snapshot);
+        }
 
         if (IsSpotifyMusicProvider())
         {
@@ -11364,8 +12127,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         UpdateSpotifyDeviceSelectionUi();
 
-        var spotifyErrors = _spotifyModule.LastRefreshErrors;
-        if (spotifyErrors.TryGetValue("Wiedergabegeräte", out var deviceError))
+        IReadOnlyDictionary<string, string> spotifyErrors = _spotifyModule.LastRefreshErrors;
+        if (spotifyErrors.TryGetValue("Wiedergabegeräte", out string? deviceError))
         {
             ServicesSpotifyDeviceStatusText.Text = "Geräte konnten nicht geladen werden: " + deviceError;
             ServicesSpotifyDeviceStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
@@ -11381,7 +12144,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             }
         }
 
-        if (spotifyErrors.TryGetValue("Playlists", out var playlistError))
+        if (spotifyErrors.TryGetValue("Playlists", out string? playlistError))
         {
             ServicesSpotifyPlaylistStatusText.Text = "Playlists konnten nicht geladen werden: " + playlistError;
             ServicesSpotifyPlaylistStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
@@ -11405,10 +12168,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             DashboardSpotifyPlaylistBox.SelectedItem = SpotifyPlaylistBox.SelectedItem;
         }
 
-        var playback = snapshot.Playback;
+        SpotifyPlaybackState playback = snapshot.Playback;
 
-        var progressMs = Math.Max(0, playback.ProgressMs);
-        var durationMs = Math.Max(0, playback.Track?.DurationMs ?? 0);
+        int progressMs = Math.Max(0, playback.ProgressMs);
+        int durationMs = Math.Max(0, playback.Track?.DurationMs ?? 0);
         _updatingSpotifyUi = true;
         try
         {
@@ -11455,7 +12218,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             : playback.Track.Artist +
               " – " +
               playback.Track.Name;
-        var intelligenceTrackId = playback.Track is null ? null : $"{playback.Track.Artist}|{playback.Track.Name}|{playback.Track.Album}";
+        string? intelligenceTrackId = playback.Track is null ? null : $"{playback.Track.Artist}|{playback.Track.Name}|{playback.Track.Album}";
         if (!string.IsNullOrWhiteSpace(intelligenceTrackId) && !string.Equals(_lastCreatorIntelligenceTrackId, intelligenceTrackId, StringComparison.Ordinal))
         {
             _lastCreatorIntelligenceTrackId = intelligenceTrackId;
@@ -11513,11 +12276,16 @@ private Task ApplyCombinedAlertDuckingAsync()
         _ = LoadSpotifyAlbumCoverAsync(playback.Track?.AlbumImageUrl);
 
         if (playback.Track is not null)
+        {
             _lastStableSpotifyPlayback = playback;
-        if (playback.IsPlaying)
-            _lastSpotifyPlayingAt = DateTimeOffset.UtcNow;
+        }
 
-        var overlayPlayback = StabilizeSpotifyOverlayPlayback(playback);
+        if (playback.IsPlaying)
+        {
+            _lastSpotifyPlayingAt = DateTimeOffset.UtcNow;
+        }
+
+        SpotifyPlaybackState overlayPlayback = StabilizeSpotifyOverlayPlayback(playback);
         if (IsSpotifyMusicProvider())
         {
             _ = WriteSpotifyOverlayRuntimeDataAsync(snapshot, overlayPlayback);
@@ -11561,7 +12329,9 @@ private Task ApplyCombinedAlertDuckingAsync()
         // Der Schalter steuert ausschließlich das Schreiben der Spotify-Laufzeitdaten.
         // Sein Zustand wird in den Einstellungen gespeichert und beim Start geladen.
         if (!_settings.Spotify.OverlayEnabled)
+        {
             return;
+        }
 
         await OverlayDataWriteCoordinator.Lock.WaitAsync();
 
@@ -11572,12 +12342,16 @@ private Task ApplyCombinedAlertDuckingAsync()
             // schreiben wir hier bewusst direkt in diese Datei und umgehen den
             // allgemeinen OverlayDataService, dessen gespeicherter Pfad bei älteren
             // Installationen noch auf die zweite JSON im Root zeigen kann.
-            var overlayRoot = OverlayRootBox.Text.Trim();
+            string overlayRoot = OverlayRootBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(overlayRoot))
+            {
                 overlayRoot = _settings.Overlay.RootPath?.Trim() ?? "";
+            }
 
             if (string.IsNullOrWhiteSpace(overlayRoot))
+            {
                 throw new InvalidOperationException("Es ist kein Overlay-Ordner ausgewählt.");
+            }
 
             overlayRoot = Path.GetFullPath(Environment.ExpandEnvironmentVariables(overlayRoot));
 
@@ -11587,7 +12361,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             // Hotfix 6 leitete den Zielpfad erneut nur aus dem Overlay-Root ab und
             // konnte dadurch eine andere overlay-data.json beschreiben als die von
             // der OBS-HTML geladene Datei.
-            var targetPath = ResolveActiveOverlayDataPath();
+            string targetPath = ResolveActiveOverlayDataPath();
 
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
 
@@ -11596,34 +12370,37 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 try
                 {
-                    var existingJson = await File.ReadAllTextAsync(targetPath);
-                    rootObject = JsonNode.Parse(existingJson) as JsonObject ?? new JsonObject();
+                    string existingJson = await File.ReadAllTextAsync(targetPath);
+                    rootObject = JsonNode.Parse(existingJson) as JsonObject ?? [];
                 }
                 catch (JsonException)
                 {
-                    rootObject = new JsonObject();
+                    rootObject = [];
                 }
             }
             else
             {
-                rootObject = new JsonObject();
+                rootObject = [];
             }
 
-            var spotify = rootObject["spotify"] as JsonObject ?? new JsonObject();
+            JsonObject spotify = rootObject["spotify"] as JsonObject ?? [];
             // Der Overlay-Verbindungsstatus wird nach einer erfolgreichen Verbindung
             // bis zu einem ausdrücklichen Trennen gehalten. Kurzlebige Poll-/Token-
             // Snapshots dürfen die Anzeige nicht sekündlich auf "nicht verbunden" setzen.
             if (snapshot.Authenticated || playback.Track is not null)
+            {
                 _spotifyOverlayConnectionLatched = true;
+            }
 
             // Nur ein ausdrücklich vom Benutzer gestarteter Disconnect darf den
             // öffentlichen Overlay-Verbindungsstatus auf false setzen. Polling,
             // leere API-Antworten und Token-Erneuerungen dürfen das niemals.
-            var overlayConnected = _spotifyExplicitDisconnectInProgress
-                ? false
-                : _spotifyOverlayConnectionLatched || snapshot.Authenticated || playback.Track is not null;
+            bool overlayConnected = !_spotifyExplicitDisconnectInProgress && (_spotifyOverlayConnectionLatched || snapshot.Authenticated || playback.Track is not null);
             if (overlayConnected)
+            {
                 _spotifyOverlayConnectionLatched = true;
+            }
+
             spotify["connected"] = overlayConnected;
             spotify["provider"] = MusicProviderIds.Spotify;
             spotify["isPlaying"] = playback.IsPlaying;
@@ -11636,7 +12413,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             // Spotify-Schreibvorgang mitgeführt. Dadurch bleibt showInOverlay nicht
             // versehentlich fehlend/false, wenn die separate Mute-Routine wegen ihres
             // Cachewerts keinen erneuten Schreibvorgang ausführt.
-            var overlayVisible = overlayConnected && _lastSpotifyOverlayMuted != true;
+            bool overlayVisible = overlayConnected && _lastSpotifyOverlayMuted != true;
             spotify["showInOverlay"] = overlayVisible;
             spotify["visible"] = overlayVisible;
             spotify["showTitle"] = true;
@@ -11654,7 +12431,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             rootObject["spotify"] = spotify;
             rootObject["updatedAt"] = DateTimeOffset.UtcNow;
 
-            var json = rootObject.ToJsonString(new JsonSerializerOptions
+            string json = rootObject.ToJsonString(new JsonSerializerOptions
             {
                 WriteIndented = true
             });
@@ -11689,24 +12466,28 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task DisableLegacyOverlayWriterAsync(string overlayRoot)
     {
         if (_legacyOverlayWriterChecked)
+        {
             return;
+        }
 
         _legacyOverlayWriterChecked = true;
 
         try
         {
-            var legacyRoot = Path.Combine(overlayRoot, "StreamingSuite");
-            var legacyScript = Path.Combine(legacyRoot, "Start.ps1");
+            string legacyRoot = Path.Combine(overlayRoot, "StreamingSuite");
+            string legacyScript = Path.Combine(legacyRoot, "Start.ps1");
             if (!File.Exists(legacyScript))
+            {
                 return;
+            }
 
             // Die alte DenverJohn-StreamingSuite schreibt periodisch in dieselbe
             // Overlay/data/overlay-data.json wie die Creator Control Suite. Ein
             // paralleler Betrieb erzeugt wechselnde connected-/Live-Zustände.
             // Beende ausschließlich Prozesse, deren Befehlszeile exakt auf dieses
             // Legacy-Skript verweist.
-            var escapedScript = legacyScript.Replace("'", "''");
-            var stopCommand =
+            string escapedScript = legacyScript.Replace("'", "''");
+            string stopCommand =
                 "$target='" + escapedScript + "'; " +
                 "Get-CimInstance Win32_Process | Where-Object { " +
                 "$_.CommandLine -and $_.CommandLine.IndexOf($target,[System.StringComparison]::OrdinalIgnoreCase) -ge 0 " +
@@ -11723,25 +12504,32 @@ private Task ApplyCombinedAlertDuckingAsync()
             }))
             {
                 if (process is not null)
+                {
                     await process.WaitForExitAsync();
+                }
             }
 
             // Verhindere einen versehentlichen Neustart der alten Suite. Die Dateien
             // bleiben als Sicherung erhalten und können bei Bedarf manuell
             // zurückbenannt werden.
-            foreach (var fileName in new[] { "Start.bat", "Start.vbs", "Start.ps1" })
+            foreach (string? fileName in new[] { "Start.bat", "Start.vbs", "Start.ps1" })
             {
-                var source = Path.Combine(legacyRoot, fileName);
+                string source = Path.Combine(legacyRoot, fileName);
                 if (!File.Exists(source))
+                {
                     continue;
+                }
 
-                var disabled = source + ".disabled-by-creator-control-suite";
+                string disabled = source + ".disabled-by-creator-control-suite";
                 if (File.Exists(disabled))
+                {
                     File.Delete(disabled);
+                }
+
                 File.Move(source, disabled);
             }
 
-            var markerPath = Path.Combine(legacyRoot, "LEGACY-WRITER-DISABLED.txt");
+            string markerPath = Path.Combine(legacyRoot, "LEGACY-WRITER-DISABLED.txt");
             await File.WriteAllTextAsync(markerPath,
                 "Die alte DenverJohn StreamingSuite wurde deaktiviert, weil sie parallel zur Creator Control Suite in Overlay\\data\\overlay-data.json geschrieben hat.\r\n" +
                 "Dadurch wechselten Spotify- und Live-Status zwischen unterschiedlichen Zuständen.\r\n" +
@@ -11760,18 +12548,23 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private string ResolveActiveOverlayDataPath()
     {
-        var overlayRoot = OverlayRootBox.Text.Trim();
+        string overlayRoot = OverlayRootBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(overlayRoot))
+        {
             overlayRoot = _settings.Overlay.RootPath?.Trim() ?? "";
+        }
+
         if (string.IsNullOrWhiteSpace(overlayRoot))
+        {
             throw new InvalidOperationException("Es ist kein Overlay-Ordner ausgewählt.");
+        }
 
         overlayRoot = Path.GetFullPath(Environment.ExpandEnvironmentVariables(overlayRoot));
 
         // Bei DenverJohn v18.x ist der Pfad durch die HTML-Struktur eindeutig:
         // Overlay/modules/ui/*.html lädt ../../data/overlay-data.json. Eine alte
         // gespeicherte Root/data-Einstellung darf diesen Pfad nicht überstimmen.
-        var denverUi = Path.Combine(overlayRoot, "Overlay", "modules", "ui");
+        string denverUi = Path.Combine(overlayRoot, "Overlay", "modules", "ui");
         if (Directory.Exists(denverUi) &&
             (File.Exists(Path.Combine(denverUi, "spotify.html")) ||
              File.Exists(Path.Combine(denverUi, "live-status.html"))))
@@ -11779,17 +12572,19 @@ private Task ApplyCombinedAlertDuckingAsync()
             return Path.Combine(overlayRoot, "Overlay", "data", "overlay-data.json");
         }
 
-        var configuredPath = _settings.Overlay.DataFilePath?.Trim();
+        string? configuredPath = _settings.Overlay.DataFilePath?.Trim();
         if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
             return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configuredPath));
+        }
 
         return ResolveOverlayDataPathFromRoot(overlayRoot);
     }
 
     private static string ResolveOverlayDataPathFromRoot(string overlayRoot)
     {
-        var nestedPath = Path.Combine(overlayRoot, "Overlay", "data", "overlay-data.json");
-        var rootPath = Path.Combine(overlayRoot, "data", "overlay-data.json");
+        string nestedPath = Path.Combine(overlayRoot, "Overlay", "data", "overlay-data.json");
+        string rootPath = Path.Combine(overlayRoot, "data", "overlay-data.json");
         return File.Exists(nestedPath) || Directory.Exists(Path.GetDirectoryName(nestedPath)!)
             ? nestedPath
             : rootPath;
@@ -11800,19 +12595,22 @@ private Task ApplyCombinedAlertDuckingAsync()
         await OverlayDataWriteCoordinator.Lock.WaitAsync();
         try
         {
-            var targetPath = ResolveActiveOverlayDataPath();
+            string targetPath = ResolveActiveOverlayDataPath();
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
             JsonObject root;
             if (File.Exists(targetPath))
             {
-                try { root = JsonNode.Parse(await File.ReadAllTextAsync(targetPath)) as JsonObject ?? new JsonObject(); }
-                catch (JsonException) { root = new JsonObject(); }
+                try { root = JsonNode.Parse(await File.ReadAllTextAsync(targetPath)) as JsonObject ?? []; }
+                catch (JsonException) { root = []; }
             }
-            else root = new JsonObject();
+            else
+            {
+                root = [];
+            }
 
             update(root);
             root["updatedAt"] = DateTimeOffset.UtcNow;
-            var json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            string json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
             // In-place schreiben: Ein Ersetzen per File.Move trennt Hardlinks und
             // lässt verschiedene OBS-Browserquellen anschließend unterschiedliche
             // Dateiknoten lesen. Die globale Sperre verhindert zugleich verlorene
@@ -11833,8 +12631,8 @@ private Task ApplyCombinedAlertDuckingAsync()
         _streamStartAutomationCts?.Cancel();
         _streamStartAutomationCts?.Dispose();
         _streamStartAutomationCts = new CancellationTokenSource();
-        var token = _streamStartAutomationCts.Token;
-        var startScene = string.IsNullOrWhiteSpace(_settings.Obs.StartScene) ? "Start" : _settings.Obs.StartScene.Trim();
+        CancellationToken token = _streamStartAutomationCts.Token;
+        string startScene = string.IsNullOrWhiteSpace(_settings.Obs.StartScene) ? "Start" : _settings.Obs.StartScene.Trim();
 
         try
         {
@@ -11851,7 +12649,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
             await UpdateActiveOverlayJsonAsync(root =>
             {
-                var stream = root["stream"] as JsonObject ?? new JsonObject();
+                JsonObject stream = root["stream"] as JsonObject ?? [];
                 stream["isLive"] = true;
                 stream["phase"] = "Starting";
                 stream["startedAt"] = _streamSessionStartedAt;
@@ -11862,7 +12660,9 @@ private Task ApplyCombinedAlertDuckingAsync()
 
             await Task.Delay(TimeSpan.FromMinutes(5), token);
             if (_obsClient.IsConnected)
+            {
                 await _obsClient.SetSceneItemEnabledAsync(startScene, "Start_Testbild", false, token);
+            }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -11884,7 +12684,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return _lastRequestedSpotifyVolumePercent.Value;
         }
 
-        var reportedVolume = playback.Device?.VolumePercent;
+        int? reportedVolume = playback.Device?.VolumePercent;
         if (reportedVolume.HasValue)
         {
             _lastRequestedSpotifyVolumePercent = reportedVolume.Value;
@@ -11918,15 +12718,15 @@ private Task ApplyCombinedAlertDuckingAsync()
                 return;
             }
 
-            var hideBecausePaused = _settings.Spotify.OverlayHideWhenPaused &&
+            bool hideBecausePaused = _settings.Spotify.OverlayHideWhenPaused &&
                                     !playback.IsPlaying &&
                                     DateTimeOffset.UtcNow - _lastSpotifyPlayingAt >= TimeSpan.FromSeconds(3);
-            var hideBecauseVolume = false;
-            var hideBecauseObsMute = false;
+            bool hideBecauseVolume = false;
+            bool hideBecauseObsMute = false;
 
             if (_settings.Spotify.OverlayHideWhenMuted && _settings.Spotify.OverlayMuteDetectionSpotifyVolume)
             {
-                var volumePercent = ResolveEffectiveSpotifyVolume(playback);
+                int? volumePercent = ResolveEffectiveSpotifyVolume(playback);
                 hideBecauseVolume = volumePercent.HasValue && volumePercent.Value <= 0;
             }
 
@@ -11934,12 +12734,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 if (_obsClient.IsConnected)
                 {
-                    var audioSource = _settings.Spotify.OverlayObsAudioSource?.Trim();
+                    string? audioSource = _settings.Spotify.OverlayObsAudioSource?.Trim();
                     if (!string.IsNullOrWhiteSpace(audioSource))
                     {
                         try
                         {
-                            var audioState = await _obsClient.GetInputAudioStateAsync(audioSource);
+                            ObsInputAudioState audioState = await _obsClient.GetInputAudioStateAsync(audioSource);
                             _lastKnownSpotifyObsMute = audioState.Muted;
                         }
                         catch (Exception exception)
@@ -11966,10 +12766,14 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task ApplySpotifyOverlayMuteStateAsync(bool isMuted)
     {
         if (!_settings.Spotify.OverlayHideWhenMuted && !_settings.Spotify.OverlayHideWhenPaused)
+        {
             isMuted = false;
+        }
 
         if (_lastSpotifyOverlayMuted == isMuted)
+        {
             return;
+        }
 
         // Die JSON-Sichtbarkeit wird unabhängig von OBS aktualisiert. Damit
         // funktioniert das Ausblenden auch bei Overlays, die nur das Feld
@@ -11978,7 +12782,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             await UpdateActiveOverlayJsonAsync(root =>
             {
-                var spotify = root["spotify"] as JsonObject ?? new JsonObject();
+                JsonObject spotify = root["spotify"] as JsonObject ?? [];
                 spotify["hideWhenMuted"] = _settings.Spotify.OverlayHideWhenMuted;
                 spotify["hideWhenPaused"] = _settings.Spotify.OverlayHideWhenPaused;
                 spotify["muteDetectionObsSource"] = _settings.Spotify.OverlayMuteDetectionObsSource;
@@ -11998,8 +12802,8 @@ private Task ApplyCombinedAlertDuckingAsync()
         // geschaltet. Fehlt OBS, bleibt wenigstens die JSON-Steuerung wirksam.
         if (_obsClient.IsConnected)
         {
-            var sceneName = _settings.Spotify.OverlayObsScene?.Trim();
-            var sourceName = _settings.Spotify.OverlayObsSource?.Trim();
+            string? sceneName = _settings.Spotify.OverlayObsScene?.Trim();
+            string? sourceName = _settings.Spotify.OverlayObsSource?.Trim();
             if (!string.IsNullOrWhiteSpace(sceneName) && !string.IsNullOrWhiteSpace(sourceName))
             {
                 try
@@ -12027,7 +12831,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             TwitchConnectionStatusText.Text =
                 "Gerätecode wird angefordert ...";
 
-            var deviceCode =
+            TwitchDeviceCode deviceCode =
                 await _twitchModule.StartAuthorizationAsync();
 
             Clipboard.SetText(deviceCode.UserCode);
@@ -12039,7 +12843,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                     UseShellExecute = true
                 });
 
-            var result = MessageBox.Show(
+            MessageBoxResult result = MessageBox.Show(
                 "Twitch wurde im Browser geöffnet.\n\n" +
                 "Code: " + deviceCode.UserCode + "\n\n" +
                 "Der Code wurde in die Zwischenablage kopiert.\n" +
@@ -12121,16 +12925,20 @@ private Task ApplyCombinedAlertDuckingAsync()
             "Nicht verbunden";
         TwitchConnectionStatusText.Foreground =
             System.Windows.Media.Brushes.Gray;
-    
+
         RefreshDashboardServiceActionButtons();
-}
+    }
 
     private async Task SearchTwitchCategoriesAsync(System.Windows.Controls.TextBox searchBox, System.Windows.Controls.ComboBox resultsBox)
     {
         try
         {
-            var query = searchBox.Text.Trim();
-            if (string.IsNullOrWhiteSpace(query)) return;
+            string query = searchBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return;
+            }
+
             resultsBox.ItemsSource = await _twitchModule.SearchCategoriesAsync(query);
             resultsBox.IsDropDownOpen = true;
         }
@@ -12156,7 +12964,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task OpenTwitchChannelEditorAsync()
     {
-        var snapshot = _twitchModule.GetSnapshot();
+        TwitchConnectionSnapshot snapshot = _twitchModule.GetSnapshot();
         var editor = new TwitchChannelEditorWindow(
             snapshot.ChannelTitle,
             snapshot.CategoryName,
@@ -12174,7 +12982,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         if (editor.ShowDialog() == true)
         {
-            var updated = _twitchModule.GetSnapshot();
+            TwitchConnectionSnapshot updated = _twitchModule.GetSnapshot();
             DashboardTwitchTitleBox.Text = updated.ChannelTitle;
             DashboardTwitchCategorySearchBox.Text = updated.CategoryName;
             RefreshTwitchUi();
@@ -12186,7 +12994,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var query =
+            string query =
                 TwitchCategorySearchBox.Text.Trim();
 
             if (string.IsNullOrWhiteSpace(query))
@@ -12255,10 +13063,10 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void SelectDashboardStatisticInUi()
     {
-        var metric = string.IsNullOrWhiteSpace(_settings.Dashboard.DashboardStatistic)
+        string metric = string.IsNullOrWhiteSpace(_settings.Dashboard.DashboardStatistic)
             ? "ViewerCount"
             : _settings.Dashboard.DashboardStatistic;
-        foreach (var entry in StatisticsDashboardMetricBox.Items.OfType<ComboBoxItem>())
+        foreach (ComboBoxItem entry in StatisticsDashboardMetricBox.Items.OfType<ComboBoxItem>())
         {
             if (string.Equals(entry.Tag as string, metric, StringComparison.OrdinalIgnoreCase))
             {
@@ -12271,8 +13079,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void UpdateDashboardSelectedStatistic()
     {
-        var stats = _workflowModule.Service.SessionStats;
-        var metric = _settings.Dashboard.DashboardStatistic ?? "ViewerCount";
+        StreamSessionStats stats = _workflowModule.Service.SessionStats;
+        string metric = _settings.Dashboard.DashboardStatistic ?? "ViewerCount";
         (DashboardSelectedStatisticLabel.Text, DashboardSelectedStatisticValue.Text) = metric switch
         {
             "FollowerCount" => ("FOLLOWERZAHL", _currentFollowerCount.ToString()),
@@ -12290,7 +13098,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             : System.Windows.Media.Brushes.IndianRed;
         StreamDashboardStatus.BeginAnimation(UIElement.OpacityProperty, null);
         StreamDashboardStatus.Opacity = 1;
-        if (!isLive) return;
+        if (!isLive)
+        {
+            return;
+        }
+
         var pulse = new System.Windows.Media.Animation.DoubleAnimation
         {
             From = 1.0,
@@ -12312,7 +13124,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ModerateTwitchUserAsync(string userName, bool ban, string? durationMinutesText, string? reason)
     {
-        var cleanName = (userName ?? string.Empty).Trim().TrimStart('@');
+        string cleanName = (userName ?? string.Empty).Trim().TrimStart('@');
         if (string.IsNullOrWhiteSpace(cleanName))
         {
             MessageBox.Show("Bitte zuerst einen Twitch-User auswählen oder eingeben.", "Twitch-Moderation", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -12322,7 +13134,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         int? durationSeconds = null;
         if (!ban)
         {
-            if (!int.TryParse(durationMinutesText, out var minutes) || minutes < 1)
+            if (!int.TryParse(durationMinutesText, out int minutes) || minutes < 1)
             {
                 MessageBox.Show("Bitte eine Timeout-Dauer von mindestens einer Minute eingeben.", "Twitch-Moderation", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
@@ -12334,7 +13146,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         try
         {
             await _twitchModule.ModerateUserAsync(cleanName, durationSeconds, reason);
-            var resultText = ban
+            string resultText = ban
                 ? $"{cleanName} wurde gebannt."
                 : $"{cleanName} erhielt einen Timeout von {durationSeconds / 60} Minuten.";
             AddDashboardNotification(resultText, "Info");
@@ -12349,7 +13161,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task UnbanTwitchUserAsync(string userName)
     {
-        var cleanName = (userName ?? string.Empty).Trim().TrimStart('@');
+        string cleanName = (userName ?? string.Empty).Trim().TrimStart('@');
         if (string.IsNullOrWhiteSpace(cleanName))
         {
             MessageBox.Show("Bitte zuerst einen Twitch-User auswählen oder eingeben.", "Twitch-Moderation", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -12359,7 +13171,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         try
         {
             await _twitchModule.UnbanUserAsync(cleanName);
-            var resultText = $"Ban oder Timeout für {cleanName} wurde aufgehoben.";
+            string resultText = $"Ban oder Timeout für {cleanName} wurde aufgehoben.";
             AddDashboardNotification(resultText, "Info");
             await AddTwitchModerationLogAsync("AUFHEBEN", cleanName, null, resultText);
         }
@@ -12371,37 +13183,41 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private string GetTwitchModerationLogPath()
     {
-        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "Logs");
+        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "Logs");
         Directory.CreateDirectory(folder);
         return Path.Combine(folder, "twitch-moderation.log");
     }
 
     private async Task AddTwitchModerationLogAsync(string action, string userName, string? reason, string result)
     {
-        var line = $"{DateTimeOffset.Now:dd.MM.yyyy HH:mm:ss} · {action} · @{userName}" +
+        string line = $"{DateTimeOffset.Now:dd.MM.yyyy HH:mm:ss} · {action} · @{userName}" +
                    (string.IsNullOrWhiteSpace(reason) ? string.Empty : $" · Grund: {reason.Trim()}") +
                    $" · {result}";
         _twitchModerationLogItems.Insert(0, line);
-        while (_twitchModerationLogItems.Count > 100) _twitchModerationLogItems.RemoveAt(_twitchModerationLogItems.Count - 1);
+        while (_twitchModerationLogItems.Count > 100)
+        {
+            _twitchModerationLogItems.RemoveAt(_twitchModerationLogItems.Count - 1);
+        }
+
         await File.AppendAllTextAsync(GetTwitchModerationLogPath(), line + Environment.NewLine, new System.Text.UTF8Encoding(true));
     }
 
     private async Task ExportTwitchModerationLogAsync()
     {
-        var source = GetTwitchModerationLogPath();
+        string source = GetTwitchModerationLogPath();
         if (!File.Exists(source))
         {
             MessageBox.Show("Es sind noch keine Moderationsaktionen gespeichert.", "Twitch-Moderation", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        var target = Path.Combine(Path.GetDirectoryName(source)!, $"twitch-moderation-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+        string target = Path.Combine(Path.GetDirectoryName(source)!, $"twitch-moderation-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
         await Task.Run(() => File.Copy(source, target, true));
         Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
     }
 
     private async Task SendTwitchChatAsync()
     {
-        var message = TwitchChatMessageBox.Text.Trim();
+        string message = TwitchChatMessageBox.Text.Trim();
 
         if (string.IsNullOrWhiteSpace(message))
         {
@@ -12431,7 +13247,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var latest = _twitchChatItems[^1];
+        string latest = _twitchChatItems[^1];
         TwitchChatList.ScrollIntoView(latest);
         DashboardTwitchChatList.ScrollIntoView(latest);
         ServicesTwitchChatList.ScrollIntoView(latest);
@@ -12440,7 +13256,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task LoadTwitchProfessionalHistoryAsync()
     {
         _twitchProfessionalHistoryItems.Clear();
-        var path = GetStreamHistoryFilePath();
+        string path = GetStreamHistoryFilePath();
         if (!File.Exists(path))
         {
             ServicesTwitchProfessionalTotalStreamsText.Text = "0";
@@ -12461,22 +13277,22 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
 
         var rows = new List<(DateTimeOffset StartedAt, long DurationSeconds, int Peak, double Average, int Followers, int Chat, int Events, string Category, string Title)>();
-        foreach (var line in await File.ReadAllLinesAsync(path))
+        foreach (string line in await File.ReadAllLinesAsync(path))
         {
             try
             {
                 using var document = JsonDocument.Parse(line);
-                var root = document.RootElement;
+                JsonElement root = document.RootElement;
                 rows.Add((
                     root.GetProperty("StartedAt").GetDateTimeOffset(),
-                    root.TryGetProperty("DurationSeconds", out var duration) ? duration.GetInt64() : 0,
-                    root.TryGetProperty("PeakViewers", out var peak) ? peak.GetInt32() : 0,
-                    root.TryGetProperty("AverageViewers", out var average) ? average.GetDouble() : 0,
-                    root.TryGetProperty("FollowersGained", out var followers) ? followers.GetInt32() : 0,
-                    root.TryGetProperty("ChatMessages", out var chat) ? chat.GetInt32() : 0,
-                    root.TryGetProperty("AlertsPlayed", out var eventsCount) ? eventsCount.GetInt32() : 0,
-                    root.TryGetProperty("Category", out var category) ? category.GetString() ?? "-" : "-",
-                    root.TryGetProperty("Title", out var title) ? title.GetString() ?? "-" : "-"));
+                    root.TryGetProperty("DurationSeconds", out JsonElement duration) ? duration.GetInt64() : 0,
+                    root.TryGetProperty("PeakViewers", out JsonElement peak) ? peak.GetInt32() : 0,
+                    root.TryGetProperty("AverageViewers", out JsonElement average) ? average.GetDouble() : 0,
+                    root.TryGetProperty("FollowersGained", out JsonElement followers) ? followers.GetInt32() : 0,
+                    root.TryGetProperty("ChatMessages", out JsonElement chat) ? chat.GetInt32() : 0,
+                    root.TryGetProperty("AlertsPlayed", out JsonElement eventsCount) ? eventsCount.GetInt32() : 0,
+                    root.TryGetProperty("Category", out JsonElement category) ? category.GetString() ?? "-" : "-",
+                    root.TryGetProperty("Title", out JsonElement title) ? title.GetString() ?? "-" : "-"));
             }
             catch
             {
@@ -12493,10 +13309,10 @@ private Task ApplyCombinedAlertDuckingAsync()
         var recent = rows.OrderBy(x => x.StartedAt).TakeLast(10).ToList();
         if (recent.Count >= 2)
         {
-            var split = Math.Max(1, recent.Count / 2);
-            var earlier = recent.Take(split).Average(x => x.Average);
-            var later = recent.Skip(split).Average(x => x.Average);
-            var delta = later - earlier;
+            int split = Math.Max(1, recent.Count / 2);
+            double earlier = recent.Take(split).Average(x => x.Average);
+            double later = recent.Skip(split).Average(x => x.Average);
+            double delta = later - earlier;
             ServicesTwitchProfessionalViewerTrendText.Text = $"Zuschauertrend: {(delta >= 0 ? "+" : string.Empty)}{delta:0.0} Ø Zuschauer";
             ServicesTwitchProfessionalFollowerTrendText.Text = $"Followertrend: {recent.Average(x => x.Followers):0.0} pro Stream";
         }
@@ -12511,20 +13327,20 @@ private Task ApplyCombinedAlertDuckingAsync()
         var ordered = rows.OrderByDescending(x => x.StartedAt).ToList();
         var latestFive = ordered.Take(5).ToList();
         var previousFive = ordered.Skip(5).Take(5).ToList();
-        static string PercentTrend(double current, double previous) => previous <= 0 ? "-" : $"{((current - previous) / previous) * 100:+0.0;-0.0;0.0}%";
-        var latestPeak = latestFive.Count == 0 ? 0 : latestFive.Average(x => x.Peak);
-        var previousPeak = previousFive.Count == 0 ? 0 : previousFive.Average(x => x.Peak);
-        var latestAverage = latestFive.Count == 0 ? 0 : latestFive.Average(x => x.Average);
-        var previousAverage = previousFive.Count == 0 ? 0 : previousFive.Average(x => x.Average);
+        static string PercentTrend(double current, double previous) => previous <= 0 ? "-" : $"{(current - previous) / previous * 100:+0.0;-0.0;0.0}%";
+        double latestPeak = latestFive.Count == 0 ? 0 : latestFive.Average(x => x.Peak);
+        double previousPeak = previousFive.Count == 0 ? 0 : previousFive.Average(x => x.Peak);
+        double latestAverage = latestFive.Count == 0 ? 0 : latestFive.Average(x => x.Average);
+        double previousAverage = previousFive.Count == 0 ? 0 : previousFive.Average(x => x.Average);
         ServicesTwitchProfessionalPeakTrendText.Text = PercentTrend(latestPeak, previousPeak);
         ServicesTwitchProfessionalAverageTrendText.Text = PercentTrend(latestAverage, previousAverage);
-        var totalHours = rows.Sum(x => x.DurationSeconds) / 3600d;
+        double totalHours = rows.Sum(x => x.DurationSeconds) / 3600d;
         ServicesTwitchProfessionalChatRateText.Text = totalHours <= 0 ? "0" : (rows.Sum(x => x.Chat) / totalHours).ToString("0.0");
         var bestCategory = rows.Where(x => !string.IsNullOrWhiteSpace(x.Category) && x.Category != "-")
             .GroupBy(x => x.Category).Select(g => new { Name = g.Key, Average = g.Average(x => x.Average) })
             .OrderByDescending(x => x.Average).FirstOrDefault();
         ServicesTwitchProfessionalBestCategoryText.Text = bestCategory?.Name ?? "-";
-        var totalEngagement = rows.Sum(x => x.Chat + x.Events);
+        int totalEngagement = rows.Sum(x => x.Chat + x.Events);
         ServicesTwitchProfessionalEngagementRateText.Text = totalHours <= 0 ? "0" : (totalEngagement / totalHours).ToString("0.0");
         ServicesTwitchProfessionalFollowerRateText.Text = totalHours <= 0 ? "0" : (rows.Sum(x => x.Followers) / totalHours).ToString("0.00");
         var recentAverages = latestFive.Select(x => x.Average).ToList();
@@ -12534,9 +13350,9 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
         else
         {
-            var mean = recentAverages.Average();
-            var variance = recentAverages.Sum(value => Math.Pow(value - mean, 2)) / recentAverages.Count;
-            var coefficient = Math.Sqrt(variance) / mean;
+            double mean = recentAverages.Average();
+            double variance = recentAverages.Sum(value => Math.Pow(value - mean, 2)) / recentAverages.Count;
+            double coefficient = Math.Sqrt(variance) / mean;
             ServicesTwitchProfessionalConsistencyText.Text = coefficient switch
             {
                 <= 0.15 => "Sehr stabil",
@@ -12548,9 +13364,9 @@ private Task ApplyCombinedAlertDuckingAsync()
         ServicesTwitchProfessionalSummaryText.Text = rows.Count == 0 ? "Noch keine Trenddaten verfügbar." :
             $"Letzte {latestFive.Count} Streams: Ø {latestAverage:0.0} Zuschauer, mittlerer Peak {latestPeak:0.0}. Insgesamt {rows.Sum(x => x.Chat)} Chatnachrichten und {rows.Sum(x => x.Followers)} neue Follower.";
 
-        foreach (var row in ordered.Take(20))
+        foreach ((DateTimeOffset StartedAt, long DurationSeconds, int Peak, double Average, int Followers, int Chat, int Events, string Category, string Title) row in ordered.Take(20))
         {
-            var local = row.StartedAt.ToLocalTime();
+            DateTimeOffset local = row.StartedAt.ToLocalTime();
             var duration = TimeSpan.FromSeconds(Math.Max(0, row.DurationSeconds));
             _twitchProfessionalHistoryItems.Add(
                 $"{local:dd.MM.yyyy HH:mm} · {duration:hh\\:mm\\:ss} · Peak {row.Peak} · Ø {row.Average:0.0} · +{row.Followers} Follower · {row.Category}");
@@ -12570,11 +13386,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var snapshot = _twitchModule.GetSnapshot();
-        var stats = _workflowModule.Service.SessionStats;
-        var live = liveStatus?.IsOnline ?? _lastObsStreamActive;
-        var startedAt = liveStatus?.StartedAt ?? _streamSessionStartedAt ?? _twitchSessionObservedAt;
-        var duration = startedAt.HasValue
+        TwitchConnectionSnapshot snapshot = _twitchModule.GetSnapshot();
+        StreamSessionStats stats = _workflowModule.Service.SessionStats;
+        bool live = liveStatus?.IsOnline ?? _lastObsStreamActive;
+        DateTimeOffset? startedAt = liveStatus?.StartedAt ?? _streamSessionStartedAt ?? _twitchSessionObservedAt;
+        TimeSpan duration = startedAt.HasValue
             ? DateTimeOffset.Now - startedAt.Value
             : TimeSpan.Zero;
 
@@ -12600,7 +13416,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshTwitchUi()
     {
-        var snapshot = _twitchModule.GetSnapshot();
+        TwitchConnectionSnapshot snapshot = _twitchModule.GetSnapshot();
 
         TwitchDashboardStatus.Text = snapshot.Authenticated
             ? "VERBUNDEN"
@@ -12628,7 +13444,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         DashboardTwitchChannelTitleText.Text = string.IsNullOrWhiteSpace(snapshot.ChannelTitle)
             ? "Kein Streamtitel gesetzt"
             : snapshot.ChannelTitle;
-        var notification = string.IsNullOrWhiteSpace(_settings.Twitch.LiveNotificationText)
+        string notification = string.IsNullOrWhiteSpace(_settings.Twitch.LiveNotificationText)
             ? "Live-Benachrichtigung nicht gesetzt"
             : _settings.Twitch.LiveNotificationText;
         DashboardTwitchChannelDetailsText.Text =
@@ -12690,10 +13506,10 @@ private Task ApplyCombinedAlertDuckingAsync()
         TwitchChatMessage message,
         string role)
     {
-        var userId = string.IsNullOrWhiteSpace(message.ChatterUserId)
+        string userId = string.IsNullOrWhiteSpace(message.ChatterUserId)
             ? message.ChatterLogin
             : message.ChatterUserId;
-        var userName = string.IsNullOrWhiteSpace(message.ChatterName)
+        string userName = string.IsNullOrWhiteSpace(message.ChatterName)
             ? message.ChatterLogin
             : message.ChatterName;
 
@@ -12703,11 +13519,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var display = role + userName;
+        string display = role + userName;
 
-        if (_twitchUserDisplayById.TryGetValue(userId, out var previous))
+        if (_twitchUserDisplayById.TryGetValue(userId, out string? previous))
         {
-            var index = _twitchUserItems.IndexOf(previous);
+            int index = _twitchUserItems.IndexOf(previous);
 
             if (index >= 0)
             {
@@ -12733,7 +13549,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static string GetTwitchUserNameFromDisplay(string display)
     {
-        foreach (var prefix in new[]
+        foreach (string? prefix in new[]
                  {
                      "[STREAMER] ",
                      "[MOD] ",
@@ -12756,10 +13572,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             IReadOnlyDictionary<string, string> data,
             params string[] keys)
         {
-            foreach (var key in keys)
+            foreach (string key in keys)
             {
-                if (data.TryGetValue(key, out var value) &&
-                    int.TryParse(value, out var parsed))
+                if (data.TryGetValue(key, out string? value) &&
+                    int.TryParse(value, out int parsed))
                 {
                     return Math.Max(1, parsed);
                 }
@@ -12802,7 +13618,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var originalContent = button.Content;
+        object originalContent = button.Content;
         button.IsEnabled = false;
 
         try
@@ -12867,7 +13683,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         if (!IsSpotifyMusicProvider())
         {
-            var snapshot = await _musicPlayerRouter.GetSnapshotAsync();
+            NowPlayingSnapshot snapshot = await _musicPlayerRouter.GetSnapshotAsync();
             if (snapshot.Connected || _youTubeMusicModule.IsBridgeRunning)
             {
                 await _musicPlayerRouter.DisconnectActiveAsync();
@@ -12897,7 +13713,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ToggleStreamerBotFromDashboardAsync()
     {
-        var connected =
+        bool connected =
             _streamerBotClient.IsConnected;
 
         if (connected)
@@ -12914,12 +13730,12 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshDashboardServiceActionButtons()
     {
-        var obsConnected = _obsClient.IsConnected;
-        var twitchConnected = _twitchModule.GetSnapshot().Authenticated;
-        var musicConnected = GetActiveMusicConnected();
-        var streamerBotConnected =
+        bool obsConnected = _obsClient.IsConnected;
+        bool twitchConnected = _twitchModule.GetSnapshot().Authenticated;
+        bool musicConnected = GetActiveMusicConnected();
+        bool streamerBotConnected =
             _streamerBotClient.IsConnected;
-        var musicName = _musicPlayerRouter.ActiveDisplayName;
+        string musicName = _musicPlayerRouter.ActiveDisplayName;
 
         DashboardServiceConnectObsButton.Content =
             obsConnected ? "TRENNEN" : "VERBINDEN";
@@ -12977,14 +13793,14 @@ private Task ApplyCombinedAlertDuckingAsync()
         bool streamerBotConnected)
     {
         const int total = 4;
-        var connectedCount =
+        int connectedCount =
             (obsConnected ? 1 : 0) +
             (twitchConnected ? 1 : 0) +
             (musicConnected ? 1 : 0) +
             (streamerBotConnected ? 1 : 0);
-        var brokenCount = total - connectedCount;
-        var allOk = brokenCount == 0;
-        var musicName = _musicPlayerRouter.ActiveDisplayName;
+        int brokenCount = total - connectedCount;
+        bool allOk = brokenCount == 0;
+        string musicName = _musicPlayerRouter.ActiveDisplayName;
 
         DashboardConnectionSummaryCount.Text = $"{connectedCount}/{total}";
         DashboardConnectionSummaryDetail.Text = allOk
@@ -13030,11 +13846,11 @@ private Task ApplyCombinedAlertDuckingAsync()
         string name,
         bool connected)
     {
-        var successBrush = Application.Current.TryFindResource("SuccessBrush") as Brush
+        Brush successBrush = Application.Current.TryFindResource("SuccessBrush") as Brush
             ?? new SolidColorBrush(Color.FromRgb(0x4C, 0xD9, 0x64));
-        var warningBrush = Application.Current.TryFindResource("WarningBrush") as Brush
+        Brush warningBrush = Application.Current.TryFindResource("WarningBrush") as Brush
             ?? new SolidColorBrush(Color.FromRgb(0xE8, 0xA2, 0x3A));
-        var dangerBrush = Application.Current.TryFindResource("DangerBrush") as Brush
+        Brush dangerBrush = Application.Current.TryFindResource("DangerBrush") as Brush
             ?? System.Windows.Media.Brushes.IndianRed;
 
         var row = new System.Windows.Controls.StackPanel
@@ -13080,15 +13896,15 @@ private Task ApplyCombinedAlertDuckingAsync()
                 ? "OBS ist verbunden."
                 : "OBS konnte nicht verbunden werden.",
             _obsClient.IsConnected ? "Info" : "Warnung");
-    
+
         RefreshDashboardServiceActionButtons();
-}
+    }
 
     private async Task ConnectTwitchFromDashboardAsync()
     {
         await ConnectTwitchAsync();
 
-        var connected = _twitchModule.GetSnapshot().Authenticated;
+        bool connected = _twitchModule.GetSnapshot().Authenticated;
         RefreshTwitchUi();
 
         if (connected)
@@ -13103,15 +13919,15 @@ private Task ApplyCombinedAlertDuckingAsync()
                 ? "Twitch ist verbunden."
                 : "Twitch konnte nicht verbunden werden.",
             connected ? "Info" : "Warnung");
-    
+
         RefreshDashboardServiceActionButtons();
-}
+    }
 
     private async Task ConnectSpotifyFromDashboardAsync()
     {
         await ConnectSpotifyAsync();
 
-        var connected = _spotifyModule.GetSnapshot().Authenticated;
+        bool connected = _spotifyModule.GetSnapshot().Authenticated;
 
         if (connected)
         {
@@ -13127,15 +13943,15 @@ private Task ApplyCombinedAlertDuckingAsync()
                 ? "Spotify ist verbunden."
                 : "Spotify konnte nicht verbunden werden.",
             connected ? "Info" : "Warnung");
-    
+
         RefreshDashboardServiceActionButtons();
-}
+    }
 
     private async Task ConnectStreamerBotFromDashboardAsync()
     {
         await ConnectStreamerBotAsync();
 
-        var connected =
+        bool connected =
             _streamerBotClient.IsConnected;
 
         StreamerBotDashboardStatus.Text =
@@ -13150,9 +13966,9 @@ private Task ApplyCombinedAlertDuckingAsync()
                 ? "Streamer.bot ist verbunden."
                 : "Streamer.bot konnte nicht verbunden werden.",
             connected ? "Info" : "Warnung");
-    
+
         RefreshDashboardServiceActionButtons();
-}
+    }
 
     private async Task ConnectObsAsync(bool showErrorDialog = true)
     {
@@ -13218,13 +14034,17 @@ private Task ApplyCombinedAlertDuckingAsync()
         ObsStreamStatusText.Text = "Streamstatus unbekannt";
         ObsDashboardStatus.Text = "NICHT VERBUNDEN";
         ObsDashboardLamp.Fill = System.Windows.Media.Brushes.IndianRed;
-    
+
         RefreshDashboardServiceActionButtons();
-}
+    }
 
     private void RefreshSimpleObsAutomationRulesList()
     {
-        if (ServicesObsAutomationRulesList is null) return;
+        if (ServicesObsAutomationRulesList is null)
+        {
+            return;
+        }
+
         ServicesObsAutomationRulesList.ItemsSource = _settings.Workflow.TimedAutomations
             .Where(rule => (string.Equals(rule.TriggerType, "SceneElapsed", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(rule.TriggerType, "StreamElapsed", StringComparison.OrdinalIgnoreCase))
@@ -13251,7 +14071,10 @@ private Task ApplyCombinedAlertDuckingAsync()
                 .ToList();
             ServicesObsAutomationSourceBox.ItemsSource = sources;
             if (sources.Count > 0 && ServicesObsAutomationSourceBox.SelectedItem is null)
+            {
                 ServicesObsAutomationSourceBox.SelectedIndex = 0;
+            }
+
             ServicesObsAutomationStatusText.Text = $"{sources.Count} Quellen aus Szene ‘{scene.Name}’ geladen.";
         }
         catch (Exception exception)
@@ -13267,19 +14090,19 @@ private Task ApplyCombinedAlertDuckingAsync()
             ServicesObsAutomationStatusText.Text = "Bitte zuerst eine Szene auswählen.";
             return;
         }
-        var source = ServicesObsAutomationSourceBox.SelectedItem as string ?? ServicesObsAutomationSourceBox.Text?.Trim();
+        string? source = ServicesObsAutomationSourceBox.SelectedItem as string ?? ServicesObsAutomationSourceBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(source))
         {
             ServicesObsAutomationStatusText.Text = "Bitte eine Quelle auswählen.";
             return;
         }
-        if (!int.TryParse(ServicesObsAutomationDelayBox.Text, out var seconds) || seconds < 0)
+        if (!int.TryParse(ServicesObsAutomationDelayBox.Text, out int seconds) || seconds < 0)
         {
             ServicesObsAutomationStatusText.Text = "Bitte eine gültige Zeit in Sekunden eingeben.";
             return;
         }
 
-        var show = string.Equals((ServicesObsAutomationActionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), "Show", StringComparison.OrdinalIgnoreCase);
+        bool show = string.Equals((ServicesObsAutomationActionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), "Show", StringComparison.OrdinalIgnoreCase);
         var rule = new TimedAutomationRuleSettings
         {
             Name = $"{scene.Name} → {source}: nach {seconds} Sek. {(show ? "einblenden" : "ausblenden")}",
@@ -13353,19 +14176,27 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ToggleObsRecordPauseAsync()
     {
-        if (!_obsClient.IsConnected) return;
+        if (!_obsClient.IsConnected)
+        {
+            return;
+        }
+
         try
         {
-            var status = await _obsClient.GetRecordStatusAsync();
+            ObsOutputStatus status = await _obsClient.GetRecordStatusAsync();
             if (!status.Active)
             {
                 ServicesObsControlStatusText.Text = "Es läuft keine Aufnahme.";
                 return;
             }
             if (status.Paused)
+            {
                 await ExecuteObsControlAsync("Aufnahme fortsetzen", () => _obsClient.ResumeRecordAsync());
+            }
             else
+            {
                 await ExecuteObsControlAsync("Aufnahme pausieren", () => _obsClient.PauseRecordAsync());
+            }
         }
         catch (Exception ex)
         {
@@ -13380,7 +14211,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             : "Offline";
         try
         {
-            var stats = await _obsClient.GetStatsAsync();
+            ObsStats stats = await _obsClient.GetStatsAsync();
             ServicesObsCpuText.Text = $"CPU: {stats.CpuUsage:0.0} %";
             ServicesObsFpsText.Text = $"FPS: {stats.ActiveFps:0.0}";
             ServicesObsMemoryText.Text = $"RAM: {stats.MemoryUsage:0} MB";
@@ -13390,20 +14221,20 @@ private Task ApplyCombinedAlertDuckingAsync()
         catch { }
         try
         {
-            var record = await _obsClient.GetRecordStatusAsync();
+            ObsOutputStatus record = await _obsClient.GetRecordStatusAsync();
             ServicesObsRecordStateText.Text = !record.Active ? "Gestoppt" : record.Paused ? "Pausiert" : $"Läuft · {record.Timecode}";
             ServicesObsPauseRecordButton.Content = record.Paused ? "FORTSETZEN" : "PAUSE";
         }
         catch { ServicesObsRecordStateText.Text = "Nicht verfügbar"; }
         try
         {
-            var replay = await _obsClient.GetReplayBufferStatusAsync();
+            ObsOutputStatus replay = await _obsClient.GetReplayBufferStatusAsync();
             ServicesObsReplayStateText.Text = replay.Active ? "Aktiv" : "Gestoppt";
         }
         catch { ServicesObsReplayStateText.Text = "Nicht verfügbar"; }
         try
         {
-            var virtualCam = await _obsClient.GetVirtualCamStatusAsync();
+            bool virtualCam = await _obsClient.GetVirtualCamStatusAsync();
             ServicesObsVirtualCamStateText.Text = virtualCam ? "Aktiv" : "Gestoppt";
         }
         catch { ServicesObsVirtualCamStateText.Text = "Nicht verfügbar"; }
@@ -13461,14 +14292,14 @@ private Task ApplyCombinedAlertDuckingAsync()
             throw new InvalidOperationException("OBS ist nicht verbunden.");
         }
 
-        var snapshot = await _obsClient.GetSnapshotAsync();
-        var transitions = await _obsClient.GetSceneTransitionListAsync();
+        ObsSnapshot snapshot = await _obsClient.GetSnapshotAsync();
+        IReadOnlyList<ObsTransitionInfo> transitions = await _obsClient.GetSceneTransitionListAsync();
 
         if (!string.Equals(_automationCurrentScene, snapshot.CurrentProgramScene, StringComparison.OrdinalIgnoreCase))
         {
             _automationCurrentScene = snapshot.CurrentProgramScene;
             _automationSceneActivatedAt = DateTimeOffset.UtcNow;
-            foreach (var sceneRule in _settings.Workflow.TimedAutomations
+            foreach (TimedAutomationRuleSettings? sceneRule in _settings.Workflow.TimedAutomations
                          .Where(rule => string.Equals(rule.TriggerType, "SceneElapsed", StringComparison.OrdinalIgnoreCase)
                                         && string.Equals(rule.TriggerScene, snapshot.CurrentProgramScene, StringComparison.OrdinalIgnoreCase)))
             {
@@ -13478,32 +14309,51 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         ObsScenesList.ItemsSource = snapshot.Scenes;
         ObsInputsList.ItemsSource = snapshot.Inputs;
-        var selectedObsInputName = (ServicesObsInputsList.SelectedItem as ObsInputInfo)?.Name;
-        var selectedTransitionName = (ServicesObsTransitionBox.SelectedItem as ObsTransitionInfo)?.Name;
+        string? selectedObsInputName = (ServicesObsInputsList.SelectedItem as ObsInputInfo)?.Name;
+        string? selectedTransitionName = (ServicesObsTransitionBox.SelectedItem as ObsTransitionInfo)?.Name;
         _servicesObsScenes = snapshot.Scenes;
         _servicesObsCurrentScene = snapshot.CurrentProgramScene;
         ServicesObsCurrentSceneText.Text = "Aktuelle Szene: " + snapshot.CurrentProgramScene;
         ApplyServicesObsSceneFilter();
         ServicesObsAutomationSceneBox.ItemsSource = snapshot.Scenes;
         if (ServicesObsAutomationSceneBox.SelectedItem is not ObsSceneInfo)
+        {
             ServicesObsAutomationSceneBox.SelectedItem = snapshot.Scenes.FirstOrDefault();
+        }
+
         _servicesObsInputs = snapshot.Inputs;
         ApplyServicesObsInputFilter();
         RefreshSimpleObsAutomationRulesList();
         await RefreshSimpleObsAutomationSourcesAsync();
         ServicesObsTransitionBox.ItemsSource = transitions;
         if (!string.IsNullOrWhiteSpace(selectedTransitionName))
+        {
             ServicesObsTransitionBox.SelectedItem = transitions.FirstOrDefault(transition => string.Equals(transition.Name, selectedTransitionName, StringComparison.OrdinalIgnoreCase));
+        }
+
         if (ServicesObsTransitionBox.SelectedItem is not ObsTransitionInfo)
+        {
             ServicesObsTransitionBox.SelectedItem = transitions.FirstOrDefault();
+        }
+
         ServicesObsTransitionStateText.Text = transitions.Count == 0
             ? "OBS hat keine auswählbaren Übergänge gemeldet."
             : $"{transitions.Count} Übergänge geladen. Auswahl und Dauer werden erst mit „Übergang übernehmen“ an OBS gesendet.";
         if (!string.IsNullOrWhiteSpace(selectedObsInputName))
+        {
             ServicesObsInputsList.SelectedItem = snapshot.Inputs.FirstOrDefault(input => string.Equals(input.Name, selectedObsInputName, StringComparison.OrdinalIgnoreCase));
-        if (ServicesObsInputsList.SelectedItem is not ObsInputInfo) ServicesObsInputsList.SelectedItem = snapshot.Inputs.FirstOrDefault();
+        }
+
+        if (ServicesObsInputsList.SelectedItem is not ObsInputInfo)
+        {
+            ServicesObsInputsList.SelectedItem = snapshot.Inputs.FirstOrDefault();
+        }
+
         if (ServicesObsScenesList.SelectedItem is not ObsSceneInfo)
+        {
             ServicesObsScenesList.SelectedItem = snapshot.Scenes.FirstOrDefault(scene => string.Equals(scene.Name, snapshot.CurrentProgramScene, StringComparison.OrdinalIgnoreCase)) ?? snapshot.Scenes.FirstOrDefault();
+        }
+
         await RefreshServicesObsSceneItemsAsync();
         DashboardObsAudioInputBox.ItemsSource = snapshot.Inputs;
         if (DashboardObsAudioInputBox.SelectedItem is null && snapshot.Inputs.Count > 0)
@@ -13526,12 +14376,12 @@ private Task ApplyCombinedAlertDuckingAsync()
         // Keep every OBS-scene selector on the same live scene list. Previously the
         // Spotify selector copied OverlayProjectObsSceneBox.ItemsSource only while
         // overlay projects were loaded. If OBS connected afterwards, it stayed empty.
-        var requestedSpotifyOverlayScene = ServicesSpotifyOverlaySceneBox.Text?.Trim();
-        var requestedOverlayProjectScene = OverlayProjectObsSceneBox.Text?.Trim();
-        var requestedStartScene = StartSceneBox.Text?.Trim();
-        var requestedLiveScene = LiveSceneBox.Text?.Trim();
-        var requestedPauseScene = PauseSceneBox.Text?.Trim();
-        var requestedEndScene = EndSceneBox.Text?.Trim();
+        string? requestedSpotifyOverlayScene = ServicesSpotifyOverlaySceneBox.Text?.Trim();
+        string? requestedOverlayProjectScene = OverlayProjectObsSceneBox.Text?.Trim();
+        string? requestedStartScene = StartSceneBox.Text?.Trim();
+        string? requestedLiveScene = LiveSceneBox.Text?.Trim();
+        string? requestedPauseScene = PauseSceneBox.Text?.Trim();
+        string? requestedEndScene = EndSceneBox.Text?.Trim();
         StartSceneBox.ItemsSource = snapshot.Scenes;
         LiveSceneBox.ItemsSource = snapshot.Scenes;
         PauseSceneBox.ItemsSource = snapshot.Scenes;
@@ -13572,7 +14422,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 ? "■  STREAM BEENDEN"
                 : "●  LIVE GEHEN";
 
-        var obsReportsStreamActive = snapshot.Stream?.OutputActive == true;
+        bool obsReportsStreamActive = snapshot.Stream?.OutputActive == true;
         if (obsReportsStreamActive)
         {
             _consecutiveObsStreamInactivePolls = 0;
@@ -13590,7 +14440,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         // leeren/false Zwischenwert. Erst nach fünf aufeinanderfolgenden
         // bestätigten Offline-Abfragen wird der Stream als beendet behandelt.
         // Während Verbindungsabbrüchen bleibt der zuletzt bestätigte Zustand bestehen.
-        var streamActiveNow = obsReportsStreamActive ||
+        bool streamActiveNow = obsReportsStreamActive ||
             ((_lastObsStreamActive || _streamSessionStartedAt.HasValue) && _consecutiveObsStreamInactivePolls < ConfirmedObsOfflinePollsRequired);
 
         if (streamActiveNow && !_lastObsStreamActive)
@@ -13612,17 +14462,17 @@ private Task ApplyCombinedAlertDuckingAsync()
         _lastObsStreamActive = streamActiveNow;
         RefreshWorkflowUi(_workflowModule.Service.State);
 
-        var microphoneMuted = await GetTrackedObsInputMuteAsync(
+        bool microphoneMuted = await GetTrackedObsInputMuteAsync(
             snapshot.Inputs,
             _settings.Obs.MicrophoneSource,
-            new[] { "Mic", "Mikrofon", "Microphone" },
-            new[] { "mikrofon", "microphone", "mic" });
+            ["Mic", "Mikrofon", "Microphone"],
+            ["mikrofon", "microphone", "mic"]);
 
-        var desktopAudioMuted = await GetTrackedObsInputMuteAsync(
+        bool desktopAudioMuted = await GetTrackedObsInputMuteAsync(
             snapshot.Inputs,
             _settings.Obs.DesktopAudioSource,
-            new[] { "Broadcast", "Desktop Audio", "Desktop-Audio", "Spiel- und Streamsound" },
-            new[] { "broadcast", "desktop audio", "desktop-audio", "streamsound", "spiel- und streamsound" });
+            ["Broadcast", "Desktop Audio", "Desktop-Audio", "Spiel- und Streamsound"],
+            ["broadcast", "desktop audio", "desktop-audio", "streamsound", "spiel- und streamsound"]);
 
         await _overlayModule.Service.UpdateAsync(
             data =>
@@ -13636,14 +14486,14 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         await UpdateActiveOverlayJsonAsync(root =>
         {
-            var obs = root["obs"] as JsonObject ?? new JsonObject();
+            JsonObject obs = root["obs"] as JsonObject ?? [];
             obs["connected"] = snapshot.Connected;
             obs["currentScene"] = snapshot.CurrentProgramScene;
             obs["microphoneMuted"] = microphoneMuted;
             obs["desktopAudioMuted"] = desktopAudioMuted;
             root["obs"] = obs;
 
-            var stream = root["stream"] as JsonObject ?? new JsonObject();
+            JsonObject stream = root["stream"] as JsonObject ?? [];
             stream["isLive"] = streamActiveNow;
             stream["currentScene"] = snapshot.CurrentProgramScene;
             stream["startedAt"] = _streamSessionStartedAt;
@@ -13653,8 +14503,8 @@ private Task ApplyCombinedAlertDuckingAsync()
             stream["viewerCount"] = _currentLiveViewerCount;
             root["stream"] = stream;
 
-            var stats = root["stats"] as JsonObject ?? new JsonObject();
-            var sessionStats = _workflowModule.Service.SessionStats;
+            JsonObject stats = root["stats"] as JsonObject ?? [];
+            StreamSessionStats sessionStats = _workflowModule.Service.SessionStats;
             stats["followersGained"] = sessionStats.FollowersGained;
             stats["peakViewers"] = sessionStats.PeakViewers;
             stats["averageViewers"] = sessionStats.AverageViewers;
@@ -13676,7 +14526,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         // Laufzeit rekonstruieren. Bei unbekanntem Format beginnt die Anzeige
         // mit dem Zeitpunkt, zu dem der Stream erstmals erkannt wurde.
         if (!string.IsNullOrWhiteSpace(outputTimecode) &&
-            TimeSpan.TryParse(outputTimecode, System.Globalization.CultureInfo.InvariantCulture, out var elapsed) &&
+            TimeSpan.TryParse(outputTimecode, System.Globalization.CultureInfo.InvariantCulture, out TimeSpan elapsed) &&
             elapsed >= TimeSpan.Zero && elapsed < TimeSpan.FromDays(30))
         {
             return DateTimeOffset.Now - elapsed;
@@ -13757,7 +14607,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            var state = await _obsClient.GetInputAudioStateAsync(input.Name);
+            ObsInputAudioState state = await _obsClient.GetInputAudioStateAsync(input.Name);
             return state.Muted;
         }
         catch (Exception exception)
@@ -13788,9 +14638,9 @@ private Task ApplyCombinedAlertDuckingAsync()
                 return;
             }
 
-            var previewWidth = GetDashboardObsScenePreviewWidth(
+            double previewWidth = GetDashboardObsScenePreviewWidth(
                 _settings.Dashboard.ObsScenePreviewSize);
-            var bytes = await _obsClient.GetSourceScreenshotAsync(
+            byte[] bytes = await _obsClient.GetSourceScreenshotAsync(
                 sceneName,
                 (int)Math.Clamp(previewWidth, 160, 1920),
                 imageHeight: null);
@@ -13855,7 +14705,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 return;
             }
 
-            var snapshot = await _obsClient.GetSnapshotAsync();
+            ObsSnapshot snapshot = await _obsClient.GetSnapshotAsync();
 
             if (snapshot.Stream?.OutputActive == true)
             {
@@ -13883,7 +14733,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         // Hintergrundpfad noch nicht vollständig geladene Steuerelemente lesen und
         // damit AutoStart bzw. die Playlist-URI wieder leeren. Maßgeblich ist die
         // zuletzt dauerhaft gespeicherte Konfiguration.
-        var persisted = await _settingsStore.LoadAsync(CancellationToken.None);
+        AppSettings persisted = await _settingsStore.LoadAsync(CancellationToken.None);
 
         if (!persisted.Workflow.AutoStartSpotifyPlaylist)
         {
@@ -13892,7 +14742,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var playlistUri = persisted.Spotify.StartPlaylistUri?.Trim() ?? "";
+        string playlistUri = persisted.Spotify.StartPlaylistUri?.Trim() ?? "";
         if (string.IsNullOrWhiteSpace(playlistUri))
         {
             throw new InvalidOperationException(
@@ -13908,7 +14758,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         // aktives Wiedergabegerät melden. Deshalb wird der identische Start genau
         // einmal verzögert wiederholt, ohne die Playlist mehrfach auszulösen.
         Exception? firstFailure = null;
-        for (var attempt = 1; attempt <= 2; attempt++)
+        for (int attempt = 1; attempt <= 2; attempt++)
         {
             try
             {
@@ -13943,7 +14793,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task StartObsStreamAsync()
     {
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             "OBS-Stream wirklich starten?",
             "Stream starten",
             MessageBoxButton.YesNo,
@@ -14030,7 +14880,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task UpdateCurrentStreamStatsForEndSceneAsync(bool finalize)
     {
-        var endedAt = finalize ? DateTimeOffset.Now : (DateTimeOffset?)null;
+        DateTimeOffset? endedAt = finalize ? DateTimeOffset.Now : (DateTimeOffset?)null;
 
         // Letzte Live-Werte unmittelbar vor der Endszene abrufen.
         await RefreshLiveViewerSampleAsync();
@@ -14040,10 +14890,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             await _workflowModule.Service.FinalizeSessionStatsAsync(endedAt);
         }
 
-        var sessionStats = _workflowModule.Service.SessionStats;
+        StreamSessionStats sessionStats = _workflowModule.Service.SessionStats;
         await UpdateActiveOverlayJsonAsync(root =>
         {
-            var stream = root["stream"] as JsonObject ?? new JsonObject();
+            JsonObject stream = root["stream"] as JsonObject ?? [];
             stream["isLive"] = true;
             stream["phase"] = "Ending";
             stream["startedAt"] = _streamSessionStartedAt ?? sessionStats.StartedAt;
@@ -14052,7 +14902,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             stream["viewerCount"] = _currentLiveViewerCount;
             root["stream"] = stream;
 
-            var stats = root["stats"] as JsonObject ?? new JsonObject();
+            JsonObject stats = root["stats"] as JsonObject ?? [];
             stats["followersGained"] = sessionStats.FollowersGained;
             stats["peakViewers"] = sessionStats.PeakViewers;
             stats["averageViewers"] = Math.Round(sessionStats.AverageViewers, 1);
@@ -14073,7 +14923,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         _raidCountdownCts?.Cancel();
         _raidCountdownCts?.Dispose();
         _raidCountdownCts = new CancellationTokenSource();
-        var token = _raidCountdownCts.Token;
+        CancellationToken token = _raidCountdownCts.Token;
         _raidCountdownActive = true;
         UpdateDashboardStreamEndModuleVisibility();
         UpdateDashboardRaidActionButtons();
@@ -14088,10 +14938,10 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            for (var remaining = seconds; remaining >= 0; remaining--)
+            for (int remaining = seconds; remaining >= 0; remaining--)
             {
                 token.ThrowIfCancellationRequested();
-                var clock = TimeSpan.FromSeconds(remaining).ToString(@"mm\:ss");
+                string clock = TimeSpan.FromSeconds(remaining).ToString(@"mm\:ss");
                 DashboardRaidCountdownText.Text = $"Raid in: {clock}";
                 DashboardRaidCountdownProgress.Value = seconds - remaining;
                 DashboardWorkflowStageText.Text = $"RAID → {displayName} · noch {remaining}s";
@@ -14162,13 +15012,13 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        if (!int.TryParse(DashboardPlannedStreamEndSecondsBox.Text.Trim(), out var seconds) || seconds < 1)
+        if (!int.TryParse(DashboardPlannedStreamEndSecondsBox.Text.Trim(), out int seconds) || seconds < 1)
         {
             AddDashboardNotification("Bitte eine gültige Sekundenanzahl für das geplante Streamende eingeben.", "Warnung");
             return;
         }
 
-        var confirm = MessageBox.Show(
+        MessageBoxResult confirm = MessageBox.Show(
             $"Streamende in {seconds} Sekunden planen? Danach startet der Endszene-/Raid-Ablauf automatisch.",
             "Streamende planen",
             MessageBoxButton.YesNo,
@@ -14184,11 +15034,11 @@ private Task ApplyCombinedAlertDuckingAsync()
         _plannedStreamEndCts?.Cancel();
         _plannedStreamEndCts?.Dispose();
         _plannedStreamEndCts = new CancellationTokenSource();
-        var token = _plannedStreamEndCts.Token;
+        CancellationToken token = _plannedStreamEndCts.Token;
         _plannedStreamEndActive = true;
         UpdateDashboardStreamEndModuleVisibility();
 
-        var totalSeconds = seconds;
+        int totalSeconds = seconds;
         DashboardStreamEndCountdownLabel.Text = "Zeit bis Streamende (geplant)";
         DashboardStreamEndCountdownProgress.Minimum = 0;
         DashboardStreamEndCountdownProgress.Maximum = Math.Max(1, totalSeconds);
@@ -14197,7 +15047,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            for (var remaining = totalSeconds; remaining >= 0; remaining--)
+            for (int remaining = totalSeconds; remaining >= 0; remaining--)
             {
                 token.ThrowIfCancellationRequested();
                 DashboardStreamEndCountdownText.Text = FormatCountdownClock(remaining);
@@ -14266,7 +15116,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var raidChannel = (DashboardRaidChannelBox.SelectedItem as string
+        string? raidChannel = (DashboardRaidChannelBox.SelectedItem as string
             ?? _settings.Twitch.SelectedRaidChannel)?.Trim();
         if (string.IsNullOrWhiteSpace(raidChannel))
         {
@@ -14279,7 +15129,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            var raidStatus = await _twitchModule.GetRaidTargetStatusAsync(raidChannel);
+            TwitchRaidTargetStatus? raidStatus = await _twitchModule.GetRaidTargetStatusAsync(raidChannel);
             if (raidStatus is null)
             {
                 AddDashboardNotification("Raid abgebrochen: Kanal nicht gefunden.", "Fehler");
@@ -14323,7 +15173,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             AddDashboardNotification($"Twitch-Raid zu {raidStatus.DisplayName} wurde gestartet.", "Info");
             SetWorkflowVisualStage("Raid", $"Raid zu {raidStatus.DisplayName} wird gestartet.");
 
-            var raidCompleted = await RunRaidCountdownAsync(
+            bool raidCompleted = await RunRaidCountdownAsync(
                 raidStatus.DisplayName,
                 Math.Clamp(_settings.Twitch.RaidCountdownSeconds, 5, 300));
 
@@ -14363,7 +15213,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             // Raid außerhalb des End-Flows: optional Stream beenden (ohne erneute Endszene).
             if (_settings.Twitch.StopStreamAfterRaid)
             {
-                var confirm = MessageBox.Show(
+                MessageBoxResult confirm = MessageBox.Show(
                     "Raid ist durch. OBS-Stream jetzt beenden?",
                     "Stream nach Raid beenden",
                     MessageBoxButton.YesNo,
@@ -14406,7 +15256,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         _endSceneCountdownCts?.Cancel();
         _endSceneCountdownCts?.Dispose();
         _endSceneCountdownCts = new CancellationTokenSource();
-        var token = _endSceneCountdownCts.Token;
+        CancellationToken token = _endSceneCountdownCts.Token;
 
         DashboardStreamEndCountdownLabel.Text = "Zeit bis Streamende (Endszene)";
         DashboardStreamEndCountdownProgress.Minimum = 0;
@@ -14415,10 +15265,10 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            for (var remaining = endSeconds; remaining > 0; remaining--)
+            for (int remaining = endSeconds; remaining > 0; remaining--)
             {
                 token.ThrowIfCancellationRequested();
-                var clock = FormatCountdownClock(remaining);
+                string clock = FormatCountdownClock(remaining);
                 DashboardStreamEndCountdownText.Text = clock;
                 DashboardStreamEndCountdownProgress.Value = endSeconds - remaining;
                 DashboardWorkflowStageText.Text = $"ENDSZENE · Streamende in {remaining}s";
@@ -14506,7 +15356,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var mode = skipRaidPhase
+        StreamEndMode mode = skipRaidPhase
             ? StreamEndMode.EndSceneThenStop
             : (_settings.Twitch.RaidOnStreamEnd
                 ? StreamEndMode.EndSceneRaidThenStop
@@ -14522,7 +15372,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var endSeconds = Math.Max(
+        int endSeconds = Math.Max(
             0,
             _settings.Twitch.EndSceneDurationSeconds > 0
                 ? _settings.Twitch.EndSceneDurationSeconds
@@ -14540,8 +15390,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             endSeconds,
             OpenRaidChannelByName,
             SuggestRaidTargetsAsync,
-            OnStreamEndRaidTargetChanged);
-        dialog.Owner = this;
+            OnStreamEndRaidTargetChanged)
+        {
+            Owner = this
+        };
         _activeStreamEndDialog = dialog;
 
         var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -14641,7 +15493,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var url = "https://www.twitch.tv/" + Uri.EscapeDataString(channel.Trim().TrimStart('@'));
+        string url = "https://www.twitch.tv/" + Uri.EscapeDataString(channel.Trim().TrimStart('@'));
         Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 
@@ -14716,13 +15568,13 @@ private Task ApplyCombinedAlertDuckingAsync()
                 }
             }
 
-            var endSeconds = Math.Max(
+            int endSeconds = Math.Max(
                 0,
                 _settings.Twitch.EndSceneDurationSeconds > 0
                     ? _settings.Twitch.EndSceneDurationSeconds
                     : _settings.Workflow.EndSceneSeconds);
 
-            var wantsRaid = mode == StreamEndMode.EndSceneRaidThenStop
+            bool wantsRaid = mode == StreamEndMode.EndSceneRaidThenStop
                 && !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel);
 
             if (wantsRaid)
@@ -14825,7 +15677,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private Task ValidateSettingsAsync()
     {
-        var report = _settingsValidator.Validate(_settings);
+        ValidationReport report = _settingsValidator.Validate(_settings);
         ValidationGrid.ItemsSource = report.Issues;
 
         _appLogger.Write(
@@ -14872,7 +15724,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 }
             }
 
-            var twitchConnected =
+            bool twitchConnected =
                 _twitchModule.GetSnapshot().Authenticated;
 
             if (_settings.General.ReconnectTwitch &&
@@ -14944,7 +15796,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 }
             }
 
-            var streamerBotConnected = _streamerBotClient.IsConnected;
+            bool streamerBotConnected = _streamerBotClient.IsConnected;
 
             if (_settings.General.ReconnectStreamerBot &&
                 (_settings.StreamerBot.AutoConnect ||
@@ -14985,7 +15837,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         if (!_lastReconnectAttempt.TryGetValue(
                 serviceName,
-                out var lastAttempt))
+                out DateTimeOffset lastAttempt))
         {
             return true;
         }
@@ -15052,13 +15904,13 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var entries = await _appLogger.ReadRecentAsync(1000);
+        IReadOnlyList<AppLogEntry> entries = await _appLogger.ReadRecentAsync(1000);
         var validEntries = entries.Where(IsUsableLogEntry).ToList();
         var filtered = validEntries.Where(LogMatchesFilter).ToList();
 
         _visibleLogs.Clear();
 
-        foreach (var entry in filtered)
+        foreach (AppLogEntry? entry in filtered)
         {
             _visibleLogs.Add(entry);
         }
@@ -15068,17 +15920,17 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RefreshSpotifyInspectorAsync(IReadOnlyList<AppLogEntry>? suppliedEntries = null)
     {
-        var entries = suppliedEntries ?? await _appLogger.ReadRecentAsync(2000);
+        IReadOnlyList<AppLogEntry> entries = suppliedEntries ?? await _appLogger.ReadRecentAsync(2000);
         var spotifyEntries = entries
             .Where(IsUsableLogEntry)
             .Where(entry => entry.Category.StartsWith("Spotify.", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(entry => entry.Timestamp)
             .ToList();
 
-        var oneMinuteAgo = DateTimeOffset.Now.AddMinutes(-1);
+        DateTimeOffset oneMinuteAgo = DateTimeOffset.Now.AddMinutes(-1);
         SpotifyInspectorRequestsPerMinuteText.Text = spotifyEntries.Count(entry => entry.Timestamp >= oneMinuteAgo).ToString();
 
-        var methodSummary = spotifyEntries
+        IEnumerable<string> methodSummary = spotifyEntries
             .Select(ToSpotifyInspectorRow)
             .Where(row => row.Time != string.Empty)
             .GroupBy(row => string.IsNullOrWhiteSpace(row.Method) ? "–" : row.Method, StringComparer.OrdinalIgnoreCase)
@@ -15089,7 +15941,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             ? "Noch keine Aufrufe."
             : string.Join(" · ", methodSummary);
 
-        var latest = spotifyEntries.FirstOrDefault();
+        AppLogEntry? latest = spotifyEntries.FirstOrDefault();
         SpotifyInspectorLastStatusText.Text = latest is null
             ? "Noch keine Anfrage"
             : GetProperty(latest, "statusCode", latest.Level.ToString());
@@ -15097,19 +15949,19 @@ private Task ApplyCombinedAlertDuckingAsync()
             ? "–"
             : FormatRetryAfter(GetProperty(latest, "retryAfterSeconds", "none"));
 
-        var filter = (SpotifyInspectorFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "All";
-        var rows = spotifyEntries.Select(ToSpotifyInspectorRow);
+        string filter = (SpotifyInspectorFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "All";
+        IEnumerable<SpotifyApiInspectorRow> rows = spotifyEntries.Select(ToSpotifyInspectorRow);
         rows = filter switch
         {
             "GET" => rows.Where(row => string.Equals(row.Method, "GET", StringComparison.OrdinalIgnoreCase)),
             "WRITE" => rows.Where(row => row.Method is "POST" or "PUT" or "PATCH" or "DELETE"),
-            "ERROR" => rows.Where(row => !int.TryParse(row.Status, out var code) || code >= 400),
+            "ERROR" => rows.Where(row => !int.TryParse(row.Status, out int code) || code >= 400),
             "OAUTH" => rows.Where(row => string.Equals(row.Category, "OAuth", StringComparison.OrdinalIgnoreCase)),
             _ => rows
         };
 
         _spotifyInspectorRows.Clear();
-        foreach (var row in rows.Take(100))
+        foreach (SpotifyApiInspectorRow? row in rows.Take(100))
         {
             _spotifyInspectorRows.Add(row);
         }
@@ -15117,13 +15969,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static SpotifyApiInspectorRow ToSpotifyInspectorRow(AppLogEntry entry)
     {
-        var endpoint = GetProperty(entry, "endpoint", "");
+        string endpoint = GetProperty(entry, "endpoint", "");
         if (string.IsNullOrWhiteSpace(endpoint))
         {
             endpoint = InferEndpointFromMessage(entry.Message);
         }
-        var operation = GetProperty(entry, "operation", "");
-        var method = GetProperty(entry, "method", "");
+        string operation = GetProperty(entry, "operation", "");
+        string method = GetProperty(entry, "method", "");
         if (string.IsNullOrWhiteSpace(method))
         {
             method = !string.IsNullOrWhiteSpace(operation)
@@ -15167,7 +16019,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static string InferMethodFromMessage(string message)
     {
-        foreach (var method in new[] { "GET", "POST", "PUT", "DELETE", "PATCH" })
+        foreach (string? method in new[] { "GET", "POST", "PUT", "DELETE", "PATCH" })
         {
             if (message.Contains(method + " ", StringComparison.OrdinalIgnoreCase))
             {
@@ -15179,13 +16031,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static string InferEndpointFromMessage(string message)
     {
-        var marker = message.IndexOf("/v1/", StringComparison.OrdinalIgnoreCase);
+        int marker = message.IndexOf("/v1/", StringComparison.OrdinalIgnoreCase);
         if (marker < 0)
         {
             return "–";
         }
 
-        var end = message.IndexOf(" ->", marker, StringComparison.OrdinalIgnoreCase);
+        int end = message.IndexOf(" ->", marker, StringComparison.OrdinalIgnoreCase);
         return end > marker ? message[marker..end].Trim() : message[marker..].Trim();
     }
 
@@ -15196,13 +16048,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static string GetProperty(AppLogEntry entry, string key, string fallback)
         => entry.Properties is not null &&
-           entry.Properties.TryGetValue(key, out var value) &&
+           entry.Properties.TryGetValue(key, out string? value) &&
            !string.IsNullOrWhiteSpace(value)
             ? value
             : fallback;
 
     private static string FormatRetryAfter(string value)
-        => int.TryParse(value, out var seconds) && seconds > 0
+        => int.TryParse(value, out int seconds) && seconds > 0
             ? $"{seconds} Sek."
             : "–";
 
@@ -15229,7 +16081,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private bool LogMatchesFilter(AppLogEntry entry)
     {
-        var search = LogSearchBox.Text.Trim();
+        string search = LogSearchBox.Text.Trim();
 
         if (!string.IsNullOrWhiteSpace(search) &&
             !entry.Message.Contains(
@@ -15245,7 +16097,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return false;
         }
 
-        var selected =
+        string selected =
             (LogLevelFilterBox.SelectedItem
                 as System.Windows.Controls.ComboBoxItem)
                 ?.Content
@@ -15311,44 +16163,69 @@ private Task ApplyCombinedAlertDuckingAsync()
     private int _obsSceneItemsRefreshVersion;
     private async Task RefreshServicesObsSceneItemsAsync()
     {
-        var refreshVersion = ++_obsSceneItemsRefreshVersion;
+        int refreshVersion = ++_obsSceneItemsRefreshVersion;
         if (!_obsClient.IsConnected || ServicesObsScenesList.SelectedItem is not ObsSceneInfo scene)
-        { ServicesObsSceneItemsList.ItemsSource=null; ServicesObsSceneItemsList.SelectedItem=null; ServicesObsShowSceneItemButton.IsEnabled=false; ServicesObsHideSceneItemButton.IsEnabled=false;
-          ServicesObsLockSceneItemButton.IsEnabled=false; ServicesObsUnlockSceneItemButton.IsEnabled=false;
-          ServicesObsMoveSceneItemUpButton.IsEnabled=false; ServicesObsMoveSceneItemDownButton.IsEnabled=false; SetObsSceneItemTransformControlsEnabled(false); ClearObsSourceFilters("Zuerst eine Quelle auswählen."); ServicesObsSelectedSceneItemStateText.Text="Zuerst eine Szene auswählen."; return; }
-        var selectedSourceName=(ServicesObsSceneItemsList.SelectedItem as ObsSceneItemInfo)?.SourceName;
-        ServicesObsSelectedSceneItemStateText.Text=$"Quellen für „{scene.Name}“ werden geladen …";
+        {
+            ServicesObsSceneItemsList.ItemsSource = null; ServicesObsSceneItemsList.SelectedItem = null; ServicesObsShowSceneItemButton.IsEnabled = false; ServicesObsHideSceneItemButton.IsEnabled = false;
+            ServicesObsLockSceneItemButton.IsEnabled = false; ServicesObsUnlockSceneItemButton.IsEnabled = false;
+            ServicesObsMoveSceneItemUpButton.IsEnabled = false; ServicesObsMoveSceneItemDownButton.IsEnabled = false; SetObsSceneItemTransformControlsEnabled(false); ClearObsSourceFilters("Zuerst eine Quelle auswählen."); ServicesObsSelectedSceneItemStateText.Text = "Zuerst eine Szene auswählen."; return;
+        }
+        string? selectedSourceName = (ServicesObsSceneItemsList.SelectedItem as ObsSceneItemInfo)?.SourceName;
+        ServicesObsSelectedSceneItemStateText.Text = $"Quellen für „{scene.Name}“ werden geladen …";
         try
         {
-            var items=await _obsClient.GetSceneItemListAsync(scene.Name);
-            if (refreshVersion!=_obsSceneItemsRefreshVersion || ServicesObsScenesList.SelectedItem is not ObsSceneInfo currentScene || !string.Equals(currentScene.Name,scene.Name,StringComparison.OrdinalIgnoreCase)) return;
+            IReadOnlyList<ObsSceneItemInfo> items = await _obsClient.GetSceneItemListAsync(scene.Name);
+            if (refreshVersion != _obsSceneItemsRefreshVersion || ServicesObsScenesList.SelectedItem is not ObsSceneInfo currentScene || !string.Equals(currentScene.Name, scene.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             _servicesObsSceneItems = items;
             ApplyServicesObsSourceFilter();
-            if (!string.IsNullOrWhiteSpace(selectedSourceName)) ServicesObsSceneItemsList.SelectedItem=items.FirstOrDefault(item=>string.Equals(item.SourceName,selectedSourceName,StringComparison.OrdinalIgnoreCase));
-            var valid=ServicesObsSceneItemsList.SelectedItem is ObsSceneItemInfo; ServicesObsShowSceneItemButton.IsEnabled=valid; ServicesObsHideSceneItemButton.IsEnabled=valid;
-            ServicesObsLockSceneItemButton.IsEnabled=valid; ServicesObsUnlockSceneItemButton.IsEnabled=valid;
-            ServicesObsMoveSceneItemUpButton.IsEnabled=valid; ServicesObsMoveSceneItemDownButton.IsEnabled=valid; SetObsSceneItemTransformControlsEnabled(valid);
-            ServicesObsSelectedSceneItemStateText.Text=$"{items.Count} Quellen in „{scene.Name}“";
+            if (!string.IsNullOrWhiteSpace(selectedSourceName))
+            {
+                ServicesObsSceneItemsList.SelectedItem = items.FirstOrDefault(item => string.Equals(item.SourceName, selectedSourceName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            bool valid = ServicesObsSceneItemsList.SelectedItem is ObsSceneItemInfo; ServicesObsShowSceneItemButton.IsEnabled = valid; ServicesObsHideSceneItemButton.IsEnabled = valid;
+            ServicesObsLockSceneItemButton.IsEnabled = valid; ServicesObsUnlockSceneItemButton.IsEnabled = valid;
+            ServicesObsMoveSceneItemUpButton.IsEnabled = valid; ServicesObsMoveSceneItemDownButton.IsEnabled = valid; SetObsSceneItemTransformControlsEnabled(valid);
+            ServicesObsSelectedSceneItemStateText.Text = $"{items.Count} Quellen in „{scene.Name}“";
         }
-        catch(Exception exception)
-        { if(refreshVersion!=_obsSceneItemsRefreshVersion)return; ServicesObsSceneItemsList.ItemsSource=null; ServicesObsSceneItemsList.SelectedItem=null; ServicesObsShowSceneItemButton.IsEnabled=false; ServicesObsHideSceneItemButton.IsEnabled=false;
-          ServicesObsLockSceneItemButton.IsEnabled=false; ServicesObsUnlockSceneItemButton.IsEnabled=false;
-          ServicesObsMoveSceneItemUpButton.IsEnabled=false; ServicesObsMoveSceneItemDownButton.IsEnabled=false; SetObsSceneItemTransformControlsEnabled(false); ClearObsSourceFilters("Filter konnten nicht geladen werden."); ServicesObsSelectedSceneItemStateText.Text=$"Quellen konnten nicht geladen werden: {exception.Message}"; }
+        catch (Exception exception)
+        {
+            if (refreshVersion != _obsSceneItemsRefreshVersion)
+            {
+                return;
+            }
+
+            ServicesObsSceneItemsList.ItemsSource = null; ServicesObsSceneItemsList.SelectedItem = null; ServicesObsShowSceneItemButton.IsEnabled = false; ServicesObsHideSceneItemButton.IsEnabled = false;
+            ServicesObsLockSceneItemButton.IsEnabled = false; ServicesObsUnlockSceneItemButton.IsEnabled = false;
+            ServicesObsMoveSceneItemUpButton.IsEnabled = false; ServicesObsMoveSceneItemDownButton.IsEnabled = false; SetObsSceneItemTransformControlsEnabled(false); ClearObsSourceFilters("Filter konnten nicht geladen werden."); ServicesObsSelectedSceneItemStateText.Text = $"Quellen konnten nicht geladen werden: {exception.Message}";
+        }
     }
     private async Task RefreshSelectedObsSceneItemStateAsync()
     {
-        var valid=ServicesObsSceneItemsList.SelectedItem is ObsSceneItemInfo; ServicesObsShowSceneItemButton.IsEnabled=valid; ServicesObsHideSceneItemButton.IsEnabled=valid;
-            ServicesObsLockSceneItemButton.IsEnabled=valid; ServicesObsUnlockSceneItemButton.IsEnabled=valid;
-            ServicesObsMoveSceneItemUpButton.IsEnabled=valid; ServicesObsMoveSceneItemDownButton.IsEnabled=valid; SetObsSceneItemTransformControlsEnabled(valid);
-        if(ServicesObsSceneItemsList.SelectedItem is not ObsSceneItemInfo item){ ServicesObsRestartMediaButton.IsEnabled = false;
+        bool valid = ServicesObsSceneItemsList.SelectedItem is ObsSceneItemInfo; ServicesObsShowSceneItemButton.IsEnabled = valid; ServicesObsHideSceneItemButton.IsEnabled = valid;
+        ServicesObsLockSceneItemButton.IsEnabled = valid; ServicesObsUnlockSceneItemButton.IsEnabled = valid;
+        ServicesObsMoveSceneItemUpButton.IsEnabled = valid; ServicesObsMoveSceneItemDownButton.IsEnabled = valid; SetObsSceneItemTransformControlsEnabled(valid);
+        if (ServicesObsSceneItemsList.SelectedItem is not ObsSceneItemInfo item)
+        {
+            ServicesObsRestartMediaButton.IsEnabled = false;
             ServicesObsStopMediaButton.IsEnabled = false;
-            ServicesObsRefreshBrowserButton.IsEnabled = false; ClearObsSourceFilters("Quelle auswählen, um Filter zu laden."); if(ServicesObsScenesList.SelectedItem is ObsSceneInfo scene) ServicesObsSelectedSceneItemStateText.Text=$"Quelle in „{scene.Name}“ auswählen."; return; }
+            ServicesObsRefreshBrowserButton.IsEnabled = false; ClearObsSourceFilters("Quelle auswählen, um Filter zu laden."); if (ServicesObsScenesList.SelectedItem is ObsSceneInfo scene)
+            {
+                ServicesObsSelectedSceneItemStateText.Text = $"Quelle in „{scene.Name}“ auswählen.";
+            }
+
+            return;
+        }
         ServicesObsLockSceneItemButton.IsEnabled = !item.Locked;
         ServicesObsUnlockSceneItemButton.IsEnabled = item.Locked;
-        var itemCount = (ServicesObsSceneItemsList.ItemsSource as IEnumerable<ObsSceneItemInfo>)?.Count() ?? 0;
+        int itemCount = (ServicesObsSceneItemsList.ItemsSource as IEnumerable<ObsSceneItemInfo>)?.Count() ?? 0;
         ServicesObsMoveSceneItemUpButton.IsEnabled = item.Index < Math.Max(0, itemCount - 1);
         ServicesObsMoveSceneItemDownButton.IsEnabled = item.Index > 0;
-        ServicesObsSelectedSceneItemStateText.Text=$"{item.SourceName}: {(item.Enabled?"sichtbar":"ausgeblendet")} · {(item.Locked?"gesperrt":"entsperrt")} · Ebene {item.Index}"+(item.IsGroup?" · Gruppe":string.Empty);
+        ServicesObsSelectedSceneItemStateText.Text = $"{item.SourceName}: {(item.Enabled ? "sichtbar" : "ausgeblendet")} · {(item.Locked ? "gesperrt" : "entsperrt")} · Ebene {item.Index}" + (item.IsGroup ? " · Gruppe" : string.Empty);
         ServicesObsRestartMediaButton.IsEnabled = _obsClient.IsConnected && IsRestartableObsMediaSource(item.SourceType);
         ServicesObsStopMediaButton.IsEnabled = _obsClient.IsConnected && IsRestartableObsMediaSource(item.SourceType);
         ServicesObsRefreshBrowserButton.IsEnabled = _obsClient.IsConnected && IsObsBrowserSource(item.SourceType);
@@ -15359,9 +16236,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ApplyServicesObsSceneFilter()
     {
-        if (ServicesObsScenesList is null) return;
-        var selectedName = (ServicesObsScenesList.SelectedItem as ObsSceneInfo)?.Name;
-        var search = ServicesObsSceneSearchBox?.Text?.Trim() ?? string.Empty;
+        if (ServicesObsScenesList is null)
+        {
+            return;
+        }
+
+        string? selectedName = (ServicesObsScenesList.SelectedItem as ObsSceneInfo)?.Name;
+        string search = ServicesObsSceneSearchBox?.Text?.Trim() ?? string.Empty;
         var filtered = _servicesObsScenes
             .Where(scene => string.IsNullOrWhiteSpace(search) || scene.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(scene => string.Equals(scene.Name, _servicesObsCurrentScene, StringComparison.OrdinalIgnoreCase))
@@ -15374,9 +16255,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ApplyServicesObsSourceFilter()
     {
-        if (ServicesObsSceneItemsList is null) return;
-        var selectedName = (ServicesObsSceneItemsList.SelectedItem as ObsSceneItemInfo)?.SourceName;
-        var search = ServicesObsSourceSearchBox?.Text?.Trim() ?? string.Empty;
+        if (ServicesObsSceneItemsList is null)
+        {
+            return;
+        }
+
+        string? selectedName = (ServicesObsSceneItemsList.SelectedItem as ObsSceneItemInfo)?.SourceName;
+        string search = ServicesObsSourceSearchBox?.Text?.Trim() ?? string.Empty;
         var filtered = _servicesObsSceneItems
             .Where(item => string.IsNullOrWhiteSpace(search) || item.SourceName.Contains(search, StringComparison.OrdinalIgnoreCase) || item.SourceType.Contains(search, StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -15386,10 +16271,14 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ApplyServicesObsInputFilter()
     {
-        if (ServicesObsInputsList is null) return;
-        var selectedName = (ServicesObsInputsList.SelectedItem as ObsInputInfo)?.Name;
-        var search = ServicesObsInputSearchBox?.Text?.Trim() ?? string.Empty;
-        var mode = (ServicesObsInputFilterBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
+        if (ServicesObsInputsList is null)
+        {
+            return;
+        }
+
+        string? selectedName = (ServicesObsInputsList.SelectedItem as ObsInputInfo)?.Name;
+        string search = ServicesObsInputSearchBox?.Text?.Trim() ?? string.Empty;
+        string mode = (ServicesObsInputFilterBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
         var filtered = _servicesObsInputs
             .Where(input => string.IsNullOrWhiteSpace(search) || input.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || input.Kind.Contains(search, StringComparison.OrdinalIgnoreCase))
             .Where(input => mode switch
@@ -15407,29 +16296,47 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static string ClassifyObsAudioInput(ObsInputInfo input)
     {
-        var value = $"{input.Name} {input.Kind} {input.UnversionedKind}".ToLowerInvariant();
-        if (value.Contains("mic") || value.Contains("mikro") || value.Contains("yeti") || value.Contains("rode") || value.Contains("voice")) return "microphone";
-        if (value.Contains("spotify") || value.Contains("music") || value.Contains("musik")) return "music";
-        if (value.Contains("browser") || value.Contains("alert") || value.Contains("streamelements")) return "browser";
+        string value = $"{input.Name} {input.Kind} {input.UnversionedKind}".ToLowerInvariant();
+        if (value.Contains("mic") || value.Contains("mikro") || value.Contains("yeti") || value.Contains("rode") || value.Contains("voice"))
+        {
+            return "microphone";
+        }
+
+        if (value.Contains("spotify") || value.Contains("music") || value.Contains("musik"))
+        {
+            return "music";
+        }
+
+        if (value.Contains("browser") || value.Contains("alert") || value.Contains("streamelements"))
+        {
+            return "browser";
+        }
+
         return "game";
     }
 
     private bool IsObsInputMuted(string inputName) =>
-        _servicesObsInputsMuted.TryGetValue(inputName, out var muted) && muted;
+        _servicesObsInputsMuted.TryGetValue(inputName, out bool muted) && muted;
 
     private readonly Dictionary<string, bool> _servicesObsInputsMuted = new(StringComparer.OrdinalIgnoreCase);
 
     private void UpdateObsLiveMeters(IReadOnlyList<ObsInputVolumeMeter> meters)
     {
-        var now = DateTimeOffset.UtcNow;
-        foreach (var meter in meters)
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        foreach (ObsInputVolumeMeter meter in meters)
         {
             _obsLiveMeters[meter.InputName] = meter;
-            if (!_obsPeakHold.TryGetValue(meter.InputName, out var held) || meter.PeakDb >= held.PeakDb || now - held.At > TimeSpan.FromSeconds(2))
+            if (!_obsPeakHold.TryGetValue(meter.InputName, out (double PeakDb, DateTimeOffset At) held) || meter.PeakDb >= held.PeakDb || now - held.At > TimeSpan.FromSeconds(2))
+            {
                 _obsPeakHold[meter.InputName] = (meter.PeakDb, now);
+            }
         }
-        if (ServicesObsInputsList.SelectedItem is not ObsInputInfo selected || !_obsLiveMeters.TryGetValue(selected.Name, out var current)) return;
-        var heldPeak = _obsPeakHold.TryGetValue(selected.Name, out var peak) ? peak.PeakDb : current.PeakDb;
+        if (ServicesObsInputsList.SelectedItem is not ObsInputInfo selected || !_obsLiveMeters.TryGetValue(selected.Name, out ObsInputVolumeMeter? current))
+        {
+            return;
+        }
+
+        double heldPeak = _obsPeakHold.TryGetValue(selected.Name, out (double PeakDb, DateTimeOffset At) peak) ? peak.PeakDb : current.PeakDb;
         ServicesObsLiveMeterBar.Value = Math.Clamp(current.MagnitudeDb, -60, 10);
         ServicesObsLiveMeterText.Text = $"Live-Pegel: {current.MagnitudeDb:0.0} dB · Peak {current.PeakDb:0.0} dB";
         ServicesObsPeakHoldText.Text = $"Peak-Hold: {heldPeak:0.0} dB" + (heldPeak >= -0.1 ? " · CLIPPING" : string.Empty);
@@ -15438,8 +16345,8 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task SetObsInputsMuteAsync(IEnumerable<ObsInputInfo> inputs, bool muted, string label)
     {
         if (!_obsClient.IsConnected) { AddDashboardNotification("OBS ist nicht verbunden.", "Warnung"); return; }
-        var applied = 0;
-        foreach (var input in inputs)
+        int applied = 0;
+        foreach (ObsInputInfo input in inputs)
         {
             try { await _obsClient.SetInputMuteAsync(input.Name, muted); _servicesObsInputsMuted[input.Name] = muted; applied++; } catch { }
         }
@@ -15449,11 +16356,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task SoloObsAudioCategoryAsync(string category)
     {
-        foreach (var input in _servicesObsInputs)
+        foreach (ObsInputInfo input in _servicesObsInputs)
         {
             try
             {
-                var muted = !string.Equals(ClassifyObsAudioInput(input), category, StringComparison.OrdinalIgnoreCase);
+                bool muted = !string.Equals(ClassifyObsAudioInput(input), category, StringComparison.OrdinalIgnoreCase);
                 await _obsClient.SetInputMuteAsync(input.Name, muted);
                 _servicesObsInputsMuted[input.Name] = muted;
             }
@@ -15467,21 +16374,21 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task SetSelectedObsAudioGroupMuteAsync(bool muted)
     {
-        var group = SelectedObsAudioGroup();
+        string group = SelectedObsAudioGroup();
         await SetObsInputsMuteAsync(_servicesObsInputs.Where(input => ClassifyObsAudioInput(input) == group), muted, "Audiogruppe");
     }
 
     private async Task ApplyObsAudioGroupVolumeAsync()
     {
-        if (!double.TryParse(ServicesObsGroupVolumeBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var db))
+        if (!double.TryParse(ServicesObsGroupVolumeBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double db))
         {
             AddDashboardNotification("Ungültiger Gruppenpegel.", "Warnung");
             return;
         }
         db = Math.Clamp(db, -100, 26);
-        var group = SelectedObsAudioGroup();
-        var applied = 0;
-        foreach (var input in _servicesObsInputs.Where(input => ClassifyObsAudioInput(input) == group))
+        string group = SelectedObsAudioGroup();
+        int applied = 0;
+        foreach (ObsInputInfo? input in _servicesObsInputs.Where(input => ClassifyObsAudioInput(input) == group))
         {
             try { await _obsClient.SetInputVolumeDbAsync(input.Name, db); applied++; } catch { }
         }
@@ -15572,14 +16479,16 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var selectedFilterName = (ServicesObsSourceFiltersList.SelectedItem as ObsSourceFilterInfo)?.Name;
+        string? selectedFilterName = (ServicesObsSourceFiltersList.SelectedItem as ObsSourceFilterInfo)?.Name;
         ServicesObsRefreshSourceFiltersButton.IsEnabled = true;
         ServicesObsSourceFilterStateText.Text = $"Filter für „{item.SourceName}“ werden geladen …";
         try
         {
-            var filters = await _obsClient.GetSourceFilterListAsync(item.SourceName);
+            IReadOnlyList<ObsSourceFilterInfo> filters = await _obsClient.GetSourceFilterListAsync(item.SourceName);
             if (ServicesObsSceneItemsList.SelectedItem is not ObsSceneItemInfo current || !string.Equals(current.SourceName, item.SourceName, StringComparison.OrdinalIgnoreCase))
+            {
                 return;
+            }
 
             ServicesObsSourceFiltersList.ItemsSource = filters;
             ServicesObsSourceFiltersList.SelectedItem = !string.IsNullOrWhiteSpace(selectedFilterName)
@@ -15633,16 +16542,16 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task SetSelectedObsSceneItemVisibilityAsync(bool enabled)
     {
-        if(!_obsClient.IsConnected || ServicesObsScenesList.SelectedItem is not ObsSceneInfo scene || ServicesObsSceneItemsList.SelectedItem is not ObsSceneItemInfo item){ AddDashboardNotification("OBS-Quelle kann nicht geschaltet werden: Szene oder Quelle fehlt.","Warnung"); return; }
+        if (!_obsClient.IsConnected || ServicesObsScenesList.SelectedItem is not ObsSceneInfo scene || ServicesObsSceneItemsList.SelectedItem is not ObsSceneItemInfo item) { AddDashboardNotification("OBS-Quelle kann nicht geschaltet werden: Szene oder Quelle fehlt.", "Warnung"); return; }
         try
         {
-            var currentItems=await _obsClient.GetSceneItemListAsync(scene.Name);
-            var currentItem=currentItems.FirstOrDefault(candidate=>string.Equals(candidate.SourceName,item.SourceName,StringComparison.OrdinalIgnoreCase));
-            if(currentItem is null){ AddDashboardNotification($"OBS-Quelle „{item.SourceName}“ existiert in „{scene.Name}“ nicht mehr.","Warnung"); await RefreshServicesObsSceneItemsAsync(); return; }
-            await _obsClient.SetSceneItemEnabledAsync(scene.Name,currentItem.SourceName,enabled); await RefreshServicesObsSceneItemsAsync();
-            AddDashboardNotification($"{currentItem.SourceName} wurde in {scene.Name} {(enabled?"eingeblendet":"ausgeblendet")}.","Info");
+            IReadOnlyList<ObsSceneItemInfo> currentItems = await _obsClient.GetSceneItemListAsync(scene.Name);
+            ObsSceneItemInfo? currentItem = currentItems.FirstOrDefault(candidate => string.Equals(candidate.SourceName, item.SourceName, StringComparison.OrdinalIgnoreCase));
+            if (currentItem is null) { AddDashboardNotification($"OBS-Quelle „{item.SourceName}“ existiert in „{scene.Name}“ nicht mehr.", "Warnung"); await RefreshServicesObsSceneItemsAsync(); return; }
+            await _obsClient.SetSceneItemEnabledAsync(scene.Name, currentItem.SourceName, enabled); await RefreshServicesObsSceneItemsAsync();
+            AddDashboardNotification($"{currentItem.SourceName} wurde in {scene.Name} {(enabled ? "eingeblendet" : "ausgeblendet")}.", "Info");
         }
-        catch(Exception exception){ AddDashboardNotification($"OBS-Quelle konnte nicht geschaltet werden: {exception.Message}","Fehler"); }
+        catch (Exception exception) { AddDashboardNotification($"OBS-Quelle konnte nicht geschaltet werden: {exception.Message}", "Fehler"); }
     }
 
     private async Task SetSelectedObsSceneItemLockAsync(bool locked)
@@ -15675,8 +16584,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            var items = await _obsClient.GetSceneItemListAsync(scene.Name);
-            var current = items.FirstOrDefault(candidate => candidate.ItemId == item.ItemId)
+            IReadOnlyList<ObsSceneItemInfo> items = await _obsClient.GetSceneItemListAsync(scene.Name);
+            ObsSceneItemInfo? current = items.FirstOrDefault(candidate => candidate.ItemId == item.ItemId)
                 ?? items.FirstOrDefault(candidate => string.Equals(candidate.SourceName, item.SourceName, StringComparison.OrdinalIgnoreCase));
             if (current is null)
             {
@@ -15685,10 +16594,12 @@ private Task ApplyCombinedAlertDuckingAsync()
                 return;
             }
 
-            var maximumIndex = Math.Max(0, items.Count - 1);
-            var targetIndex = Math.Clamp(current.Index + indexDelta, 0, maximumIndex);
+            int maximumIndex = Math.Max(0, items.Count - 1);
+            int targetIndex = Math.Clamp(current.Index + indexDelta, 0, maximumIndex);
             if (targetIndex == current.Index)
+            {
                 return;
+            }
 
             await _obsClient.SetSceneItemIndexAsync(scene.Name, current.SourceName, targetIndex);
             await RefreshServicesObsSceneItemsAsync();
@@ -15729,11 +16640,13 @@ private Task ApplyCombinedAlertDuckingAsync()
         if (!_obsClient.IsConnected
             || ServicesObsScenesList.SelectedItem is not ObsSceneInfo scene
             || ServicesObsSceneItemsList.SelectedItem is not ObsSceneItemInfo item)
+        {
             return;
+        }
 
         try
         {
-            var transform = await _obsClient.GetSceneItemTransformAsync(scene.Name, item.SourceName);
+            ObsSceneItemTransformInfo transform = await _obsClient.GetSceneItemTransformAsync(scene.Name, item.SourceName);
             ServicesObsSceneItemXBox.Text = transform.PositionX.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             ServicesObsSceneItemYBox.Text = transform.PositionY.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             ServicesObsSceneItemWidthBox.Text = transform.Width.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
@@ -15744,12 +16657,16 @@ private Task ApplyCombinedAlertDuckingAsync()
             ServicesObsSceneItemCropRightBox.Text = transform.CropRight.ToString(System.Globalization.CultureInfo.InvariantCulture);
             ServicesObsSceneItemCropBottomBox.Text = transform.CropBottom.ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (showNotification)
+            {
                 AddDashboardNotification($"Transformation von {item.SourceName} wurde aus OBS geladen.", "Info");
+            }
         }
         catch (Exception exception)
         {
             if (showNotification)
+            {
                 AddDashboardNotification($"Transformation konnte nicht geladen werden: {exception.Message}", "Fehler");
+            }
         }
     }
 
@@ -15758,7 +16675,9 @@ private Task ApplyCombinedAlertDuckingAsync()
         if (!_obsClient.IsConnected
             || ServicesObsScenesList.SelectedItem is not ObsSceneInfo scene
             || ServicesObsSceneItemsList.SelectedItem is not ObsSceneItemInfo item)
+        {
             return;
+        }
 
         try
         {
@@ -15774,15 +16693,15 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ApplySelectedObsSceneItemTransformAsync()
     {
-        if (!TryParseObsTransformValue(ServicesObsSceneItemXBox.Text, out var x)
-            || !TryParseObsTransformValue(ServicesObsSceneItemYBox.Text, out var y)
-            || !TryParseObsTransformValue(ServicesObsSceneItemWidthBox.Text, out var width)
-            || !TryParseObsTransformValue(ServicesObsSceneItemHeightBox.Text, out var height)
-            || !TryParseObsTransformValue(ServicesObsSceneItemRotationBox.Text, out var rotation)
-            || !int.TryParse(ServicesObsSceneItemCropLeftBox.Text, out var cropLeft)
-            || !int.TryParse(ServicesObsSceneItemCropTopBox.Text, out var cropTop)
-            || !int.TryParse(ServicesObsSceneItemCropRightBox.Text, out var cropRight)
-            || !int.TryParse(ServicesObsSceneItemCropBottomBox.Text, out var cropBottom))
+        if (!TryParseObsTransformValue(ServicesObsSceneItemXBox.Text, out double x)
+            || !TryParseObsTransformValue(ServicesObsSceneItemYBox.Text, out double y)
+            || !TryParseObsTransformValue(ServicesObsSceneItemWidthBox.Text, out double width)
+            || !TryParseObsTransformValue(ServicesObsSceneItemHeightBox.Text, out double height)
+            || !TryParseObsTransformValue(ServicesObsSceneItemRotationBox.Text, out double rotation)
+            || !int.TryParse(ServicesObsSceneItemCropLeftBox.Text, out int cropLeft)
+            || !int.TryParse(ServicesObsSceneItemCropTopBox.Text, out int cropTop)
+            || !int.TryParse(ServicesObsSceneItemCropRightBox.Text, out int cropRight)
+            || !int.TryParse(ServicesObsSceneItemCropBottomBox.Text, out int cropBottom))
         {
             AddDashboardNotification("Transformation enthält ungültige Zahlen.", "Warnung");
             return;
@@ -15828,8 +16747,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            var currentItems = await _obsClient.GetSceneItemListAsync(scene.Name);
-            var current = currentItems.FirstOrDefault(candidate => candidate.ItemId == item.ItemId)
+            IReadOnlyList<ObsSceneItemInfo> currentItems = await _obsClient.GetSceneItemListAsync(scene.Name);
+            ObsSceneItemInfo? current = currentItems.FirstOrDefault(candidate => candidate.ItemId == item.ItemId)
                 ?? currentItems.FirstOrDefault(candidate => string.Equals(candidate.SourceName, item.SourceName, StringComparison.OrdinalIgnoreCase));
             if (current is null)
             {
@@ -15849,7 +16768,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task SwitchServicesObsSceneAsync()
     {
-        if (ServicesObsScenesList.SelectedItem is not ObsSceneInfo scene) return;
+        if (ServicesObsScenesList.SelectedItem is not ObsSceneInfo scene)
+        {
+            return;
+        }
+
         await _obsClient.SetCurrentProgramSceneAsync(scene.Name);
         await RefreshObsAsync();
         await RefreshServicesObsSceneItemsAsync();
@@ -15866,7 +16789,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            var state = await _obsClient.GetInputAudioStateAsync(input.Name);
+            ObsInputAudioState state = await _obsClient.GetInputAudioStateAsync(input.Name);
             DashboardObsAudioStateText.Text =
                 $"{state.Name}: {(state.Muted ? "GEMUTET" : "AKTIV")} · {state.VolumeDb:0.0} dB";
             DashboardObsAudioVolumeBox.Text =
@@ -15917,7 +16840,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 DashboardObsAudioVolumeBox.Text.Replace(',', '.'),
                 System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture,
-                out var db))
+                out double db))
         {
             AddDashboardNotification("Ungültiger dB-Wert für den OBS-Audiomixer.", "Warnung");
             return;
@@ -15955,7 +16878,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        if (!int.TryParse(ServicesObsTransitionDurationBox.Text.Trim(), out var durationMilliseconds))
+        if (!int.TryParse(ServicesObsTransitionDurationBox.Text.Trim(), out int durationMilliseconds))
         {
             ServicesObsTransitionStateText.Text = "Die Übergangsdauer muss eine ganze Zahl sein.";
             AddDashboardNotification("Ungültige OBS-Übergangsdauer.", "Warnung");
@@ -16003,31 +16926,39 @@ private Task ApplyCombinedAlertDuckingAsync()
     }
     private static double DbToPercent(double db)
     {
-        if (db <= -60) return 0;
-        var multiplier = Math.Pow(10, db / 20.0);
+        if (db <= -60)
+        {
+            return 0;
+        }
+
+        double multiplier = Math.Pow(10, db / 20.0);
         return Math.Clamp(multiplier * 100.0, 0, 316);
     }
 
     private async Task RefreshSelectedObsInputStateAsync()
     {
-        var refreshVersion=++_obsInputStateRefreshVersion;
-        if(!_obsClient.IsConnected || ServicesObsInputsList.SelectedItem is not ObsInputInfo input){ SetServicesObsAudioControlsEnabled(false); ServicesObsSelectedInputStateText.Text="Audioquelle auswählen"; return; }
-        SetServicesObsAudioControlsEnabled(false); ServicesObsSelectedInputStateText.Text=$"{input.Name}: Status wird geladen …";
+        int refreshVersion = ++_obsInputStateRefreshVersion;
+        if (!_obsClient.IsConnected || ServicesObsInputsList.SelectedItem is not ObsInputInfo input) { SetServicesObsAudioControlsEnabled(false); ServicesObsSelectedInputStateText.Text = "Audioquelle auswählen"; return; }
+        SetServicesObsAudioControlsEnabled(false); ServicesObsSelectedInputStateText.Text = $"{input.Name}: Status wird geladen …";
         try
         {
-            var state=await _obsClient.GetInputAudioStateAsync(input.Name);
-            var advancedState=await _obsClient.GetInputAdvancedAudioStateAsync(input.Name);
-            if(refreshVersion!=_obsInputStateRefreshVersion || ServicesObsInputsList.SelectedItem is not ObsInputInfo currentInput || !string.Equals(currentInput.Name,input.Name,StringComparison.OrdinalIgnoreCase)) return;
+            ObsInputAudioState state = await _obsClient.GetInputAudioStateAsync(input.Name);
+            ObsInputAdvancedAudioState advancedState = await _obsClient.GetInputAdvancedAudioStateAsync(input.Name);
+            if (refreshVersion != _obsInputStateRefreshVersion || ServicesObsInputsList.SelectedItem is not ObsInputInfo currentInput || !string.Equals(currentInput.Name, input.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             _servicesObsInputsMuted[state.Name] = state.Muted;
             ServicesObsSelectedInputStateText.Text = $"{state.Name}: {(state.Muted ? "GEMUTET" : "AKTIV")} · {state.VolumeDb:0.0} dB · Sync {advancedState.SyncOffsetMilliseconds} ms";
             _updatingObsMixerVolumeUi = true;
             try
             {
-                var sliderValue = Math.Clamp(state.VolumeDb, ServicesObsVolumeSlider.Minimum, ServicesObsVolumeSlider.Maximum);
+                double sliderValue = Math.Clamp(state.VolumeDb, ServicesObsVolumeSlider.Minimum, ServicesObsVolumeSlider.Maximum);
                 ServicesObsVolumeSlider.Value = sliderValue;
                 ServicesObsVolumeDbBox.Text = state.VolumeDb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
                 ServicesObsSyncOffsetBox.Text = advancedState.SyncOffsetMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                foreach (var item in ServicesObsMonitoringBox.Items.OfType<ComboBoxItem>())
+                foreach (ComboBoxItem item in ServicesObsMonitoringBox.Items.OfType<ComboBoxItem>())
                 {
                     if (string.Equals(item.Tag?.ToString(), advancedState.MonitorType, StringComparison.OrdinalIgnoreCase))
                     {
@@ -16042,21 +16973,21 @@ private Task ApplyCombinedAlertDuckingAsync()
             }
             SetServicesObsAudioControlsEnabled(true);
         }
-        catch(Exception exception){ if(refreshVersion!=_obsInputStateRefreshVersion)return; SetServicesObsAudioControlsEnabled(false); ServicesObsSelectedInputStateText.Text=$"Keine steuerbaren Audioeigenschaften: {exception.Message}"; }
+        catch (Exception exception) { if (refreshVersion != _obsInputStateRefreshVersion) { return; } SetServicesObsAudioControlsEnabled(false); ServicesObsSelectedInputStateText.Text = $"Keine steuerbaren Audioeigenschaften: {exception.Message}"; }
     }
     private async Task SetSelectedObsInputMuteAsync(bool muted)
     {
-        if(!_obsClient.IsConnected || ServicesObsInputsList.SelectedItem is not ObsInputInfo input){ AddDashboardNotification("OBS-Audio kann nicht gesteuert werden: keine gültige Audioquelle ausgewählt.","Warnung"); return; }
-        try{ await _obsClient.SetInputMuteAsync(input.Name,muted); await RefreshSelectedObsInputStateAsync(); AddDashboardNotification($"{input.Name} wurde {(muted?"gemutet":"aktiviert")}.","Info"); }
-        catch(Exception exception){ AddDashboardNotification($"OBS-Audiofehler bei {input.Name}: {exception.Message}","Fehler"); await RefreshSelectedObsInputStateAsync(); }
+        if (!_obsClient.IsConnected || ServicesObsInputsList.SelectedItem is not ObsInputInfo input) { AddDashboardNotification("OBS-Audio kann nicht gesteuert werden: keine gültige Audioquelle ausgewählt.", "Warnung"); return; }
+        try { await _obsClient.SetInputMuteAsync(input.Name, muted); await RefreshSelectedObsInputStateAsync(); AddDashboardNotification($"{input.Name} wurde {(muted ? "gemutet" : "aktiviert")}.", "Info"); }
+        catch (Exception exception) { AddDashboardNotification($"OBS-Audiofehler bei {input.Name}: {exception.Message}", "Fehler"); await RefreshSelectedObsInputStateAsync(); }
     }
     private async Task SetSelectedObsInputVolumeAsync()
     {
-        if(!_obsClient.IsConnected || ServicesObsInputsList.SelectedItem is not ObsInputInfo input){ AddDashboardNotification("OBS-Lautstärke kann nicht gesetzt werden: keine gültige Audioquelle ausgewählt.","Warnung"); return; }
-        if(!double.TryParse(ServicesObsVolumeDbBox.Text.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var db)){ AddDashboardNotification("Ungültige OBS-Lautstärke. Bitte einen dB-Wert zwischen -100 und 26 eingeben.","Warnung"); await RefreshSelectedObsInputStateAsync(); return; }
-        db=Math.Clamp(db,-100,26);
-        try{ await _obsClient.SetInputVolumeDbAsync(input.Name,db); await RefreshSelectedObsInputStateAsync(); AddDashboardNotification($"{input.Name}: Lautstärke auf {db:0.0} dB gesetzt.","Info"); }
-        catch(Exception exception){ AddDashboardNotification($"OBS-Lautstärke konnte für {input.Name} nicht gesetzt werden: {exception.Message}","Fehler"); await RefreshSelectedObsInputStateAsync(); }
+        if (!_obsClient.IsConnected || ServicesObsInputsList.SelectedItem is not ObsInputInfo input) { AddDashboardNotification("OBS-Lautstärke kann nicht gesetzt werden: keine gültige Audioquelle ausgewählt.", "Warnung"); return; }
+        if (!double.TryParse(ServicesObsVolumeDbBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double db)) { AddDashboardNotification("Ungültige OBS-Lautstärke. Bitte einen dB-Wert zwischen -100 und 26 eingeben.", "Warnung"); await RefreshSelectedObsInputStateAsync(); return; }
+        db = Math.Clamp(db, -100, 26);
+        try { await _obsClient.SetInputVolumeDbAsync(input.Name, db); await RefreshSelectedObsInputStateAsync(); AddDashboardNotification($"{input.Name}: Lautstärke auf {db:0.0} dB gesetzt.", "Info"); }
+        catch (Exception exception) { AddDashboardNotification($"OBS-Lautstärke konnte für {input.Name} nicht gesetzt werden: {exception.Message}", "Fehler"); await RefreshSelectedObsInputStateAsync(); }
     }
 
     private async Task ApplyObsMixerPresetAsync(double db)
@@ -16096,7 +17027,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        if (!int.TryParse(ServicesObsSyncOffsetBox.Text, out var syncOffsetMilliseconds))
+        if (!int.TryParse(ServicesObsSyncOffsetBox.Text, out int syncOffsetMilliseconds))
         {
             AddDashboardNotification("Der Audio-Sync-Wert muss eine ganze Millisekunden-Zahl sein.", "Warnung");
             return;
@@ -16124,9 +17055,16 @@ private Task ApplyCombinedAlertDuckingAsync()
         _settings.Obs.AudioProfiles ??= [];
         ServicesObsAudioProfileBox.ItemsSource = null;
         ServicesObsAudioProfileBox.ItemsSource = _settings.Obs.AudioProfiles.OrderBy(profile => profile.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-        var selected = _settings.Obs.AudioProfiles.FirstOrDefault(profile => string.Equals(profile.Name, selectedName, StringComparison.OrdinalIgnoreCase));
-        if (selected is not null) ServicesObsAudioProfileBox.SelectedItem = selected;
-        else if (ServicesObsAudioProfileBox.Items.Count > 0) ServicesObsAudioProfileBox.SelectedIndex = 0;
+        ObsAudioProfileSettings? selected = _settings.Obs.AudioProfiles.FirstOrDefault(profile => string.Equals(profile.Name, selectedName, StringComparison.OrdinalIgnoreCase));
+        if (selected is not null)
+        {
+            ServicesObsAudioProfileBox.SelectedItem = selected;
+        }
+        else if (ServicesObsAudioProfileBox.Items.Count > 0)
+        {
+            ServicesObsAudioProfileBox.SelectedIndex = 0;
+        }
+
         ServicesObsApplyAudioProfileButton.IsEnabled = _obsClient.IsConnected && ServicesObsAudioProfileBox.Items.Count > 0;
         ServicesObsDeleteAudioProfileButton.IsEnabled = ServicesObsAudioProfileBox.Items.Count > 0;
         ServicesObsSaveAudioProfileButton.IsEnabled = _obsClient.IsConnected;
@@ -16139,7 +17077,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             AddDashboardNotification("Audio-Profil kann nicht gespeichert werden: OBS ist nicht verbunden.", "Warnung");
             return;
         }
-        var name = ServicesObsAudioProfileNameBox.Text?.Trim();
+        string? name = ServicesObsAudioProfileNameBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(name))
         {
             AddDashboardNotification("Bitte einen Namen für das Audio-Profil eingeben.", "Warnung");
@@ -16148,14 +17086,14 @@ private Task ApplyCombinedAlertDuckingAsync()
         try
         {
             ServicesObsAudioProfileStateText.Text = "Audioquellen werden gelesen …";
-            var inputs = await _obsClient.GetInputListAsync();
+            IReadOnlyList<ObsInputInfo> inputs = await _obsClient.GetInputListAsync();
             var entries = new List<ObsAudioProfileEntrySettings>();
-            foreach (var input in inputs)
+            foreach (ObsInputInfo input in inputs)
             {
                 try
                 {
-                    var state = await _obsClient.GetInputAudioStateAsync(input.Name);
-                    var advanced = await _obsClient.GetInputAdvancedAudioStateAsync(input.Name);
+                    ObsInputAudioState state = await _obsClient.GetInputAudioStateAsync(input.Name);
+                    ObsInputAdvancedAudioState advanced = await _obsClient.GetInputAdvancedAudioStateAsync(input.Name);
                     entries.Add(new ObsAudioProfileEntrySettings
                     {
                         InputName = input.Name,
@@ -16197,12 +17135,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             AddDashboardNotification("Bitte OBS verbinden und ein Audio-Profil auswählen.", "Warnung");
             return;
         }
-        var applied = 0;
+        int applied = 0;
         var missing = new List<string>();
         ServicesObsApplyAudioProfileButton.IsEnabled = false;
         try
         {
-            foreach (var entry in profile.Inputs)
+            foreach (ObsAudioProfileEntrySettings entry in profile.Inputs)
             {
                 try
                 {
@@ -16236,7 +17174,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task DeleteSelectedObsAudioProfileAsync()
     {
-        if (ServicesObsAudioProfileBox.SelectedItem is not ObsAudioProfileSettings profile) return;
+        if (ServicesObsAudioProfileBox.SelectedItem is not ObsAudioProfileSettings profile)
+        {
+            return;
+        }
+
         _settings.Obs.AudioProfiles.RemoveAll(item => string.Equals(item.Name, profile.Name, StringComparison.OrdinalIgnoreCase));
         await _settingsStore.SaveAsync(_settings);
         RefreshObsAudioProfilesUi();
@@ -16249,7 +17191,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         // Während des initialen Ladens werden die CheckBox-Ereignisse ebenfalls ausgelöst.
         // Erst speichern, wenn das Fenster vollständig geladen ist.
-        if (!IsLoaded || _loadingSettingsIntoUi) return;
+        if (!IsLoaded || _loadingSettingsIntoUi)
+        {
+            return;
+        }
+
         try
         {
             await SaveSpotifyOverlaySettingsAsync();
@@ -16291,7 +17237,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         _settings.Spotify.OverlayObsAudioSource = ServicesSpotifyObsAudioSourceBox.Text?.Trim() ?? "Spotify";
         _settings.Spotify.OverlayEnabled = true;
 
-        var requestedPath = ServicesSpotifyDataJsonPathBox.Text?.Trim();
+        string? requestedPath = ServicesSpotifyDataJsonPathBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(requestedPath))
         {
             requestedPath = Path.Combine(
@@ -16302,7 +17248,9 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         requestedPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(requestedPath));
         if (!string.Equals(Path.GetExtension(requestedPath), ".json", StringComparison.OrdinalIgnoreCase))
+        {
             requestedPath += ".json";
+        }
 
         // Wurde versehentlich die Overlay-Projektdatei (overlay.json) gewählt,
         // verwende automatisch deren DataSourcePath statt die Projektdefinition
@@ -16313,10 +17261,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 using var selectedJson = JsonDocument.Parse(await File.ReadAllTextAsync(requestedPath));
                 if (selectedJson.RootElement.ValueKind == JsonValueKind.Object &&
-                    selectedJson.RootElement.TryGetProperty("DataSourcePath", out var dataSourcePathElement) &&
+                    selectedJson.RootElement.TryGetProperty("DataSourcePath", out JsonElement dataSourcePathElement) &&
                     dataSourcePathElement.ValueKind == JsonValueKind.String)
                 {
-                    var manifestDataPath = dataSourcePathElement.GetString()?.Trim();
+                    string? manifestDataPath = dataSourcePathElement.GetString()?.Trim();
                     if (!string.IsNullOrWhiteSpace(manifestDataPath))
                     {
                         requestedPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(manifestDataPath));
@@ -16341,7 +17289,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             data.Spotify.ShowAlbumCover = true;
             data.Spotify.ShowProgress = true;
             data.Spotify.HideWhenPaused = false;
-                data.Spotify.HideWhenMuted = _settings.Spotify.OverlayHideWhenMuted;
+            data.Spotify.HideWhenMuted = _settings.Spotify.OverlayHideWhenMuted;
             data.Spotify.ShowInOverlay = true;
             data.Spotify.Cover = data.Spotify.CoverUrl;
         });
@@ -16353,7 +17301,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             : "JSON-Pfad gespeichert. Die Datei wird beim nächsten Spotify-Datenupdate automatisch angelegt.";
         ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGreen;
 
-        var patchedFiles = await PatchSpotifyOverlayHtmlAsync(requestedPath);
+        int patchedFiles = await PatchSpotifyOverlayHtmlAsync(requestedPath);
         if (patchedFiles > 0)
         {
             ServicesSpotifyOverlayStatusText.Text += $" Anzeigeoptionen wurden in {patchedFiles} Spotify-HTML-Datei(en) aktiviert.";
@@ -16364,10 +17312,12 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var dataDirectory = Path.GetDirectoryName(dataJsonPath);
-            var overlayDirectory = dataDirectory is null ? null : Directory.GetParent(dataDirectory)?.FullName;
+            string? dataDirectory = Path.GetDirectoryName(dataJsonPath);
+            string? overlayDirectory = dataDirectory is null ? null : Directory.GetParent(dataDirectory)?.FullName;
             if (string.IsNullOrWhiteSpace(overlayDirectory) || !Directory.Exists(overlayDirectory))
+            {
                 return 0;
+            }
 
             const string marker = "CCS-SPOTIFY-DISPLAY-OPTIONS-V2";
             const string compatibilityScript = @"
@@ -16392,18 +17342,25 @@ private Task ApplyCombinedAlertDuckingAsync()
 })();
 </script>";
 
-            var patched = 0;
+            int patched = 0;
             var candidates = Directory.EnumerateFiles(overlayDirectory, "*.html", SearchOption.AllDirectories)
                 .Where(path => Path.GetFileName(path).Contains("spotify", StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
-            foreach (var htmlPath in candidates)
+            foreach (string? htmlPath in candidates)
             {
-                var html = await File.ReadAllTextAsync(htmlPath);
-                if (html.Contains(marker, StringComparison.Ordinal)) continue;
-                if (!html.Contains("CreatorOverlayData", StringComparison.OrdinalIgnoreCase)) continue;
+                string html = await File.ReadAllTextAsync(htmlPath);
+                if (html.Contains(marker, StringComparison.Ordinal))
+                {
+                    continue;
+                }
 
-                var bodyIndex = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+                if (!html.Contains("CreatorOverlayData", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                int bodyIndex = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
                 html = bodyIndex >= 0
                     ? html.Insert(bodyIndex, compatibilityScript)
                     : html + compatibilityScript;
@@ -16421,7 +17378,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void BrowseSpotifyDataJsonPath()
     {
-        var current = ServicesSpotifyDataJsonPathBox.Text?.Trim();
+        string? current = ServicesSpotifyDataJsonPathBox.Text?.Trim();
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = "JSON-Datei für Spotify-Daten auswählen oder anlegen",
@@ -16451,7 +17408,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             await SaveSpotifyOverlaySettingsAsync();
             await _overlayModule.Service.WriteAsync();
-            var path = await _overlayModule.Service.GetDataFilePathAsync();
+            string path = await _overlayModule.Service.GetDataFilePathAsync();
             ServicesSpotifyOverlayStatusText.Text = $"JSON wurde aktualisiert: {path}";
             ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGreen;
         }
@@ -16466,8 +17423,8 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var path = Path.GetFullPath(Environment.ExpandEnvironmentVariables(ServicesSpotifyDataJsonPathBox.Text.Trim()));
-            var directory = Path.GetDirectoryName(path) ?? throw new InvalidOperationException("Der JSON-Ordner konnte nicht bestimmt werden.");
+            string path = Path.GetFullPath(Environment.ExpandEnvironmentVariables(ServicesSpotifyDataJsonPathBox.Text.Trim()));
+            string directory = Path.GetDirectoryName(path) ?? throw new InvalidOperationException("Der JSON-Ordner konnte nicht bestimmt werden.");
             Directory.CreateDirectory(directory);
             Process.Start(new ProcessStartInfo("explorer.exe", directory) { UseShellExecute = true });
         }
@@ -16482,9 +17439,12 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var path = Path.GetFullPath(Environment.ExpandEnvironmentVariables(ServicesSpotifyDataJsonPathBox.Text.Trim()));
+            string path = Path.GetFullPath(Environment.ExpandEnvironmentVariables(ServicesSpotifyDataJsonPathBox.Text.Trim()));
             if (!File.Exists(path))
+            {
                 throw new FileNotFoundException("Die JSON-Datei existiert noch nicht. Klicke zuerst auf JSON-PFAD SPEICHERN oder JSON JETZT SCHREIBEN.", path);
+            }
+
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
         catch (Exception exception)
@@ -16496,15 +17456,18 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RefreshSpotifyOverlayBrowserSourcesAsync()
     {
-        if (ServicesSpotifyOverlaySourceBox is null) return;
+        if (ServicesSpotifyOverlaySourceBox is null)
+        {
+            return;
+        }
 
-        var sceneName = ServicesSpotifyOverlaySceneBox.SelectedItem as string;
+        string? sceneName = ServicesSpotifyOverlaySceneBox.SelectedItem as string;
         if (string.IsNullOrWhiteSpace(sceneName))
         {
             sceneName = ServicesSpotifyOverlaySceneBox.Text?.Trim();
         }
 
-        var requestedSource = ServicesSpotifyOverlaySourceBox.Text?.Trim();
+        string? requestedSource = ServicesSpotifyOverlaySourceBox.Text?.Trim();
         if (!_obsClient.IsConnected || string.IsNullOrWhiteSpace(sceneName))
         {
             ServicesSpotifyOverlaySourceBox.ItemsSource = Array.Empty<string>();
@@ -16513,8 +17476,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            var sceneItems = await _obsClient.GetSceneItemListAsync(sceneName);
-            var allInputs = await _obsClient.GetInputListAsync();
+            IReadOnlyList<ObsSceneItemInfo> sceneItems = await _obsClient.GetSceneItemListAsync(sceneName);
+            IReadOnlyList<ObsInputInfo> allInputs = await _obsClient.GetInputListAsync();
             ServicesSpotifyObsAudioSourceBox.ItemsSource = allInputs
                 .Select(input => input.Name)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -16535,10 +17498,10 @@ private Task ApplyCombinedAlertDuckingAsync()
 
             ServicesSpotifyOverlaySourceBox.ItemsSource = browserSources;
 
-            var preferredSource = !string.IsNullOrWhiteSpace(requestedSource)
+            string preferredSource = !string.IsNullOrWhiteSpace(requestedSource)
                 ? requestedSource
                 : _settings.Spotify.OverlayObsSource;
-            var matchingSource = browserSources.FirstOrDefault(source =>
+            string? matchingSource = browserSources.FirstOrDefault(source =>
                 string.Equals(source, preferredSource, StringComparison.OrdinalIgnoreCase));
 
             if (!string.IsNullOrWhiteSpace(matchingSource))
@@ -16571,12 +17534,16 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshSpotifyOverlayProjectSelector()
     {
-        if (ServicesSpotifyOverlayProjectBox is null) return;
+        if (ServicesSpotifyOverlayProjectBox is null)
+        {
+            return;
+        }
+
         ServicesSpotifyOverlayProjectBox.ItemsSource = _overlayProjects;
         // The live OBS refresh supplies this selector directly. As a fallback, reuse
         // the overlay-project scene list when it is already available.
-        if (ServicesSpotifyOverlaySceneBox.ItemsSource is null)
-            ServicesSpotifyOverlaySceneBox.ItemsSource = OverlayProjectObsSceneBox.ItemsSource;
+        ServicesSpotifyOverlaySceneBox.ItemsSource ??= OverlayProjectObsSceneBox.ItemsSource;
+
         ServicesSpotifyOverlayProjectBox.SelectedItem = _overlayProjects.FirstOrDefault(x => x.Id == _settings.Spotify.OverlayProjectId)
             ?? _overlayProjects.FirstOrDefault(x => x.Items.Any(i => i.Name.Contains("spotify", StringComparison.OrdinalIgnoreCase) || i.RelativePath.Contains("spotify", StringComparison.OrdinalIgnoreCase)))
             ?? _overlayProjects.FirstOrDefault();
@@ -16585,9 +17552,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshSpotifyOverlayProjectItems()
     {
-        if (ServicesSpotifyOverlayItemBox is null) return;
+        if (ServicesSpotifyOverlayItemBox is null)
+        {
+            return;
+        }
+
         var project = ServicesSpotifyOverlayProjectBox.SelectedItem as OverlayProjectDefinition;
-        var candidates = project?.Items.Where(x => x.RelativePath.EndsWith(".html", StringComparison.OrdinalIgnoreCase)).ToList() ?? [];
+        List<OverlayProjectItem> candidates = project?.Items.Where(x => x.RelativePath.EndsWith(".html", StringComparison.OrdinalIgnoreCase)).ToList() ?? [];
         ServicesSpotifyOverlayItemBox.ItemsSource = candidates;
         ServicesSpotifyOverlayItemBox.SelectedItem = candidates.FirstOrDefault(x => x.Id == _settings.Spotify.OverlayItemId)
             ?? candidates.FirstOrDefault(x => x.Name.Contains("spotify", StringComparison.OrdinalIgnoreCase) || x.RelativePath.Contains("spotify", StringComparison.OrdinalIgnoreCase))
@@ -16597,20 +17568,32 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshSpotifyOverlaySelectionDetails()
     {
-        if (ServicesSpotifyOverlayPathText is null || ServicesSpotifyOverlayStatusText is null) return;
+        if (ServicesSpotifyOverlayPathText is null || ServicesSpotifyOverlayStatusText is null)
+        {
+            return;
+        }
+
         if (ServicesSpotifyOverlayProjectBox.SelectedItem is not OverlayProjectDefinition project || ServicesSpotifyOverlayItemBox.SelectedItem is not OverlayProjectItem item)
         {
-            var jsonPath = ServicesSpotifyDataJsonPathBox?.Text?.Trim();
+            string? jsonPath = ServicesSpotifyDataJsonPathBox?.Text?.Trim();
             ServicesSpotifyOverlayPathText.Text = string.IsNullOrWhiteSpace(jsonPath) ? "Noch keine JSON-Datei ausgewählt." : $"JSON: {jsonPath}";
             ServicesSpotifyOverlayStatusText.Text = "Die HTML- und OBS-Konfiguration wird nicht verändert. Die Suite schreibt nur in die ausgewählte JSON-Datei.";
             ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGray;
             return;
         }
-        var path = item.IsLocalFile && !Path.IsPathRooted(item.RelativePath) ? Path.Combine(project.RootPath, item.RelativePath) : item.RelativePath;
+        string path = item.IsLocalFile && !Path.IsPathRooted(item.RelativePath) ? Path.Combine(project.RootPath, item.RelativePath) : item.RelativePath;
         ServicesSpotifyOverlayPathText.Text = $"HTML: {path}";
-        if (!string.IsNullOrWhiteSpace(item.ObsScene)) ServicesSpotifyOverlaySceneBox.Text = item.ObsScene;
-        if (!string.IsNullOrWhiteSpace(item.ObsSource)) ServicesSpotifyOverlaySourceBox.Text = item.ObsSource;
-        var fileOk = !item.IsLocalFile || File.Exists(path);
+        if (!string.IsNullOrWhiteSpace(item.ObsScene))
+        {
+            ServicesSpotifyOverlaySceneBox.Text = item.ObsScene;
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.ObsSource))
+        {
+            ServicesSpotifyOverlaySourceBox.Text = item.ObsSource;
+        }
+
+        bool fileOk = !item.IsLocalFile || File.Exists(path);
         ServicesSpotifyOverlayStatusText.Text = $"{(fileOk ? "HTML-Datei gefunden" : "HTML-Datei fehlt")} · {(string.IsNullOrWhiteSpace(item.ObsSource) ? "Browserquelle noch nicht festgelegt" : "Browserquelle: " + item.ObsSource)} · {project.DataReferenceStatus} · {(_obsClient.IsConnected ? "OBS verbunden" : "OBS nicht verbunden")}";
         ServicesSpotifyOverlayStatusText.Foreground = fileOk ? Brushes.LightGray : Brushes.IndianRed;
     }
@@ -16621,8 +17604,15 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             await SaveSpotifyOverlaySettingsAsync();
             if (ServicesSpotifyOverlayProjectBox.SelectedItem is not OverlayProjectDefinition project || ServicesSpotifyOverlayItemBox.SelectedItem is not OverlayProjectItem)
+            {
                 throw new InvalidOperationException("Bitte ein Overlay-Projekt und ein HTML-Modul auswählen.");
-            if (!_obsClient.IsConnected) throw new InvalidOperationException("OBS ist nicht verbunden.");
+            }
+
+            if (!_obsClient.IsConnected)
+            {
+                throw new InvalidOperationException("OBS ist nicht verbunden.");
+            }
+
             await _overlayProjectService.SynchronizeWithObsAsync(project);
             await _overlayProjectService.SaveAsync(_overlayProjects);
             ServicesSpotifyOverlayStatusText.Text = "Spotify-Browserquelle wurde in OBS erstellt bzw. aktualisiert.";
@@ -16640,9 +17630,16 @@ private Task ApplyCombinedAlertDuckingAsync()
         try
         {
             if (ServicesSpotifyOverlayProjectBox.SelectedItem is not OverlayProjectDefinition project || ServicesSpotifyOverlayItemBox.SelectedItem is not OverlayProjectItem item)
+            {
                 throw new InvalidOperationException("Bitte ein Overlay-Projekt und ein HTML-Modul auswählen.");
-            var path = item.IsLocalFile && !Path.IsPathRooted(item.RelativePath) ? Path.Combine(project.RootPath, item.RelativePath) : item.RelativePath;
-            if (item.IsLocalFile && !File.Exists(path)) throw new FileNotFoundException("Die ausgewählte HTML-Datei wurde nicht gefunden.", path);
+            }
+
+            string path = item.IsLocalFile && !Path.IsPathRooted(item.RelativePath) ? Path.Combine(project.RootPath, item.RelativePath) : item.RelativePath;
+            if (item.IsLocalFile && !File.Exists(path))
+            {
+                throw new FileNotFoundException("Die ausgewählte HTML-Datei wurde nicht gefunden.", path);
+            }
+
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             ServicesSpotifyOverlayStatusText.Text = "Overlay-Vorschau wurde im Standardbrowser geöffnet.";
             ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGreen;
@@ -16656,8 +17653,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ApplyTwitchGoalFieldsToSettings()
     {
-        static double D(string text, double fallback) => double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : fallback;
-        static int I(string text, int fallback) => int.TryParse(text, out var value) ? value : fallback;
+        static double D(string text, double fallback) => double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value) ? value : fallback;
+        static int I(string text, int fallback) => int.TryParse(text, out int value) ? value : fallback;
         _settings.Obs.GoalOverlayScene = string.IsNullOrWhiteSpace(GoalOverlaySceneBox.Text)
             ? "CCS Ziele & Overlay-Daten"
             : GoalOverlaySceneBox.Text.Trim();
@@ -16697,10 +17694,10 @@ private Task ApplyCombinedAlertDuckingAsync()
         });
         await UpdateActiveOverlayJsonAsync(root =>
         {
-            var twitch = root["twitch"] as JsonObject ?? new JsonObject();
+            JsonObject twitch = root["twitch"] as JsonObject ?? [];
             twitch["followers"] = _currentFollowerCount;
             twitch["followerGoal"] = _settings.Twitch.FollowerGoal.Target;
-            var followerGoal = twitch["followerGoalState"] as JsonObject ?? new JsonObject();
+            JsonObject followerGoal = twitch["followerGoalState"] as JsonObject ?? [];
             followerGoal["title"] = _settings.Twitch.FollowerGoal.Title;
             followerGoal["current"] = _currentFollowerCount > 0 ? _currentFollowerCount : _settings.Twitch.FollowerGoal.Current;
             followerGoal["target"] = _settings.Twitch.FollowerGoal.Target;
@@ -16713,20 +17710,25 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static CreatorControlSuite.Modules.Overlay.Models.OverlayGoalState ToOverlayGoal(TwitchGoalSettings goal) => new()
     {
-        Title = goal.Title, Current = goal.Current, Target = goal.Target, FontFace = goal.FontFace, FontSize = goal.FontSize, Currency = goal.Currency
+        Title = goal.Title,
+        Current = goal.Current,
+        Target = goal.Target,
+        FontFace = goal.FontFace,
+        FontSize = goal.FontSize,
+        Currency = goal.Currency
     };
 
     private async Task InstallGoalInObsAsync(string goalType)
     {
         await SaveTwitchGoalsAsync();
-        var result = await _obsBrowserSourceInstaller.InstallGoalAsync(goalType);
+        string result = await _obsBrowserSourceInstaller.InstallGoalAsync(goalType);
         MessageBox.Show(result, "OBS-Zielquelle", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private async Task InstallAllGoalsSceneInObsAsync()
     {
         await SaveTwitchGoalsAsync();
-        var result = await _obsBrowserSourceInstaller.InstallAllGoalsAsync();
+        string result = await _obsBrowserSourceInstaller.InstallAllGoalsAsync();
         MessageBox.Show(result, "OBS-Zielszene", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -16734,7 +17736,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var users = await _twitchModule.GetChattersAsync();
+            IReadOnlyList<string> users = await _twitchModule.GetChattersAsync();
             await Dispatcher.InvokeAsync(() =>
             {
                 var merged = users
@@ -16752,7 +17754,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                     .ToList();
 
                 _twitchUserItems.Clear();
-                foreach (var user in merged)
+                foreach (string? user in merged)
                 {
                     _twitchUserItems.Add(user);
                 }
@@ -16809,7 +17811,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var suppress = SuiteAlertsEnabledBox.IsChecked == true &&
+        bool suppress = SuiteAlertsEnabledBox.IsChecked == true &&
                        SuppressStreamerBotAlertsBox.IsChecked == true;
         await SetStreamerBotAlertsEnabledAsync(!suppress, showSuccess: false);
     }
@@ -16826,14 +17828,24 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static string GetStreamerBotActionName(params object[] values)
     {
-        foreach (var value in values)
+        foreach (object value in values)
         {
             if (value is System.Windows.Controls.ComboBox combo)
             {
-                if (combo.SelectedItem is StreamerBotActionOption option && !string.IsNullOrWhiteSpace(option.Name)) return option.Name;
-                if (!string.IsNullOrWhiteSpace(combo.Text)) return combo.Text.Trim();
+                if (combo.SelectedItem is StreamerBotActionOption option && !string.IsNullOrWhiteSpace(option.Name))
+                {
+                    return option.Name;
+                }
+
+                if (!string.IsNullOrWhiteSpace(combo.Text))
+                {
+                    return combo.Text.Trim();
+                }
             }
-            else if (value is string text && !string.IsNullOrWhiteSpace(text)) return text.Trim();
+            else if (value is string text && !string.IsNullOrWhiteSpace(text))
+            {
+                return text.Trim();
+            }
         }
         return string.Empty;
     }
@@ -16862,25 +17874,34 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            var response = await SendStreamerBotRequestAsync(new { request = "GetActions" });
-            if (!response.RootElement.TryGetProperty("actions", out var actionsElement) || actionsElement.ValueKind != System.Text.Json.JsonValueKind.Array)
-                throw new InvalidOperationException("Streamer.bot hat keine Aktionsliste zurückgegeben.");
-
-            var previousDisable = _settings.StreamerBot.DisableAlertsActionName;
-            var previousEnable = _settings.StreamerBot.EnableAlertsActionName;
-            _streamerBotActions.Clear();
-            foreach (var action in actionsElement.EnumerateArray())
+            JsonDocument response = await SendStreamerBotRequestAsync(new { request = "GetActions" });
+            if (!response.RootElement.TryGetProperty("actions", out JsonElement actionsElement) || actionsElement.ValueKind != System.Text.Json.JsonValueKind.Array)
             {
-                var id = action.TryGetProperty("id", out var idNode) ? idNode.GetString() ?? "" : "";
-                var name = action.TryGetProperty("name", out var nameNode) ? nameNode.GetString() ?? "" : "";
-                var group = action.TryGetProperty("group", out var groupNode) ? groupNode.GetString() ?? "Ohne Gruppe" : "Ohne Gruppe";
-                var enabled = !action.TryGetProperty("enabled", out var enabledNode) || enabledNode.GetBoolean();
-                if (!string.IsNullOrWhiteSpace(name)) _streamerBotActions.Add(new StreamerBotActionOption(id, name, group, enabled));
+                throw new InvalidOperationException("Streamer.bot hat keine Aktionsliste zurückgegeben.");
+            }
+
+            string previousDisable = _settings.StreamerBot.DisableAlertsActionName;
+            string previousEnable = _settings.StreamerBot.EnableAlertsActionName;
+            _streamerBotActions.Clear();
+            foreach (JsonElement action in actionsElement.EnumerateArray())
+            {
+                string id = action.TryGetProperty("id", out JsonElement idNode) ? idNode.GetString() ?? "" : "";
+                string name = action.TryGetProperty("name", out JsonElement nameNode) ? nameNode.GetString() ?? "" : "";
+                string group = action.TryGetProperty("group", out JsonElement groupNode) ? groupNode.GetString() ?? "Ohne Gruppe" : "Ohne Gruppe";
+                bool enabled = !action.TryGetProperty("enabled", out JsonElement enabledNode) || enabledNode.GetBoolean();
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    _streamerBotActions.Add(new StreamerBotActionOption(id, name, group, enabled));
+                }
             }
 
             var ordered = _streamerBotActions.OrderBy(x => x.Group).ThenBy(x => x.Name).ToList();
             _streamerBotActions.Clear();
-            foreach (var option in ordered) _streamerBotActions.Add(option);
+            foreach (StreamerBotActionOption? option in ordered)
+            {
+                _streamerBotActions.Add(option);
+            }
+
             ApplyStreamerBotActionFilter();
 
             SelectStreamerBotAction(StreamerBotDisableAlertsActionBox, _settings.StreamerBot.DisableAlertsActionId, previousDisable);
@@ -16888,13 +17909,18 @@ private Task ApplyCombinedAlertDuckingAsync()
             SelectStreamerBotAction(StreamerBotEnableAlertsActionBox, _settings.StreamerBot.EnableAlertsActionId, previousEnable);
             SelectStreamerBotAction(SettingsStreamerBotEnableAlertsActionBox, _settings.StreamerBot.EnableAlertsActionId, previousEnable);
             if (RunOfShowStepsList.SelectedItem is RunOfShowStepSettings selectedRunOfShowStep)
+            {
                 SelectStreamerBotAction(RunOfShowStreamerBotActionBox, selectedRunOfShowStep.StreamerBotActionId, selectedRunOfShowStep.StreamerBotActionName);
+            }
 
             var groups = ordered.Select(x => x.Group).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             StreamerBotAlertGroupsText.Text = groups.Count == 0
                 ? "Keine Aktionsgruppen gefunden."
                 : "Gefundene Aktionsgruppen: " + string.Join(", ", groups);
-            if (showStatus) StreamerBotAlertControlStatusText.Text = $"{ordered.Count} Streamer.bot-Aktionen geladen. Wähle je eine Hilfsaktion zum Deaktivieren und Aktivieren aus.";
+            if (showStatus)
+            {
+                StreamerBotAlertControlStatusText.Text = $"{ordered.Count} Streamer.bot-Aktionen geladen. Wähle je eine Hilfsaktion zum Deaktivieren und Aktivieren aus.";
+            }
         }
         catch (Exception ex)
         {
@@ -16904,8 +17930,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ApplyStreamerBotActionFilter()
     {
-        var search = ServicesStreamerBotActionSearchBox.Text?.Trim() ?? string.Empty;
-        var filtered = string.IsNullOrWhiteSpace(search)
+        string search = ServicesStreamerBotActionSearchBox.Text?.Trim() ?? string.Empty;
+        IEnumerable<StreamerBotActionOption> filtered = string.IsNullOrWhiteSpace(search)
             ? _streamerBotActions.AsEnumerable()
             : _streamerBotActions.Where(action =>
                 action.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
@@ -16944,19 +17970,26 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RunSelectedStreamerBotActionAsync()
     {
-        if (ServicesStreamerBotActionsList.SelectedItem is not StreamerBotActionOption action) return;
-        var repeatCount = int.TryParse(ServicesStreamerBotRepeatCountBox.Text, out var count) ? Math.Clamp(count, 1, 20) : 1;
-        var delayMs = int.TryParse(ServicesStreamerBotRepeatDelayBox.Text, out var delay) ? Math.Clamp(delay, 0, 10000) : 500;
+        if (ServicesStreamerBotActionsList.SelectedItem is not StreamerBotActionOption action)
+        {
+            return;
+        }
+
+        int repeatCount = int.TryParse(ServicesStreamerBotRepeatCountBox.Text, out int count) ? Math.Clamp(count, 1, 20) : 1;
+        int delayMs = int.TryParse(ServicesStreamerBotRepeatDelayBox.Text, out int delay) ? Math.Clamp(delay, 0, 10000) : 500;
         ServicesStreamerBotRepeatCountBox.Text = repeatCount.ToString();
         ServicesStreamerBotRepeatDelayBox.Text = delayMs.ToString();
         ServicesStreamerBotRunActionButton.IsEnabled = false;
         try
         {
-            for (var index = 1; index <= repeatCount; index++)
+            for (int index = 1; index <= repeatCount; index++)
             {
                 ServicesStreamerBotActionResultText.Text = $"„{action.Name}“ wird ausgeführt ({index}/{repeatCount}) …";
                 await ExecuteStreamerBotActionOnceAsync(action);
-                if (index < repeatCount && delayMs > 0) await Task.Delay(delayMs);
+                if (index < repeatCount && delayMs > 0)
+                {
+                    await Task.Delay(delayMs);
+                }
             }
         }
         finally { UpdateSelectedStreamerBotAction(); }
@@ -16966,23 +17999,26 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var started = DateTimeOffset.UtcNow;
-            var arguments = ParseStreamerBotArguments(ServicesStreamerBotActionArgumentsBox.Text);
+            DateTimeOffset started = DateTimeOffset.UtcNow;
+            Dictionary<string, object?> arguments = ParseStreamerBotArguments(ServicesStreamerBotActionArgumentsBox.Text);
             arguments["source"] = "Creator Control Suite";
             arguments["manual"] = true;
-            using var response = await SendStreamerBotRequestAsync(new
+            using JsonDocument response = await SendStreamerBotRequestAsync(new
             {
                 request = "DoAction",
                 action = new { id = action.Id, name = action.Name },
                 args = arguments
             });
-            var status = response.RootElement.TryGetProperty("status", out var node) ? node.GetString() : null;
+            string? status = response.RootElement.TryGetProperty("status", out JsonElement node) ? node.GetString() : null;
             ServicesStreamerBotLastResponseBox.Text = System.Text.Json.JsonSerializer.Serialize(
                 response.RootElement,
                 new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
+            {
                 throw new InvalidOperationException("Streamer.bot hat die Aktion nicht bestätigt.");
-            var elapsed = DateTimeOffset.UtcNow - started;
+            }
+
+            TimeSpan elapsed = DateTimeOffset.UtcNow - started;
             ServicesStreamerBotActionResultText.Text = $"Aktion erfolgreich ausgeführt · {elapsed.TotalMilliseconds:0} ms";
             ServicesStreamerBotActionResultText.Foreground = Brushes.LightGreen;
             AddStreamerBotHistory(action, true, $"{elapsed.TotalMilliseconds:0} ms", ServicesStreamerBotActionArgumentsBox.Text, ServicesStreamerBotLastResponseBox.Text);
@@ -17006,10 +18042,18 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
         try { _ = ParseStreamerBotArguments(ServicesStreamerBotActionArgumentsBox.Text); }
         catch (Exception exception) { ServicesStreamerBotActionResultText.Text = "Vorlage nicht gespeichert: " + exception.Message; return; }
-        var name = ServicesStreamerBotTemplateNameBox.Text?.Trim();
-        if (string.IsNullOrWhiteSpace(name)) name = action.Name;
-        var existing = _streamerBotActionTemplates.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null) _streamerBotActionTemplates.Remove(existing);
+        string? name = ServicesStreamerBotTemplateNameBox.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = action.Name;
+        }
+
+        StreamerBotActionTemplate? existing = _streamerBotActionTemplates.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            _streamerBotActionTemplates.Remove(existing);
+        }
+
         var template = new StreamerBotActionTemplate(name, action.Id, action.Name, ServicesStreamerBotActionArgumentsBox.Text.Trim());
         _streamerBotActionTemplates.Add(template);
         ServicesStreamerBotTemplateBox.SelectedItem = template;
@@ -17018,10 +18062,18 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void LoadSelectedStreamerBotTemplate()
     {
-        if (ServicesStreamerBotTemplateBox.SelectedItem is not StreamerBotActionTemplate template) return;
-        var action = _streamerBotActions.FirstOrDefault(x => string.Equals(x.Id, template.ActionId, StringComparison.OrdinalIgnoreCase))
+        if (ServicesStreamerBotTemplateBox.SelectedItem is not StreamerBotActionTemplate template)
+        {
+            return;
+        }
+
+        StreamerBotActionOption? action = _streamerBotActions.FirstOrDefault(x => string.Equals(x.Id, template.ActionId, StringComparison.OrdinalIgnoreCase))
             ?? _streamerBotActions.FirstOrDefault(x => string.Equals(x.Name, template.ActionName, StringComparison.OrdinalIgnoreCase));
-        if (action is not null) ServicesStreamerBotActionsList.SelectedItem = action;
+        if (action is not null)
+        {
+            ServicesStreamerBotActionsList.SelectedItem = action;
+        }
+
         ServicesStreamerBotActionArgumentsBox.Text = template.ArgumentsJson;
         ServicesStreamerBotTemplateNameBox.Text = template.Name;
         ServicesStreamerBotActionResultText.Text = $"Vorlage „{template.Name}“ geladen.";
@@ -17029,15 +18081,23 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void DeleteSelectedStreamerBotTemplate()
     {
-        if (ServicesStreamerBotTemplateBox.SelectedItem is not StreamerBotActionTemplate template) return;
+        if (ServicesStreamerBotTemplateBox.SelectedItem is not StreamerBotActionTemplate template)
+        {
+            return;
+        }
+
         _streamerBotActionTemplates.Remove(template);
         ServicesStreamerBotActionResultText.Text = $"Vorlage „{template.Name}“ gelöscht.";
     }
 
     private async Task ScheduleSelectedStreamerBotActionAsync()
     {
-        if (ServicesStreamerBotActionsList.SelectedItem is not StreamerBotActionOption action) return;
-        var minutes = double.TryParse(ServicesStreamerBotScheduleMinutesBox.Text, out var value) ? Math.Clamp(value, 0.05, 1440) : 1;
+        if (ServicesStreamerBotActionsList.SelectedItem is not StreamerBotActionOption action)
+        {
+            return;
+        }
+
+        double minutes = double.TryParse(ServicesStreamerBotScheduleMinutesBox.Text, out double value) ? Math.Clamp(value, 0.05, 1440) : 1;
         CancelScheduledStreamerBotAction();
         _streamerBotScheduledActionCts = new CancellationTokenSource();
         ServicesStreamerBotCancelScheduleButton.IsEnabled = true;
@@ -17064,18 +18124,33 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private Dictionary<string, object?> ParseStreamerBotArguments(string? json)
     {
-        if (string.IsNullOrWhiteSpace(json)) return new Dictionary<string, object?>();
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
         using var document = System.Text.Json.JsonDocument.Parse(json);
         if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+        {
             throw new InvalidOperationException("Die Parameter müssen ein JSON-Objekt sein.");
+        }
+
         return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(document.RootElement.GetRawText())
-            ?? new Dictionary<string, object?>();
+            ?? [];
     }
 
     private void ToggleSelectedStreamerBotFavorite()
     {
-        if (ServicesStreamerBotActionsList.SelectedItem is not StreamerBotActionOption action) return;
-        if (!_streamerBotFavoriteActionIds.Add(action.Id)) _streamerBotFavoriteActionIds.Remove(action.Id);
+        if (ServicesStreamerBotActionsList.SelectedItem is not StreamerBotActionOption action)
+        {
+            return;
+        }
+
+        if (!_streamerBotFavoriteActionIds.Add(action.Id))
+        {
+            _streamerBotFavoriteActionIds.Remove(action.Id);
+        }
+
         ApplyStreamerBotActionFilter();
         ServicesStreamerBotActionsList.SelectedItem = action;
         UpdateSelectedStreamerBotAction();
@@ -17084,7 +18159,10 @@ private Task ApplyCombinedAlertDuckingAsync()
     private void AddStreamerBotHistory(StreamerBotActionOption action, bool success, string detail, string argumentsJson, string responseJson)
     {
         _streamerBotExecutionHistory.Insert(0, new StreamerBotExecutionHistoryItem(DateTimeOffset.Now, action.Name, success, detail, argumentsJson, responseJson));
-        while (_streamerBotExecutionHistory.Count > 50) _streamerBotExecutionHistory.RemoveAt(_streamerBotExecutionHistory.Count - 1);
+        while (_streamerBotExecutionHistory.Count > 50)
+        {
+            _streamerBotExecutionHistory.RemoveAt(_streamerBotExecutionHistory.Count - 1);
+        }
     }
 
     private void FormatStreamerBotArgumentsJson()
@@ -17118,7 +18196,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             Filter = "CSV-Datei|*.csv",
             FileName = $"streamerbot-history-{DateTime.Now:yyyyMMdd-HHmmss}.csv"
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
         static string Csv(string? value) => "\"" + (value ?? string.Empty).Replace("\"", "\"\"").Replace("\r", " ").Replace("\n", " ") + "\"";
         var lines = new List<string> { "Zeitpunkt;Aktion;Erfolg;Detail;Argumente;Antwort" };
         lines.AddRange(_streamerBotExecutionHistory.Select(item => string.Join(";",
@@ -17134,7 +18216,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         ServicesStreamerBotDiagnosticText.Text = "Verbindung wird neu aufgebaut …";
         ServicesStreamerBotDiagnosticText.Foreground = Brushes.Gold;
         Exception? lastError = null;
-        for (var attempt = 1; attempt <= 3; attempt++)
+        for (int attempt = 1; attempt <= 3; attempt++)
         {
             try
             {
@@ -17166,10 +18248,10 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            var started = DateTimeOffset.UtcNow;
-            using var response = await SendStreamerBotRequestAsync(new { request = "GetActions" }, TimeSpan.FromSeconds(5));
-            var elapsed = DateTimeOffset.UtcNow - started;
-            var actionCount = response.RootElement.TryGetProperty("actions", out var actions) && actions.ValueKind == System.Text.Json.JsonValueKind.Array
+            DateTimeOffset started = DateTimeOffset.UtcNow;
+            using JsonDocument response = await SendStreamerBotRequestAsync(new { request = "GetActions" }, TimeSpan.FromSeconds(5));
+            TimeSpan elapsed = DateTimeOffset.UtcNow - started;
+            int actionCount = response.RootElement.TryGetProperty("actions", out JsonElement actions) && actions.ValueKind == System.Text.Json.JsonValueKind.Array
                 ? actions.GetArrayLength()
                 : 0;
             ServicesStreamerBotDiagnosticText.Text = $"WebSocket OK · Antwort {elapsed.TotalMilliseconds:0} ms · {actionCount} Aktionen · Event-Listener {(_streamerBotEventSocket?.State == System.Net.WebSockets.WebSocketState.Open ? "aktiv" : "inaktiv")}";
@@ -17185,10 +18267,16 @@ private Task ApplyCombinedAlertDuckingAsync()
     private static void SelectStreamerBotAction(System.Windows.Controls.ComboBox box, string id, string name)
     {
         if (box.ItemsSource is not IEnumerable<StreamerBotActionOption> actions) { box.Text = name; return; }
-        var selected = actions.FirstOrDefault(x => !string.IsNullOrWhiteSpace(id) && string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase))
+        StreamerBotActionOption? selected = actions.FirstOrDefault(x => !string.IsNullOrWhiteSpace(id) && string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase))
             ?? actions.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
-        if (selected is not null) box.SelectedItem = selected;
-        else box.Text = name;
+        if (selected is not null)
+        {
+            box.SelectedItem = selected;
+        }
+        else
+        {
+            box.Text = name;
+        }
     }
 
     private async Task<System.Text.Json.JsonDocument> SendStreamerBotRequestAsync(object requestBody, TimeSpan? timeout = null)
@@ -17202,11 +18290,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var primaryBox = enabled ? StreamerBotEnableAlertsActionBox : StreamerBotDisableAlertsActionBox;
-        var settingsBox = enabled ? SettingsStreamerBotEnableAlertsActionBox : SettingsStreamerBotDisableAlertsActionBox;
-        var selected = primaryBox.SelectedItem as StreamerBotActionOption ?? settingsBox.SelectedItem as StreamerBotActionOption;
-        var actionName = selected?.Name ?? GetStreamerBotActionName(primaryBox, settingsBox, enabled ? _settings.StreamerBot.EnableAlertsActionName : _settings.StreamerBot.DisableAlertsActionName);
-        var actionId = selected?.Id ?? (enabled ? _settings.StreamerBot.EnableAlertsActionId : _settings.StreamerBot.DisableAlertsActionId);
+        ComboBox primaryBox = enabled ? StreamerBotEnableAlertsActionBox : StreamerBotDisableAlertsActionBox;
+        ComboBox settingsBox = enabled ? SettingsStreamerBotEnableAlertsActionBox : SettingsStreamerBotDisableAlertsActionBox;
+        StreamerBotActionOption? selected = primaryBox.SelectedItem as StreamerBotActionOption ?? settingsBox.SelectedItem as StreamerBotActionOption;
+        string actionName = selected?.Name ?? GetStreamerBotActionName(primaryBox, settingsBox, enabled ? _settings.StreamerBot.EnableAlertsActionName : _settings.StreamerBot.DisableAlertsActionName);
+        string actionId = selected?.Id ?? (enabled ? _settings.StreamerBot.EnableAlertsActionId : _settings.StreamerBot.DisableAlertsActionId);
         if (string.IsNullOrWhiteSpace(actionName) && string.IsNullOrWhiteSpace(actionId))
         {
             StreamerBotAlertControlStatusText.Text = "Bitte zuerst eine vorhandene Streamer.bot-Hilfsaktion auswählen.";
@@ -17216,14 +18304,17 @@ private Task ApplyCombinedAlertDuckingAsync()
         try
         {
             var action = !string.IsNullOrWhiteSpace(actionId) ? new { id = actionId, name = actionName } : new { id = "", name = actionName };
-            using var response = await SendStreamerBotRequestAsync(new
+            using JsonDocument response = await SendStreamerBotRequestAsync(new
             {
                 request = "DoAction",
                 action,
                 args = new { source = "Creator Control Suite", alertsEnabled = enabled }
             });
-            var status = response.RootElement.TryGetProperty("status", out var statusNode) ? statusNode.GetString() : null;
-            if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Streamer.bot hat die Aktion nicht bestätigt.");
+            string? status = response.RootElement.TryGetProperty("status", out JsonElement statusNode) ? statusNode.GetString() : null;
+            if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Streamer.bot hat die Aktion nicht bestätigt.");
+            }
 
             if (enabled)
             {
@@ -17277,13 +18368,15 @@ private Task ApplyCombinedAlertDuckingAsync()
         _streamerBotEventCts = new CancellationTokenSource();
         _streamerBotEventSocket = new System.Net.WebSockets.ClientWebSocket();
 
-        var connection = _streamerBotClient.ResolveConnection(_settings.StreamerBot);
+        StreamerBotConnectionInfo connection = _streamerBotClient.ResolveConnection(_settings.StreamerBot);
         if (!string.IsNullOrWhiteSpace(connection.Password))
+        {
             _streamerBotEventSocket.Options.SetRequestHeader("Authorization", "Bearer " + connection.Password);
+        }
 
         await _streamerBotEventSocket.ConnectAsync(connection.WebSocketUri, _streamerBotEventCts.Token);
 
-        var subscribe = System.Text.Json.JsonSerializer.Serialize(new
+        string subscribe = System.Text.Json.JsonSerializer.Serialize(new
         {
             request = "Subscribe",
             id = "ccs-events-" + Guid.NewGuid().ToString("N"),
@@ -17293,14 +18386,14 @@ private Task ApplyCombinedAlertDuckingAsync()
                 General = new[] { "Custom" }
             }
         });
-        var bytes = System.Text.Encoding.UTF8.GetBytes(subscribe);
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(subscribe);
         await _streamerBotEventSocket.SendAsync(bytes, System.Net.WebSockets.WebSocketMessageType.Text, true, _streamerBotEventCts.Token);
         _ = Task.Run(() => ListenForStreamerBotAlertEventsAsync(_streamerBotEventCts.Token));
     }
 
     private async Task ListenForStreamerBotAlertEventsAsync(CancellationToken token)
     {
-        var buffer = new byte[64 * 1024];
+        byte[] buffer = new byte[64 * 1024];
         try
         {
             while (!token.IsCancellationRequested && _streamerBotEventSocket is { State: System.Net.WebSockets.WebSocketState.Open })
@@ -17310,32 +18403,46 @@ private Task ApplyCombinedAlertDuckingAsync()
                 do
                 {
                     result = await _streamerBotEventSocket.ReceiveAsync(buffer, token);
-                    if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Close) return;
+                    if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Close)
+                    {
+                        return;
+                    }
+
                     stream.Write(buffer, 0, result.Count);
                 } while (!result.EndOfMessage);
 
                 using var document = System.Text.Json.JsonDocument.Parse(stream.ToArray());
-                var root = document.RootElement;
-                if (!root.TryGetProperty("event", out var eventNode)) continue;
-                var source = eventNode.TryGetProperty("source", out var sourceNode) ? sourceNode.GetString() ?? "Streamer.bot" : "Streamer.bot";
-                var type = eventNode.TryGetProperty("type", out var typeNode) ? typeNode.GetString() ?? "Alert" : "Alert";
-                var normalized = (source + " " + type).ToLowerInvariant();
-                var summary = BuildStreamerBotEventSummary(root, source, type);
+                JsonElement root = document.RootElement;
+                if (!root.TryGetProperty("event", out JsonElement eventNode))
+                {
+                    continue;
+                }
+
+                string source = eventNode.TryGetProperty("source", out JsonElement sourceNode) ? sourceNode.GetString() ?? "Streamer.bot" : "Streamer.bot";
+                string type = eventNode.TryGetProperty("type", out JsonElement typeNode) ? typeNode.GetString() ?? "Alert" : "Alert";
+                string normalized = (source + " " + type).ToLowerInvariant();
+                string summary = BuildStreamerBotEventSummary(root, source, type);
 
                 await Dispatcher.InvokeAsync(() =>
                 {
                     _streamerBotLiveEvents.Insert(0, new StreamerBotLiveEventItem(DateTimeOffset.Now, source, type, summary));
                     while (_streamerBotLiveEvents.Count > 100)
+                    {
                         _streamerBotLiveEvents.RemoveAt(_streamerBotLiveEvents.Count - 1);
+                    }
+
                     ServicesStreamerBotLiveEventStatusText.Text = $"Letztes Ereignis: {type} · {DateTime.Now:HH:mm:ss}";
                     ServicesStreamerBotLiveEventsList.ScrollIntoView(_streamerBotLiveEvents.FirstOrDefault());
                 });
 
-                var isKnownAlert = normalized.Contains("follow") || normalized.Contains("cheer") || normalized.Contains("sub") ||
+                bool isKnownAlert = normalized.Contains("follow") || normalized.Contains("cheer") || normalized.Contains("sub") ||
                                    normalized.Contains("raid") || normalized.Contains("alert");
-                if (!isKnownAlert) continue;
+                if (!isKnownAlert)
+                {
+                    continue;
+                }
 
-                var id = Guid.NewGuid().ToString("N");
+                string id = Guid.NewGuid().ToString("N");
                 _ = PulseExternalAlertAsync("Streamer.bot", id, TimeSpan.FromSeconds(8));
                 await Dispatcher.InvokeAsync(() =>
                 {
@@ -17356,24 +18463,38 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         static string? ReadString(System.Text.Json.JsonElement element, params string[] names)
         {
-            foreach (var name in names)
+            foreach (string name in names)
             {
-                if (element.TryGetProperty(name, out var value) && value.ValueKind == System.Text.Json.JsonValueKind.String)
+                if (element.TryGetProperty(name, out JsonElement value) && value.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
                     return value.GetString();
+                }
             }
             return null;
         }
 
-        var data = root.TryGetProperty("data", out var dataNode) && dataNode.ValueKind == System.Text.Json.JsonValueKind.Object
+        JsonElement data = root.TryGetProperty("data", out JsonElement dataNode) && dataNode.ValueKind == System.Text.Json.JsonValueKind.Object
             ? dataNode
             : root;
-        var user = ReadString(data, "user_name", "userName", "displayName", "user", "from");
-        var message = ReadString(data, "message", "text", "input", "reason");
-        var amount = ReadString(data, "amount", "bits", "months", "viewers");
+        string? user = ReadString(data, "user_name", "userName", "displayName", "user", "from");
+        string? message = ReadString(data, "message", "text", "input", "reason");
+        string? amount = ReadString(data, "amount", "bits", "months", "viewers");
         var parts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(user)) parts.Add(user);
-        if (!string.IsNullOrWhiteSpace(amount)) parts.Add(amount);
-        if (!string.IsNullOrWhiteSpace(message)) parts.Add(message);
+        if (!string.IsNullOrWhiteSpace(user))
+        {
+            parts.Add(user);
+        }
+
+        if (!string.IsNullOrWhiteSpace(amount))
+        {
+            parts.Add(amount);
+        }
+
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            parts.Add(message);
+        }
+
         return parts.Count > 0 ? string.Join(" · ", parts) : $"{source} · {type}";
     }
 
@@ -17401,17 +18522,17 @@ private Task ApplyCombinedAlertDuckingAsync()
         ServicesStreamerBotDiagnosticText.Foreground = Brushes.Gray;
         ServicesStreamerBotSelectedActionText.Text = "Keine Aktion ausgewählt.";
         ServicesStreamerBotRunActionButton.IsEnabled = false;
-    
+
         RefreshDashboardServiceActionButtons();
-}
+    }
 
     private void SetWorkflowVisualStage(string stage, string summary)
     {
-        var inactive = _themeService.GetBrush("BorderBrush")
+        Brush inactive = _themeService.GetBrush("BorderBrush")
             ?? new SolidColorBrush(Color.FromRgb(51, 55, 59));
-        var complete = _themeService.GetBrush("SuccessBrush")
+        Brush complete = _themeService.GetBrush("SuccessBrush")
             ?? new SolidColorBrush(Color.FromRgb(45, 125, 70));
-        var active = _themeService.GetBrush("AccentBrush")
+        Brush active = _themeService.GetBrush("AccentBrush")
             ?? new SolidColorBrush(Color.FromRgb(112, 70, 190));
 
         WorkflowPrepareNode.Background = inactive;
@@ -17482,7 +18603,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         AddCheck(!_settings.Workflow.AutoStartSpotifyPlaylist || !string.IsNullOrWhiteSpace(_settings.Spotify.StartPlaylistUri), "Spotify-Startplaylist konfiguriert");
         AddCheck(!_settings.Twitch.RaidOnStreamEnd || !string.IsNullOrWhiteSpace(_settings.Twitch.SelectedRaidChannel), "Raid-Ziel für Streamende gesetzt");
 
-        var warningCount = _dashboardPreflightItems.Count(x => x.StartsWith("⚠", StringComparison.Ordinal));
+        int warningCount = _dashboardPreflightItems.Count(x => x.StartsWith("⚠", StringComparison.Ordinal));
         DashboardWorkflowStageText.Text = warningCount == 0
             ? "BEREIT → START → LIVE → ENDE → RAID"
             : $"VORBEREITEN · {warningCount} Punkt(e) prüfen";
@@ -17544,7 +18665,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private string GetDashboardNotificationFilePath()
     {
-        var folder = Path.Combine(
+        string folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "CreatorControlSuite");
         Directory.CreateDirectory(folder);
@@ -17553,7 +18674,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void AddDashboardNotification(string message, string severity = "Info")
     {
-        var normalizedSeverity = severity switch
+        string normalizedSeverity = severity switch
         {
             "Error" => "Fehler",
             "Warning" => "Warnung",
@@ -17586,7 +18707,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var selectedFilter = (DashboardNotificationFilterBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString()
+        string selectedFilter = (DashboardNotificationFilterBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString()
             ?? "Alle";
 
         IEnumerable<DashboardNotificationEntry> query = _dashboardNotifications;
@@ -17599,20 +18720,20 @@ private Task ApplyCombinedAlertDuckingAsync()
         };
 
         _dashboardNotificationItems.Clear();
-        foreach (var item in query.OrderByDescending(item => item.Timestamp).Take(100))
+        foreach (DashboardNotificationEntry? item in query.OrderByDescending(item => item.Timestamp).Take(100))
         {
-            var icon = item.Severity switch
+            string icon = item.Severity switch
             {
                 "Fehler" => "✕",
                 "Warnung" => "⚠",
                 _ => "ℹ"
             };
-            var unread = item.IsRead ? "" : " •";
+            string unread = item.IsRead ? "" : " •";
             _dashboardNotificationItems.Add(
                 $"{icon} {item.Timestamp:HH:mm:ss} · {item.Message}{unread}");
         }
 
-        var unreadCount = _dashboardNotifications.Count(item => !item.IsRead);
+        int unreadCount = _dashboardNotifications.Count(item => !item.IsRead);
         DashboardNotificationCountText.Text = unreadCount == 0
             ? $"{_dashboardNotifications.Count} Meldungen"
             : $"{unreadCount} ungelesen";
@@ -17621,13 +18742,13 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task LoadDashboardNotificationsAsync()
     {
         _dashboardNotifications.Clear();
-        var path = GetDashboardNotificationFilePath();
+        string path = GetDashboardNotificationFilePath();
         if (File.Exists(path))
         {
             try
             {
-                var json = await File.ReadAllTextAsync(path);
-                var items = System.Text.Json.JsonSerializer.Deserialize<List<DashboardNotificationEntry>>(json);
+                string json = await File.ReadAllTextAsync(path);
+                List<DashboardNotificationEntry>? items = System.Text.Json.JsonSerializer.Deserialize<List<DashboardNotificationEntry>>(json);
                 if (items is not null)
                 {
                     _dashboardNotifications.AddRange(items.TakeLast(250));
@@ -17646,7 +18767,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var json = System.Text.Json.JsonSerializer.Serialize(
+            string json = System.Text.Json.JsonSerializer.Serialize(
                 _dashboardNotifications.TakeLast(250),
                 new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(GetDashboardNotificationFilePath(), json);
@@ -17676,11 +18797,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task RefreshStatisticsAsync()
     {
         var rows = new List<StreamStatisticsRow>();
-        var path = GetStreamHistoryFilePath();
+        string path = GetStreamHistoryFilePath();
 
         if (File.Exists(path))
         {
-            foreach (var line in await File.ReadAllLinesAsync(path))
+            foreach (string line in await File.ReadAllLinesAsync(path))
             {
                 if (string.IsNullOrWhiteSpace(line))
                 {
@@ -17690,36 +18811,36 @@ private Task ApplyCombinedAlertDuckingAsync()
                 try
                 {
                     using var document = System.Text.Json.JsonDocument.Parse(line);
-                    var item = document.RootElement;
+                    JsonElement item = document.RootElement;
 
-                    var startedAt = item.TryGetProperty("StartedAt", out var startedProperty)
+                    DateTimeOffset startedAt = item.TryGetProperty("StartedAt", out JsonElement startedProperty)
                         ? startedProperty.GetDateTimeOffset().ToLocalTime()
                         : DateTimeOffset.MinValue;
-                    var durationSeconds = item.TryGetProperty("DurationSeconds", out var durationProperty)
+                    long durationSeconds = item.TryGetProperty("DurationSeconds", out JsonElement durationProperty)
                         ? durationProperty.GetInt64()
                         : 0;
-                    var averageViewers = item.TryGetProperty("AverageViewers", out var averageProperty)
+                    double averageViewers = item.TryGetProperty("AverageViewers", out JsonElement averageProperty)
                         ? averageProperty.GetDouble()
                         : 0;
-                    var peakViewers = item.TryGetProperty("PeakViewers", out var peakProperty)
+                    int peakViewers = item.TryGetProperty("PeakViewers", out JsonElement peakProperty)
                         ? peakProperty.GetInt32()
                         : 0;
-                    var followers = item.TryGetProperty("FollowersGained", out var followersProperty)
+                    int followers = item.TryGetProperty("FollowersGained", out JsonElement followersProperty)
                         ? followersProperty.GetInt32()
                         : 0;
-                    var newSubscriptions = item.TryGetProperty("NewSubscriptions", out var subscriptionsProperty)
+                    int newSubscriptions = item.TryGetProperty("NewSubscriptions", out JsonElement subscriptionsProperty)
                         ? subscriptionsProperty.GetInt32()
                         : 0;
-                    var giftSubscriptions = item.TryGetProperty("GiftSubscriptions", out var giftSubscriptionsProperty)
+                    int giftSubscriptions = item.TryGetProperty("GiftSubscriptions", out JsonElement giftSubscriptionsProperty)
                         ? giftSubscriptionsProperty.GetInt32()
                         : 0;
-                    var bitsCheered = item.TryGetProperty("BitsCheered", out var bitsProperty)
+                    int bitsCheered = item.TryGetProperty("BitsCheered", out JsonElement bitsProperty)
                         ? bitsProperty.GetInt32()
                         : 0;
-                    var category = item.TryGetProperty("Category", out var categoryProperty)
+                    string category = item.TryGetProperty("Category", out JsonElement categoryProperty)
                         ? categoryProperty.ToString()
                         : "";
-                    var title = item.TryGetProperty("Title", out var titleProperty)
+                    string title = item.TryGetProperty("Title", out JsonElement titleProperty)
                         ? titleProperty.GetString() ?? ""
                         : "";
 
@@ -17752,14 +18873,14 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         StatisticsSessionsGrid.ItemsSource = ordered;
 
-        var totalStreams = rows.Count;
-        var totalSeconds = rows.Sum(row => Math.Max(0, row.DurationSeconds));
-        var weightedAverageViewers = totalSeconds > 0
+        int totalStreams = rows.Count;
+        long totalSeconds = rows.Sum(row => Math.Max(0, row.DurationSeconds));
+        double weightedAverageViewers = totalSeconds > 0
             ? rows.Sum(row => row.AverageViewers * Math.Max(0, row.DurationSeconds)) / totalSeconds
             : rows.Count > 0 ? rows.Average(row => row.AverageViewers) : 0;
-        var peak = rows.Count > 0 ? rows.Max(row => row.PeakViewers) : 0;
-        var followersTotal = rows.Sum(row => row.FollowersGained);
-        var averageDurationSeconds = rows.Count > 0 ? totalSeconds / rows.Count : 0;
+        int peak = rows.Count > 0 ? rows.Max(row => row.PeakViewers) : 0;
+        int followersTotal = rows.Sum(row => row.FollowersGained);
+        long averageDurationSeconds = rows.Count > 0 ? totalSeconds / rows.Count : 0;
 
         StatisticsTotalStreamsText.Text = totalStreams.ToString();
         StatisticsTotalDurationText.Text = FormatStatisticsDuration(totalSeconds);
@@ -17791,7 +18912,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
 
         StatisticsDevelopmentList.Items.Clear();
-        foreach (var row in rows
+        foreach (StreamStatisticsRow? row in rows
                      .Where(row => row.StartedAt != DateTimeOffset.MinValue)
                      .OrderBy(row => row.StartedAt)
                      .TakeLast(20))
@@ -17819,7 +18940,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RefreshCreatorIntelligenceAsync()
     {
-        var summary = await _creatorIntelligence.AnalyzeLatestSessionAsync();
+        CreatorIntelligenceSummary? summary = await _creatorIntelligence.AnalyzeLatestSessionAsync();
         if (summary is null)
         {
             ServicesCreatorIntelligenceStatusText.Text = _creatorIntelligence.IsRecording
@@ -17843,9 +18964,12 @@ private Task ApplyCombinedAlertDuckingAsync()
         ServicesCreatorIntelligenceGrowthText.Text = $"{summary.FollowersPerHour:0.0}/h";
         ServicesCreatorIntelligenceContextText.Text = $"{summary.DistinctScenes} Szenen · {summary.TracksPlayed} Songs · {summary.ChatMessages} Chatnachrichten";
         _creatorIntelligenceRecommendations.Clear();
-        foreach (var recommendation in summary.Recommendations) _creatorIntelligenceRecommendations.Add("• " + recommendation);
+        foreach (string recommendation in summary.Recommendations)
+        {
+            _creatorIntelligenceRecommendations.Add("• " + recommendation);
+        }
 
-        var dashboard = await _creatorIntelligence.AnalyzeDashboardAsync(30);
+        CreatorIntelligenceDashboard dashboard = await _creatorIntelligence.AnalyzeDashboardAsync(30);
         ApplyCreatorIntelligenceDashboard(dashboard);
         ApplyCreatorContentPerformance(await _creatorIntelligence.AnalyzeContentPerformanceAsync(30));
         ApplyCreatorEventCorrelations(await _creatorIntelligence.AnalyzeEventCorrelationsAsync(30));
@@ -17878,20 +19002,20 @@ private Task ApplyCombinedAlertDuckingAsync()
         ServicesCreatorIntelligenceGrowthIndexText.Text = dashboard.GrowthIndex.ToString();
         ServicesCreatorIntelligenceForecastText.Text = $"Score {dashboard.PredictedCreatorScore} · Ø {dashboard.PredictedAverageViewers:0.0}";
         ServicesCreatorIntelligencePeriodText.Text = $"Woche: {dashboard.WeeklySessionCount} Streams · Ø Score {dashboard.WeeklyAverageCreatorScore:0.0} · Monat: {dashboard.SessionCount} Streams · Ø Score {dashboard.AverageCreatorScore:0.0}";
-        var scoreDirection = dashboard.CreatorScoreTrend > .5 ? "+" : string.Empty;
-        var viewerDirection = dashboard.ViewerTrendPerStream > .05 ? "+" : string.Empty;
+        string scoreDirection = dashboard.CreatorScoreTrend > .5 ? "+" : string.Empty;
+        string viewerDirection = dashboard.ViewerTrendPerStream > .05 ? "+" : string.Empty;
         ServicesCreatorIntelligenceTrendText.Text = $"Trend: Score {scoreDirection}{dashboard.CreatorScoreTrend:0.0} · Zuschauer {viewerDirection}{dashboard.ViewerTrendPerStream:0.0} je Stream";
         ServicesCreatorIntelligenceBestTimeText.Text = $"Beste Startzeit: {dashboard.BestDay.ToGermanDayName()} gegen {dashboard.BestStartHour:00}:00 Uhr";
         ServicesCreatorIntelligenceBestCategoryText.Text = $"Beste Kategorie: {dashboard.BestCategory} · Ø Bindung {dashboard.AverageRetentionPercent:0}%";
 
-        foreach (var session in dashboard.RecentSessions)
+        foreach (CreatorIntelligenceSummary session in dashboard.RecentSessions)
         {
-            var category = string.IsNullOrWhiteSpace(session.Category) ? "Ohne Kategorie" : session.Category;
+            string category = string.IsNullOrWhiteSpace(session.Category) ? "Ohne Kategorie" : session.Category;
             ServicesCreatorIntelligenceRecentSessionsList.Items.Add(
                 $"{session.StartedAt:dd.MM. HH:mm} · Score {session.CreatorScore} · Ø {session.AverageViewers:0.0} · {session.RetentionPercent:0}% Bindung · {category}");
         }
 
-        foreach (var insight in dashboard.Insights)
+        foreach (string insight in dashboard.Insights)
         {
             _creatorIntelligenceRecommendations.Add("◆ " + insight);
         }
@@ -17912,27 +19036,36 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        foreach (var scene in performance.Scenes)
+        foreach (CreatorContentPerformanceRow scene in performance.Scenes)
         {
-            var delta = scene.ViewerDelta > 0 ? $"+{scene.ViewerDelta:0.0}" : $"{scene.ViewerDelta:0.0}";
+            string delta = scene.ViewerDelta > 0 ? $"+{scene.ViewerDelta:0.0}" : $"{scene.ViewerDelta:0.0}";
             ServicesCreatorIntelligenceScenesList.Items.Add($"{scene.Name} · {delta} Zuschauer · Ø {scene.AverageViewers:0.0} · {scene.Occurrences}×");
         }
-        if (performance.Scenes.Count == 0) ServicesCreatorIntelligenceScenesList.Items.Add("Keine OBS-Szenenwechsel aufgezeichnet.");
-
-        foreach (var track in performance.Tracks)
+        if (performance.Scenes.Count == 0)
         {
-            var delta = track.ViewerDelta > 0 ? $"+{track.ViewerDelta:0.0}" : $"{track.ViewerDelta:0.0}";
+            ServicesCreatorIntelligenceScenesList.Items.Add("Keine OBS-Szenenwechsel aufgezeichnet.");
+        }
+
+        foreach (CreatorContentPerformanceRow track in performance.Tracks)
+        {
+            string delta = track.ViewerDelta > 0 ? $"+{track.ViewerDelta:0.0}" : $"{track.ViewerDelta:0.0}";
             ServicesCreatorIntelligenceTracksList.Items.Add($"{track.Name} · {delta} Zuschauer · Ø {track.AverageViewers:0.0}");
         }
-        if (performance.Tracks.Count == 0) ServicesCreatorIntelligenceTracksList.Items.Add("Keine Spotify-Titelwechsel aufgezeichnet.");
+        if (performance.Tracks.Count == 0)
+        {
+            ServicesCreatorIntelligenceTracksList.Items.Add("Keine Spotify-Titelwechsel aufgezeichnet.");
+        }
 
-        foreach (var cell in performance.Heatmap)
+        foreach (CreatorHeatmapCell cell in performance.Heatmap)
         {
             ServicesCreatorIntelligenceHeatmapList.Items.Add($"{cell.Day.ToGermanDayName()} {cell.Hour:00}:00 · Ø {cell.AverageViewers:0.0} · {cell.SampleCount} Samples");
         }
-        if (performance.Heatmap.Count == 0) ServicesCreatorIntelligenceHeatmapList.Items.Add("Keine Zuschauer-Samples vorhanden.");
+        if (performance.Heatmap.Count == 0)
+        {
+            ServicesCreatorIntelligenceHeatmapList.Items.Add("Keine Zuschauer-Samples vorhanden.");
+        }
 
-        foreach (var insight in performance.Insights)
+        foreach (string insight in performance.Insights)
         {
             _creatorIntelligenceRecommendations.Add("◇ " + insight);
         }
@@ -17945,19 +19078,28 @@ private Task ApplyCombinedAlertDuckingAsync()
         ServicesCreatorIntelligenceRaidList.Items.Clear();
         ServicesCreatorIntelligenceActionsList.Items.Clear();
 
-        foreach (var row in report.Correlations)
+        foreach (CreatorEventCorrelationRow row in report.Correlations)
         {
-            var delta5 = row.ViewerDelta5Minutes > 0 ? $"+{row.ViewerDelta5Minutes:0.0}" : $"{row.ViewerDelta5Minutes:0.0}";
-            var delta10 = row.ViewerDelta10Minutes > 0 ? $"+{row.ViewerDelta10Minutes:0.0}" : $"{row.ViewerDelta10Minutes:0.0}";
+            string delta5 = row.ViewerDelta5Minutes > 0 ? $"+{row.ViewerDelta5Minutes:0.0}" : $"{row.ViewerDelta5Minutes:0.0}";
+            string delta10 = row.ViewerDelta10Minutes > 0 ? $"+{row.ViewerDelta10Minutes:0.0}" : $"{row.ViewerDelta10Minutes:0.0}";
             ServicesCreatorIntelligenceCorrelationList.Items.Add($"{row.EventName} · 5 Min {delta5} · 10 Min {delta10} · {row.Occurrences}×");
         }
-        if (report.Correlations.Count == 0) ServicesCreatorIntelligenceCorrelationList.Items.Add("Noch keine belastbare Ereigniskorrelation.");
+        if (report.Correlations.Count == 0)
+        {
+            ServicesCreatorIntelligenceCorrelationList.Items.Add("Noch keine belastbare Ereigniskorrelation.");
+        }
 
-        foreach (var raid in report.Raids)
+        foreach (CreatorRaidRetentionRow raid in report.Raids)
+        {
             ServicesCreatorIntelligenceRaidList.Items.Add($"{raid.RaidSummary} · 5m {raid.ViewersAfter5:0} · 10m {raid.ViewersAfter10:0} · 30m {raid.ViewersAfter30:0} · {raid.Retention30Percent:0}%");
-        if (report.Raids.Count == 0) ServicesCreatorIntelligenceRaidList.Items.Add("Noch keine Raid-Daten mit Zuschauer-Samples.");
+        }
 
-        foreach (var action in report.Actions)
+        if (report.Raids.Count == 0)
+        {
+            ServicesCreatorIntelligenceRaidList.Items.Add("Noch keine Raid-Daten mit Zuschauer-Samples.");
+        }
+
+        foreach (string action in report.Actions)
         {
             ServicesCreatorIntelligenceActionsList.Items.Add(action);
             _creatorIntelligenceRecommendations.Add("▶ " + action);
@@ -17968,13 +19110,16 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         ServicesCreatorIntelligenceActionPlanList.Items.Clear();
         ServicesCreatorIntelligenceActionStatusText.Text = $"{plan.OpenCount} offen · {plan.CompletedCount} erledigt";
-        foreach (var item in plan.Items.Take(20))
+        foreach (CreatorActionItem? item in plan.Items.Take(20))
         {
-            var priority = item.Priority == 1 ? "HOCH" : item.Priority == 2 ? "MITTEL" : "NORMAL";
-            var progress = item.Metric == "manual" ? string.Empty : $" · {item.CurrentValue ?? item.Baseline:0.0}/{item.Target:0.0}";
+            string priority = item.Priority == 1 ? "HOCH" : item.Priority == 2 ? "MITTEL" : "NORMAL";
+            string progress = item.Metric == "manual" ? string.Empty : $" · {item.CurrentValue ?? item.Baseline:0.0}/{item.Target:0.0}";
             ServicesCreatorIntelligenceActionPlanList.Items.Add(new CreatorActionListItem(item.Id, $"[{item.Status}] [{priority}] {item.Title}{progress}"));
         }
-        if (plan.Items.Count == 0) ServicesCreatorIntelligenceActionPlanList.Items.Add(new CreatorActionListItem(string.Empty, "Noch keine Maßnahmen vorhanden."));
+        if (plan.Items.Count == 0)
+        {
+            ServicesCreatorIntelligenceActionPlanList.Items.Add(new CreatorActionListItem(string.Empty, "Noch keine Maßnahmen vorhanden."));
+        }
     }
 
     private void ApplyCreatorActionEffectiveness(CreatorActionEffectivenessReport report)
@@ -17982,12 +19127,15 @@ private Task ApplyCombinedAlertDuckingAsync()
         ServicesCreatorIntelligenceEffectivenessList.Items.Clear();
         ServicesCreatorIntelligenceEffectivenessStatusText.Text = $"{report.ImprovedCount} verbessert · {report.ReachedCount} erreicht · {report.DeclinedCount} rückläufig";
         ServicesCreatorIntelligenceEffectivenessSummaryText.Text = report.Summary;
-        foreach (var row in report.Rows.Take(15))
+        foreach (CreatorActionEffectivenessRow? row in report.Rows.Take(15))
         {
-            var delta = row.Improvement > 0 ? $"+{row.Improvement:0.0}" : $"{row.Improvement:0.0}";
+            string delta = row.Improvement > 0 ? $"+{row.Improvement:0.0}" : $"{row.Improvement:0.0}";
             ServicesCreatorIntelligenceEffectivenessList.Items.Add($"[{row.Status}] {row.Title} · {row.Baseline:0.0} → {row.Current:0.0} · Δ {delta} · {row.ProgressPercent:0}% · {row.Verdict}");
         }
-        if (report.Rows.Count == 0) ServicesCreatorIntelligenceEffectivenessList.Items.Add("Noch keine messbaren Maßnahmen vorhanden.");
+        if (report.Rows.Count == 0)
+        {
+            ServicesCreatorIntelligenceEffectivenessList.Items.Add("Noch keine messbaren Maßnahmen vorhanden.");
+        }
     }
 
 
@@ -17996,12 +19144,15 @@ private Task ApplyCombinedAlertDuckingAsync()
         ServicesCreatorIntelligenceExperimentList.Items.Clear();
         ServicesCreatorIntelligenceExperimentStatusText.Text = $"{report.ActiveCount} aktiv · {report.CompletedCount} ausgewertet · {report.PositiveCount} positiv";
         ServicesCreatorIntelligenceExperimentSummaryText.Text = report.Summary;
-        foreach (var row in report.Rows.Take(15))
+        foreach (CreatorExperimentRow? row in report.Rows.Take(15))
         {
-            var delta = row.Delta > 0 ? $"+{row.Delta:0.0}" : $"{row.Delta:0.0}";
+            string delta = row.Delta > 0 ? $"+{row.Delta:0.0}" : $"{row.Delta:0.0}";
             ServicesCreatorIntelligenceExperimentList.Items.Add($"[{row.Status}] {row.Title} · {row.SessionCount}/{row.TargetSessions} Streams · {row.Baseline:0.0} → {row.Current:0.0} · Δ {delta} · {row.Confidence} · {row.Verdict}");
         }
-        if (report.Rows.Count == 0) ServicesCreatorIntelligenceExperimentList.Items.Add("Noch keine Experimente vorhanden.");
+        if (report.Rows.Count == 0)
+        {
+            ServicesCreatorIntelligenceExperimentList.Items.Add("Noch keine Experimente vorhanden.");
+        }
     }
 
     private async Task StartSelectedCreatorExperimentAsync()
@@ -18018,7 +19169,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task CompleteSelectedCreatorActionAsync()
     {
-        if (ServicesCreatorIntelligenceActionPlanList.SelectedItem is not CreatorActionListItem item || string.IsNullOrWhiteSpace(item.Id)) return;
+        if (ServicesCreatorIntelligenceActionPlanList.SelectedItem is not CreatorActionListItem item || string.IsNullOrWhiteSpace(item.Id))
+        {
+            return;
+        }
+
         await _creatorIntelligence.CompleteActionAsync(item.Id);
         ApplyCreatorActionPlan(await _creatorIntelligence.AnalyzeActionPlanAsync());
         ApplyCreatorActionEffectiveness(await _creatorIntelligence.AnalyzeActionEffectivenessAsync());
@@ -18030,7 +19185,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var path = await _creatorIntelligence.GenerateWeeklyReportAsync();
+            string path = await _creatorIntelligence.GenerateWeeklyReportAsync();
             ServicesCreatorIntelligenceStatusText.Text = "Wochenbericht erstellt.";
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
@@ -18042,8 +19197,12 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task AddCreatorIntelligenceNoteAsync()
     {
-        var note = ServicesCreatorIntelligenceNoteBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(note)) return;
+        string note = ServicesCreatorIntelligenceNoteBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return;
+        }
+
         await _creatorIntelligence.RecordAsync("session.note", new { note, scene = _servicesObsCurrentScene, viewers = _currentLiveViewerCount });
         ServicesCreatorIntelligenceNoteBox.Clear();
         ServicesCreatorIntelligenceStatusText.Text = "Session-Notiz gespeichert.";
@@ -18059,7 +19218,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private string GetStreamHistoryDirectory()
     {
-        var root = Path.Combine(
+        string root = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "CreatorControlSuite",
             "StreamHistory");
@@ -18072,30 +19231,30 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task SaveCurrentStreamHistoryAsync()
     {
-        var stats = _workflowModule.Service.SessionStats;
-        var endedAt = DateTimeOffset.Now;
-        var startedAt = _streamSessionStartedAt ?? endedAt;
+        StreamSessionStats stats = _workflowModule.Service.SessionStats;
+        DateTimeOffset endedAt = DateTimeOffset.Now;
+        DateTimeOffset startedAt = _streamSessionStartedAt ?? endedAt;
         var item = new
         {
             StartedAt = startedAt,
             EndedAt = endedAt,
             DurationSeconds = Math.Max(0, (long)(endedAt - startedAt).TotalSeconds),
-            PeakViewers = stats.PeakViewers,
-            AverageViewers = stats.AverageViewers,
-            FollowersGained = stats.FollowersGained,
-            ChatMessages = stats.ChatMessages,
-            AlertsPlayed = stats.AlertsPlayed,
-            NewSubscriptions = stats.NewSubscriptions,
-            GiftSubscriptions = stats.GiftSubscriptions,
-            BitsCheered = stats.BitsCheered,
-            IncomingRaids = stats.IncomingRaids,
+            stats.PeakViewers,
+            stats.AverageViewers,
+            stats.FollowersGained,
+            stats.ChatMessages,
+            stats.AlertsPlayed,
+            stats.NewSubscriptions,
+            stats.GiftSubscriptions,
+            stats.BitsCheered,
+            stats.IncomingRaids,
             RaidEnabled = _settings.Twitch.RaidOnStreamEnd,
             RaidTarget = _settings.Twitch.SelectedRaidChannel,
             Category = DashboardTwitchCategoryResultsBox.SelectedItem?.ToString() ?? DashboardTwitchCategorySearchBox.Text,
             Title = DashboardTwitchTitleBox.Text
         };
 
-        var line = System.Text.Json.JsonSerializer.Serialize(item);
+        string line = System.Text.Json.JsonSerializer.Serialize(item);
         await File.AppendAllTextAsync(GetStreamHistoryFilePath(), line + Environment.NewLine);
         await LoadTwitchProfessionalHistoryAsync();
         await _creatorIntelligence.CompleteSessionAsync(endedAt);
@@ -18106,25 +19265,25 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task LoadStreamHistoryAsync()
     {
         _streamHistoryItems.Clear();
-        var path = GetStreamHistoryFilePath();
+        string path = GetStreamHistoryFilePath();
         if (!File.Exists(path))
         {
             _streamHistoryItems.Add("Noch keine abgeschlossenen Streams gespeichert.");
             return;
         }
 
-        var lines = await File.ReadAllLinesAsync(path);
-        foreach (var line in lines.Reverse().Take(50))
+        string[] lines = await File.ReadAllLinesAsync(path);
+        foreach (string? line in lines.Reverse().Take(50))
         {
             try
             {
                 using var doc = System.Text.Json.JsonDocument.Parse(line);
-                var root = doc.RootElement;
-                var started = root.GetProperty("StartedAt").GetDateTimeOffset().ToLocalTime();
+                JsonElement root = doc.RootElement;
+                DateTimeOffset started = root.GetProperty("StartedAt").GetDateTimeOffset().ToLocalTime();
                 var duration = TimeSpan.FromSeconds(root.GetProperty("DurationSeconds").GetInt64());
-                var peak = root.GetProperty("PeakViewers").GetInt32();
-                var avg = root.GetProperty("AverageViewers").GetDouble();
-                var followers = root.GetProperty("FollowersGained").GetInt32();
+                int peak = root.GetProperty("PeakViewers").GetInt32();
+                double avg = root.GetProperty("AverageViewers").GetDouble();
+                int followers = root.GetProperty("FollowersGained").GetInt32();
                 _streamHistoryItems.Add(
                     $"{started:dd.MM.yyyy HH:mm} · {duration:hh\\:mm\\:ss} · Peak {peak} · Ø {avg:0.0} · +{followers} Follower");
             }
@@ -18137,28 +19296,28 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task CopyLatestTwitchProfessionalSummaryAsync()
     {
-        var path = GetStreamHistoryFilePath();
+        string path = GetStreamHistoryFilePath();
         if (!File.Exists(path))
         {
             MessageBox.Show("Es ist noch kein abgeschlossener Stream gespeichert.", "Twitch Professional", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        foreach (var line in (await File.ReadAllLinesAsync(path)).Reverse())
+        foreach (string? line in (await File.ReadAllLinesAsync(path)).Reverse())
         {
             try
             {
                 using var document = JsonDocument.Parse(line);
-                var root = document.RootElement;
-                var startedAt = root.GetProperty("StartedAt").GetDateTimeOffset().ToLocalTime();
-                var durationSeconds = root.TryGetProperty("DurationSeconds", out var duration) ? duration.GetInt64() : 0;
-                var peak = root.TryGetProperty("PeakViewers", out var peakElement) ? peakElement.GetInt32() : 0;
-                var average = root.TryGetProperty("AverageViewers", out var averageElement) ? averageElement.GetDouble() : 0;
-                var followers = root.TryGetProperty("FollowersGained", out var followerElement) ? followerElement.GetInt32() : 0;
-                var chat = root.TryGetProperty("ChatMessages", out var chatElement) ? chatElement.GetInt32() : 0;
-                var category = root.TryGetProperty("Category", out var categoryElement) ? categoryElement.GetString() ?? "-" : "-";
-                var title = root.TryGetProperty("Title", out var titleElement) ? titleElement.GetString() ?? "-" : "-";
-                var summary = $"Stream-Zusammenfassung vom {startedAt:dd.MM.yyyy}\n" +
+                JsonElement root = document.RootElement;
+                DateTimeOffset startedAt = root.GetProperty("StartedAt").GetDateTimeOffset().ToLocalTime();
+                long durationSeconds = root.TryGetProperty("DurationSeconds", out JsonElement duration) ? duration.GetInt64() : 0;
+                int peak = root.TryGetProperty("PeakViewers", out JsonElement peakElement) ? peakElement.GetInt32() : 0;
+                double average = root.TryGetProperty("AverageViewers", out JsonElement averageElement) ? averageElement.GetDouble() : 0;
+                int followers = root.TryGetProperty("FollowersGained", out JsonElement followerElement) ? followerElement.GetInt32() : 0;
+                int chat = root.TryGetProperty("ChatMessages", out JsonElement chatElement) ? chatElement.GetInt32() : 0;
+                string category = root.TryGetProperty("Category", out JsonElement categoryElement) ? categoryElement.GetString() ?? "-" : "-";
+                string title = root.TryGetProperty("Title", out JsonElement titleElement) ? titleElement.GetString() ?? "-" : "-";
+                string summary = $"Stream-Zusammenfassung vom {startedAt:dd.MM.yyyy}\n" +
                               $"Titel: {title}\nKategorie: {category}\n" +
                               $"Dauer: {TimeSpan.FromSeconds(Math.Max(0, durationSeconds)):hh\\:mm\\:ss}\n" +
                               $"Peak: {peak} Zuschauer | Durchschnitt: {average:0.0}\n" +
@@ -18176,7 +19335,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task CreateTwitchProfessionalReportAsync()
     {
-        var path = GetStreamHistoryFilePath();
+        string path = GetStreamHistoryFilePath();
         if (!File.Exists(path))
         {
             MessageBox.Show("Für einen Stream-Report werden abgeschlossene Streams benötigt.", "Twitch Professional", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -18184,22 +19343,22 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
 
         var rows = new List<(DateTimeOffset StartedAt, long DurationSeconds, int Peak, double Average, int Followers, int Chat, int Events, string Category, string Title)>();
-        foreach (var line in await File.ReadAllLinesAsync(path))
+        foreach (string line in await File.ReadAllLinesAsync(path))
         {
             try
             {
                 using var document = JsonDocument.Parse(line);
-                var root = document.RootElement;
+                JsonElement root = document.RootElement;
                 rows.Add((
                     root.GetProperty("StartedAt").GetDateTimeOffset(),
-                    root.TryGetProperty("DurationSeconds", out var duration) ? duration.GetInt64() : 0,
-                    root.TryGetProperty("PeakViewers", out var peak) ? peak.GetInt32() : 0,
-                    root.TryGetProperty("AverageViewers", out var average) ? average.GetDouble() : 0,
-                    root.TryGetProperty("FollowersGained", out var followers) ? followers.GetInt32() : 0,
-                    root.TryGetProperty("ChatMessages", out var chat) ? chat.GetInt32() : 0,
-                    root.TryGetProperty("AlertsPlayed", out var eventsCount) ? eventsCount.GetInt32() : 0,
-                    root.TryGetProperty("Category", out var category) ? category.GetString() ?? "-" : "-",
-                    root.TryGetProperty("Title", out var title) ? title.GetString() ?? "-" : "-"));
+                    root.TryGetProperty("DurationSeconds", out JsonElement duration) ? duration.GetInt64() : 0,
+                    root.TryGetProperty("PeakViewers", out JsonElement peak) ? peak.GetInt32() : 0,
+                    root.TryGetProperty("AverageViewers", out JsonElement average) ? average.GetDouble() : 0,
+                    root.TryGetProperty("FollowersGained", out JsonElement followers) ? followers.GetInt32() : 0,
+                    root.TryGetProperty("ChatMessages", out JsonElement chat) ? chat.GetInt32() : 0,
+                    root.TryGetProperty("AlertsPlayed", out JsonElement eventsCount) ? eventsCount.GetInt32() : 0,
+                    root.TryGetProperty("Category", out JsonElement category) ? category.GetString() ?? "-" : "-",
+                    root.TryGetProperty("Title", out JsonElement title) ? title.GetString() ?? "-" : "-"));
             }
             catch { }
         }
@@ -18213,32 +19372,36 @@ private Task ApplyCombinedAlertDuckingAsync()
         static string H(string value) => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
         var ordered = rows.OrderByDescending(x => x.StartedAt).ToList();
         var recent = ordered.Take(5).ToList();
-        var totalHours = rows.Sum(x => x.DurationSeconds) / 3600d;
+        double totalHours = rows.Sum(x => x.DurationSeconds) / 3600d;
         var bestCategory = rows.Where(x => !string.IsNullOrWhiteSpace(x.Category) && x.Category != "-")
             .GroupBy(x => x.Category)
             .Select(group => new { Name = group.Key, Average = group.Average(x => x.Average) })
             .OrderByDescending(x => x.Average)
             .FirstOrDefault();
-        var tableRows = string.Join(Environment.NewLine, ordered.Take(50).Select(row =>
+        string tableRows = string.Join(Environment.NewLine, ordered.Take(50).Select(row =>
             $"<tr><td>{row.StartedAt.ToLocalTime():dd.MM.yyyy HH:mm}</td><td>{H(row.Title)}</td><td>{H(row.Category)}</td><td>{TimeSpan.FromSeconds(Math.Max(0, row.DurationSeconds)):hh\\:mm\\:ss}</td><td>{row.Peak}</td><td>{row.Average:0.0}</td><td>{row.Followers}</td><td>{row.Chat}</td></tr>"));
-        var html = $$"""<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Twitch Stream-Report</title><style>body{font-family:Segoe UI,Arial;background:#0b1014;color:#eef3f6;margin:32px}h1,h2{color:#fff}.cards{display:flex;flex-wrap:wrap;gap:12px}.card{background:#151d23;border:1px solid #2a3740;border-radius:10px;padding:16px;min-width:160px}.value{font-size:26px;font-weight:700;margin-top:5px}table{width:100%;border-collapse:collapse;margin-top:16px;background:#11181d}th,td{border-bottom:1px solid #2a3740;padding:10px;text-align:left}th{background:#192229}.muted{color:#aeb8bf}</style></head><body><h1>Creator Control Suite – Twitch Stream-Report</h1><p class="muted">Erstellt am {{DateTime.Now:dd.MM.yyyy HH:mm}}</p><div class="cards"><div class="card">Streams<div class="value">{{rows.Count}}</div></div><div class="card">Rekord-Peak<div class="value">{{rows.Max(x => x.Peak)}}</div></div><div class="card">Bestes Ø<div class="value">{{rows.Max(x => x.Average):0.0}}</div></div><div class="card">Livezeit<div class="value">{{FormatStatisticsDuration(rows.Sum(x => x.DurationSeconds))}}</div></div><div class="card">Follower<div class="value">{{rows.Sum(x => x.Followers)}}</div></div><div class="card">Chat / Std.<div class="value">{{(totalHours <= 0 ? 0 : rows.Sum(x => x.Chat) / totalHours):0.0}}</div></div></div><h2>Auswertung</h2><p>Die letzten {{recent.Count}} Streams erreichten durchschnittlich {{recent.Average(x => x.Average):0.0}} Zuschauer bei einem mittleren Peak von {{recent.Average(x => x.Peak):0.0}}. Beste Kategorie nach Zuschauerdurchschnitt: <strong>{{H(bestCategory?.Name ?? "-")}}</strong>.</p><h2>Letzte Streams</h2><table><thead><tr><th>Start</th><th>Titel</th><th>Kategorie</th><th>Dauer</th><th>Peak</th><th>Ø</th><th>Follower</th><th>Chat</th></tr></thead><tbody>{{tableRows}}</tbody></table></body></html>""";
-        var reportPath = Path.Combine(GetStreamHistoryDirectory(), $"twitch-stream-report-{DateTime.Now:yyyyMMdd-HHmmss}.html");
+        string html = $$"""<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Twitch Stream-Report</title><style>body{font-family:Segoe UI,Arial;background:#0b1014;color:#eef3f6;margin:32px}h1,h2{color:#fff}.cards{display:flex;flex-wrap:wrap;gap:12px}.card{background:#151d23;border:1px solid #2a3740;border-radius:10px;padding:16px;min-width:160px}.value{font-size:26px;font-weight:700;margin-top:5px}table{width:100%;border-collapse:collapse;margin-top:16px;background:#11181d}th,td{border-bottom:1px solid #2a3740;padding:10px;text-align:left}th{background:#192229}.muted{color:#aeb8bf}</style></head><body><h1>Creator Control Suite – Twitch Stream-Report</h1><p class="muted">Erstellt am {{DateTime.Now:dd.MM.yyyy HH:mm}}</p><div class="cards"><div class="card">Streams<div class="value">{{rows.Count}}</div></div><div class="card">Rekord-Peak<div class="value">{{rows.Max(x => x.Peak)}}</div></div><div class="card">Bestes Ø<div class="value">{{rows.Max(x => x.Average):0.0}}</div></div><div class="card">Livezeit<div class="value">{{FormatStatisticsDuration(rows.Sum(x => x.DurationSeconds))}}</div></div><div class="card">Follower<div class="value">{{rows.Sum(x => x.Followers)}}</div></div><div class="card">Chat / Std.<div class="value">{{(totalHours <= 0 ? 0 : rows.Sum(x => x.Chat) / totalHours):0.0}}</div></div></div><h2>Auswertung</h2><p>Die letzten {{recent.Count}} Streams erreichten durchschnittlich {{recent.Average(x => x.Average):0.0}} Zuschauer bei einem mittleren Peak von {{recent.Average(x => x.Peak):0.0}}. Beste Kategorie nach Zuschauerdurchschnitt: <strong>{{H(bestCategory?.Name ?? "-")}}</strong>.</p><h2>Letzte Streams</h2><table><thead><tr><th>Start</th><th>Titel</th><th>Kategorie</th><th>Dauer</th><th>Peak</th><th>Ø</th><th>Follower</th><th>Chat</th></tr></thead><tbody>{{tableRows}}</tbody></table></body></html>""";
+        string reportPath = Path.Combine(GetStreamHistoryDirectory(), $"twitch-stream-report-{DateTime.Now:yyyyMMdd-HHmmss}.html");
         await File.WriteAllTextAsync(reportPath, html, new System.Text.UTF8Encoding(true));
         Process.Start(new ProcessStartInfo(reportPath) { UseShellExecute = true });
     }
 
     private async Task ExportTwitchProfessionalHistoryCsvAsync()
     {
-        var path = GetStreamHistoryFilePath();
-        if (!File.Exists(path)) return;
-        var csvPath = Path.Combine(GetStreamHistoryDirectory(), $"twitch-history-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+        string path = GetStreamHistoryFilePath();
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        string csvPath = Path.Combine(GetStreamHistoryDirectory(), $"twitch-history-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
         var lines = new List<string> { "StartedAt;EndedAt;DurationSeconds;PeakViewers;AverageViewers;FollowersGained;ChatMessages;Category;Title" };
-        foreach (var line in await File.ReadAllLinesAsync(path))
+        foreach (string line in await File.ReadAllLinesAsync(path))
         {
             try
             {
-                using var doc = JsonDocument.Parse(line); var r = doc.RootElement;
-                string V(string n) => r.TryGetProperty(n, out var v) ? v.ToString().Replace(";", ",").Replace("\r", " ").Replace("\n", " ") : string.Empty;
+                using var doc = JsonDocument.Parse(line); JsonElement r = doc.RootElement;
+                string V(string n) => r.TryGetProperty(n, out JsonElement v) ? v.ToString().Replace(";", ",").Replace("\r", " ").Replace("\n", " ") : string.Empty;
                 lines.Add(string.Join(";", new[] { V("StartedAt"), V("EndedAt"), V("DurationSeconds"), V("PeakViewers"), V("AverageViewers"), V("FollowersGained"), V("ChatMessages"), V("Category"), V("Title") }));
             }
             catch { }
@@ -18249,7 +19412,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void OpenStreamHistoryFolder()
     {
-        var folder = GetStreamHistoryDirectory();
+        string folder = GetStreamHistoryDirectory();
         Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
     }
 
@@ -18258,9 +19421,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var converted = System.Windows.Media.ColorConverter.ConvertFromString(color);
+            object converted = System.Windows.Media.ColorConverter.ConvertFromString(color);
             if (converted is System.Windows.Media.Color parsed)
+            {
                 OverlayFrameColorPreview.Background = new System.Windows.Media.SolidColorBrush(parsed);
+            }
         }
         catch
         {
@@ -18270,7 +19435,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static void SelectComboBoxTag(ComboBox box, string value)
     {
-        foreach (var entry in box.Items.OfType<ComboBoxItem>())
+        foreach (ComboBoxItem entry in box.Items.OfType<ComboBoxItem>())
         {
             if (string.Equals(entry.Tag?.ToString(), value, StringComparison.OrdinalIgnoreCase))
             {
@@ -18278,12 +19443,15 @@ private Task ApplyCombinedAlertDuckingAsync()
                 return;
             }
         }
-        if (box.Items.Count > 0) box.SelectedIndex = 0;
+        if (box.Items.Count > 0)
+        {
+            box.SelectedIndex = 0;
+        }
     }
 
     private void LoadStreamerHudSettingsIntoUi()
     {
-        var hud = _settings.StreamerHud;
+        StreamerHudSettings hud = _settings.StreamerHud;
         StreamerHudEnabledBox.IsChecked = hud.Enabled;
         StreamerHudShowChatBox.IsChecked = hud.ShowChat;
         StreamerHudShowEventsBox.IsChecked = hud.ShowEvents;
@@ -18301,21 +19469,25 @@ private Task ApplyCombinedAlertDuckingAsync()
     private void PopulateStreamerHudMonitorBox(int selectedIndex)
     {
         StreamerHudMonitorBox.Items.Clear();
-        var monitors = NativeWindowHelper.GetMonitors();
-        foreach (var monitor in monitors)
+        IReadOnlyList<NativeWindowHelper.MonitorInfo> monitors = NativeWindowHelper.GetMonitors();
+        foreach (NativeWindowHelper.MonitorInfo monitor in monitors)
         {
-            var label = monitor.IsPrimary
+            string label = monitor.IsPrimary
                 ? $"{monitor.Index}: Primär ({(int)monitor.BoundsDip.Width}×{(int)monitor.BoundsDip.Height})"
                 : $"{monitor.Index}: {monitor.Name} ({(int)monitor.BoundsDip.Width}×{(int)monitor.BoundsDip.Height})";
             StreamerHudMonitorBox.Items.Add(new ComboBoxItem { Content = label, Tag = monitor.Index });
         }
 
         if (StreamerHudMonitorBox.Items.Count == 0)
+        {
             StreamerHudMonitorBox.Items.Add(new ComboBoxItem { Content = "0: Primär", Tag = 0 });
+        }
 
         SelectComboBoxTag(StreamerHudMonitorBox, selectedIndex.ToString());
         if (StreamerHudMonitorBox.SelectedIndex < 0)
+        {
             StreamerHudMonitorBox.SelectedIndex = 0;
+        }
     }
 
     private void ReadStreamerHudSettingsFromUi()
@@ -18327,13 +19499,13 @@ private Task ApplyCombinedAlertDuckingAsync()
         _settings.StreamerHud.ClickThrough = StreamerHudClickThroughBox.IsChecked == true;
         _settings.StreamerHud.Opacity = Math.Clamp(StreamerHudOpacitySlider.Value, 0.3, 1.0);
         _settings.StreamerHud.Anchor = (StreamerHudAnchorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "TopRight";
-        _settings.StreamerHud.MonitorIndex = int.TryParse((StreamerHudMonitorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var monitor)
+        _settings.StreamerHud.MonitorIndex = int.TryParse((StreamerHudMonitorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out int monitor)
             ? monitor
             : 0;
-        _settings.StreamerHud.PanelWidth = int.TryParse(StreamerHudPanelWidthBox.Text.Trim(), out var width)
+        _settings.StreamerHud.PanelWidth = int.TryParse(StreamerHudPanelWidthBox.Text.Trim(), out int width)
             ? Math.Clamp(width, 280, 800)
             : 420;
-        _settings.StreamerHud.Margin = int.TryParse(StreamerHudMarginBox.Text.Trim(), out var margin)
+        _settings.StreamerHud.Margin = int.TryParse(StreamerHudMarginBox.Text.Trim(), out int margin)
             ? Math.Max(0, margin)
             : 24;
     }
@@ -18371,7 +19543,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void UpdateStreamerHudLiveStatus(bool isLive, string detail)
     {
-        var text = isLive
+        string text = isLive
             ? $"LIVE · {_currentLiveViewerCount} Zuschauer · {detail}"
             : "OFFLINE";
         _streamerHudService.UpdateLiveStatus(text);
@@ -18379,8 +19551,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task WriteOverlayConfigurationAsync()
     {
-        var root = await _overlayModule.Service.GetOverlayRootAsync();
-        var dataFolder = Path.Combine(root, "data");
+        string root = await _overlayModule.Service.GetOverlayRootAsync();
+        string dataFolder = Path.Combine(root, "data");
         Directory.CreateDirectory(dataFolder);
         var config = new
         {
@@ -18399,7 +19571,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             frameColor = _settings.Overlay.FrameColor,
             frameEffect = _settings.Overlay.FrameEffect
         };
-        var json = System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        string json = System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
         await File.WriteAllTextAsync(Path.Combine(dataFolder, "overlay-config.json"), json);
     }
 
@@ -18408,10 +19580,10 @@ private Task ApplyCombinedAlertDuckingAsync()
         try
         {
             await SaveSettingsAsync();
-            var scene = OverlayObsSceneTargetBox.SelectedItem?.ToString() ?? OverlayObsSceneTargetBox.Text;
+            string scene = OverlayObsSceneTargetBox.SelectedItem?.ToString() ?? OverlayObsSceneTargetBox.Text;
             var item = OverlayContentTypeBox.SelectedItem as ComboBoxItem;
-            var type = item?.Tag?.ToString() ?? "content-name";
-            var result = await _obsBrowserSourceInstaller.InstallContentAsync(scene, type);
+            string type = item?.Tag?.ToString() ?? "content-name";
+            string result = await _obsBrowserSourceInstaller.InstallContentAsync(scene, type);
             OverlayStatusText.Text = result;
             OverlayStatusText.Foreground = System.Windows.Media.Brushes.LightGreen;
         }
@@ -18430,7 +19602,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         RefreshObsAudioProfilesUi();
         if (_settings.Workflow.RunOfShowPlans.Count == 0)
         {
-            var legacySteps = _settings.Workflow.RunOfShowSteps ?? [];
+            List<RunOfShowStepSettings> legacySteps = _settings.Workflow.RunOfShowSteps ?? [];
             var initialPlan = new RunOfShowPlanSettings
             {
                 Name = "Standard",
@@ -18440,7 +19612,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             _settings.Workflow.ActiveRunOfShowPlanId = initialPlan.Id;
         }
 
-        var active = _settings.Workflow.RunOfShowPlans.FirstOrDefault(x =>
+        RunOfShowPlanSettings active = _settings.Workflow.RunOfShowPlans.FirstOrDefault(x =>
             string.Equals(x.Id, _settings.Workflow.ActiveRunOfShowPlanId, StringComparison.OrdinalIgnoreCase))
             ?? _settings.Workflow.RunOfShowPlans[0];
         active.Steps ??= [];
@@ -18455,7 +19627,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshRunOfShowPlanSelector()
     {
-        var active = EnsureRunOfShowPlansInitialized();
+        RunOfShowPlanSettings active = EnsureRunOfShowPlansInitialized();
         _updatingRunOfShowPlanUi = true;
         try
         {
@@ -18473,33 +19645,52 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshRunOfShowSteps()
     {
-        var active = EnsureRunOfShowPlansInitialized();
+        RunOfShowPlanSettings active = EnsureRunOfShowPlansInitialized();
         RefreshRunOfShowPlanSelector();
         _runOfShowSteps.Clear();
-        foreach (var step in active.Steps) _runOfShowSteps.Add(step);
+        foreach (RunOfShowStepSettings step in active.Steps)
+        {
+            _runOfShowSteps.Add(step);
+        }
+
         if (_runOfShowSteps.Count > 0 && RunOfShowStepsList.SelectedItem is null)
+        {
             RunOfShowStepsList.SelectedIndex = 0;
+        }
+
         _runOfShowCurrentIndex = -1;
         UpdateRunOfShowStatus();
     }
 
     private async Task PersistRunOfShowAsync()
     {
-        var active = EnsureRunOfShowPlansInitialized();
-        active.Steps = _runOfShowSteps.ToList();
+        RunOfShowPlanSettings active = EnsureRunOfShowPlansInitialized();
+        active.Steps = [.. _runOfShowSteps];
         _settings.Workflow.RunOfShowSteps = active.Steps;
         await _settingsStore.SaveAsync(_settings);
     }
 
     private async Task SwitchRunOfShowPlanAsync()
     {
-        if (_updatingRunOfShowPlanUi || RunOfShowPlanBox.SelectedItem is not RunOfShowPlanSettings selected) return;
+        if (_updatingRunOfShowPlanUi || RunOfShowPlanBox.SelectedItem is not RunOfShowPlanSettings selected)
+        {
+            return;
+        }
+
         StopAutomaticRunOfShow();
-        if (CurrentRunOfShowPlan() is not null) await PersistRunOfShowAsync();
+        if (CurrentRunOfShowPlan() is not null)
+        {
+            await PersistRunOfShowAsync();
+        }
+
         _settings.Workflow.ActiveRunOfShowPlanId = selected.Id;
         _settings.Workflow.RunOfShowSteps = selected.Steps ?? [];
         _runOfShowSteps.Clear();
-        foreach (var step in _settings.Workflow.RunOfShowSteps) _runOfShowSteps.Add(step);
+        foreach (RunOfShowStepSettings step in _settings.Workflow.RunOfShowSteps)
+        {
+            _runOfShowSteps.Add(step);
+        }
+
         _runOfShowCurrentIndex = -1;
         RunOfShowStepsList.SelectedIndex = _runOfShowSteps.Count > 0 ? 0 : -1;
         await _settingsStore.SaveAsync(_settings);
@@ -18510,11 +19701,14 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task CreateRunOfShowPlanAsync()
     {
         await PersistRunOfShowAsync();
-        var baseName = "Neuer Regieplan";
-        var name = baseName;
-        var counter = 2;
+        string baseName = "Neuer Regieplan";
+        string name = baseName;
+        int counter = 2;
         while (_settings.Workflow.RunOfShowPlans.Any(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
             name = $"{baseName} {counter++}";
+        }
+
         var plan = new RunOfShowPlanSettings { Name = name };
         _settings.Workflow.RunOfShowPlans.Add(plan);
         _settings.Workflow.ActiveRunOfShowPlanId = plan.Id;
@@ -18531,9 +19725,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RenameRunOfShowPlanAsync()
     {
-        var plan = CurrentRunOfShowPlan();
-        if (plan is null) return;
-        var name = RunOfShowPlanBox.Text.Trim();
+        RunOfShowPlanSettings? plan = CurrentRunOfShowPlan();
+        if (plan is null)
+        {
+            return;
+        }
+
+        string name = RunOfShowPlanBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(name))
         {
             RunOfShowStatusText.Text = "Bitte einen Namen für den Regieplan eingeben.";
@@ -18552,22 +19750,30 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task DeleteRunOfShowPlanAsync()
     {
-        var plan = CurrentRunOfShowPlan();
+        RunOfShowPlanSettings? plan = CurrentRunOfShowPlan();
         if (plan is null || _settings.Workflow.RunOfShowPlans.Count <= 1)
         {
             RunOfShowStatusText.Text = "Der letzte Regieplan kann nicht gelöscht werden.";
             return;
         }
-        var answer = MessageBox.Show(this, $"Regieplan '{plan.Name}' einschließlich aller Schritte löschen?",
+        MessageBoxResult answer = MessageBox.Show(this, $"Regieplan '{plan.Name}' einschließlich aller Schritte löschen?",
             "Regieplan löschen", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (answer != MessageBoxResult.Yes) return;
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
         StopAutomaticRunOfShow();
         _settings.Workflow.RunOfShowPlans.Remove(plan);
-        var next = _settings.Workflow.RunOfShowPlans[0];
+        RunOfShowPlanSettings next = _settings.Workflow.RunOfShowPlans[0];
         _settings.Workflow.ActiveRunOfShowPlanId = next.Id;
         _settings.Workflow.RunOfShowSteps = next.Steps;
         _runOfShowSteps.Clear();
-        foreach (var step in next.Steps) _runOfShowSteps.Add(step);
+        foreach (RunOfShowStepSettings step in next.Steps)
+        {
+            _runOfShowSteps.Add(step);
+        }
+
         _runOfShowCurrentIndex = -1;
         RefreshRunOfShowPlanSelector();
         RunOfShowStepsList.SelectedIndex = _runOfShowSteps.Count > 0 ? 0 : -1;
@@ -18587,7 +19793,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task DuplicateSelectedRunOfShowStepAsync()
     {
-        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings source) return;
+        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings source)
+        {
+            return;
+        }
+
         var copy = new RunOfShowStepSettings
         {
             Name = source.Name + " (Kopie)",
@@ -18614,7 +19824,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             AutoAdvance = source.AutoAdvance,
             AutoAdvanceDelaySeconds = source.AutoAdvanceDelaySeconds
         };
-        var index = _runOfShowSteps.IndexOf(source) + 1;
+        int index = _runOfShowSteps.IndexOf(source) + 1;
         _settings.Workflow.RunOfShowSteps.Insert(index, copy);
         _runOfShowSteps.Insert(index, copy);
         RunOfShowStepsList.SelectedItem = copy;
@@ -18625,23 +19835,42 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task MoveSelectedRunOfShowStepAsync(int direction)
     {
-        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings step) return;
-        var oldIndex = _runOfShowSteps.IndexOf(step);
-        var newIndex = oldIndex + direction;
-        if (oldIndex < 0 || newIndex < 0 || newIndex >= _runOfShowSteps.Count) return;
+        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings step)
+        {
+            return;
+        }
+
+        int oldIndex = _runOfShowSteps.IndexOf(step);
+        int newIndex = oldIndex + direction;
+        if (oldIndex < 0 || newIndex < 0 || newIndex >= _runOfShowSteps.Count)
+        {
+            return;
+        }
+
         _runOfShowSteps.Move(oldIndex, newIndex);
         _settings.Workflow.RunOfShowSteps.Remove(step);
         _settings.Workflow.RunOfShowSteps.Insert(newIndex, step);
         RunOfShowStepsList.SelectedItem = step;
-        if (_runOfShowCurrentIndex == oldIndex) _runOfShowCurrentIndex = newIndex;
-        else if (_runOfShowCurrentIndex == newIndex) _runOfShowCurrentIndex = oldIndex;
+        if (_runOfShowCurrentIndex == oldIndex)
+        {
+            _runOfShowCurrentIndex = newIndex;
+        }
+        else if (_runOfShowCurrentIndex == newIndex)
+        {
+            _runOfShowCurrentIndex = oldIndex;
+        }
+
         await PersistRunOfShowAsync();
         UpdateRunOfShowStatus();
     }
 
     private void LoadSelectedRunOfShowStep()
     {
-        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings step) return;
+        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings step)
+        {
+            return;
+        }
+
         RunOfShowEnabledBox.IsChecked = step.Enabled;
         RunOfShowNameBox.Text = step.Name;
         RunOfShowSceneBox.Text = step.ObsScene;
@@ -18666,28 +19895,32 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private RunOfShowStepSettings ReadRunOfShowEditor(RunOfShowStepSettings? target = null)
     {
-        var step = target ?? new RunOfShowStepSettings();
+        RunOfShowStepSettings step = target ?? new RunOfShowStepSettings();
         step.Enabled = RunOfShowEnabledBox.IsChecked == true;
         step.Name = string.IsNullOrWhiteSpace(RunOfShowNameBox.Text) ? "Neuer Regieschritt" : RunOfShowNameBox.Text.Trim();
         step.ObsScene = RunOfShowSceneBox.Text.Trim();
         step.TransitionName = RunOfShowTransitionBox.Text.Trim();
-        step.TransitionDurationMilliseconds = int.TryParse(RunOfShowTransitionDurationBox.Text, out var duration) ? Math.Clamp(duration, 50, 20000) : 1000;
+        step.TransitionDurationMilliseconds = int.TryParse(RunOfShowTransitionDurationBox.Text, out int duration) ? Math.Clamp(duration, 50, 20000) : 1000;
         step.SpotifyAction = ComboTag(RunOfShowSpotifyActionBox, "None");
-        step.SpotifyVolumePercent = int.TryParse(RunOfShowSpotifyVolumeBox.Text, out var volume) ? Math.Clamp(volume, 0, 100) : 35;
+        step.SpotifyVolumePercent = int.TryParse(RunOfShowSpotifyVolumeBox.Text, out int volume) ? Math.Clamp(volume, 0, 100) : 35;
         var streamerAction = RunOfShowStreamerBotActionBox.SelectedItem as StreamerBotActionOption;
         step.StreamerBotActionId = streamerAction?.Id ?? "";
         step.StreamerBotActionName = streamerAction?.Name ?? RunOfShowStreamerBotActionBox.Text.Trim();
-        step.ActionDelayMilliseconds = int.TryParse(RunOfShowActionDelayBox.Text, out var actionDelay) ? Math.Clamp(actionDelay, 0, 60000) : 0;
+        step.ActionDelayMilliseconds = int.TryParse(RunOfShowActionDelayBox.Text, out int actionDelay) ? Math.Clamp(actionDelay, 0, 60000) : 0;
         step.ContinueOnActionError = RunOfShowContinueOnActionErrorBox.IsChecked == true;
         step.UpdateTwitchChannel = RunOfShowUpdateTwitchBox.IsChecked == true;
         step.TwitchTitle = RunOfShowTwitchTitleBox.Text.Trim();
         var twitchCategory = RunOfShowTwitchCategoryResultsBox.SelectedItem as TwitchCategory;
         step.TwitchCategoryId = twitchCategory?.Id ?? step.TwitchCategoryId;
         step.TwitchCategoryName = twitchCategory?.Name ?? RunOfShowTwitchCategorySearchBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(step.TwitchCategoryName)) step.TwitchCategoryId = "";
+        if (string.IsNullOrWhiteSpace(step.TwitchCategoryName))
+        {
+            step.TwitchCategoryId = "";
+        }
+
         step.ContinueOnTwitchError = RunOfShowContinueOnTwitchErrorBox.IsChecked == true;
         step.AutoAdvance = RunOfShowAutoAdvanceBox.IsChecked == true;
-        step.AutoAdvanceDelaySeconds = int.TryParse(RunOfShowAutoAdvanceDelayBox.Text, out var autoDelay) ? Math.Clamp(autoDelay, 1, 86400) : 10;
+        step.AutoAdvanceDelaySeconds = int.TryParse(RunOfShowAutoAdvanceDelayBox.Text, out int autoDelay) ? Math.Clamp(autoDelay, 1, 86400) : 10;
         return step;
     }
 
@@ -18699,7 +19932,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             CreateNewRunOfShowStep();
             step = RunOfShowStepsList.SelectedItem as RunOfShowStepSettings;
         }
-        if (step is null) return;
+        if (step is null)
+        {
+            return;
+        }
+
         ReadRunOfShowEditor(step);
         RunOfShowStepsList.Items.Refresh();
         await PersistRunOfShowAsync();
@@ -18708,12 +19945,24 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task DeleteSelectedRunOfShowStepAsync()
     {
-        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings step) return;
-        var index = _runOfShowSteps.IndexOf(step);
+        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings step)
+        {
+            return;
+        }
+
+        int index = _runOfShowSteps.IndexOf(step);
         _settings.Workflow.RunOfShowSteps.Remove(step);
         _runOfShowSteps.Remove(step);
-        if (_runOfShowCurrentIndex >= _runOfShowSteps.Count) _runOfShowCurrentIndex = _runOfShowSteps.Count - 1;
-        if (_runOfShowSteps.Count > 0) RunOfShowStepsList.SelectedIndex = Math.Clamp(index, 0, _runOfShowSteps.Count - 1);
+        if (_runOfShowCurrentIndex >= _runOfShowSteps.Count)
+        {
+            _runOfShowCurrentIndex = _runOfShowSteps.Count - 1;
+        }
+
+        if (_runOfShowSteps.Count > 0)
+        {
+            RunOfShowStepsList.SelectedIndex = Math.Clamp(index, 0, _runOfShowSteps.Count - 1);
+        }
+
         await PersistRunOfShowAsync();
         UpdateRunOfShowStatus();
     }
@@ -18725,8 +19974,8 @@ private Task ApplyCombinedAlertDuckingAsync()
             RunOfShowStatusText.Text = "OBS ist nicht verbunden.";
             return;
         }
-        var previousScene = RunOfShowSceneBox.Text;
-        var previousTransition = RunOfShowTransitionBox.Text;
+        string previousScene = RunOfShowSceneBox.Text;
+        string previousTransition = RunOfShowTransitionBox.Text;
         var scenes = (await _obsClient.GetSceneListAsync()).Select(x => x.Name).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
         var transitions = (await _obsClient.GetSceneTransitionListAsync()).Select(x => x.Name).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
         RunOfShowSceneBox.ItemsSource = scenes;
@@ -18739,7 +19988,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task RefreshRunOfShowStreamerBotActionsAsync(bool showStatus)
     {
         await RefreshStreamerBotActionsAsync(false);
-        if (!showStatus) return;
+        if (!showStatus)
+        {
+            return;
+        }
+
         if (!_streamerBotClient.IsConnected)
         {
             RunOfShowStatusText.Text = "Streamer.bot ist nicht verbunden.";
@@ -18752,14 +20005,14 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            var query = RunOfShowTwitchCategorySearchBox.Text.Trim();
+            string query = RunOfShowTwitchCategorySearchBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(query))
             {
                 RunOfShowStatusText.Text = "Bitte einen Kategorienamen eingeben.";
                 return;
             }
 
-            var categories = await _twitchModule.SearchCategoriesAsync(query);
+            IReadOnlyList<TwitchCategory> categories = await _twitchModule.SearchCategoriesAsync(query);
             RunOfShowTwitchCategoryResultsBox.ItemsSource = categories;
             RunOfShowTwitchCategoryResultsBox.SelectedIndex = categories.Count > 0 ? 0 : -1;
             RunOfShowStatusText.Text = categories.Count > 0
@@ -18776,7 +20029,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static string SanitizeFileName(string value)
     {
-        foreach (var invalid in Path.GetInvalidFileNameChars()) value = value.Replace(invalid, '-');
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+        {
+            value = value.Replace(invalid, '-');
+        }
+
         return string.IsNullOrWhiteSpace(value) ? "Mein-Regieplan.ccs-regieplan.json" : value;
     }
 
@@ -18792,7 +20049,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            if (RunOfShowStepsList.SelectedItem is RunOfShowStepSettings selected) ReadRunOfShowEditor(selected);
+            if (RunOfShowStepsList.SelectedItem is RunOfShowStepSettings selected)
+            {
+                ReadRunOfShowEditor(selected);
+            }
+
             if (_runOfShowSteps.Count == 0)
             {
                 RunOfShowStatusText.Text = "Der Regieplan enthält noch keine Schritte.";
@@ -18807,14 +20068,17 @@ private Task ApplyCombinedAlertDuckingAsync()
                 AddExtension = true,
                 FileName = SanitizeFileName((CurrentRunOfShowPlan()?.Name ?? "Mein-Regieplan") + ".ccs-regieplan.json")
             };
-            if (dialog.ShowDialog(this) != true) return;
+            if (dialog.ShowDialog(this) != true)
+            {
+                return;
+            }
 
             var document = new RunOfShowExportDocument
             {
                 Name = CurrentRunOfShowPlan()?.Name ?? "Creator Control Suite Regieplan",
-                Steps = _runOfShowSteps.Select(CloneRunOfShowStep).ToList()
+                Steps = [.. _runOfShowSteps.Select(CloneRunOfShowStep)]
             };
-            var json = System.Text.Json.JsonSerializer.Serialize(document, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            string json = System.Text.Json.JsonSerializer.Serialize(document, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(dialog.FileName, json);
             RunOfShowStatusText.Text = $"Regieplan exportiert: {Path.GetFileName(dialog.FileName)}";
             _appLogger.Write(AppLogLevel.Information, "RunOfShow.Export", RunOfShowStatusText.Text);
@@ -18836,28 +20100,43 @@ private Task ApplyCombinedAlertDuckingAsync()
                 Filter = "Creator Control Suite Regieplan (*.ccs-regieplan.json;*.json)|*.ccs-regieplan.json;*.json|Alle Dateien (*.*)|*.*",
                 Multiselect = false
             };
-            if (dialog.ShowDialog(this) != true) return;
+            if (dialog.ShowDialog(this) != true)
+            {
+                return;
+            }
 
-            var json = await File.ReadAllTextAsync(dialog.FileName);
-            var document = System.Text.Json.JsonSerializer.Deserialize<RunOfShowExportDocument>(json, new System.Text.Json.JsonSerializerOptions
+            string json = await File.ReadAllTextAsync(dialog.FileName);
+            RunOfShowExportDocument? document = System.Text.Json.JsonSerializer.Deserialize<RunOfShowExportDocument>(json, new System.Text.Json.JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
             if (document?.Steps is null || document.Steps.Count == 0)
+            {
                 throw new InvalidDataException("Die Datei enthält keine Regieschritte.");
-            if (document.FormatVersion < 1 || document.FormatVersion > 1)
-                throw new InvalidDataException($"Nicht unterstützte Regieplan-Version: {document.FormatVersion}.");
+            }
 
-            var answer = MessageBox.Show(this,
+            if (document.FormatVersion < 1 || document.FormatVersion > 1)
+            {
+                throw new InvalidDataException($"Nicht unterstützte Regieplan-Version: {document.FormatVersion}.");
+            }
+
+            MessageBoxResult answer = MessageBox.Show(this,
                 $"{document.Steps.Count} Regieschritte wurden gefunden. Soll der aktuelle Regieplan ersetzt werden?{Environment.NewLine}{Environment.NewLine}Ja = ersetzen{Environment.NewLine}Nein = anhängen",
                 "Regieplan importieren", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-            if (answer == MessageBoxResult.Cancel) return;
+            if (answer == MessageBoxResult.Cancel)
+            {
+                return;
+            }
 
             StopAutomaticRunOfShow();
-            if (answer == MessageBoxResult.Yes) _runOfShowSteps.Clear();
-            foreach (var imported in document.Steps)
+            if (answer == MessageBoxResult.Yes)
             {
-                var step = CloneRunOfShowStep(imported);
+                _runOfShowSteps.Clear();
+            }
+
+            foreach (RunOfShowStepSettings imported in document.Steps)
+            {
+                RunOfShowStepSettings step = CloneRunOfShowStep(imported);
                 step.Id = Guid.NewGuid().ToString("N");
                 step.TransitionDurationMilliseconds = Math.Clamp(step.TransitionDurationMilliseconds, 0, 20000);
                 step.SpotifyVolumePercent = Math.Clamp(step.SpotifyVolumePercent, 0, 100);
@@ -18886,7 +20165,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            if (RunOfShowStepsList.SelectedItem is RunOfShowStepSettings selected) ReadRunOfShowEditor(selected);
+            if (RunOfShowStepsList.SelectedItem is RunOfShowStepSettings selected)
+            {
+                ReadRunOfShowEditor(selected);
+            }
+
             if (_runOfShowSteps.Count == 0)
             {
                 RunOfShowStatusText.Text = "Der Regieplan enthält noch keine Schritte.";
@@ -18894,20 +20177,41 @@ private Task ApplyCombinedAlertDuckingAsync()
             }
 
             var issues = new List<string>();
-            var obsScenes = _obsClient.IsConnected ? await _obsClient.GetSceneListAsync() : [];
+            IReadOnlyList<ObsSceneInfo> obsScenes = _obsClient.IsConnected ? await _obsClient.GetSceneListAsync() : [];
             var sceneNames = obsScenes.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var duplicateNames = _runOfShowSteps.Where(x => x.Enabled).GroupBy(x => x.Name.Trim(), StringComparer.OrdinalIgnoreCase).Where(x => !string.IsNullOrWhiteSpace(x.Key) && x.Count() > 1).Select(x => x.Key);
-            foreach (var name in duplicateNames) issues.Add($"Doppelter Schrittname: {name}");
-
-            for (var i = 0; i < _runOfShowSteps.Count; i++)
+            IEnumerable<string> duplicateNames = _runOfShowSteps.Where(x => x.Enabled).GroupBy(x => x.Name.Trim(), StringComparer.OrdinalIgnoreCase).Where(x => !string.IsNullOrWhiteSpace(x.Key) && x.Count() > 1).Select(x => x.Key);
+            foreach (string name in duplicateNames)
             {
-                var step = _runOfShowSteps[i];
-                var label = $"Schritt {i + 1} ({(string.IsNullOrWhiteSpace(step.Name) ? "ohne Name" : step.Name)})";
-                if (string.IsNullOrWhiteSpace(step.Name)) issues.Add(label + ": Name fehlt.");
-                if (step.Enabled && string.IsNullOrWhiteSpace(step.ObsScene)) issues.Add(label + ": Keine OBS-Szene ausgewählt.");
-                else if (step.Enabled && _obsClient.IsConnected && !sceneNames.Contains(step.ObsScene)) issues.Add(label + $": OBS-Szene '{step.ObsScene}' wurde nicht gefunden.");
-                if (step.UpdateTwitchChannel && string.IsNullOrWhiteSpace(step.TwitchTitle) && string.IsNullOrWhiteSpace(step.TwitchCategoryId)) issues.Add(label + ": Twitch-Aktualisierung ist aktiv, aber Titel und Kategorie fehlen.");
-                if (step.AutoAdvance && step.AutoAdvanceDelaySeconds < 1) issues.Add(label + ": Automatische Wartezeit muss mindestens 1 Sekunde betragen.");
+                issues.Add($"Doppelter Schrittname: {name}");
+            }
+
+            for (int i = 0; i < _runOfShowSteps.Count; i++)
+            {
+                RunOfShowStepSettings step = _runOfShowSteps[i];
+                string label = $"Schritt {i + 1} ({(string.IsNullOrWhiteSpace(step.Name) ? "ohne Name" : step.Name)})";
+                if (string.IsNullOrWhiteSpace(step.Name))
+                {
+                    issues.Add(label + ": Name fehlt.");
+                }
+
+                if (step.Enabled && string.IsNullOrWhiteSpace(step.ObsScene))
+                {
+                    issues.Add(label + ": Keine OBS-Szene ausgewählt.");
+                }
+                else if (step.Enabled && _obsClient.IsConnected && !sceneNames.Contains(step.ObsScene))
+                {
+                    issues.Add(label + $": OBS-Szene '{step.ObsScene}' wurde nicht gefunden.");
+                }
+
+                if (step.UpdateTwitchChannel && string.IsNullOrWhiteSpace(step.TwitchTitle) && string.IsNullOrWhiteSpace(step.TwitchCategoryId))
+                {
+                    issues.Add(label + ": Twitch-Aktualisierung ist aktiv, aber Titel und Kategorie fehlen.");
+                }
+
+                if (step.AutoAdvance && step.AutoAdvanceDelaySeconds < 1)
+                {
+                    issues.Add(label + ": Automatische Wartezeit muss mindestens 1 Sekunde betragen.");
+                }
             }
 
             if (issues.Count == 0)
@@ -18954,7 +20258,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ExecuteSelectedRunOfShowStepAsync()
     {
-        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings step) return;
+        if (RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings step)
+        {
+            return;
+        }
+
         ReadRunOfShowEditor(step);
         await ExecuteRunOfShowStepAsync(step);
         _runOfShowCurrentIndex = _runOfShowSteps.IndexOf(step);
@@ -18964,10 +20272,14 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task ExecuteNextRunOfShowStepAsync()
     {
         if (_runOfShowSteps.Count == 0) { RunOfShowStatusText.Text = "Noch keine Regieschritte vorhanden."; return; }
-        var nextIndex = _runOfShowCurrentIndex + 1;
-        while (nextIndex < _runOfShowSteps.Count && !_runOfShowSteps[nextIndex].Enabled) nextIndex++;
+        int nextIndex = _runOfShowCurrentIndex + 1;
+        while (nextIndex < _runOfShowSteps.Count && !_runOfShowSteps[nextIndex].Enabled)
+        {
+            nextIndex++;
+        }
+
         if (nextIndex >= _runOfShowSteps.Count) { RunOfShowStatusText.Text = "Regieplan ist beendet."; return; }
-        var step = _runOfShowSteps[nextIndex];
+        RunOfShowStepSettings step = _runOfShowSteps[nextIndex];
         RunOfShowStepsList.SelectedItem = step;
         await ExecuteRunOfShowStepAsync(step);
         _runOfShowCurrentIndex = nextIndex;
@@ -18979,24 +20291,44 @@ private Task ApplyCombinedAlertDuckingAsync()
         try
         {
             string? executionWarning = null;
-            if (!_obsClient.IsConnected) throw new InvalidOperationException("OBS ist nicht verbunden.");
-            if (string.IsNullOrWhiteSpace(step.ObsScene)) throw new InvalidOperationException("Keine OBS-Szene ausgewählt.");
+            if (!_obsClient.IsConnected)
+            {
+                throw new InvalidOperationException("OBS ist nicht verbunden.");
+            }
+
+            if (string.IsNullOrWhiteSpace(step.ObsScene))
+            {
+                throw new InvalidOperationException("Keine OBS-Szene ausgewählt.");
+            }
+
             if (!string.IsNullOrWhiteSpace(step.TransitionName))
             {
                 await _obsClient.SetCurrentSceneTransitionAsync(step.TransitionName);
                 await _obsClient.SetCurrentSceneTransitionDurationAsync(step.TransitionDurationMilliseconds);
             }
             await _obsClient.SetCurrentProgramSceneAsync(step.ObsScene);
-            if (string.Equals(step.SpotifyAction, "Pause", StringComparison.OrdinalIgnoreCase)) await _spotifyModule.PauseAsync();
-            else if (string.Equals(step.SpotifyAction, "Resume", StringComparison.OrdinalIgnoreCase)) await _spotifyModule.ResumeAsync();
-            else if (string.Equals(step.SpotifyAction, "SetVolume", StringComparison.OrdinalIgnoreCase)) await _spotifyModule.SetVolumeImmediateAsync(step.SpotifyVolumePercent);
+            if (string.Equals(step.SpotifyAction, "Pause", StringComparison.OrdinalIgnoreCase))
+            {
+                await _spotifyModule.PauseAsync();
+            }
+            else if (string.Equals(step.SpotifyAction, "Resume", StringComparison.OrdinalIgnoreCase))
+            {
+                await _spotifyModule.ResumeAsync();
+            }
+            else if (string.Equals(step.SpotifyAction, "SetVolume", StringComparison.OrdinalIgnoreCase))
+            {
+                await _spotifyModule.SetVolumeImmediateAsync(step.SpotifyVolumePercent);
+            }
 
             if (step.UpdateTwitchChannel)
             {
                 try
                 {
                     if (string.IsNullOrWhiteSpace(step.TwitchTitle) && string.IsNullOrWhiteSpace(step.TwitchCategoryId))
+                    {
                         throw new InvalidOperationException("Für die Twitch-Aktualisierung ist weder ein Titel noch eine Kategorie eingetragen.");
+                    }
+
                     await _twitchModule.UpdateChannelAsync(
                         string.IsNullOrWhiteSpace(step.TwitchTitle) ? null : step.TwitchTitle,
                         string.IsNullOrWhiteSpace(step.TwitchCategoryId) ? null : step.TwitchCategoryId);
@@ -19005,7 +20337,11 @@ private Task ApplyCombinedAlertDuckingAsync()
                 catch (Exception twitchException)
                 {
                     _appLogger.Write(AppLogLevel.Error, "RunOfShow.Twitch", $"{step.Name}: {twitchException.Message}");
-                    if (!step.ContinueOnTwitchError) throw;
+                    if (!step.ContinueOnTwitchError)
+                    {
+                        throw;
+                    }
+
                     executionWarning = string.IsNullOrWhiteSpace(executionWarning)
                         ? "Twitch: " + twitchException.Message
                         : executionWarning + " | Twitch: " + twitchException.Message;
@@ -19014,26 +20350,39 @@ private Task ApplyCombinedAlertDuckingAsync()
 
             if (!string.IsNullOrWhiteSpace(step.StreamerBotActionId) || !string.IsNullOrWhiteSpace(step.StreamerBotActionName))
             {
-                if (step.ActionDelayMilliseconds > 0) await Task.Delay(step.ActionDelayMilliseconds);
+                if (step.ActionDelayMilliseconds > 0)
+                {
+                    await Task.Delay(step.ActionDelayMilliseconds);
+                }
+
                 try
                 {
                     if (!_streamerBotClient.IsConnected)
+                    {
                         throw new InvalidOperationException("Streamer.bot ist nicht verbunden.");
+                    }
+
                     var action = new { id = step.StreamerBotActionId, name = step.StreamerBotActionName };
-                    using var response = await SendStreamerBotRequestAsync(new
+                    using JsonDocument response = await SendStreamerBotRequestAsync(new
                     {
                         request = "DoAction",
                         action,
                         args = new { source = "Creator Control Suite", runOfShowStep = step.Name }
                     });
-                    var status = response.RootElement.TryGetProperty("status", out var statusNode) ? statusNode.GetString() : null;
+                    string? status = response.RootElement.TryGetProperty("status", out JsonElement statusNode) ? statusNode.GetString() : null;
                     if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
+                    {
                         throw new InvalidOperationException("Streamer.bot hat die Regieaktion nicht bestätigt.");
+                    }
                 }
                 catch (Exception actionException)
                 {
                     _appLogger.Write(AppLogLevel.Error, "RunOfShow.StreamerBot", $"{step.Name}: {actionException.Message}");
-                    if (!step.ContinueOnActionError) throw;
+                    if (!step.ContinueOnActionError)
+                    {
+                        throw;
+                    }
+
                     executionWarning = actionException.Message;
                 }
             }
@@ -19063,7 +20412,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
 
         _runOfShowAutoCts = new CancellationTokenSource();
-        var token = _runOfShowAutoCts.Token;
+        CancellationToken token = _runOfShowAutoCts.Token;
         StartAutomaticRunOfShowButton.IsEnabled = false;
         StopAutomaticRunOfShowButton.IsEnabled = true;
         RunOfShowStatusText.Text = "Automatischer Regieplan gestartet.";
@@ -19072,15 +20421,19 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             while (!token.IsCancellationRequested)
             {
-                var nextIndex = _runOfShowCurrentIndex + 1;
-                while (nextIndex < _runOfShowSteps.Count && !_runOfShowSteps[nextIndex].Enabled) nextIndex++;
+                int nextIndex = _runOfShowCurrentIndex + 1;
+                while (nextIndex < _runOfShowSteps.Count && !_runOfShowSteps[nextIndex].Enabled)
+                {
+                    nextIndex++;
+                }
+
                 if (nextIndex >= _runOfShowSteps.Count)
                 {
                     RunOfShowStatusText.Text = "Automatischer Regieplan beendet.";
                     break;
                 }
 
-                var step = _runOfShowSteps[nextIndex];
+                RunOfShowStepSettings step = _runOfShowSteps[nextIndex];
                 RunOfShowStepsList.SelectedItem = step;
                 RunOfShowStepsList.ScrollIntoView(step);
                 await ExecuteRunOfShowStepAsync(step);
@@ -19093,8 +20446,8 @@ private Task ApplyCombinedAlertDuckingAsync()
                     break;
                 }
 
-                var delaySeconds = Math.Clamp(step.AutoAdvanceDelaySeconds, 1, 86400);
-                for (var remaining = delaySeconds; remaining > 0; remaining--)
+                int delaySeconds = Math.Clamp(step.AutoAdvanceDelaySeconds, 1, 86400);
+                for (int remaining = delaySeconds; remaining > 0; remaining--)
                 {
                     token.ThrowIfCancellationRequested();
                     RunOfShowStatusText.Text = $"{step.Name} ausgeführt. Nächster Schritt in {remaining} s.";
@@ -19134,8 +20487,12 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void UpdateRunOfShowStatus()
     {
-        if (RunOfShowStatusText is null) return;
-        var next = _runOfShowSteps.Skip(_runOfShowCurrentIndex + 1).FirstOrDefault(x => x.Enabled);
+        if (RunOfShowStatusText is null)
+        {
+            return;
+        }
+
+        RunOfShowStepSettings? next = _runOfShowSteps.Skip(_runOfShowCurrentIndex + 1).FirstOrDefault(x => x.Enabled);
         RunOfShowCurrentText.Text = _runOfShowCurrentIndex >= 0 && _runOfShowCurrentIndex < _runOfShowSteps.Count ? _runOfShowSteps[_runOfShowCurrentIndex].Name : "Noch nicht gestartet";
         RunOfShowNextText.Text = next?.Name ?? "Kein weiterer Schritt";
         RunOfShowProgressText.Text = _runOfShowSteps.Count == 0 ? "0 / 0" : $"{Math.Max(0, _runOfShowCurrentIndex + 1)} / {_runOfShowSteps.Count}";
@@ -19143,12 +20500,23 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshTimedAutomationRules()
     {
-        if (TimedAutomationRulesList is null) return;
+        if (TimedAutomationRulesList is null)
+        {
+            return;
+        }
+
         _timedAutomationRules.Clear();
-        foreach (var rule in _settings.Workflow.TimedAutomations) _timedAutomationRules.Add(rule);
-        if (TimedAutomationNextRuleBox is not null) TimedAutomationNextRuleBox.ItemsSource = _timedAutomationRules.ToList();
+        foreach (TimedAutomationRuleSettings rule in _settings.Workflow.TimedAutomations)
+        {
+            _timedAutomationRules.Add(rule);
+        }
+
+        TimedAutomationNextRuleBox?.ItemsSource = _timedAutomationRules.ToList();
+
         if (_timedAutomationRules.Count > 0 && TimedAutomationRulesList.SelectedItem is null)
+        {
             TimedAutomationRulesList.SelectedIndex = 0;
+        }
     }
 
     private static string ComboTag(ComboBox box, string fallback)
@@ -19162,11 +20530,15 @@ private Task ApplyCombinedAlertDuckingAsync()
             Filter = "Creator-Control-Automationen (*.ccsautomation.json)|*.ccsautomation.json|JSON (*.json)|*.json",
             FileName = $"CreatorControlSuite-Automationen-{DateTime.Now:yyyyMMdd-HHmm}.ccsautomation.json"
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
         var package = new TimedAutomationExportPackage
         {
             ExportedAt = DateTimeOffset.Now,
-            Rules = _timedAutomationRules.Select(CloneTimedAutomationRule).ToList()
+            Rules = [.. _timedAutomationRules.Select(CloneTimedAutomationRule)]
         };
         await File.WriteAllTextAsync(dialog.FileName, JsonSerializer.Serialize(package, new JsonSerializerOptions { WriteIndented = true }));
         AddTimedAutomationDiagnostic($"Exportiert: {package.Rules.Count} Regeln nach {Path.GetFileName(dialog.FileName)}.");
@@ -19179,21 +20551,29 @@ private Task ApplyCombinedAlertDuckingAsync()
             Title = "Automatisierungsregeln importieren",
             Filter = "Creator-Control-Automationen (*.ccsautomation.json;*.json)|*.ccsautomation.json;*.json"
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
         try
         {
-            var package = JsonSerializer.Deserialize<TimedAutomationExportPackage>(await File.ReadAllTextAsync(dialog.FileName), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (package?.Rules is null || package.Rules.Count == 0) throw new InvalidDataException("Die Datei enthält keine Regeln.");
-            var idMap = package.Rules.ToDictionary(x => x.Id, _ => Guid.NewGuid().ToString("N"), StringComparer.OrdinalIgnoreCase);
-            foreach (var imported in package.Rules)
+            TimedAutomationExportPackage? package = JsonSerializer.Deserialize<TimedAutomationExportPackage>(await File.ReadAllTextAsync(dialog.FileName), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (package?.Rules is null || package.Rules.Count == 0)
             {
-                var clone = CloneTimedAutomationRule(imported);
+                throw new InvalidDataException("Die Datei enthält keine Regeln.");
+            }
+
+            var idMap = package.Rules.ToDictionary(x => x.Id, _ => Guid.NewGuid().ToString("N"), StringComparer.OrdinalIgnoreCase);
+            foreach (TimedAutomationRuleSettings imported in package.Rules)
+            {
+                TimedAutomationRuleSettings clone = CloneTimedAutomationRule(imported);
                 clone.Id = idMap[imported.Id];
                 clone.Name = EnsureUniqueAutomationName(clone.Name);
-                clone.NextRuleId = !string.IsNullOrWhiteSpace(imported.NextRuleId) && idMap.TryGetValue(imported.NextRuleId, out var nextId) ? nextId : "";
-                clone.DependencyRuleId = !string.IsNullOrWhiteSpace(imported.DependencyRuleId) && idMap.TryGetValue(imported.DependencyRuleId, out var dependencyId) ? dependencyId : "";
-                clone.FailureRuleId = !string.IsNullOrWhiteSpace(imported.FailureRuleId) && idMap.TryGetValue(imported.FailureRuleId, out var failureId) ? failureId : "";
-                clone.RollbackRuleId = !string.IsNullOrWhiteSpace(imported.RollbackRuleId) && idMap.TryGetValue(imported.RollbackRuleId, out var rollbackId) ? rollbackId : "";
+                clone.NextRuleId = !string.IsNullOrWhiteSpace(imported.NextRuleId) && idMap.TryGetValue(imported.NextRuleId, out string? nextId) ? nextId : "";
+                clone.DependencyRuleId = !string.IsNullOrWhiteSpace(imported.DependencyRuleId) && idMap.TryGetValue(imported.DependencyRuleId, out string? dependencyId) ? dependencyId : "";
+                clone.FailureRuleId = !string.IsNullOrWhiteSpace(imported.FailureRuleId) && idMap.TryGetValue(imported.FailureRuleId, out string? failureId) ? failureId : "";
+                clone.RollbackRuleId = !string.IsNullOrWhiteSpace(imported.RollbackRuleId) && idMap.TryGetValue(imported.RollbackRuleId, out string? rollbackId) ? rollbackId : "";
                 _settings.Workflow.TimedAutomations.Add(clone);
             }
             await _settingsStore.SaveAsync(_settings);
@@ -19210,10 +20590,14 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task AddTimedAutomationTemplateAsync()
     {
-        var result = MessageBox.Show(this,
+        MessageBoxResult result = MessageBox.Show(this,
             "Vorlage '10-Minuten-Streamstart' anlegen?\n\nSie erstellt drei verkettete Regeln: direkt beim Streamstart, nach 5 Minuten Intro-Quelle ausblenden und nach 10 Minuten auf die Game-Szene wechseln.",
             "Automationsvorlage", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes) return;
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
         var start = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Streamstart – Initialisierung"), TriggerType = "StreamStarted", DelaySeconds = 0, ActionType = "SpotifyOnly", SpotifyAction = "Resume", OncePerStream = true };
         var intro = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Streamstart – Intro ausblenden"), TriggerType = "StreamElapsed", DelaySeconds = 300, ActionType = "SetSourceVisibility", ObsScene = "Start", ObsSource = "Intro", SourceVisible = false, OncePerStream = true };
         var game = new TimedAutomationRuleSettings { Name = EnsureUniqueAutomationName("Startszene – nach 10 Minuten zu Game"), TriggerType = "SceneElapsed", TriggerScene = string.IsNullOrWhiteSpace(_settings.Obs.StartScene) ? "Start" : _settings.Obs.StartScene, DelaySeconds = 600, ActionType = "SwitchScene", TargetScene = string.IsNullOrWhiteSpace(_settings.Obs.LiveScene) ? "Game" : _settings.Obs.LiveScene, OncePerStream = true };
@@ -19229,10 +20613,20 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private string EnsureUniqueAutomationName(string baseName)
     {
-        var name = string.IsNullOrWhiteSpace(baseName) ? "Importierte Automatisierung" : baseName.Trim();
+        string name = string.IsNullOrWhiteSpace(baseName) ? "Importierte Automatisierung" : baseName.Trim();
         var existing = _settings.Workflow.TimedAutomations.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!existing.Contains(name)) return name;
-        for (var i = 2; ; i++) if (!existing.Contains($"{name} ({i})")) return $"{name} ({i})";
+        if (!existing.Contains(name))
+        {
+            return name;
+        }
+
+        for (int i = 2; ; i++)
+        {
+            if (!existing.Contains($"{name} ({i})"))
+            {
+                return $"{name} ({i})";
+            }
+        }
     }
 
     private static TimedAutomationRuleSettings CloneTimedAutomationRule(TimedAutomationRuleSettings rule)
@@ -19240,7 +20634,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static string DescribeTimedAutomationAction(TimedAutomationRuleSettings rule)
     {
-        var action = rule.ActionType switch
+        string action = rule.ActionType switch
         {
             "SwitchScene" => $"Szene '{rule.TargetScene}' aktivieren",
             "SetSourceVisibility" => $"Quelle '{rule.ObsSource}' in '{rule.ObsScene}' {(rule.SourceVisible ? "einblenden" : "ausblenden")}",
@@ -19250,7 +20644,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             "StreamerBotAction" => $"Streamer.bot-Aktion '{rule.StreamerBotActionName}' ausführen",
             _ => "keine OBS-Aktion"
         };
-        if (!string.Equals(rule.SpotifyAction, "None", StringComparison.OrdinalIgnoreCase)) action += $", Spotify: {rule.SpotifyAction}";
+        if (!string.Equals(rule.SpotifyAction, "None", StringComparison.OrdinalIgnoreCase))
+        {
+            action += $", Spotify: {rule.SpotifyAction}";
+        }
+
         return action;
     }
 
@@ -19264,7 +20662,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void LoadSelectedTimedAutomationRule()
     {
-        if (TimedAutomationRulesList.SelectedItem is not TimedAutomationRuleSettings rule) return;
+        if (TimedAutomationRulesList.SelectedItem is not TimedAutomationRuleSettings rule)
+        {
+            return;
+        }
+
         TimedAutomationEnabledBox.IsChecked = rule.Enabled;
         TimedAutomationNameBox.Text = rule.Name;
         SelectComboByTag(TimedAutomationTriggerTypeBox, rule.TriggerType);
@@ -19335,48 +20737,50 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static void SelectComboByTag(ComboBox box, string tag)
     {
-        foreach (var item in box.Items.OfType<ComboBoxItem>())
+        foreach (ComboBoxItem item in box.Items.OfType<ComboBoxItem>())
+        {
             if (string.Equals(item.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase)) { box.SelectedItem = item; return; }
+        }
     }
 
     private TimedAutomationRuleSettings ReadTimedAutomationEditor(TimedAutomationRuleSettings? target = null)
     {
-        var rule = target ?? new TimedAutomationRuleSettings();
+        TimedAutomationRuleSettings rule = target ?? new TimedAutomationRuleSettings();
         rule.Enabled = TimedAutomationEnabledBox.IsChecked == true;
         rule.Name = string.IsNullOrWhiteSpace(TimedAutomationNameBox.Text) ? "Neue Automatisierung" : TimedAutomationNameBox.Text.Trim();
         rule.TriggerType = ComboTag(TimedAutomationTriggerTypeBox, "StreamElapsed");
         rule.TriggerScene = TimedAutomationTriggerSceneBox.Text.Trim();
-        rule.DelaySeconds = int.TryParse(TimedAutomationDelayBox.Text, out var delay) ? Math.Max(0, delay) : 10;
-        rule.ScheduleTime = TimeOnly.TryParse(TimedAutomationScheduleTimeBox.Text, out var scheduleTime) ? scheduleTime.ToString("HH:mm") : "20:00";
+        rule.DelaySeconds = int.TryParse(TimedAutomationDelayBox.Text, out int delay) ? Math.Max(0, delay) : 10;
+        rule.ScheduleTime = TimeOnly.TryParse(TimedAutomationScheduleTimeBox.Text, out TimeOnly scheduleTime) ? scheduleTime.ToString("HH:mm") : "20:00";
         rule.ScheduleDays = TimedAutomationScheduleDaysBox.Text.Trim();
-        rule.ScheduleDate = DateOnly.TryParse(TimedAutomationScheduleDateBox.Text, out var scheduleDate) ? scheduleDate.ToString("yyyy-MM-dd") : "";
-        rule.ActiveFromDate = DateOnly.TryParse(TimedAutomationActiveFromBox.Text, out var activeFrom) ? activeFrom.ToString("yyyy-MM-dd") : "";
-        rule.ActiveUntilDate = DateOnly.TryParse(TimedAutomationActiveUntilBox.Text, out var activeUntil) ? activeUntil.ToString("yyyy-MM-dd") : "";
+        rule.ScheduleDate = DateOnly.TryParse(TimedAutomationScheduleDateBox.Text, out DateOnly scheduleDate) ? scheduleDate.ToString("yyyy-MM-dd") : "";
+        rule.ActiveFromDate = DateOnly.TryParse(TimedAutomationActiveFromBox.Text, out DateOnly activeFrom) ? activeFrom.ToString("yyyy-MM-dd") : "";
+        rule.ActiveUntilDate = DateOnly.TryParse(TimedAutomationActiveUntilBox.Text, out DateOnly activeUntil) ? activeUntil.ToString("yyyy-MM-dd") : "";
         rule.ExcludedDates = TimedAutomationExcludedDatesBox.Text.Trim();
         rule.BlackoutRanges = TimedAutomationBlackoutRangesBox.Text.Trim();
         rule.MissedRunBehavior = ComboTag(TimedAutomationMissedRunBehaviorBox, "SameDay");
-        rule.CatchUpGraceMinutes = int.TryParse(TimedAutomationCatchUpGraceBox.Text, out var graceMinutes) ? Math.Clamp(graceMinutes, 0, 1440) : 30;
+        rule.CatchUpGraceMinutes = int.TryParse(TimedAutomationCatchUpGraceBox.Text, out int graceMinutes) ? Math.Clamp(graceMinutes, 0, 1440) : 30;
         rule.ActionType = ComboTag(TimedAutomationActionTypeBox, "SwitchScene");
         rule.TargetScene = TimedAutomationTargetSceneBox.Text.Trim();
         rule.TransitionName = TimedAutomationTransitionBox.Text.Trim();
-        rule.TransitionDurationMilliseconds = int.TryParse(TimedAutomationTransitionDurationBox.Text, out var transitionMs) ? Math.Clamp(transitionMs, 50, 20000) : 1000;
+        rule.TransitionDurationMilliseconds = int.TryParse(TimedAutomationTransitionDurationBox.Text, out int transitionMs) ? Math.Clamp(transitionMs, 50, 20000) : 1000;
         rule.ObsScene = TimedAutomationSourceSceneBox.Text.Trim();
         rule.ObsSource = TimedAutomationSourceBox.Text.Trim();
         rule.SourceVisible = TimedAutomationSourceVisibleBox.IsChecked == true;
         rule.ResetSourceAtStreamEnd = TimedAutomationResetSourceBox.IsChecked == true;
         rule.ResetSourceVisible = TimedAutomationResetVisibleBox.IsChecked == true;
         rule.SpotifyAction = ComboTag(TimedAutomationSpotifyActionBox, "None");
-        rule.SpotifyVolumePercent = int.TryParse(TimedAutomationSpotifyVolumeBox.Text, out var volume) ? Math.Clamp(volume, 0, 100) : 35;
+        rule.SpotifyVolumePercent = int.TryParse(TimedAutomationSpotifyVolumeBox.Text, out int volume) ? Math.Clamp(volume, 0, 100) : 35;
         rule.SpotifyPlaylistUri = TimedAutomationSpotifyPlaylistUriBox.Text.Trim();
         rule.SpotifyPlaylistShuffle = TimedAutomationSpotifyPlaylistShuffleBox.IsChecked == true;
-        rule.SpotifyActionDelaySeconds = int.TryParse(TimedAutomationSpotifyDelayBox.Text, out var spotifyDelay) ? Math.Clamp(spotifyDelay, 0, 3600) : 0;
-        rule.SpotifyFadeSeconds = int.TryParse(TimedAutomationSpotifyFadeBox.Text, out var spotifyFade) ? Math.Clamp(spotifyFade, 0, 120) : 0;
-        rule.SpotifyPriority = int.TryParse(TimedAutomationSpotifyPriorityBox.Text, out var spotifyPriority) ? Math.Clamp(spotifyPriority, -1000, 1000) : 0;
+        rule.SpotifyActionDelaySeconds = int.TryParse(TimedAutomationSpotifyDelayBox.Text, out int spotifyDelay) ? Math.Clamp(spotifyDelay, 0, 3600) : 0;
+        rule.SpotifyFadeSeconds = int.TryParse(TimedAutomationSpotifyFadeBox.Text, out int spotifyFade) ? Math.Clamp(spotifyFade, 0, 120) : 0;
+        rule.SpotifyPriority = int.TryParse(TimedAutomationSpotifyPriorityBox.Text, out int spotifyPriority) ? Math.Clamp(spotifyPriority, -1000, 1000) : 0;
         rule.SpotifyAutomationGroup = string.IsNullOrWhiteSpace(TimedAutomationSpotifyGroupBox.Text) ? "Standard" : TimedAutomationSpotifyGroupBox.Text.Trim();
         rule.SpotifyExclusiveGroup = TimedAutomationSpotifyExclusiveGroupBox.IsChecked == true;
         rule.SpotifySavePreviousState = TimedAutomationSpotifySavePreviousBox.IsChecked == true;
         rule.SpotifyAutoRestorePreviousState = TimedAutomationSpotifyAutoRestoreBox.IsChecked == true;
-        rule.SpotifyAutoRestoreDelaySeconds = int.TryParse(TimedAutomationSpotifyAutoRestoreDelayBox.Text, out var spotifyAutoRestoreDelay) ? Math.Clamp(spotifyAutoRestoreDelay, 1, 86400) : 30;
+        rule.SpotifyAutoRestoreDelaySeconds = int.TryParse(TimedAutomationSpotifyAutoRestoreDelayBox.Text, out int spotifyAutoRestoreDelay) ? Math.Clamp(spotifyAutoRestoreDelay, 1, 86400) : 30;
         rule.SpotifyAutoRestoreRequireSameScene = TimedAutomationSpotifyAutoRestoreSameSceneBox.IsChecked == true;
         rule.SpotifyAutoRestoreRequireSameGroup = TimedAutomationSpotifyAutoRestoreSameGroupBox.IsChecked == true;
         rule.SpotifyAutoRestoreRequireUnchangedPlayback = TimedAutomationSpotifyAutoRestoreUnchangedPlaybackBox.IsChecked == true;
@@ -19390,18 +20794,18 @@ private Task ApplyCombinedAlertDuckingAsync()
         rule.ConditionValue = TimedAutomationConditionValueBox.Text.Trim();
         rule.ConditionNegated = TimedAutomationConditionNegatedBox.IsChecked == true;
         rule.NextRuleId = (TimedAutomationNextRuleBox.SelectedItem as TimedAutomationRuleSettings)?.Id ?? "";
-        rule.NextRuleDelaySeconds = int.TryParse(TimedAutomationNextRuleDelayBox.Text, out var nextDelay) ? Math.Clamp(nextDelay, 0, 86400) : 0;
+        rule.NextRuleDelaySeconds = int.TryParse(TimedAutomationNextRuleDelayBox.Text, out int nextDelay) ? Math.Clamp(nextDelay, 0, 86400) : 0;
         rule.ContinueChainOnError = TimedAutomationContinueChainOnErrorBox.IsChecked == true;
-        rule.Priority = int.TryParse(TimedAutomationPriorityBox.Text, out var priority) ? Math.Clamp(priority, -1000, 1000) : 0;
-        rule.TimeoutSeconds = int.TryParse(TimedAutomationTimeoutBox.Text, out var timeout) ? Math.Clamp(timeout, 1, 86400) : 60;
+        rule.Priority = int.TryParse(TimedAutomationPriorityBox.Text, out int priority) ? Math.Clamp(priority, -1000, 1000) : 0;
+        rule.TimeoutSeconds = int.TryParse(TimedAutomationTimeoutBox.Text, out int timeout) ? Math.Clamp(timeout, 1, 86400) : 60;
         rule.ExecutionMode = ComboTag(TimedAutomationExecutionModeBox, "SkipIfRunning");
         rule.DependencyRuleId = (TimedAutomationDependencyRuleBox.SelectedItem as TimedAutomationRuleSettings)?.Id ?? "";
         rule.DependencyRequiredStatus = "Erfolgreich";
-        rule.RetryCount = int.TryParse(TimedAutomationRetryCountBox.Text, out var retryCount) ? Math.Clamp(retryCount, 0, 20) : 0;
-        rule.RetryDelaySeconds = int.TryParse(TimedAutomationRetryDelayBox.Text, out var retryDelay) ? Math.Clamp(retryDelay, 0, 3600) : 5;
+        rule.RetryCount = int.TryParse(TimedAutomationRetryCountBox.Text, out int retryCount) ? Math.Clamp(retryCount, 0, 20) : 0;
+        rule.RetryDelaySeconds = int.TryParse(TimedAutomationRetryDelayBox.Text, out int retryDelay) ? Math.Clamp(retryDelay, 0, 3600) : 5;
         rule.FailureRuleId = (TimedAutomationFailureRuleBox.SelectedItem as TimedAutomationRuleSettings)?.Id ?? "";
         rule.WorkflowGroup = TimedAutomationWorkflowGroupBox.Text.Trim();
-        rule.WorkflowOrder = int.TryParse(TimedAutomationWorkflowOrderBox.Text, out var workflowOrder) ? Math.Clamp(workflowOrder, -1000, 1000) : 0;
+        rule.WorkflowOrder = int.TryParse(TimedAutomationWorkflowOrderBox.Text, out int workflowOrder) ? Math.Clamp(workflowOrder, -1000, 1000) : 0;
         rule.StartWorkflowGroup = TimedAutomationStartWorkflowBox.IsChecked == true;
         rule.WorkflowFailureMode = ComboTag(TimedAutomationWorkflowFailureModeBox, "Stop");
         rule.RollbackRuleId = (TimedAutomationRollbackRuleBox.SelectedItem as TimedAutomationRuleSettings)?.Id ?? "";
@@ -19412,19 +20816,25 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         var selected = TimedAutomationRulesList.SelectedItem as TimedAutomationRuleSettings;
         if (selected is null) { CreateNewTimedAutomationRule(); selected = TimedAutomationRulesList.SelectedItem as TimedAutomationRuleSettings; }
-        if (selected is null) return;
+        if (selected is null)
+        {
+            return;
+        }
+
         ReadTimedAutomationEditor(selected);
         TimedAutomationRulesList.Items.Refresh();
-        _settings.Workflow.TimedAutomations = _timedAutomationRules
-            .Select(rule => rule)
-            .ToList();
+        _settings.Workflow.TimedAutomations = [.. _timedAutomationRules.Select(rule => rule)];
         await _settingsStore.SaveAsync(_settings);
         TimedAutomationTestStatusText.Text = "Regel gespeichert.";
     }
 
     private async Task DeleteSelectedTimedAutomationRuleAsync()
     {
-        if (TimedAutomationRulesList.SelectedItem is not TimedAutomationRuleSettings rule) return;
+        if (TimedAutomationRulesList.SelectedItem is not TimedAutomationRuleSettings rule)
+        {
+            return;
+        }
+
         _settings.Workflow.TimedAutomations.Remove(rule); _timedAutomationRules.Remove(rule);
         await _settingsStore.SaveAsync(_settings);
     }
@@ -19450,47 +20860,47 @@ private Task ApplyCombinedAlertDuckingAsync()
         _timedAutomationObsRefreshRunning = true;
         try
         {
-        var previousTrigger = TimedAutomationTriggerSceneBox.Text;
-        var previousTarget = TimedAutomationTargetSceneBox.Text;
-        var previousSourceScene = TimedAutomationSourceSceneBox.Text;
-        var previousTransition = TimedAutomationTransitionBox.Text;
+            string previousTrigger = TimedAutomationTriggerSceneBox.Text;
+            string previousTarget = TimedAutomationTargetSceneBox.Text;
+            string previousSourceScene = TimedAutomationSourceSceneBox.Text;
+            string previousTransition = TimedAutomationTransitionBox.Text;
 
-        var scenes = (await _obsClient.GetSceneListAsync())
-            .Select(x => x.Name)
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var transitions = (await _obsClient.GetSceneTransitionListAsync())
-            .Select(x => x.Name)
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            var scenes = (await _obsClient.GetSceneListAsync())
+                .Select(x => x.Name)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var transitions = (await _obsClient.GetSceneTransitionListAsync())
+                .Select(x => x.Name)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-        TimedAutomationTriggerSceneBox.ItemsSource = scenes;
-        TimedAutomationTargetSceneBox.ItemsSource = scenes;
-        TimedAutomationSourceSceneBox.ItemsSource = scenes;
-        TimedAutomationTransitionBox.ItemsSource = transitions;
+            TimedAutomationTriggerSceneBox.ItemsSource = scenes;
+            TimedAutomationTargetSceneBox.ItemsSource = scenes;
+            TimedAutomationSourceSceneBox.ItemsSource = scenes;
+            TimedAutomationTransitionBox.ItemsSource = transitions;
 
-        TimedAutomationTriggerSceneBox.Text = previousTrigger;
-        TimedAutomationTargetSceneBox.Text = previousTarget;
-        TimedAutomationSourceSceneBox.Text = previousSourceScene;
-        TimedAutomationTransitionBox.Text = previousTransition;
+            TimedAutomationTriggerSceneBox.Text = previousTrigger;
+            TimedAutomationTargetSceneBox.Text = previousTarget;
+            TimedAutomationSourceSceneBox.Text = previousSourceScene;
+            TimedAutomationTransitionBox.Text = previousTransition;
 
-        var inputs = (await _obsClient.GetInputListAsync())
-            .Select(x => x.Name)
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var previousInput = TimedAutomationInputBox.Text;
-        TimedAutomationInputBox.ItemsSource = inputs;
-        TimedAutomationInputBox.Text = previousInput;
-        await RefreshStreamerBotActionsAsync(false);
-        TimedAutomationTestStatusText.Text = $"{scenes.Count} Szenen, {transitions.Count} Übergänge und {inputs.Count} Eingaben aus OBS geladen.";
-        await RefreshTimedAutomationSourceListAsync();
-        _lastTimedAutomationObsRefresh = DateTimeOffset.UtcNow;
+            var inputs = (await _obsClient.GetInputListAsync())
+                .Select(x => x.Name)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            string previousInput = TimedAutomationInputBox.Text;
+            TimedAutomationInputBox.ItemsSource = inputs;
+            TimedAutomationInputBox.Text = previousInput;
+            await RefreshStreamerBotActionsAsync(false);
+            TimedAutomationTestStatusText.Text = $"{scenes.Count} Szenen, {transitions.Count} Übergänge und {inputs.Count} Eingaben aus OBS geladen.";
+            await RefreshTimedAutomationSourceListAsync();
+            _lastTimedAutomationObsRefresh = DateTimeOffset.UtcNow;
         }
         finally
         {
@@ -19500,7 +20910,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RefreshTimedAutomationSourceListAsync()
     {
-        var sceneName = TimedAutomationSourceSceneBox.SelectedItem as string;
+        string? sceneName = TimedAutomationSourceSceneBox.SelectedItem as string;
         if (string.IsNullOrWhiteSpace(sceneName))
         {
             sceneName = TimedAutomationSourceSceneBox.Text?.Trim();
@@ -19511,7 +20921,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var previousSource = TimedAutomationSourceBox.Text;
+        string previousSource = TimedAutomationSourceBox.Text;
         try
         {
             var sources = (await _obsClient.GetSceneItemListAsync(sceneName))
@@ -19533,10 +20943,10 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task TestSelectedTimedAutomationRuleAsync()
     {
-        var rule = ReadTimedAutomationEditor(TimedAutomationRulesList.SelectedItem as TimedAutomationRuleSettings);
+        TimedAutomationRuleSettings rule = ReadTimedAutomationEditor(TimedAutomationRulesList.SelectedItem as TimedAutomationRuleSettings);
         if (!_obsClient.IsConnected) { TimedAutomationTestStatusText.Text = "OBS verbinden, bevor der Test gestartet wird."; return; }
         _timedAutomationTestCts?.Cancel(); _timedAutomationTestCts = new CancellationTokenSource();
-        var seconds = int.TryParse(TimedAutomationTestSecondsBox.Text, out var value) ? Math.Clamp(value, 0, 60) : 3;
+        int seconds = int.TryParse(TimedAutomationTestSecondsBox.Text, out int value) ? Math.Clamp(value, 0, 60) : 3;
         try
         {
             TimedAutomationTestStatusText.Text = $"Test läuft · Aktion in {seconds} Sekunde(n). Der Stream bleibt aus.";
@@ -19552,7 +20962,7 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         _timedAutomationTestCts?.Cancel();
         _timedAutomationTestCts = new CancellationTokenSource();
-        var token = _timedAutomationTestCts.Token;
+        CancellationToken token = _timedAutomationTestCts.Token;
         ShortStreamTestResultsList.Items.Clear();
         StartShortStreamTestButton.IsEnabled = false;
         ShortStreamTestStatusText.Text = "Kurztest läuft. OBS-Streaming bleibt ausgeschaltet.";
@@ -19577,10 +20987,18 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 await AddResultAsync("OBS-Verbindung und Szenen", async () =>
                 {
-                    if (!_obsClient.IsConnected) throw new InvalidOperationException("OBS ist nicht verbunden.");
-                    var scenes = await _obsClient.GetSceneListAsync(token);
-                    var transitions = await _obsClient.GetSceneTransitionListAsync(token);
-                    if (scenes.Count == 0) throw new InvalidOperationException("Keine OBS-Szenen gefunden.");
+                    if (!_obsClient.IsConnected)
+                    {
+                        throw new InvalidOperationException("OBS ist nicht verbunden.");
+                    }
+
+                    IReadOnlyList<ObsSceneInfo> scenes = await _obsClient.GetSceneListAsync(token);
+                    IReadOnlyList<ObsTransitionInfo> transitions = await _obsClient.GetSceneTransitionListAsync(token);
+                    if (scenes.Count == 0)
+                    {
+                        throw new InvalidOperationException("Keine OBS-Szenen gefunden.");
+                    }
+
                     ShortStreamTestResultsList.Items.Add($"  {scenes.Count} Szenen · {transitions.Count} Übergänge");
                 });
             }
@@ -19589,7 +21007,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 await AddResultAsync("Spotify", async () =>
                 {
-                    if (!_spotifyModule.GetSnapshot().Authenticated) throw new InvalidOperationException("Spotify ist nicht verbunden.");
+                    if (!_spotifyModule.GetSnapshot().Authenticated)
+                    {
+                        throw new InvalidOperationException("Spotify ist nicht verbunden.");
+                    }
+
                     await RefreshSpotifyInspectorAsync();
                 });
             }
@@ -19599,7 +21021,10 @@ private Task ApplyCombinedAlertDuckingAsync()
                 await AddResultAsync("Streamer.bot", () =>
                 {
                     if (!_streamerBotClient.IsConnected)
+                    {
                         throw new InvalidOperationException("Streamer.bot ist nicht verbunden.");
+                    }
+
                     return Task.CompletedTask;
                 });
             }
@@ -19608,9 +21033,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 await AddResultAsync("Overlay", () =>
                 {
-                    var path = _settings.General.OverlayManifestPath;
+                    string path = _settings.General.OverlayManifestPath;
                     if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                    {
                         throw new InvalidOperationException("overlay.json wurde nicht gefunden.");
+                    }
+
                     return Task.CompletedTask;
                 });
             }
@@ -19624,8 +21052,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 await AddResultAsync("Automatisierungsregel", async () =>
                 {
-                    if (!_obsClient.IsConnected) throw new InvalidOperationException("OBS ist nicht verbunden.");
-                    var rule = ReadTimedAutomationEditor(TimedAutomationRulesList.SelectedItem as TimedAutomationRuleSettings);
+                    if (!_obsClient.IsConnected)
+                    {
+                        throw new InvalidOperationException("OBS ist nicht verbunden.");
+                    }
+
+                    TimedAutomationRuleSettings rule = ReadTimedAutomationEditor(TimedAutomationRulesList.SelectedItem as TimedAutomationRuleSettings);
                     await ExecuteTimedAutomationRuleAsync(rule, token);
                 });
             }
@@ -19644,29 +21076,48 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task EvaluateTimedAutomationRulesAsync()
     {
-        if (_timedAutomationEvaluationRunning || !_obsClient.IsConnected) return;
+        if (_timedAutomationEvaluationRunning || !_obsClient.IsConnected)
+        {
+            return;
+        }
+
         _timedAutomationEvaluationRunning = true;
         try
         {
-            var now = DateTimeOffset.UtcNow;
-            foreach (var rule in _settings.Workflow.TimedAutomations.Where(x => x.Enabled).OrderByDescending(x => x.Priority).ThenBy(x => x.Name).ToList())
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            foreach (TimedAutomationRuleSettings? rule in _settings.Workflow.TimedAutomations.Where(x => x.Enabled).OrderByDescending(x => x.Priority).ThenBy(x => x.Name).ToList())
             {
-                if (rule.OncePerStream && _executedTimedAutomationRuleIds.Contains(rule.Id)) continue;
+                if (rule.OncePerStream && _executedTimedAutomationRuleIds.Contains(rule.Id))
+                {
+                    continue;
+                }
+
                 bool due = false;
                 if (string.Equals(rule.TriggerType, "StreamElapsed", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(rule.TriggerType, "StreamStarted", StringComparison.OrdinalIgnoreCase))
+                {
                     due = _streamSessionStartedAt.HasValue && now - _streamSessionStartedAt.Value >= TimeSpan.FromSeconds(string.Equals(rule.TriggerType, "StreamStarted", StringComparison.OrdinalIgnoreCase) ? 0 : rule.DelaySeconds);
+                }
                 else if (string.Equals(rule.TriggerType, "SceneElapsed", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(rule.TriggerType, "SceneActivated", StringComparison.OrdinalIgnoreCase))
+                {
                     due = _automationSceneActivatedAt.HasValue && string.Equals(_automationCurrentScene, rule.TriggerScene, StringComparison.OrdinalIgnoreCase) && now - _automationSceneActivatedAt.Value >= TimeSpan.FromSeconds(string.Equals(rule.TriggerType, "SceneActivated", StringComparison.OrdinalIgnoreCase) ? 0 : rule.DelaySeconds);
+                }
                 else if (rule.TriggerType is "DailySchedule" or "WeeklySchedule" or "OneTimeSchedule")
                 {
-                    var localNow = DateTime.Now;
+                    DateTime localNow = DateTime.Now;
                     due = IsScheduledAutomationDue(rule, localNow);
                 }
-                if (!due) continue;
+                if (!due)
+                {
+                    continue;
+                }
+
                 await StartTimedAutomationRuleAsync(rule, simulate: false);
-                if (rule.OncePerStream) _executedTimedAutomationRuleIds.Add(rule.Id);
+                if (rule.OncePerStream)
+                {
+                    _executedTimedAutomationRuleIds.Add(rule.Id);
+                }
             }
         }
         finally { _timedAutomationEvaluationRunning = false; }
@@ -19675,24 +21126,62 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static bool IsScheduledAutomationDue(TimedAutomationRuleSettings rule, DateTime localNow)
     {
-        if (!TimeOnly.TryParse(rule.ScheduleTime, out var scheduledTime)) return false;
+        if (!TimeOnly.TryParse(rule.ScheduleTime, out TimeOnly scheduledTime))
+        {
+            return false;
+        }
+
         var today = DateOnly.FromDateTime(localNow);
-        if (DateOnly.TryParse(rule.ActiveFromDate, out var activeFrom) && today < activeFrom) return false;
-        if (DateOnly.TryParse(rule.ActiveUntilDate, out var activeUntil) && today > activeUntil) return false;
-        if (IsAutomationDateExcluded(rule, today) || IsAutomationDateInBlackout(rule, today)) return false;
+        if (DateOnly.TryParse(rule.ActiveFromDate, out DateOnly activeFrom) && today < activeFrom)
+        {
+            return false;
+        }
+
+        if (DateOnly.TryParse(rule.ActiveUntilDate, out DateOnly activeUntil) && today > activeUntil)
+        {
+            return false;
+        }
+
+        if (IsAutomationDateExcluded(rule, today) || IsAutomationDateInBlackout(rule, today))
+        {
+            return false;
+        }
+
         var scheduledDateTime = today.ToDateTime(scheduledTime);
-        if (localNow < scheduledDateTime) return false;
-        var missedBy = localNow - scheduledDateTime;
-        if (string.Equals(rule.MissedRunBehavior, "Skip", StringComparison.OrdinalIgnoreCase) && missedBy > TimeSpan.FromMinutes(1)) return false;
-        if (string.Equals(rule.MissedRunBehavior, "WithinGrace", StringComparison.OrdinalIgnoreCase) && missedBy > TimeSpan.FromMinutes(Math.Clamp(rule.CatchUpGraceMinutes, 0, 1440))) return false;
-        if (string.Equals(rule.LastScheduledRunDate, localNow.ToString("yyyy-MM-dd"), StringComparison.Ordinal)) return false;
+        if (localNow < scheduledDateTime)
+        {
+            return false;
+        }
+
+        TimeSpan missedBy = localNow - scheduledDateTime;
+        if (string.Equals(rule.MissedRunBehavior, "Skip", StringComparison.OrdinalIgnoreCase) && missedBy > TimeSpan.FromMinutes(1))
+        {
+            return false;
+        }
+
+        if (string.Equals(rule.MissedRunBehavior, "WithinGrace", StringComparison.OrdinalIgnoreCase) && missedBy > TimeSpan.FromMinutes(Math.Clamp(rule.CatchUpGraceMinutes, 0, 1440)))
+        {
+            return false;
+        }
+
+        if (string.Equals(rule.LastScheduledRunDate, localNow.ToString("yyyy-MM-dd"), StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         if (string.Equals(rule.TriggerType, "WeeklySchedule", StringComparison.OrdinalIgnoreCase))
         {
-            var days = (rule.ScheduleDays ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (!days.Any(x => string.Equals(x, localNow.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase))) return false;
+            string[] days = (rule.ScheduleDays ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (!days.Any(x => string.Equals(x, localNow.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
         }
         if (string.Equals(rule.TriggerType, "OneTimeSchedule", StringComparison.OrdinalIgnoreCase))
-            return DateOnly.TryParse(rule.ScheduleDate, out var scheduledDate) && today == scheduledDate;
+        {
+            return DateOnly.TryParse(rule.ScheduleDate, out DateOnly scheduledDate) && today == scheduledDate;
+        }
+
         return true;
     }
 
@@ -19701,39 +21190,77 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         return (rule.ExcludedDates ?? "")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(value => DateOnly.TryParse(value, out var excluded) && excluded == day);
+            .Any(value => DateOnly.TryParse(value, out DateOnly excluded) && excluded == day);
     }
 
     private static bool IsAutomationDateInBlackout(TimedAutomationRuleSettings rule, DateOnly day)
     {
-        foreach (var entry in (rule.BlackoutRanges ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (string entry in (rule.BlackoutRanges ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            var bounds = entry.Split("..", StringSplitOptions.TrimEntries);
-            if (bounds.Length != 2 || !DateOnly.TryParse(bounds[0], out var start) || !DateOnly.TryParse(bounds[1], out var end)) continue;
-            if (start <= day && day <= end) return true;
+            string[] bounds = entry.Split("..", StringSplitOptions.TrimEntries);
+            if (bounds.Length != 2 || !DateOnly.TryParse(bounds[0], out DateOnly start) || !DateOnly.TryParse(bounds[1], out DateOnly end))
+            {
+                continue;
+            }
+
+            if (start <= day && day <= end)
+            {
+                return true;
+            }
         }
         return false;
     }
 
     private static string DescribeNextScheduledRun(TimedAutomationRuleSettings rule)
     {
-        if (rule.TriggerType is not ("DailySchedule" or "WeeklySchedule" or "OneTimeSchedule")) return "nicht zeitplanbasiert";
-        if (!TimeOnly.TryParse(rule.ScheduleTime, out var time)) return "ungültige Uhrzeit";
-        var now = DateTime.Now;
-        for (var offset = 0; offset <= 370; offset++)
+        if (rule.TriggerType is not ("DailySchedule" or "WeeklySchedule" or "OneTimeSchedule"))
+        {
+            return "nicht zeitplanbasiert";
+        }
+
+        if (!TimeOnly.TryParse(rule.ScheduleTime, out TimeOnly time))
+        {
+            return "ungültige Uhrzeit";
+        }
+
+        DateTime now = DateTime.Now;
+        for (int offset = 0; offset <= 370; offset++)
         {
             var day = DateOnly.FromDateTime(now.Date.AddDays(offset));
-            if (DateOnly.TryParse(rule.ActiveFromDate, out var from) && day < from) continue;
-            if (DateOnly.TryParse(rule.ActiveUntilDate, out var until) && day > until) break;
-            if (IsAutomationDateExcluded(rule, day) || IsAutomationDateInBlackout(rule, day)) continue;
+            if (DateOnly.TryParse(rule.ActiveFromDate, out DateOnly from) && day < from)
+            {
+                continue;
+            }
+
+            if (DateOnly.TryParse(rule.ActiveUntilDate, out DateOnly until) && day > until)
+            {
+                break;
+            }
+
+            if (IsAutomationDateExcluded(rule, day) || IsAutomationDateInBlackout(rule, day))
+            {
+                continue;
+            }
+
             if (rule.TriggerType == "WeeklySchedule")
             {
-                var names = (rule.ScheduleDays ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                if (!names.Any(x => string.Equals(x, day.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase))) continue;
+                string[] names = (rule.ScheduleDays ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (!names.Any(x => string.Equals(x, day.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
             }
-            if (rule.TriggerType == "OneTimeSchedule" && (!DateOnly.TryParse(rule.ScheduleDate, out var once) || day != once)) continue;
+            if (rule.TriggerType == "OneTimeSchedule" && (!DateOnly.TryParse(rule.ScheduleDate, out DateOnly once) || day != once))
+            {
+                continue;
+            }
+
             var candidate = day.ToDateTime(time);
-            if (candidate <= now) continue;
+            if (candidate <= now)
+            {
+                continue;
+            }
+
             return candidate.ToString("dd.MM.yyyy HH:mm");
         }
         return "kein Termin im gültigen Zeitraum";
@@ -19749,7 +21276,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         if (!string.IsNullOrWhiteSpace(rule.DependencyRuleId))
         {
-            var dependency = _settings.Workflow.TimedAutomations.FirstOrDefault(x => string.Equals(x.Id, rule.DependencyRuleId, StringComparison.OrdinalIgnoreCase));
+            TimedAutomationRuleSettings? dependency = _settings.Workflow.TimedAutomations.FirstOrDefault(x => string.Equals(x.Id, rule.DependencyRuleId, StringComparison.OrdinalIgnoreCase));
             if (dependency is null || !string.Equals(dependency.LastRunStatus, rule.DependencyRequiredStatus, StringComparison.OrdinalIgnoreCase))
             {
                 rule.SkippedRuns++;
@@ -19775,7 +21302,10 @@ private Task ApplyCombinedAlertDuckingAsync()
                     _ = _settingsStore.SaveAsync(_settings);
                     return;
                 }
-                if (string.Equals(rule.ExecutionMode, "Restart", StringComparison.OrdinalIgnoreCase)) previous.Cancel();
+                if (string.Equals(rule.ExecutionMode, "Restart", StringComparison.OrdinalIgnoreCase))
+                {
+                    previous.Cancel();
+                }
             }
         }
 
@@ -19783,19 +21313,26 @@ private Task ApplyCombinedAlertDuckingAsync()
         lock (_timedAutomationRunSync)
         {
             if (!string.Equals(rule.ExecutionMode, "Parallel", StringComparison.OrdinalIgnoreCase))
+            {
                 _activeTimedAutomationRuns[rule.Id] = timeoutCts;
+            }
+
             UpdateTimedAutomationRuntimeStatus();
         }
 
         Exception? finalError = null;
-        var maxAttempts = Math.Clamp(rule.RetryCount, 0, 20) + 1;
+        int maxAttempts = Math.Clamp(rule.RetryCount, 0, 20) + 1;
         try
         {
-            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 try
                 {
-                    if (attempt > 1) AddTimedAutomationDiagnostic($"Wiederholungsversuch {attempt}/{maxAttempts}: '{rule.Name}'.");
+                    if (attempt > 1)
+                    {
+                        AddTimedAutomationDiagnostic($"Wiederholungsversuch {attempt}/{maxAttempts}: '{rule.Name}'.");
+                    }
+
                     await ExecuteTimedAutomationRuleAsync(rule, timeoutCts.Token, simulate: simulate);
                     finalError = null;
                     break;
@@ -19804,20 +21341,34 @@ private Task ApplyCombinedAlertDuckingAsync()
                 catch (Exception ex)
                 {
                     finalError = ex;
-                    if (attempt >= maxAttempts) break;
+                    if (attempt >= maxAttempts)
+                    {
+                        break;
+                    }
+
                     AddTimedAutomationDiagnostic($"Fehler bei '{rule.Name}': {ex.Message} – neuer Versuch in {rule.RetryDelaySeconds} Sekunden.");
                     if (rule.RetryDelaySeconds > 0)
+                    {
                         await Task.Delay(TimeSpan.FromSeconds(rule.RetryDelaySeconds), timeoutCts.Token);
+                    }
                 }
             }
 
-            if (finalError is not null) throw finalError;
+            if (finalError is not null)
+            {
+                throw finalError;
+            }
+
             if (!simulate)
             {
                 rule.SuccessfulRuns++;
                 rule.LastRunStatus = "Erfolgreich";
                 rule.LastRunAt = DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss");
-                if (rule.TriggerType is "DailySchedule" or "WeeklySchedule" or "OneTimeSchedule") rule.LastScheduledRunDate = DateTime.Now.ToString("yyyy-MM-dd");
+                if (rule.TriggerType is "DailySchedule" or "WeeklySchedule" or "OneTimeSchedule")
+                {
+                    rule.LastScheduledRunDate = DateTime.Now.ToString("yyyy-MM-dd");
+                }
+
                 await _settingsStore.SaveAsync(_settings);
             }
         }
@@ -19839,7 +21390,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
             if (!string.IsNullOrWhiteSpace(rule.FailureRuleId))
             {
-                var fallback = _settings.Workflow.TimedAutomations.FirstOrDefault(x => string.Equals(x.Id, rule.FailureRuleId, StringComparison.OrdinalIgnoreCase));
+                TimedAutomationRuleSettings? fallback = _settings.Workflow.TimedAutomations.FirstOrDefault(x => string.Equals(x.Id, rule.FailureRuleId, StringComparison.OrdinalIgnoreCase));
                 if (fallback is not null)
                 {
                     AddTimedAutomationDiagnostic($"Ersatzregel: '{rule.Name}' → '{fallback.Name}'.");
@@ -19851,8 +21402,11 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             lock (_timedAutomationRunSync)
             {
-                if (_activeTimedAutomationRuns.TryGetValue(rule.Id, out var current) && ReferenceEquals(current, timeoutCts))
+                if (_activeTimedAutomationRuns.TryGetValue(rule.Id, out CancellationTokenSource? current) && ReferenceEquals(current, timeoutCts))
+                {
                     _activeTimedAutomationRuns.Remove(rule.Id);
+                }
+
                 UpdateTimedAutomationRuntimeStatus();
             }
         }
@@ -19872,17 +21426,17 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var runId = Guid.NewGuid().ToString("N")[..8];
+        string runId = Guid.NewGuid().ToString("N")[..8];
         var completed = new List<TimedAutomationRuleSettings>();
         AddTimedAutomationDiagnostic($"Workflow {runId} gestartet: '{starter.WorkflowGroup}' mit {steps.Count} Schritt(en).");
-        foreach (var step in steps)
+        foreach (TimedAutomationRuleSettings? step in steps)
         {
             try
             {
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Clamp(step.TimeoutSeconds, 1, 86400)));
                 Exception? lastError = null;
-                var attempts = Math.Clamp(step.RetryCount, 0, 20) + 1;
-                for (var attempt = 1; attempt <= attempts; attempt++)
+                int attempts = Math.Clamp(step.RetryCount, 0, 20) + 1;
+                for (int attempt = 1; attempt <= attempts; attempt++)
                 {
                     try
                     {
@@ -19894,23 +21448,37 @@ private Task ApplyCombinedAlertDuckingAsync()
                     {
                         lastError = ex;
                         if (attempt < attempts && step.RetryDelaySeconds > 0)
+                        {
                             await Task.Delay(TimeSpan.FromSeconds(step.RetryDelaySeconds), timeout.Token);
+                        }
                     }
                 }
-                if (lastError is not null) throw lastError;
+                if (lastError is not null)
+                {
+                    throw lastError;
+                }
+
                 completed.Add(step);
                 AddTimedAutomationDiagnostic($"Workflow {runId}: Schritt '{step.Name}' abgeschlossen.");
             }
             catch (Exception ex)
             {
                 AddTimedAutomationDiagnostic($"Workflow {runId}: Schritt '{step.Name}' fehlgeschlagen – {ex.Message}");
-                if (string.Equals(starter.WorkflowFailureMode, "Continue", StringComparison.OrdinalIgnoreCase)) continue;
+                if (string.Equals(starter.WorkflowFailureMode, "Continue", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 if (string.Equals(starter.WorkflowFailureMode, "Rollback", StringComparison.OrdinalIgnoreCase))
                 {
-                    foreach (var done in completed.AsEnumerable().Reverse())
+                    foreach (TimedAutomationRuleSettings? done in completed.AsEnumerable().Reverse())
                     {
-                        var rollback = _settings.Workflow.TimedAutomations.FirstOrDefault(x => string.Equals(x.Id, done.RollbackRuleId, StringComparison.OrdinalIgnoreCase));
-                        if (rollback is null) continue;
+                        TimedAutomationRuleSettings? rollback = _settings.Workflow.TimedAutomations.FirstOrDefault(x => string.Equals(x.Id, done.RollbackRuleId, StringComparison.OrdinalIgnoreCase));
+                        if (rollback is null)
+                        {
+                            continue;
+                        }
+
                         try
                         {
                             AddTimedAutomationDiagnostic($"Workflow {runId}: Rückabwicklung '{done.Name}' → '{rollback.Name}'.");
@@ -19942,15 +21510,27 @@ private Task ApplyCombinedAlertDuckingAsync()
     private void StopAllTimedAutomations()
     {
         List<CancellationTokenSource> running;
-        lock (_timedAutomationRunSync) running = _activeTimedAutomationRuns.Values.Distinct().ToList();
-        foreach (var cts in running) cts.Cancel();
+        lock (_timedAutomationRunSync)
+        {
+            running = [.. _activeTimedAutomationRuns.Values.Distinct()];
+        }
+
+        foreach (CancellationTokenSource cts in running)
+        {
+            cts.Cancel();
+        }
+
         AddTimedAutomationDiagnostic($"Abbruch angefordert: {running.Count} laufende Automation(en).");
     }
 
     private void UpdateTimedAutomationRuntimeStatus()
     {
-        if (TimedAutomationRuntimeStatusText is null) return;
-        var count = _activeTimedAutomationRuns.Count;
+        if (TimedAutomationRuntimeStatusText is null)
+        {
+            return;
+        }
+
+        int count = _activeTimedAutomationRuns.Count;
         Dispatcher.InvokeAsync(() => TimedAutomationRuntimeStatusText.Text = count == 0 ? "Keine laufende Automation." : $"{count} Automation(en) laufen.");
     }
 
@@ -19988,19 +21568,25 @@ private Task ApplyCombinedAlertDuckingAsync()
             executionError = ex;
             AddTimedAutomationDiagnostic($"Fehler: '{rule.Name}' – {ex.Message}");
             _appLogger.Write(AppLogLevel.Error, "Automation", $"Regel fehlgeschlagen ({rule.Name}): {ex.Message}");
-            if (!rule.ContinueChainOnError) throw;
+            if (!rule.ContinueChainOnError)
+            {
+                throw;
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(rule.NextRuleId) && (executionError is null || rule.ContinueChainOnError))
         {
-            var next = _settings.Workflow.TimedAutomations.FirstOrDefault(x => string.Equals(x.Id, rule.NextRuleId, StringComparison.OrdinalIgnoreCase));
+            TimedAutomationRuleSettings? next = _settings.Workflow.TimedAutomations.FirstOrDefault(x => string.Equals(x.Id, rule.NextRuleId, StringComparison.OrdinalIgnoreCase));
             if (next is null)
             {
                 AddTimedAutomationDiagnostic($"Kette unvollständig: Folgeregel für '{rule.Name}' wurde nicht gefunden.");
                 return;
             }
             if (rule.NextRuleDelaySeconds > 0)
+            {
                 await Task.Delay(TimeSpan.FromSeconds(rule.NextRuleDelaySeconds), cancellationToken);
+            }
+
             AddTimedAutomationDiagnostic($"Kette: '{rule.Name}' → '{next.Name}'.");
             await ExecuteTimedAutomationRuleAsync(next, cancellationToken, chain, simulate);
         }
@@ -20023,7 +21609,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         if (string.Equals(rule.ActionType, "SwitchScene", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.IsNullOrWhiteSpace(rule.TargetScene)) throw new InvalidOperationException("Keine Zielszene gewählt.");
+            if (string.IsNullOrWhiteSpace(rule.TargetScene))
+            {
+                throw new InvalidOperationException("Keine Zielszene gewählt.");
+            }
+
             if (!string.IsNullOrWhiteSpace(rule.TransitionName))
             {
                 await _obsClient.SetCurrentSceneTransitionAsync(rule.TransitionName, cancellationToken);
@@ -20033,12 +21623,20 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
         else if (string.Equals(rule.ActionType, "SetSourceVisibility", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.IsNullOrWhiteSpace(rule.ObsScene) || string.IsNullOrWhiteSpace(rule.ObsSource)) throw new InvalidOperationException("Szene und Quelle müssen gewählt sein.");
+            if (string.IsNullOrWhiteSpace(rule.ObsScene) || string.IsNullOrWhiteSpace(rule.ObsSource))
+            {
+                throw new InvalidOperationException("Szene und Quelle müssen gewählt sein.");
+            }
+
             await _obsClient.SetSceneItemEnabledAsync(rule.ObsScene, rule.ObsSource, rule.SourceVisible, cancellationToken);
         }
         else if (string.Equals(rule.ActionType, "SetInputMute", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.IsNullOrWhiteSpace(rule.ObsInput)) throw new InvalidOperationException("Keine OBS-Audioquelle gewählt.");
+            if (string.IsNullOrWhiteSpace(rule.ObsInput))
+            {
+                throw new InvalidOperationException("Keine OBS-Audioquelle gewählt.");
+            }
+
             await _obsClient.SetInputMuteAsync(rule.ObsInput, rule.InputMuted, cancellationToken);
         }
         else if (string.Equals(rule.ActionType, "StartObsStream", StringComparison.OrdinalIgnoreCase))
@@ -20052,18 +21650,26 @@ private Task ApplyCombinedAlertDuckingAsync()
         else if (string.Equals(rule.ActionType, "StreamerBotAction", StringComparison.OrdinalIgnoreCase))
         {
             if (!_streamerBotClient.IsConnected)
+            {
                 throw new InvalidOperationException("Streamer.bot ist nicht verbunden.");
+            }
+
             if (string.IsNullOrWhiteSpace(rule.StreamerBotActionId) && string.IsNullOrWhiteSpace(rule.StreamerBotActionName))
+            {
                 throw new InvalidOperationException("Keine Streamer.bot-Aktion gewählt.");
-            using var response = await SendStreamerBotRequestAsync(new
+            }
+
+            using JsonDocument response = await SendStreamerBotRequestAsync(new
             {
                 request = "DoAction",
                 action = new { id = rule.StreamerBotActionId, name = rule.StreamerBotActionName },
                 args = new { source = "Creator Control Suite", automationRule = rule.Name }
             });
-            var status = response.RootElement.TryGetProperty("status", out var statusNode) ? statusNode.GetString() : null;
+            string? status = response.RootElement.TryGetProperty("status", out JsonElement statusNode) ? statusNode.GetString() : null;
             if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
+            {
                 throw new InvalidOperationException("Streamer.bot hat die Aktion nicht bestätigt.");
+            }
         }
 
         if (!string.Equals(rule.SpotifyAction, "None", StringComparison.OrdinalIgnoreCase))
@@ -20071,15 +21677,15 @@ private Task ApplyCombinedAlertDuckingAsync()
             CancellationTokenSource spotifyRunCts;
             lock (_spotifyAutomationSync)
             {
-                var incomingGroup = string.IsNullOrWhiteSpace(rule.SpotifyAutomationGroup) ? "Standard" : rule.SpotifyAutomationGroup.Trim();
+                string incomingGroup = string.IsNullOrWhiteSpace(rule.SpotifyAutomationGroup) ? "Standard" : rule.SpotifyAutomationGroup.Trim();
                 if (_spotifyAutomationCts is not null)
                 {
-                    var sameGroup = string.Equals(incomingGroup, _activeSpotifyAutomationGroup, StringComparison.OrdinalIgnoreCase);
-                    var blockedByExclusiveGroup = !sameGroup && (_activeSpotifyAutomationExclusive || rule.SpotifyExclusiveGroup);
+                    bool sameGroup = string.Equals(incomingGroup, _activeSpotifyAutomationGroup, StringComparison.OrdinalIgnoreCase);
+                    bool blockedByExclusiveGroup = !sameGroup && (_activeSpotifyAutomationExclusive || rule.SpotifyExclusiveGroup);
                     if (rule.SpotifyPriority < _activeSpotifyAutomationPriority ||
                         (blockedByExclusiveGroup && rule.SpotifyPriority <= _activeSpotifyAutomationPriority))
                     {
-                        var reason = blockedByExclusiveGroup
+                        string reason = blockedByExclusiveGroup
                             ? $"Gruppe '{incomingGroup}' ist durch die aktive Gruppe '{_activeSpotifyAutomationGroup}' gesperrt"
                             : $"Priorität {rule.SpotifyPriority} ist niedriger als aktive Priorität {_activeSpotifyAutomationPriority}";
                         AddTimedAutomationDiagnostic($"Spotify-Aktion '{rule.Name}' übersprungen: {reason}.");
@@ -20098,29 +21704,47 @@ private Task ApplyCombinedAlertDuckingAsync()
 
             try
             {
-                var spotifyToken = spotifyRunCts.Token;
+                CancellationToken spotifyToken = spotifyRunCts.Token;
                 if (rule.SpotifyActionDelaySeconds > 0)
+                {
                     await Task.Delay(TimeSpan.FromSeconds(rule.SpotifyActionDelaySeconds), spotifyToken);
+                }
 
-                var spotifyGroup = string.IsNullOrWhiteSpace(rule.SpotifyAutomationGroup) ? "Standard" : rule.SpotifyAutomationGroup.Trim();
+                string spotifyGroup = string.IsNullOrWhiteSpace(rule.SpotifyAutomationGroup) ? "Standard" : rule.SpotifyAutomationGroup.Trim();
                 if (rule.SpotifySavePreviousState && !string.Equals(rule.SpotifyAction, "RestorePrevious", StringComparison.OrdinalIgnoreCase))
+                {
                     await SaveSpotifyAutomationStateAsync(spotifyGroup, spotifyToken);
+                }
 
                 if (string.Equals(rule.SpotifyAction, "RestorePrevious", StringComparison.OrdinalIgnoreCase))
+                {
                     await RestoreSpotifyAutomationStateAsync(spotifyGroup, rule, spotifyToken);
-                else if (string.Equals(rule.SpotifyAction, "Pause", StringComparison.OrdinalIgnoreCase)) await _spotifyModule.PauseAsync(spotifyToken);
+                }
+                else if (string.Equals(rule.SpotifyAction, "Pause", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _spotifyModule.PauseAsync(spotifyToken);
+                }
                 else if (string.Equals(rule.SpotifyAction, "Resume", StringComparison.OrdinalIgnoreCase))
                 {
                     await _spotifyModule.ResumeAsync(spotifyToken);
                     await ApplySpotifyAutomationVolumeAsync(rule, spotifyToken);
                 }
                 else if (string.Equals(rule.SpotifyAction, "SetVolume", StringComparison.OrdinalIgnoreCase))
+                {
                     await ApplySpotifyAutomationVolumeAsync(rule, spotifyToken);
+                }
                 else if (string.Equals(rule.SpotifyAction, "StartPlaylist", StringComparison.OrdinalIgnoreCase))
                 {
                     if (string.IsNullOrWhiteSpace(rule.SpotifyPlaylistUri))
+                    {
                         throw new InvalidOperationException("Für die Spotify-Automation wurde keine Playlist-URI eingetragen.");
-                    if (rule.SpotifyFadeSeconds > 0) await _spotifyModule.SetVolumeImmediateAsync(0, spotifyToken);
+                    }
+
+                    if (rule.SpotifyFadeSeconds > 0)
+                    {
+                        await _spotifyModule.SetVolumeImmediateAsync(0, spotifyToken);
+                    }
+
                     await _spotifyModule.StartPlaylistAsync(
                         rule.SpotifyPlaylistUri,
                         applyConfiguredStartVolume: false,
@@ -20132,18 +21756,24 @@ private Task ApplyCombinedAlertDuckingAsync()
                 if (rule.SpotifyAutoRestorePreviousState &&
                     !string.Equals(rule.SpotifyAction, "RestorePrevious", StringComparison.OrdinalIgnoreCase))
                 {
-                    var hasSavedState = false;
-                    lock (_spotifyAutomationSync) hasSavedState = _spotifyAutomationSavedStates.ContainsKey(spotifyGroup);
+                    bool hasSavedState;
+                    lock (_spotifyAutomationSync)
+                    {
+                        hasSavedState = _spotifyAutomationSavedStates.ContainsKey(spotifyGroup);
+                    }
+
                     if (!hasSavedState)
+                    {
                         AddTimedAutomationDiagnostic($"Spotify-Gruppe '{spotifyGroup}': Automatische Rückkehr übersprungen, weil kein Zustand gesichert wurde.");
+                    }
                     else
                     {
-                        var restoreDelay = Math.Clamp(rule.SpotifyAutoRestoreDelaySeconds, 1, 86400);
-                        var expectedScene = _automationCurrentScene;
+                        int restoreDelay = Math.Clamp(rule.SpotifyAutoRestoreDelaySeconds, 1, 86400);
+                        string expectedScene = _automationCurrentScene;
                         await _spotifyModule.RefreshPlaybackAsync(spotifyToken);
-                        var expectedPlayback = _spotifyModule.GetSnapshot().Playback;
-                        var expectedTrackUri = expectedPlayback.Track?.Uri ?? "";
-                        var expectedContextUri = expectedPlayback.ContextUri ?? "";
+                        SpotifyPlaybackState expectedPlayback = _spotifyModule.GetSnapshot().Playback;
+                        string expectedTrackUri = expectedPlayback.Track?.Uri ?? "";
+                        string expectedContextUri = expectedPlayback.ContextUri ?? "";
                         AddTimedAutomationDiagnostic($"Spotify-Gruppe '{spotifyGroup}': Automatische Rückkehr in {restoreDelay} Sekunden vorgemerkt.");
                         await Task.Delay(TimeSpan.FromSeconds(restoreDelay), spotifyToken);
 
@@ -20166,9 +21796,9 @@ private Task ApplyCombinedAlertDuckingAsync()
                         if (rule.SpotifyAutoRestoreRequireUnchangedPlayback)
                         {
                             await _spotifyModule.RefreshPlaybackAsync(spotifyToken);
-                            var currentPlayback = _spotifyModule.GetSnapshot().Playback;
-                            var currentTrackUri = currentPlayback.Track?.Uri ?? "";
-                            var currentContextUri = currentPlayback.ContextUri ?? "";
+                            SpotifyPlaybackState currentPlayback = _spotifyModule.GetSnapshot().Playback;
+                            string currentTrackUri = currentPlayback.Track?.Uri ?? "";
+                            string currentContextUri = currentPlayback.ContextUri ?? "";
                             if (!string.Equals(expectedTrackUri, currentTrackUri, StringComparison.OrdinalIgnoreCase) ||
                                 !string.Equals(expectedContextUri, currentContextUri, StringComparison.OrdinalIgnoreCase))
                             {
@@ -20207,9 +21837,12 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshSpotifySavedStateStatus()
     {
-        var group = GetSpotifyAutomationEditorGroup();
+        string group = GetSpotifyAutomationEditorGroup();
         SpotifyAutomationSavedState? state;
-        lock (_spotifyAutomationSync) _spotifyAutomationSavedStates.TryGetValue(group, out state);
+        lock (_spotifyAutomationSync)
+        {
+            _spotifyAutomationSavedStates.TryGetValue(group, out state);
+        }
 
         if (state is null)
         {
@@ -20217,12 +21850,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var title = state.Track?.Name ?? "Unbekannter Titel";
-        var artist = state.Track?.Artist ?? "Unbekannter Interpret";
+        string title = state.Track?.Name ?? "Unbekannter Titel";
+        string artist = state.Track?.Artist ?? "Unbekannter Interpret";
         var position = TimeSpan.FromMilliseconds(Math.Max(0, state.ProgressMs));
-        var playbackState = state.WasPlaying ? "lief" : "war pausiert";
-        var age = DateTimeOffset.UtcNow - state.SavedAtUtc;
-        var expiry = IsSpotifySavedStateExpired(state) ? " · ABGELAUFEN" : "";
+        string playbackState = state.WasPlaying ? "lief" : "war pausiert";
+        TimeSpan age = DateTimeOffset.UtcNow - state.SavedAtUtc;
+        string expiry = IsSpotifySavedStateExpired(state) ? " · ABGELAUFEN" : "";
         TimedAutomationSpotifySavedStateText.Text =
             $"Gruppe '{group}': {title} – {artist} bei {position:mm\\:ss}, Lautstärke {state.VolumePercent} %, " +
             $"Shuffle {(state.ShuffleEnabled ? "an" : "aus")}, Wiederholung {state.RepeatMode}, {playbackState}. " +
@@ -20234,26 +21867,25 @@ private Task ApplyCombinedAlertDuckingAsync()
         List<SpotifySavedStateOverviewItem> items;
         lock (_spotifyAutomationSync)
         {
-            items = _spotifyAutomationSavedStates
+            items = [.. _spotifyAutomationSavedStates
                 .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(entry =>
                 {
-                    var state = entry.Value;
-                    var title = state.Track?.Name ?? "Unbekannter Titel";
-                    var artist = state.Track?.Artist ?? "Unbekannter Interpret";
+                    SpotifyAutomationSavedState state = entry.Value;
+                    string title = state.Track?.Name ?? "Unbekannter Titel";
+                    string artist = state.Track?.Artist ?? "Unbekannter Interpret";
                     var position = TimeSpan.FromMilliseconds(Math.Max(0, state.ProgressMs));
-                    var playbackState = state.WasPlaying ? "lief" : "pausiert";
-                    var age = DateTimeOffset.UtcNow - state.SavedAtUtc;
-                    var expired = IsSpotifySavedStateExpired(state);
-                    var prefix = expired ? "[ABGELAUFEN] " : "";
-                    var summary = $"{prefix}{entry.Key} · {title} – {artist} · {position:mm\\:ss} · {state.VolumePercent} % · {playbackState} · vor {FormatSpotifySavedStateAge(age)}";
+                    string playbackState = state.WasPlaying ? "lief" : "pausiert";
+                    TimeSpan age = DateTimeOffset.UtcNow - state.SavedAtUtc;
+                    bool expired = IsSpotifySavedStateExpired(state);
+                    string prefix = expired ? "[ABGELAUFEN] " : "";
+                    string summary = $"{prefix}{entry.Key} · {title} – {artist} · {position:mm\\:ss} · {state.VolumePercent} % · {playbackState} · vor {FormatSpotifySavedStateAge(age)}";
                     return new SpotifySavedStateOverviewItem(entry.Key, summary, expired);
-                })
-                .ToList();
+                })];
         }
 
         SpotifySavedStatesOverviewList.ItemsSource = items;
-        var expiredCount = items.Count(item => item.IsExpired);
+        int expiredCount = items.Count(item => item.IsExpired);
         SpotifySavedStatesOverviewStatusText.Text = items.Count == 0
             ? "Es ist aktuell kein Spotify-Zustand gespeichert."
             : expiredCount == 0
@@ -20263,7 +21895,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void UpdateSpotifySavedStatesOverviewSelection()
     {
-        if (SpotifySavedStatesOverviewList.SelectedItem is not SpotifySavedStateOverviewItem item) return;
+        if (SpotifySavedStatesOverviewList.SelectedItem is not SpotifySavedStateOverviewItem item)
+        {
+            return;
+        }
+
         SpotifySavedStatesOverviewStatusText.Text = item.IsExpired
             ? $"Ausgewählt: Gruppe '{item.Group}' · Zustand ist abgelaufen, kann aber weiterhin manuell wiederhergestellt werden."
             : $"Ausgewählt: Gruppe '{item.Group}'.";
@@ -20290,8 +21926,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var removed = false;
-        lock (_spotifyAutomationSync) removed = _spotifyAutomationSavedStates.Remove(item.Group);
+        bool removed;
+        lock (_spotifyAutomationSync)
+        {
+            removed = _spotifyAutomationSavedStates.Remove(item.Group);
+        }
+
         AddTimedAutomationDiagnostic(removed
             ? $"Spotify-Gruppe '{item.Group}': Gespeicherter Zustand wurde über die Übersicht verworfen."
             : $"Spotify-Gruppe '{item.Group}': Zustand war bereits nicht mehr vorhanden.");
@@ -20331,21 +21971,41 @@ private Task ApplyCombinedAlertDuckingAsync()
         _loadingSpotifySavedStateHistoryPersistence = true;
         try
         {
-            if (!File.Exists(SpotifySavedStateHistoryPersistencePath)) return;
-            var state = JsonSerializer.Deserialize<SpotifySavedStateHistoryPersistence>(
+            if (!File.Exists(SpotifySavedStateHistoryPersistencePath))
+            {
+                return;
+            }
+
+            SpotifySavedStateHistoryPersistence? state = JsonSerializer.Deserialize<SpotifySavedStateHistoryPersistence>(
                 File.ReadAllText(SpotifySavedStateHistoryPersistencePath));
-            if (state is null || state.FormatVersion != 1 || state.Entries is null) return;
+            if (state is null || state.FormatVersion != 1 || state.Entries is null)
+            {
+                return;
+            }
 
             _spotifySavedStateHistory.Clear();
             _spotifySavedStateHistoryFavorites.Clear();
             _spotifySavedStateHistoryNotes.Clear();
-            foreach (var entry in state.Entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).Take(100))
+            foreach (string? entry in state.Entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).Take(100))
+            {
                 _spotifySavedStateHistory.Add(entry);
-            foreach (var entry in state.FavoriteEntries ?? [])
-                if (_spotifySavedStateHistory.Contains(entry)) _spotifySavedStateHistoryFavorites.Add(entry);
-            foreach (var pair in state.Notes ?? new Dictionary<string, string>())
+            }
+
+            foreach (string entry in state.FavoriteEntries ?? [])
+            {
+                if (_spotifySavedStateHistory.Contains(entry))
+                {
+                    _spotifySavedStateHistoryFavorites.Add(entry);
+                }
+            }
+
+            foreach (KeyValuePair<string, string> pair in state.Notes ?? [])
+            {
                 if (_spotifySavedStateHistory.Contains(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
+                {
                     _spotifySavedStateHistoryNotes[pair.Key] = pair.Value;
+                }
+            }
 
             _spotifySavedStateSaveCount = Math.Max(0, state.SavedCount);
             _spotifySavedStateRestoreCount = Math.Max(0, state.RestoredCount);
@@ -20369,19 +22029,27 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void SaveSpotifySavedStateHistoryPersistence()
     {
-        if (_loadingSpotifySavedStateHistoryPersistence) return;
+        if (_loadingSpotifySavedStateHistoryPersistence)
+        {
+            return;
+        }
+
         try
         {
-            var directory = Path.GetDirectoryName(SpotifySavedStateHistoryPersistencePath);
-            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+            string? directory = Path.GetDirectoryName(SpotifySavedStateHistoryPersistencePath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
             var state = new SpotifySavedStateHistoryPersistence(
                 1,
                 _spotifySavedStateSaveCount,
                 _spotifySavedStateRestoreCount,
                 _spotifySavedStateDiscardCount,
                 _spotifySavedStateCleanupCount,
-                _spotifySavedStateHistory.ToList(),
-                _spotifySavedStateHistoryFavorites.ToList(),
+                [.. _spotifySavedStateHistory],
+                [.. _spotifySavedStateHistoryFavorites],
                 new Dictionary<string, string>(_spotifySavedStateHistoryNotes),
                 SpotifySavedStateHistorySearchBox?.Text ?? "",
                 SpotifySavedStateHistoryActionFilterBox?.SelectedIndex ?? 0,
@@ -20392,7 +22060,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             {
                 CreateSpotifySavedStateHistoryBackup(manual: false);
             }
-            var temporaryPath = SpotifySavedStateHistoryPersistencePath + ".tmp";
+            string temporaryPath = SpotifySavedStateHistoryPersistencePath + ".tmp";
             File.WriteAllText(temporaryPath, JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
             File.Move(temporaryPath, SpotifySavedStateHistoryPersistencePath, true);
         }
@@ -20410,18 +22078,21 @@ private Task ApplyCombinedAlertDuckingAsync()
             if (!File.Exists(SpotifySavedStateHistoryPersistencePath))
             {
                 if (manual)
+                {
                     SpotifySavedStateHistoryStatusText.Text = "Es ist noch keine lokale Verlaufshistorie vorhanden, die gesichert werden kann.";
+                }
+
                 return;
             }
 
             Directory.CreateDirectory(SpotifySavedStateHistoryBackupDirectory);
-            var backupPath = Path.Combine(
+            string backupPath = Path.Combine(
                 SpotifySavedStateHistoryBackupDirectory,
                 $"spotify-saved-state-history-{DateTime.Now:yyyyMMdd-HHmmss}.json");
             File.Copy(SpotifySavedStateHistoryPersistencePath, backupPath, overwrite: false);
             _lastSpotifySavedStateHistoryBackupUtc = DateTimeOffset.UtcNow;
 
-            foreach (var oldBackup in new DirectoryInfo(SpotifySavedStateHistoryBackupDirectory)
+            foreach (FileInfo? oldBackup in new DirectoryInfo(SpotifySavedStateHistoryBackupDirectory)
                          .GetFiles("spotify-saved-state-history-*.json")
                          .OrderByDescending(file => file.CreationTimeUtc)
                          .Skip(10))
@@ -20434,23 +22105,27 @@ private Task ApplyCombinedAlertDuckingAsync()
                 : "Spotify: Automatischer Wiederherstellungspunkt für den Zustandsverlauf erstellt.");
             RefreshSpotifySavedStateHistoryBackups();
             if (manual)
+            {
                 SpotifySavedStateHistoryStatusText.Text = "Wiederherstellungspunkt wurde erstellt. Es werden höchstens 10 Sicherungen aufbewahrt.";
+            }
         }
         catch (Exception exception)
         {
             AddTimedAutomationDiagnostic("Spotify: Verlaufssicherung konnte nicht erstellt werden: " + exception.Message);
             if (manual)
+            {
                 SpotifySavedStateHistoryStatusText.Text = "Sicherung fehlgeschlagen: " + exception.Message;
+            }
         }
     }
 
     private void RefreshSpotifySavedStateHistoryBackups()
     {
-        var selectedPath = (SpotifySavedStateHistoryBackupsList?.SelectedItem as SpotifySavedStateHistoryBackupItem)?.FullPath;
+        string? selectedPath = (SpotifySavedStateHistoryBackupsList?.SelectedItem as SpotifySavedStateHistoryBackupItem)?.FullPath;
         _spotifySavedStateHistoryBackups.Clear();
         if (Directory.Exists(SpotifySavedStateHistoryBackupDirectory))
         {
-            foreach (var file in new DirectoryInfo(SpotifySavedStateHistoryBackupDirectory)
+            foreach (FileInfo? file in new DirectoryInfo(SpotifySavedStateHistoryBackupDirectory)
                          .GetFiles("spotify-saved-state-history-*.json")
                          .OrderByDescending(file => file.LastWriteTimeUtc))
             {
@@ -20463,14 +22138,21 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
 
         if (!string.IsNullOrWhiteSpace(selectedPath) && SpotifySavedStateHistoryBackupsList is not null)
+        {
             SpotifySavedStateHistoryBackupsList.SelectedItem = _spotifySavedStateHistoryBackups.FirstOrDefault(item => item.FullPath == selectedPath);
+        }
+
         UpdateSpotifySavedStateHistoryBackupDetail();
         UpdateSpotifySavedStateHistoryBackupPreview(showStatus: false);
     }
 
     private void UpdateSpotifySavedStateHistoryBackupDetail()
     {
-        if (SpotifySavedStateHistoryBackupDetailText is null) return;
+        if (SpotifySavedStateHistoryBackupDetailText is null)
+        {
+            return;
+        }
+
         if (SpotifySavedStateHistoryBackupsList?.SelectedItem is not SpotifySavedStateHistoryBackupItem backup)
         {
             SpotifySavedStateHistoryBackupDetailText.Text = _spotifySavedStateHistoryBackups.Count == 0
@@ -20485,47 +22167,70 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void UpdateSpotifySavedStateHistoryBackupPreview(bool showStatus)
     {
-        if (SpotifySavedStateHistoryBackupPreviewText is null) return;
+        if (SpotifySavedStateHistoryBackupPreviewText is null)
+        {
+            return;
+        }
+
         if (SpotifySavedStateHistoryBackupsList?.SelectedItem is not SpotifySavedStateHistoryBackupItem backup)
         {
             SpotifySavedStateHistoryBackupPreviewText.Text =
                 "Sicherung auswählen, um Inhalt und Unterschiede zum aktuellen Verlauf anzuzeigen.";
             _spotifySavedStateHistoryBackupDifferences.Clear();
-            if (showStatus) SpotifySavedStateHistoryStatusText.Text = "Bitte zuerst einen Wiederherstellungspunkt auswählen.";
+            if (showStatus)
+            {
+                SpotifySavedStateHistoryStatusText.Text = "Bitte zuerst einen Wiederherstellungspunkt auswählen.";
+            }
+
             return;
         }
 
         try
         {
-            var state = JsonSerializer.Deserialize<SpotifySavedStateHistoryPersistence>(File.ReadAllText(backup.FullPath));
+            SpotifySavedStateHistoryPersistence? state = JsonSerializer.Deserialize<SpotifySavedStateHistoryPersistence>(File.ReadAllText(backup.FullPath));
             if (state is null || state.FormatVersion != 1 || state.Entries is null)
+            {
                 throw new InvalidDataException("Die Sicherungsdatei enthält kein unterstütztes Verlaufsformat.");
+            }
 
             var backupEntries = new HashSet<string>(state.Entries, StringComparer.Ordinal);
             var currentEntries = new HashSet<string>(_spotifySavedStateHistory, StringComparer.Ordinal);
             var addedEntries = backupEntries.Except(currentEntries).OrderBy(entry => entry, StringComparer.CurrentCultureIgnoreCase).ToList();
             var replacedEntries = currentEntries.Except(backupEntries).OrderBy(entry => entry, StringComparer.CurrentCultureIgnoreCase).ToList();
             var unchangedEntries = backupEntries.Intersect(currentEntries).OrderBy(entry => entry, StringComparer.CurrentCultureIgnoreCase).ToList();
-            var onlyInBackup = addedEntries.Count;
-            var onlyCurrent = replacedEntries.Count;
-            var common = unchangedEntries.Count;
-            var backupFavorites = state.FavoriteEntries?.Count ?? 0;
-            var backupNotes = state.Notes?.Count(pair => !string.IsNullOrWhiteSpace(pair.Value)) ?? 0;
-            var currentNotes = _spotifySavedStateHistoryNotes.Count(pair => !string.IsNullOrWhiteSpace(pair.Value));
+            int onlyInBackup = addedEntries.Count;
+            int onlyCurrent = replacedEntries.Count;
+            int common = unchangedEntries.Count;
+            int backupFavorites = state.FavoriteEntries?.Count ?? 0;
+            int backupNotes = state.Notes?.Count(pair => !string.IsNullOrWhiteSpace(pair.Value)) ?? 0;
+            int currentNotes = _spotifySavedStateHistoryNotes.Count(pair => !string.IsNullOrWhiteSpace(pair.Value));
 
             _spotifySavedStateHistoryBackupDifferences.Clear();
-            foreach (var entry in addedEntries.Take(50))
+            foreach (string? entry in addedEntries.Take(50))
+            {
                 _spotifySavedStateHistoryBackupDifferences.Add("+ HINZUKOMMEND: " + entry);
-            foreach (var entry in replacedEntries.Take(50))
-                _spotifySavedStateHistoryBackupDifferences.Add("− WIRD ERSETZT: " + entry);
-            foreach (var entry in unchangedEntries.Take(25))
-                _spotifySavedStateHistoryBackupDifferences.Add("= UNVERÄNDERT: " + entry);
+            }
 
-            var hiddenDifferenceCount = Math.Max(0, addedEntries.Count - 50) + Math.Max(0, replacedEntries.Count - 50) + Math.Max(0, unchangedEntries.Count - 25);
+            foreach (string? entry in replacedEntries.Take(50))
+            {
+                _spotifySavedStateHistoryBackupDifferences.Add("− WIRD ERSETZT: " + entry);
+            }
+
+            foreach (string? entry in unchangedEntries.Take(25))
+            {
+                _spotifySavedStateHistoryBackupDifferences.Add("= UNVERÄNDERT: " + entry);
+            }
+
+            int hiddenDifferenceCount = Math.Max(0, addedEntries.Count - 50) + Math.Max(0, replacedEntries.Count - 50) + Math.Max(0, unchangedEntries.Count - 25);
             if (hiddenDifferenceCount > 0)
+            {
                 _spotifySavedStateHistoryBackupDifferences.Add($"… {hiddenDifferenceCount} weitere Vergleichseinträge werden aus Übersichtsgründen nicht angezeigt.");
+            }
+
             if (_spotifySavedStateHistoryBackupDifferences.Count == 0)
+            {
                 _spotifySavedStateHistoryBackupDifferences.Add("Keine Eintragsunterschiede vorhanden.");
+            }
 
             SpotifySavedStateHistoryBackupPreviewText.Text =
                 $"Inhalt der Sicherung:\n" +
@@ -20540,7 +22245,9 @@ private Task ApplyCombinedAlertDuckingAsync()
                 $"• Notizen: aktuell {currentNotes}, Sicherung {backupNotes}";
 
             if (showStatus)
+            {
                 SpotifySavedStateHistoryStatusText.Text = $"Sicherung vom {backup.LastWriteTime:dd.MM.yyyy HH:mm:ss} wurde erfolgreich analysiert.";
+            }
         }
         catch (Exception exception)
         {
@@ -20548,7 +22255,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             _spotifySavedStateHistoryBackupDifferences.Clear();
             _spotifySavedStateHistoryBackupDifferences.Add("Vorschaufehler: " + exception.Message);
             AddTimedAutomationDiagnostic("Spotify: Sicherungsvorschau konnte nicht erstellt werden: " + exception.Message);
-            if (showStatus) SpotifySavedStateHistoryStatusText.Text = "Sicherungsvorschau fehlgeschlagen: " + exception.Message;
+            if (showStatus)
+            {
+                SpotifySavedStateHistoryStatusText.Text = "Sicherungsvorschau fehlgeschlagen: " + exception.Message;
+            }
         }
     }
 
@@ -20560,18 +22270,23 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             $"Den Spotify-Zustandsverlauf aus der Sicherung vom {backup.LastWriteTime:dd.MM.yyyy HH:mm:ss} wiederherstellen?\n\nDer aktuelle Verlauf wird vorher automatisch gesichert.",
             "Spotify-Verlauf wiederherstellen",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes) return;
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
 
         try
         {
-            var state = JsonSerializer.Deserialize<SpotifySavedStateHistoryPersistence>(File.ReadAllText(backup.FullPath));
+            SpotifySavedStateHistoryPersistence? state = JsonSerializer.Deserialize<SpotifySavedStateHistoryPersistence>(File.ReadAllText(backup.FullPath));
             if (state is null || state.FormatVersion != 1 || state.Entries is null)
+            {
                 throw new InvalidDataException("Die Sicherungsdatei enthält kein unterstütztes Verlaufsformat.");
+            }
 
             CreateSpotifySavedStateHistoryBackup(manual: false);
             Directory.CreateDirectory(Path.GetDirectoryName(SpotifySavedStateHistoryPersistencePath)!);
@@ -20603,9 +22318,11 @@ private Task ApplyCombinedAlertDuckingAsync()
         {
             if (File.Exists(SpotifyHistoryRestoreProfilesPath))
             {
-                var custom = JsonSerializer.Deserialize<List<SpotifyHistoryRestoreProfile>>(File.ReadAllText(SpotifyHistoryRestoreProfilesPath)) ?? [];
-                foreach (var profile in custom.Where(profile => !string.IsNullOrWhiteSpace(profile.Name)))
+                List<SpotifyHistoryRestoreProfile> custom = JsonSerializer.Deserialize<List<SpotifyHistoryRestoreProfile>>(File.ReadAllText(SpotifyHistoryRestoreProfilesPath)) ?? [];
+                foreach (SpotifyHistoryRestoreProfile? profile in custom.Where(profile => !string.IsNullOrWhiteSpace(profile.Name)))
+                {
                     _spotifyHistoryRestoreProfiles.Add(profile with { IsBuiltIn = false });
+                }
             }
         }
         catch (Exception exception)
@@ -20633,7 +22350,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void SaveSpotifyHistoryRestoreProfile()
     {
-        var name = SpotifyHistoryRestoreProfileNameBox.Text.Trim();
+        string name = SpotifyHistoryRestoreProfileNameBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(name))
         {
             SpotifySavedStateHistoryStatusText.Text = "Bitte einen Namen für das Wiederherstellungsprofil eingeben.";
@@ -20643,8 +22360,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             RestoreSpotifyHistoryEntriesBox.IsChecked == true, RestoreSpotifyHistoryFavoritesBox.IsChecked == true,
             RestoreSpotifyHistoryNotesBox.IsChecked == true, RestoreSpotifyHistoryCountersBox.IsChecked == true,
             RestoreSpotifyHistoryFiltersBox.IsChecked == true, MergeSpotifyHistoryEntriesBox.IsChecked == true);
-        var existing = _spotifyHistoryRestoreProfiles.FirstOrDefault(item => !item.IsBuiltIn && item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null) _spotifyHistoryRestoreProfiles.Remove(existing);
+        SpotifyHistoryRestoreProfile? existing = _spotifyHistoryRestoreProfiles.FirstOrDefault(item => !item.IsBuiltIn && item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            _spotifyHistoryRestoreProfiles.Remove(existing);
+        }
+
         _spotifyHistoryRestoreProfiles.Add(profile);
         PersistSpotifyHistoryRestoreProfiles();
         SpotifyHistoryRestoreProfileBox.SelectedItem = profile;
@@ -20653,7 +22374,11 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void DeleteSpotifyHistoryRestoreProfile()
     {
-        if (SpotifyHistoryRestoreProfileBox.SelectedItem is not SpotifyHistoryRestoreProfile profile) return;
+        if (SpotifyHistoryRestoreProfileBox.SelectedItem is not SpotifyHistoryRestoreProfile profile)
+        {
+            return;
+        }
+
         if (profile.IsBuiltIn)
         {
             SpotifySavedStateHistoryStatusText.Text = "Integrierte Wiederherstellungsprofile können nicht gelöscht werden.";
@@ -20685,7 +22410,10 @@ private Task ApplyCombinedAlertDuckingAsync()
                 AddExtension = true,
                 OverwritePrompt = true
             };
-            if (dialog.ShowDialog(this) != true) return;
+            if (dialog.ShowDialog(this) != true)
+            {
+                return;
+            }
 
             var exportModel = new
             {
@@ -20716,26 +22444,33 @@ private Task ApplyCombinedAlertDuckingAsync()
                 CheckFileExists = true,
                 Multiselect = false
             };
-            if (dialog.ShowDialog(this) != true) return;
+            if (dialog.ShowDialog(this) != true)
+            {
+                return;
+            }
 
-            var imported = ReadSpotifyHistoryRestoreProfilesImport(dialog.FileName);
+            List<SpotifyHistoryRestoreProfile> imported = ReadSpotifyHistoryRestoreProfilesImport(dialog.FileName);
             _pendingSpotifyHistoryRestoreProfileImport = imported;
             _pendingSpotifyHistoryRestoreProfileImportPath = dialog.FileName;
             _spotifyHistoryRestoreProfileImportPreview.Clear();
 
-            var added = 0;
-            var updated = 0;
-            var unchanged = 0;
-            foreach (var profile in imported)
+            int added = 0;
+            int updated = 0;
+            int unchanged = 0;
+            foreach (SpotifyHistoryRestoreProfile profile in imported)
             {
-                var existing = _spotifyHistoryRestoreProfiles.FirstOrDefault(item => !item.IsBuiltIn && item.Name.Equals(profile.Name, StringComparison.OrdinalIgnoreCase));
+                SpotifyHistoryRestoreProfile? existing = _spotifyHistoryRestoreProfiles.FirstOrDefault(item => !item.IsBuiltIn && item.Name.Equals(profile.Name, StringComparison.OrdinalIgnoreCase));
                 if (existing is null)
                 {
                     added++;
                     _spotifyHistoryRestoreProfileImportPreview.Add(new SpotifyHistoryRestoreProfileImportItem
                     {
-                        Profile = profile, Status = "+ NEU", Description = DescribeSpotifyHistoryRestoreProfile(profile),
-                        ActionOptions = ["Importieren", "Überspringen"], SelectedAction = "Importieren", CanSelect = true
+                        Profile = profile,
+                        Status = "+ NEU",
+                        Description = DescribeSpotifyHistoryRestoreProfile(profile),
+                        ActionOptions = ["Importieren", "Überspringen"],
+                        SelectedAction = "Importieren",
+                        CanSelect = true
                     });
                 }
                 else if (existing == profile)
@@ -20743,8 +22478,12 @@ private Task ApplyCombinedAlertDuckingAsync()
                     unchanged++;
                     _spotifyHistoryRestoreProfileImportPreview.Add(new SpotifyHistoryRestoreProfileImportItem
                     {
-                        Profile = profile, Status = "= UNVERÄNDERT", Description = "Keine Änderung erforderlich",
-                        ActionOptions = ["Überspringen"], SelectedAction = "Überspringen", CanSelect = false
+                        Profile = profile,
+                        Status = "= UNVERÄNDERT",
+                        Description = "Keine Änderung erforderlich",
+                        ActionOptions = ["Überspringen"],
+                        SelectedAction = "Überspringen",
+                        CanSelect = false
                     });
                 }
                 else
@@ -20752,8 +22491,12 @@ private Task ApplyCombinedAlertDuckingAsync()
                     updated++;
                     _spotifyHistoryRestoreProfileImportPreview.Add(new SpotifyHistoryRestoreProfileImportItem
                     {
-                        Profile = profile, Status = "~ KONFLIKT", Description = DescribeSpotifyHistoryRestoreProfile(profile),
-                        ActionOptions = ["Überschreiben", "Als Kopie importieren", "Überspringen"], SelectedAction = "Überschreiben", CanSelect = true
+                        Profile = profile,
+                        Status = "~ KONFLIKT",
+                        Description = DescribeSpotifyHistoryRestoreProfile(profile),
+                        ActionOptions = ["Überschreiben", "Als Kopie importieren", "Überspringen"],
+                        SelectedAction = "Überschreiben",
+                        CanSelect = true
                     });
                 }
             }
@@ -20777,22 +22520,27 @@ private Task ApplyCombinedAlertDuckingAsync()
     private List<SpotifyHistoryRestoreProfile> ReadSpotifyHistoryRestoreProfilesImport(string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        var root = document.RootElement;
+        JsonElement root = document.RootElement;
         JsonElement profilesElement;
         if (root.ValueKind == JsonValueKind.Array)
         {
             profilesElement = root;
         }
-        else if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("Profiles", out var wrappedProfiles))
+        else if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("Profiles", out JsonElement wrappedProfiles))
         {
-            if (root.TryGetProperty("Format", out var formatElement))
+            if (root.TryGetProperty("Format", out JsonElement formatElement))
             {
-                var format = formatElement.GetString();
+                string? format = formatElement.GetString();
                 if (!string.IsNullOrWhiteSpace(format) && !format.Equals("CreatorControlSuite.SpotifyHistoryRestoreProfiles", StringComparison.Ordinal))
+                {
                     throw new InvalidDataException("Die Datei besitzt eine unbekannte Formatkennung.");
+                }
             }
-            if (root.TryGetProperty("Version", out var versionElement) && versionElement.TryGetInt32(out var version) && version > 1)
+            if (root.TryGetProperty("Version", out JsonElement versionElement) && versionElement.TryGetInt32(out int version) && version > 1)
+            {
                 throw new InvalidDataException($"Die Profilversion {version} wird von dieser Suite-Version noch nicht unterstützt.");
+            }
+
             profilesElement = wrappedProfiles;
         }
         else
@@ -20800,15 +22548,17 @@ private Task ApplyCombinedAlertDuckingAsync()
             throw new InvalidDataException("Die Datei enthält keine gültige Profilliste.");
         }
 
-        var imported = JsonSerializer.Deserialize<List<SpotifyHistoryRestoreProfile>>(profilesElement.GetRawText()) ?? [];
-        imported = imported
+        List<SpotifyHistoryRestoreProfile> imported = JsonSerializer.Deserialize<List<SpotifyHistoryRestoreProfile>>(profilesElement.GetRawText()) ?? [];
+        imported = [.. imported
             .Where(profile => !string.IsNullOrWhiteSpace(profile.Name))
             .Select(profile => profile with { Name = profile.Name.Trim(), IsBuiltIn = false })
             .GroupBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.Last())
-            .ToList();
+            .Select(group => group.Last())];
         if (imported.Count == 0)
+        {
             throw new InvalidDataException("Die ausgewählte Datei enthält keine verwendbaren Profile.");
+        }
+
         return imported;
     }
 
@@ -20822,9 +22572,9 @@ private Task ApplyCombinedAlertDuckingAsync()
 
         try
         {
-            var replaced = 0;
-            var added = 0;
-            var unchanged = 0;
+            int replaced = 0;
+            int added = 0;
+            int unchanged = 0;
             SpotifyHistoryRestoreProfile? lastChanged = null;
             var actionableItems = _spotifyHistoryRestoreProfileImportPreview
                 .Where(item => item.CanSelect && !item.SelectedAction.Equals("Überspringen", StringComparison.OrdinalIgnoreCase))
@@ -20835,11 +22585,11 @@ private Task ApplyCombinedAlertDuckingAsync()
                 return;
             }
 
-            var copied = 0;
-            foreach (var importItem in actionableItems)
+            int copied = 0;
+            foreach (SpotifyHistoryRestoreProfileImportItem? importItem in actionableItems)
             {
-                var profile = importItem.Profile;
-                var existing = _spotifyHistoryRestoreProfiles.FirstOrDefault(item => !item.IsBuiltIn && item.Name.Equals(profile.Name, StringComparison.OrdinalIgnoreCase));
+                SpotifyHistoryRestoreProfile profile = importItem.Profile;
+                SpotifyHistoryRestoreProfile? existing = _spotifyHistoryRestoreProfiles.FirstOrDefault(item => !item.IsBuiltIn && item.Name.Equals(profile.Name, StringComparison.OrdinalIgnoreCase));
                 if (existing == profile)
                 {
                     unchanged++;
@@ -20848,8 +22598,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
                 if (importItem.SelectedAction.Equals("Als Kopie importieren", StringComparison.OrdinalIgnoreCase))
                 {
-                    var copyName = CreateUniqueSpotifyHistoryRestoreProfileName(profile.Name + " (Import)");
-                    var copy = profile with { Name = copyName, IsBuiltIn = false };
+                    string copyName = CreateUniqueSpotifyHistoryRestoreProfileName(profile.Name + " (Import)");
+                    SpotifyHistoryRestoreProfile copy = profile with { Name = copyName, IsBuiltIn = false };
                     _spotifyHistoryRestoreProfiles.Add(copy);
                     lastChanged = copy;
                     copied++;
@@ -20870,8 +22620,12 @@ private Task ApplyCombinedAlertDuckingAsync()
             }
 
             PersistSpotifyHistoryRestoreProfiles();
-            if (lastChanged is not null) SpotifyHistoryRestoreProfileBox.SelectedItem = lastChanged;
-            var fileName = Path.GetFileName(_pendingSpotifyHistoryRestoreProfileImportPath);
+            if (lastChanged is not null)
+            {
+                SpotifyHistoryRestoreProfileBox.SelectedItem = lastChanged;
+            }
+
+            string fileName = Path.GetFileName(_pendingSpotifyHistoryRestoreProfileImportPath);
             AddTimedAutomationDiagnostic($"Spotify: Wiederherstellungsprofile übernommen: {added} neu, {replaced} überschrieben, {copied} als Kopie, {unchanged} unverändert ({fileName}).");
             SpotifySavedStateHistoryStatusText.Text = $"Profil-Import übernommen: {added} neu, {replaced} überschrieben, {copied} als Kopie. Übersprungene Profile blieben unverändert.";
             SpotifyHistoryRestoreProfileImportPreviewText.Text = $"Import aus {fileName} wurde erfolgreich übernommen.";
@@ -20889,22 +22643,45 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private string CreateUniqueSpotifyHistoryRestoreProfileName(string requestedName)
     {
-        var baseName = string.IsNullOrWhiteSpace(requestedName) ? "Importiertes Profil" : requestedName.Trim();
-        var candidate = baseName;
-        var suffix = 2;
+        string baseName = string.IsNullOrWhiteSpace(requestedName) ? "Importiertes Profil" : requestedName.Trim();
+        string candidate = baseName;
+        int suffix = 2;
         while (_spotifyHistoryRestoreProfiles.Any(profile => profile.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+        {
             candidate = $"{baseName} {suffix++}";
+        }
+
         return candidate;
     }
 
     private static string DescribeSpotifyHistoryRestoreProfile(SpotifyHistoryRestoreProfile profile)
     {
         var parts = new List<string>();
-        if (profile.Entries) parts.Add(profile.MergeEntries ? "Verlauf zusammenführen" : "Verlauf ersetzen");
-        if (profile.Favorites) parts.Add("Favoriten");
-        if (profile.Notes) parts.Add("Notizen");
-        if (profile.Counters) parts.Add("Statistik");
-        if (profile.Filters) parts.Add("Filter/Sortierung");
+        if (profile.Entries)
+        {
+            parts.Add(profile.MergeEntries ? "Verlauf zusammenführen" : "Verlauf ersetzen");
+        }
+
+        if (profile.Favorites)
+        {
+            parts.Add("Favoriten");
+        }
+
+        if (profile.Notes)
+        {
+            parts.Add("Notizen");
+        }
+
+        if (profile.Counters)
+        {
+            parts.Add("Statistik");
+        }
+
+        if (profile.Filters)
+        {
+            parts.Add("Filter/Sortierung");
+        }
+
         return parts.Count == 0 ? "keine Bereiche aktiviert" : string.Join(", ", parts);
     }
 
@@ -20913,8 +22690,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         _pendingSpotifyHistoryRestoreProfileImport = [];
         _pendingSpotifyHistoryRestoreProfileImportPath = "";
         _spotifyHistoryRestoreProfileImportPreview.Clear();
-        if (ConfirmSpotifyHistoryRestoreProfilesImportButton is not null)
-            ConfirmSpotifyHistoryRestoreProfilesImportButton.IsEnabled = false;
+        ConfirmSpotifyHistoryRestoreProfilesImportButton?.IsEnabled = false;
     }
 
     private void PersistSpotifyHistoryRestoreProfiles()
@@ -20940,11 +22716,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var restoreEntries = RestoreSpotifyHistoryEntriesBox.IsChecked == true;
-        var restoreFavorites = RestoreSpotifyHistoryFavoritesBox.IsChecked == true;
-        var restoreNotes = RestoreSpotifyHistoryNotesBox.IsChecked == true;
-        var restoreCounters = RestoreSpotifyHistoryCountersBox.IsChecked == true;
-        var restoreFilters = RestoreSpotifyHistoryFiltersBox.IsChecked == true;
+        bool restoreEntries = RestoreSpotifyHistoryEntriesBox.IsChecked == true;
+        bool restoreFavorites = RestoreSpotifyHistoryFavoritesBox.IsChecked == true;
+        bool restoreNotes = RestoreSpotifyHistoryNotesBox.IsChecked == true;
+        bool restoreCounters = RestoreSpotifyHistoryCountersBox.IsChecked == true;
+        bool restoreFilters = RestoreSpotifyHistoryFiltersBox.IsChecked == true;
         if (!restoreEntries && !restoreFavorites && !restoreNotes && !restoreCounters && !restoreFilters)
         {
             SpotifySavedStateHistoryStatusText.Text = "Bitte mindestens einen Bereich für die Wiederherstellung auswählen.";
@@ -20952,24 +22728,48 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
 
         var selectedAreas = new List<string>();
-        if (restoreEntries) selectedAreas.Add(MergeSpotifyHistoryEntriesBox.IsChecked == true ? "Verlauf (zusammenführen)" : "Verlauf (ersetzen)");
-        if (restoreFavorites) selectedAreas.Add("Favoriten");
-        if (restoreNotes) selectedAreas.Add("Notizen");
-        if (restoreCounters) selectedAreas.Add("Statistikzähler");
-        if (restoreFilters) selectedAreas.Add("Filter und Sortierung");
+        if (restoreEntries)
+        {
+            selectedAreas.Add(MergeSpotifyHistoryEntriesBox.IsChecked == true ? "Verlauf (zusammenführen)" : "Verlauf (ersetzen)");
+        }
 
-        var result = MessageBox.Show(
+        if (restoreFavorites)
+        {
+            selectedAreas.Add("Favoriten");
+        }
+
+        if (restoreNotes)
+        {
+            selectedAreas.Add("Notizen");
+        }
+
+        if (restoreCounters)
+        {
+            selectedAreas.Add("Statistikzähler");
+        }
+
+        if (restoreFilters)
+        {
+            selectedAreas.Add("Filter und Sortierung");
+        }
+
+        MessageBoxResult result = MessageBox.Show(
             $"Folgende Bereiche aus der Sicherung vom {backup.LastWriteTime:dd.MM.yyyy HH:mm:ss} laden?\n\n• {string.Join("\n• ", selectedAreas)}\n\nDer aktuelle Zustand wird vorher automatisch gesichert.",
             "Spotify-Verlauf selektiv wiederherstellen",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes) return;
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
 
         try
         {
-            var state = JsonSerializer.Deserialize<SpotifySavedStateHistoryPersistence>(File.ReadAllText(backup.FullPath));
+            SpotifySavedStateHistoryPersistence? state = JsonSerializer.Deserialize<SpotifySavedStateHistoryPersistence>(File.ReadAllText(backup.FullPath));
             if (state is null || state.FormatVersion != 1 || state.Entries is null)
+            {
                 throw new InvalidDataException("Die Sicherungsdatei enthält kein unterstütztes Verlaufsformat.");
+            }
 
             CreateSpotifySavedStateHistoryBackup(manual: false);
             _loadingSpotifySavedStateHistoryPersistence = true;
@@ -20985,28 +22785,43 @@ private Task ApplyCombinedAlertDuckingAsync()
                             .Take(100)
                             .ToList();
                         _spotifySavedStateHistory.Clear();
-                        foreach (var entry in merged) _spotifySavedStateHistory.Add(entry);
+                        foreach (string? entry in merged)
+                        {
+                            _spotifySavedStateHistory.Add(entry);
+                        }
                     }
                     else
                     {
                         _spotifySavedStateHistory.Clear();
-                        foreach (var entry in state.Entries.Take(100)) _spotifySavedStateHistory.Add(entry);
+                        foreach (string? entry in state.Entries.Take(100))
+                        {
+                            _spotifySavedStateHistory.Add(entry);
+                        }
                     }
                 }
 
                 if (restoreFavorites)
                 {
                     _spotifySavedStateHistoryFavorites.Clear();
-                    foreach (var entry in state.FavoriteEntries ?? [])
-                        if (_spotifySavedStateHistory.Contains(entry)) _spotifySavedStateHistoryFavorites.Add(entry);
+                    foreach (string entry in state.FavoriteEntries ?? [])
+                    {
+                        if (_spotifySavedStateHistory.Contains(entry))
+                        {
+                            _spotifySavedStateHistoryFavorites.Add(entry);
+                        }
+                    }
                 }
 
                 if (restoreNotes)
                 {
                     _spotifySavedStateHistoryNotes.Clear();
-                    foreach (var pair in state.Notes ?? new Dictionary<string, string>())
+                    foreach (KeyValuePair<string, string> pair in state.Notes ?? [])
+                    {
                         if (_spotifySavedStateHistory.Contains(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
+                        {
                             _spotifySavedStateHistoryNotes[pair.Key] = pair.Value;
+                        }
+                    }
                 }
 
                 if (restoreCounters)
@@ -21054,12 +22869,15 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var result = MessageBox.Show(
+        MessageBoxResult result = MessageBox.Show(
             $"Die Sicherung vom {backup.LastWriteTime:dd.MM.yyyy HH:mm:ss} endgültig löschen?",
             "Spotify-Sicherung löschen",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
-        if (result != MessageBoxResult.Yes) return;
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
 
         try
         {
@@ -21096,24 +22914,37 @@ private Task ApplyCombinedAlertDuckingAsync()
     private void AddSpotifySavedStateHistory(string message)
     {
         _spotifySavedStateHistory.Insert(0, $"{DateTime.Now:HH:mm:ss} · {message}");
-        while (_spotifySavedStateHistory.Count > 100) _spotifySavedStateHistory.RemoveAt(_spotifySavedStateHistory.Count - 1);
+        while (_spotifySavedStateHistory.Count > 100)
+        {
+            _spotifySavedStateHistory.RemoveAt(_spotifySavedStateHistory.Count - 1);
+        }
+
         RefreshSpotifySavedStateStatistics();
         SaveSpotifySavedStateHistoryPersistence();
     }
 
     private bool SpotifySavedStateHistoryMatchesFilter(object item)
     {
-        if (item is not string entry) return false;
-        var search = SpotifySavedStateHistorySearchBox?.Text?.Trim() ?? "";
-        var note = _spotifySavedStateHistoryNotes.TryGetValue(entry, out var savedNote) ? savedNote : "";
+        if (item is not string entry)
+        {
+            return false;
+        }
+
+        string search = SpotifySavedStateHistorySearchBox?.Text?.Trim() ?? "";
+        string note = _spotifySavedStateHistoryNotes.TryGetValue(entry, out string? savedNote) ? savedNote : "";
         if (!string.IsNullOrWhiteSpace(search) &&
             entry.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0 &&
             note.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0)
+        {
             return false;
-        if (SpotifySavedStateHistoryFavoritesOnlyBox?.IsChecked == true && !_spotifySavedStateHistoryFavorites.Contains(entry))
-            return false;
+        }
 
-        var action = (SpotifySavedStateHistoryActionFilterBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
+        if (SpotifySavedStateHistoryFavoritesOnlyBox?.IsChecked == true && !_spotifySavedStateHistoryFavorites.Contains(entry))
+        {
+            return false;
+        }
+
+        string action = (SpotifySavedStateHistoryActionFilterBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
         return action switch
         {
             "save" => entry.Contains("gespeichert", StringComparison.OrdinalIgnoreCase),
@@ -21141,8 +22972,12 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ApplySpotifySavedStateHistorySort()
     {
-        if (_spotifySavedStateHistoryView is not ListCollectionView listView) return;
-        var mode = (SpotifySavedStateHistorySortBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "newest";
+        if (_spotifySavedStateHistoryView is not ListCollectionView listView)
+        {
+            return;
+        }
+
+        string mode = (SpotifySavedStateHistorySortBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "newest";
         listView.CustomSort = new SpotifySavedStateHistoryComparer(mode);
         UpdateSpotifySavedStateHistoryDetail();
         RefreshSpotifySavedStateStatistics();
@@ -21150,8 +22985,12 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void UpdateSpotifySavedStateHistoryDetail()
     {
-        if (SpotifySavedStateHistoryDetailText is null) return;
-        var selectedEntries = SpotifySavedStateHistoryList?.SelectedItems.Cast<object>().OfType<string>().ToList() ?? [];
+        if (SpotifySavedStateHistoryDetailText is null)
+        {
+            return;
+        }
+
+        List<string> selectedEntries = SpotifySavedStateHistoryList?.SelectedItems.Cast<object>().OfType<string>().ToList() ?? [];
         if (selectedEntries.Count == 0)
         {
             SpotifySavedStateHistoryDetailText.Text = "Kein Verlaufseintrag ausgewählt.";
@@ -21167,15 +23006,15 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        var entry = selectedEntries[0];
-        var separator = entry.IndexOf(" · ", StringComparison.Ordinal);
-        var time = separator >= 0 ? entry[..separator] : "Unbekannt";
-        var message = separator >= 0 ? entry[(separator + 3)..] : entry;
-        var groupSeparator = message.IndexOf(':');
-        var group = groupSeparator > 0 ? message[..groupSeparator].Trim() : "Allgemein";
-        var action = groupSeparator > 0 ? message[(groupSeparator + 1)..].Trim() : message;
-        var favorite = _spotifySavedStateHistoryFavorites.Contains(entry) ? "Ja" : "Nein";
-        var note = _spotifySavedStateHistoryNotes.TryGetValue(entry, out var savedNote) ? savedNote : "";
+        string entry = selectedEntries[0];
+        int separator = entry.IndexOf(" · ", StringComparison.Ordinal);
+        string time = separator >= 0 ? entry[..separator] : "Unbekannt";
+        string message = separator >= 0 ? entry[(separator + 3)..] : entry;
+        int groupSeparator = message.IndexOf(':');
+        string group = groupSeparator > 0 ? message[..groupSeparator].Trim() : "Allgemein";
+        string action = groupSeparator > 0 ? message[(groupSeparator + 1)..].Trim() : message;
+        string favorite = _spotifySavedStateHistoryFavorites.Contains(entry) ? "Ja" : "Nein";
+        string note = _spotifySavedStateHistoryNotes.TryGetValue(entry, out string? savedNote) ? savedNote : "";
         SpotifySavedStateHistoryDetailText.Text = $"Zeit: {time}\nGruppe: {group}\nAktion: {action}\nFavorit: {favorite}";
         SpotifySavedStateHistoryNoteBox.Text = note;
         ToggleSpotifySavedStateHistoryFavoriteButton.Content = favorite == "Ja" ? "FAVORIT ENTFERNEN" : "ALS FAVORIT MARKIEREN";
@@ -21183,15 +23022,18 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ToggleSpotifySavedStateHistoryFavorite()
     {
-        var selected = GetSelectedSpotifySavedStateHistory();
+        List<string> selected = GetSelectedSpotifySavedStateHistory();
         if (selected.Count != 1)
         {
             SpotifySavedStateHistoryStatusText.Text = "Bitte genau einen Verlaufseintrag auswählen.";
             return;
         }
-        var entry = selected[0];
+        string entry = selected[0];
         if (!_spotifySavedStateHistoryFavorites.Add(entry))
+        {
             _spotifySavedStateHistoryFavorites.Remove(entry);
+        }
+
         UpdateSpotifySavedStateHistoryDetail();
         RefreshSpotifySavedStateHistoryFilter();
         SpotifySavedStateHistoryStatusText.Text = _spotifySavedStateHistoryFavorites.Contains(entry) ? "Eintrag als Favorit markiert." : "Favoritenmarkierung entfernt.";
@@ -21200,18 +23042,23 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void SaveSpotifySavedStateHistoryNote()
     {
-        var selected = GetSelectedSpotifySavedStateHistory();
+        List<string> selected = GetSelectedSpotifySavedStateHistory();
         if (selected.Count != 1)
         {
             SpotifySavedStateHistoryStatusText.Text = "Bitte genau einen Verlaufseintrag für die Notiz auswählen.";
             return;
         }
-        var entry = selected[0];
-        var note = SpotifySavedStateHistoryNoteBox.Text.Trim();
+        string entry = selected[0];
+        string note = SpotifySavedStateHistoryNoteBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(note))
+        {
             _spotifySavedStateHistoryNotes.Remove(entry);
+        }
         else
+        {
             _spotifySavedStateHistoryNotes[entry] = note;
+        }
+
         RefreshSpotifySavedStateHistoryFilter();
         SpotifySavedStateHistoryStatusText.Text = string.IsNullOrWhiteSpace(note) ? "Notiz entfernt." : "Notiz gespeichert.";
         SaveSpotifySavedStateHistoryPersistence();
@@ -21219,8 +23066,12 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private List<string> GetFilteredSpotifySavedStateHistory()
     {
-        if (_spotifySavedStateHistoryView is null) return _spotifySavedStateHistory.ToList();
-        return _spotifySavedStateHistoryView.Cast<object>().OfType<string>().ToList();
+        if (_spotifySavedStateHistoryView is null)
+        {
+            return [.. _spotifySavedStateHistory];
+        }
+
+        return [.. _spotifySavedStateHistoryView.Cast<object>().OfType<string>()];
     }
 
     private List<string> GetSelectedSpotifySavedStateHistory()
@@ -21231,22 +23082,25 @@ private Task ApplyCombinedAlertDuckingAsync()
     private void SelectVisibleSpotifySavedStateHistory()
     {
         SpotifySavedStateHistoryList.SelectedItems.Clear();
-        foreach (var entry in GetFilteredSpotifySavedStateHistory())
+        foreach (string entry in GetFilteredSpotifySavedStateHistory())
+        {
             SpotifySavedStateHistoryList.SelectedItems.Add(entry);
+        }
+
         UpdateSpotifySavedStateHistoryDetail();
         SpotifySavedStateHistoryStatusText.Text = $"{SpotifySavedStateHistoryList.SelectedItems.Count} sichtbare Verlaufseinträge ausgewählt.";
     }
 
     private void RemoveSelectedSpotifySavedStateHistory()
     {
-        var selected = GetSelectedSpotifySavedStateHistory();
+        List<string> selected = GetSelectedSpotifySavedStateHistory();
         if (selected.Count == 0)
         {
             SpotifySavedStateHistoryStatusText.Text = "Bitte zuerst mindestens einen Verlaufseintrag auswählen.";
             return;
         }
 
-        foreach (var entry in selected)
+        foreach (string entry in selected)
         {
             _spotifySavedStateHistory.Remove(entry);
             _spotifySavedStateHistoryFavorites.Remove(entry);
@@ -21262,7 +23116,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ExportSelectedSpotifySavedStateHistory()
     {
-        var entries = GetSelectedSpotifySavedStateHistory();
+        List<string> entries = GetSelectedSpotifySavedStateHistory();
         if (entries.Count == 0)
         {
             SpotifySavedStateHistoryStatusText.Text = "Für den JSON-Export wurde kein Verlaufseintrag ausgewählt.";
@@ -21276,14 +23130,17 @@ private Task ApplyCombinedAlertDuckingAsync()
             AddExtension = true,
             DefaultExt = ".json"
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
 
         try
         {
             var export = new SpotifySavedStateHistoryExport(
                 2, DateTimeOffset.UtcNow, _spotifySavedStateSaveCount, _spotifySavedStateRestoreCount,
                 _spotifySavedStateDiscardCount, _spotifySavedStateCleanupCount, entries,
-                entries.Where(_spotifySavedStateHistoryFavorites.Contains).ToList(),
+                [.. entries.Where(_spotifySavedStateHistoryFavorites.Contains)],
                 _spotifySavedStateHistoryNotes.Where(pair => entries.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
             File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(export, new JsonSerializerOptions { WriteIndented = true }));
             SpotifySavedStateHistoryStatusText.Text = $"{entries.Count} ausgewählte Einträge als JSON exportiert: {Path.GetFileName(dialog.FileName)}";
@@ -21298,7 +23155,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ExportSelectedSpotifySavedStateHistoryCsv()
     {
-        var entries = GetSelectedSpotifySavedStateHistory();
+        List<string> entries = GetSelectedSpotifySavedStateHistory();
         if (entries.Count == 0)
         {
             SpotifySavedStateHistoryStatusText.Text = "Für den CSV-Export wurde kein Verlaufseintrag ausgewählt.";
@@ -21312,11 +23169,14 @@ private Task ApplyCombinedAlertDuckingAsync()
             AddExtension = true,
             DefaultExt = ".csv"
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
 
         try
         {
-            var csv = BuildSpotifySavedStateHistoryCsv(entries);
+            string csv = BuildSpotifySavedStateHistoryCsv(entries);
             File.WriteAllText(dialog.FileName, csv, new UTF8Encoding(true));
             SpotifySavedStateHistoryStatusText.Text = $"{entries.Count} ausgewählte Einträge als CSV exportiert: {Path.GetFileName(dialog.FileName)}";
             AddTimedAutomationDiagnostic($"Spotify: {entries.Count} ausgewählte Zustandsverlaufseinträge als CSV exportiert.");
@@ -21332,15 +23192,15 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         var csv = new StringBuilder();
         csv.AppendLine("Zeit;Aktion;Favorit;Notiz");
-        foreach (var entry in entries)
+        foreach (string entry in entries)
         {
-            var separator = entry.IndexOf(" · ", StringComparison.Ordinal);
-            var time = separator >= 0 ? entry[..separator] : "";
-            var action = separator >= 0 ? entry[(separator + 3)..] : entry;
+            int separator = entry.IndexOf(" · ", StringComparison.Ordinal);
+            string time = separator >= 0 ? entry[..separator] : "";
+            string action = separator >= 0 ? entry[(separator + 3)..] : entry;
             csv.Append('"').Append(time.Replace("\"", "\"\"")).Append("\";\"")
                .Append(action.Replace("\"", "\"\"")).Append("\";\"")
                .Append(_spotifySavedStateHistoryFavorites.Contains(entry) ? "Ja" : "Nein").Append("\";\"")
-               .Append((_spotifySavedStateHistoryNotes.TryGetValue(entry, out var note) ? note : "").Replace("\"", "\"\"")).AppendLine("\"");
+               .Append((_spotifySavedStateHistoryNotes.TryGetValue(entry, out string? note) ? note : "").Replace("\"", "\"\"")).AppendLine("\"");
         }
         return csv.ToString();
     }
@@ -21354,11 +23214,14 @@ private Task ApplyCombinedAlertDuckingAsync()
             AddExtension = true,
             DefaultExt = ".csv"
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
 
         try
         {
-            var entries = GetFilteredSpotifySavedStateHistory();
+            List<string> entries = GetFilteredSpotifySavedStateHistory();
             File.WriteAllText(dialog.FileName, BuildSpotifySavedStateHistoryCsv(entries), new UTF8Encoding(true));
             SpotifySavedStateHistoryStatusText.Text = $"{entries.Count} gefilterte Verlaufseinträge als CSV exportiert: {Path.GetFileName(dialog.FileName)}";
             AddTimedAutomationDiagnostic($"Spotify: {entries.Count} gefilterte Zustandsverlaufseinträge als CSV exportiert.");
@@ -21379,7 +23242,10 @@ private Task ApplyCombinedAlertDuckingAsync()
             AddExtension = true,
             DefaultExt = ".json"
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
 
         try
         {
@@ -21390,8 +23256,8 @@ private Task ApplyCombinedAlertDuckingAsync()
                 _spotifySavedStateRestoreCount,
                 _spotifySavedStateDiscardCount,
                 _spotifySavedStateCleanupCount,
-                _spotifySavedStateHistory.ToList(),
-                _spotifySavedStateHistoryFavorites.ToList(),
+                [.. _spotifySavedStateHistory],
+                [.. _spotifySavedStateHistoryFavorites],
                 new Dictionary<string, string>(_spotifySavedStateHistoryNotes));
             File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(export, new JsonSerializerOptions { WriteIndented = true }));
             SpotifySavedStateHistoryStatusText.Text = $"Verlauf exportiert: {Path.GetFileName(dialog.FileName)}";
@@ -21411,27 +23277,47 @@ private Task ApplyCombinedAlertDuckingAsync()
             Filter = "Spotify-Zustandsverlauf (*.json)|*.json|JSON (*.json)|*.json",
             CheckFileExists = true
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
 
         try
         {
-            var import = JsonSerializer.Deserialize<SpotifySavedStateHistoryExport>(File.ReadAllText(dialog.FileName));
+            SpotifySavedStateHistoryExport? import = JsonSerializer.Deserialize<SpotifySavedStateHistoryExport>(File.ReadAllText(dialog.FileName));
             if (import is null || import.FormatVersion is < 1 or > 2 || import.Entries is null)
+            {
                 throw new InvalidDataException("Die Datei besitzt kein unterstütztes Verlaufsformat.");
+            }
 
             _spotifySavedStateHistory.Clear();
             _spotifySavedStateHistoryFavorites.Clear();
             _spotifySavedStateHistoryNotes.Clear();
-            foreach (var entry in import.Entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).Take(100))
+            foreach (string? entry in import.Entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).Take(100))
+            {
                 _spotifySavedStateHistory.Add(entry);
+            }
+
             _spotifySavedStateSaveCount = Math.Max(0, import.SavedCount);
             _spotifySavedStateRestoreCount = Math.Max(0, import.RestoredCount);
             _spotifySavedStateDiscardCount = Math.Max(0, import.DiscardedCount);
             _spotifySavedStateCleanupCount = Math.Max(0, import.CleanupCount);
-            foreach (var entry in import.FavoriteEntries ?? [])
-                if (_spotifySavedStateHistory.Contains(entry)) _spotifySavedStateHistoryFavorites.Add(entry);
-            foreach (var pair in import.Notes ?? new Dictionary<string, string>())
-                if (_spotifySavedStateHistory.Contains(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value)) _spotifySavedStateHistoryNotes[pair.Key] = pair.Value;
+            foreach (string entry in import.FavoriteEntries ?? [])
+            {
+                if (_spotifySavedStateHistory.Contains(entry))
+                {
+                    _spotifySavedStateHistoryFavorites.Add(entry);
+                }
+            }
+
+            foreach (KeyValuePair<string, string> pair in import.Notes ?? [])
+            {
+                if (_spotifySavedStateHistory.Contains(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
+                {
+                    _spotifySavedStateHistoryNotes[pair.Key] = pair.Value;
+                }
+            }
+
             RefreshSpotifySavedStateStatistics();
             SpotifySavedStateHistoryStatusText.Text = $"Verlauf importiert: {_spotifySavedStateHistory.Count} Einträge aus {Path.GetFileName(dialog.FileName)}.";
             AddTimedAutomationDiagnostic($"Spotify: Zustandsverlauf mit {_spotifySavedStateHistory.Count} Einträgen importiert.");
@@ -21458,12 +23344,16 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshSpotifySavedStateStatistics()
     {
-        if (SpotifySavedStateStatisticsText is null) return;
+        if (SpotifySavedStateStatisticsText is null)
+        {
+            return;
+        }
+
         SpotifySavedStateStatisticsText.Text =
             $"Gespeichert: {_spotifySavedStateSaveCount} · Wiederhergestellt: {_spotifySavedStateRestoreCount} · " +
             $"Verworfen: {_spotifySavedStateDiscardCount} · Automatisch bereinigt: {_spotifySavedStateCleanupCount} · " +
             $"Aktuell vorhanden: {_spotifyAutomationSavedStates.Count}";
-        var visibleCount = _spotifySavedStateHistoryView?.Cast<object>().Count() ?? _spotifySavedStateHistory.Count;
+        int visibleCount = _spotifySavedStateHistoryView?.Cast<object>().Count() ?? _spotifySavedStateHistory.Count;
         SpotifySavedStateHistoryStatusText.Text = _spotifySavedStateHistory.Count == 0
             ? "Noch keine Zustandsaktionen in dieser Programmsitzung."
             : visibleCount == _spotifySavedStateHistory.Count
@@ -21473,7 +23363,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private int GetSpotifySavedStateMaxAgeMinutes()
     {
-        return int.TryParse(SpotifySavedStateMaxAgeBox.Text, out var minutes)
+        return int.TryParse(SpotifySavedStateMaxAgeBox.Text, out int minutes)
             ? Math.Clamp(minutes, 1, 10080)
             : 180;
     }
@@ -21485,26 +23375,45 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private static string FormatSpotifySavedStateAge(TimeSpan age)
     {
-        if (age < TimeSpan.Zero) age = TimeSpan.Zero;
-        if (age.TotalMinutes < 1) return "weniger als 1 Minute";
-        if (age.TotalHours < 1) return $"{Math.Max(1, (int)age.TotalMinutes)} Min.";
-        if (age.TotalDays < 1) return $"{(int)age.TotalHours} Std. {age.Minutes} Min.";
+        if (age < TimeSpan.Zero)
+        {
+            age = TimeSpan.Zero;
+        }
+
+        if (age.TotalMinutes < 1)
+        {
+            return "weniger als 1 Minute";
+        }
+
+        if (age.TotalHours < 1)
+        {
+            return $"{Math.Max(1, (int)age.TotalMinutes)} Min.";
+        }
+
+        if (age.TotalDays < 1)
+        {
+            return $"{(int)age.TotalHours} Std. {age.Minutes} Min.";
+        }
+
         return $"{(int)age.TotalDays} T. {age.Hours} Std.";
     }
 
     private int GetSpotifySavedStateCleanupIntervalMinutes()
     {
-        return int.TryParse(SpotifySavedStateCleanupIntervalMinutesBox.Text, out var minutes)
+        return int.TryParse(SpotifySavedStateCleanupIntervalMinutesBox.Text, out int minutes)
             ? Math.Clamp(minutes, 1, 1440)
             : 15;
     }
 
     private void UpdateSpotifySavedStateCleanupTimer()
     {
-        if (SpotifySavedStateCleanupIntervalBox is null || SpotifySavedStateCleanupIntervalMinutesBox is null) return;
+        if (SpotifySavedStateCleanupIntervalBox is null || SpotifySavedStateCleanupIntervalMinutesBox is null)
+        {
+            return;
+        }
 
         _spotifySavedStateCleanupTimer.Stop();
-        var minutes = GetSpotifySavedStateCleanupIntervalMinutes();
+        int minutes = GetSpotifySavedStateCleanupIntervalMinutes();
         _spotifySavedStateCleanupTimer.Interval = TimeSpan.FromMinutes(minutes);
 
         if (SpotifySavedStateCleanupIntervalBox.IsChecked == true)
@@ -21519,11 +23428,13 @@ private Task ApplyCombinedAlertDuckingAsync()
         List<string> expiredGroups;
         lock (_spotifyAutomationSync)
         {
-            expiredGroups = _spotifyAutomationSavedStates
+            expiredGroups = [.. _spotifyAutomationSavedStates
                 .Where(entry => IsSpotifySavedStateExpired(entry.Value))
-                .Select(entry => entry.Key)
-                .ToList();
-            foreach (var group in expiredGroups) _spotifyAutomationSavedStates.Remove(group);
+                .Select(entry => entry.Key)];
+            foreach (string group in expiredGroups)
+            {
+                _spotifyAutomationSavedStates.Remove(group);
+            }
         }
 
         if (expiredGroups.Count > 0)
@@ -21543,8 +23454,8 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RestoreSpotifySavedStateNowAsync()
     {
-        var group = GetSpotifyAutomationEditorGroup();
-        var fadeSeconds = int.TryParse(TimedAutomationSpotifyFadeBox.Text, out var fade)
+        string group = GetSpotifyAutomationEditorGroup();
+        int fadeSeconds = int.TryParse(TimedAutomationSpotifyFadeBox.Text, out int fade)
             ? Math.Clamp(fade, 0, 300)
             : 0;
         var restoreRule = new TimedAutomationRuleSettings { SpotifyFadeSeconds = fadeSeconds };
@@ -21593,9 +23504,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void DiscardSpotifySavedState()
     {
-        var group = GetSpotifyAutomationEditorGroup();
-        var removed = false;
-        lock (_spotifyAutomationSync) removed = _spotifyAutomationSavedStates.Remove(group);
+        string group = GetSpotifyAutomationEditorGroup();
+        bool removed;
+        lock (_spotifyAutomationSync)
+        {
+            removed = _spotifyAutomationSavedStates.Remove(group);
+        }
+
         AddTimedAutomationDiagnostic(removed
             ? $"Spotify-Gruppe '{group}': Gespeicherter Zustand wurde verworfen."
             : $"Spotify-Gruppe '{group}': Es war kein gespeicherter Zustand vorhanden.");
@@ -21611,9 +23526,12 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task SaveSpotifyAutomationStateAsync(string group, CancellationToken cancellationToken)
     {
         if (SpotifySavedStateCleanupOnSaveBox.IsChecked == true)
+        {
             DiscardExpiredSpotifySavedStates("vor neuem Speichern", onlyLogWhenRemoved: true);
+        }
+
         await _spotifyModule.RefreshPlaybackAsync(cancellationToken);
-        var playback = _spotifyModule.GetSnapshot().Playback;
+        SpotifyPlaybackState playback = _spotifyModule.GetSnapshot().Playback;
         if (!playback.HasPlayback || playback.Track is null)
         {
             AddTimedAutomationDiagnostic($"Spotify-Gruppe '{group}': Kein aktiver Wiedergabezustand zum Sichern vorhanden.");
@@ -21629,7 +23547,11 @@ private Task ApplyCombinedAlertDuckingAsync()
             string.IsNullOrWhiteSpace(playback.RepeatMode) ? "off" : playback.RepeatMode,
             playback.IsPlaying,
             DateTimeOffset.UtcNow);
-        lock (_spotifyAutomationSync) _spotifyAutomationSavedStates[group] = state;
+        lock (_spotifyAutomationSync)
+        {
+            _spotifyAutomationSavedStates[group] = state;
+        }
+
         _spotifySavedStateSaveCount++;
         AddSpotifySavedStateHistory($"{group}: '{playback.Track.Name}' gespeichert");
         AddTimedAutomationDiagnostic($"Spotify-Gruppe '{group}': Wiedergabe '{playback.Track.Name}' gesichert.");
@@ -21643,11 +23565,21 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task RestoreSpotifyAutomationStateAsync(string group, TimedAutomationRuleSettings rule, CancellationToken cancellationToken)
     {
         SpotifyAutomationSavedState? state;
-        lock (_spotifyAutomationSync) _spotifyAutomationSavedStates.TryGetValue(group, out state);
-        if (state is null)
-            throw new InvalidOperationException($"Für die Spotify-Gruppe '{group}' wurde noch kein vorheriger Wiedergabezustand gesichert.");
+        lock (_spotifyAutomationSync)
+        {
+            _spotifyAutomationSavedStates.TryGetValue(group, out state);
+        }
 
-        if (rule.SpotifyFadeSeconds > 0) await _spotifyModule.SetVolumeImmediateAsync(0, cancellationToken);
+        if (state is null)
+        {
+            throw new InvalidOperationException($"Für die Spotify-Gruppe '{group}' wurde noch kein vorheriger Wiedergabezustand gesichert.");
+        }
+
+        if (rule.SpotifyFadeSeconds > 0)
+        {
+            await _spotifyModule.SetVolumeImmediateAsync(0, cancellationToken);
+        }
+
         await _spotifyModule.SetRepeatAsync(state.RepeatMode, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(state.ContextUri))
@@ -21678,9 +23610,16 @@ private Task ApplyCombinedAlertDuckingAsync()
             SpotifyFadeSeconds = rule.SpotifyFadeSeconds
         };
         await ApplySpotifyAutomationVolumeAsync(restoreVolumeRule, cancellationToken);
-        if (!state.WasPlaying) await _spotifyModule.PauseAsync(cancellationToken);
+        if (!state.WasPlaying)
+        {
+            await _spotifyModule.PauseAsync(cancellationToken);
+        }
 
-        lock (_spotifyAutomationSync) _spotifyAutomationSavedStates.Remove(group);
+        lock (_spotifyAutomationSync)
+        {
+            _spotifyAutomationSavedStates.Remove(group);
+        }
+
         _spotifySavedStateRestoreCount++;
         AddSpotifySavedStateHistory($"{group}: Wiedergabe wiederhergestellt");
         AddTimedAutomationDiagnostic($"Spotify-Gruppe '{group}': Vorherige Wiedergabe wiederhergestellt.");
@@ -21693,7 +23632,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ApplySpotifyAutomationVolumeAsync(TimedAutomationRuleSettings rule, CancellationToken cancellationToken)
     {
-        var target = Math.Clamp(rule.SpotifyVolumePercent, 0, 100);
+        int target = Math.Clamp(rule.SpotifyVolumePercent, 0, 100);
         if (rule.SpotifyFadeSeconds <= 0)
         {
             await _spotifyModule.SetVolumeImmediateAsync(target, cancellationToken);
@@ -21701,40 +23640,50 @@ private Task ApplyCombinedAlertDuckingAsync()
         }
 
         await _spotifyModule.RefreshPlaybackAsync(cancellationToken);
-        var current = _spotifyModule.GetSnapshot().Playback.Device?.VolumePercent ?? 0;
-        var steps = Math.Max(1, Math.Min(rule.SpotifyFadeSeconds * 4, 120));
+        int current = _spotifyModule.GetSnapshot().Playback.Device?.VolumePercent ?? 0;
+        int steps = Math.Max(1, Math.Min(rule.SpotifyFadeSeconds * 4, 120));
         var delay = TimeSpan.FromMilliseconds(rule.SpotifyFadeSeconds * 1000d / steps);
-        for (var step = 1; step <= steps; step++)
+        for (int step = 1; step <= steps; step++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var volume = (int)Math.Round(current + ((target - current) * (step / (double)steps)));
+            int volume = (int)Math.Round(current + ((target - current) * (step / (double)steps)));
             await _spotifyModule.SetVolumeImmediateAsync(Math.Clamp(volume, 0, 100), cancellationToken);
-            if (step < steps) await Task.Delay(delay, cancellationToken);
+            if (step < steps)
+            {
+                await Task.Delay(delay, cancellationToken);
+            }
         }
     }
 
     private void AddTimedAutomationDiagnostic(string message)
     {
-        var line = $"{DateTime.Now:HH:mm:ss}  {message}";
+        string line = $"{DateTime.Now:HH:mm:ss}  {message}";
         _timedAutomationDiagnostics.Insert(0, line);
-        while (_timedAutomationDiagnostics.Count > 100) _timedAutomationDiagnostics.RemoveAt(_timedAutomationDiagnostics.Count - 1);
+        while (_timedAutomationDiagnostics.Count > 100)
+        {
+            _timedAutomationDiagnostics.RemoveAt(_timedAutomationDiagnostics.Count - 1);
+        }
     }
 
     private void ValidateTimedAutomationRules()
     {
         _timedAutomationDiagnostics.Clear();
         var ids = _timedAutomationRules.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var issues = 0;
-        foreach (var rule in _timedAutomationRules)
+        int issues = 0;
+        foreach (TimedAutomationRuleSettings rule in _timedAutomationRules)
         {
             if (string.IsNullOrWhiteSpace(rule.Name)) { AddTimedAutomationDiagnostic("Hinweis: Eine Regel hat keinen Namen."); issues++; }
             if ((rule.TriggerType is "SceneElapsed" or "SceneActivated") && string.IsNullOrWhiteSpace(rule.TriggerScene)) { AddTimedAutomationDiagnostic($"Fehlt: Ausgangsszene bei '{rule.Name}'."); issues++; }
             if ((rule.TriggerType is "DailySchedule" or "WeeklySchedule" or "OneTimeSchedule") && !TimeOnly.TryParse(rule.ScheduleTime, out _)) { AddTimedAutomationDiagnostic($"Ungültige Uhrzeit bei '{rule.Name}'."); issues++; }
             if (rule.TriggerType == "WeeklySchedule" && string.IsNullOrWhiteSpace(rule.ScheduleDays)) { AddTimedAutomationDiagnostic($"Keine Wochentage bei '{rule.Name}'."); issues++; }
             if (rule.TriggerType == "OneTimeSchedule" && !DateOnly.TryParse(rule.ScheduleDate, out _)) { AddTimedAutomationDiagnostic($"Ungültiges einmaliges Datum bei '{rule.Name}'."); issues++; }
-            if (DateOnly.TryParse(rule.ActiveFromDate, out var fromDate) && DateOnly.TryParse(rule.ActiveUntilDate, out var untilDate) && fromDate > untilDate) { AddTimedAutomationDiagnostic($"Aktivzeitraum ist umgekehrt bei '{rule.Name}'."); issues++; }
-            foreach (var value in (rule.ExcludedDates ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) if (!DateOnly.TryParse(value, out _)) { AddTimedAutomationDiagnostic($"Ungültiger Ausnahmetag '{value}' bei '{rule.Name}'."); issues++; }
-            foreach (var range in (rule.BlackoutRanges ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { var bounds = range.Split("..", StringSplitOptions.TrimEntries); if (bounds.Length != 2 || !DateOnly.TryParse(bounds[0], out var blackoutStart) || !DateOnly.TryParse(bounds[1], out var blackoutEnd) || blackoutStart > blackoutEnd) { AddTimedAutomationDiagnostic($"Ungültiger Sperrzeitraum '{range}' bei '{rule.Name}'."); issues++; } }
+            if (DateOnly.TryParse(rule.ActiveFromDate, out DateOnly fromDate) && DateOnly.TryParse(rule.ActiveUntilDate, out DateOnly untilDate) && fromDate > untilDate) { AddTimedAutomationDiagnostic($"Aktivzeitraum ist umgekehrt bei '{rule.Name}'."); issues++; }
+            foreach (string value in (rule.ExcludedDates ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!DateOnly.TryParse(value, out _)) { AddTimedAutomationDiagnostic($"Ungültiger Ausnahmetag '{value}' bei '{rule.Name}'."); issues++; }
+            }
+
+            foreach (string range in (rule.BlackoutRanges ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { string[] bounds = range.Split("..", StringSplitOptions.TrimEntries); if (bounds.Length != 2 || !DateOnly.TryParse(bounds[0], out DateOnly blackoutStart) || !DateOnly.TryParse(bounds[1], out DateOnly blackoutEnd) || blackoutStart > blackoutEnd) { AddTimedAutomationDiagnostic($"Ungültiger Sperrzeitraum '{range}' bei '{rule.Name}'."); issues++; } }
             if (rule.ActionType == "SwitchScene" && string.IsNullOrWhiteSpace(rule.TargetScene)) { AddTimedAutomationDiagnostic($"Fehlt: Zielszene bei '{rule.Name}'."); issues++; }
             if (rule.ActionType == "SetSourceVisibility" && (string.IsNullOrWhiteSpace(rule.ObsScene) || string.IsNullOrWhiteSpace(rule.ObsSource))) { AddTimedAutomationDiagnostic($"Fehlt: Szene/Quelle bei '{rule.Name}'."); issues++; }
             if (rule.ActionType == "SetInputMute" && string.IsNullOrWhiteSpace(rule.ObsInput)) { AddTimedAutomationDiagnostic($"Fehlt: Audioquelle bei '{rule.Name}'."); issues++; }
@@ -21748,18 +23697,25 @@ private Task ApplyCombinedAlertDuckingAsync()
             if (string.Equals(rule.FailureRuleId, rule.Id, StringComparison.OrdinalIgnoreCase)) { AddTimedAutomationDiagnostic($"Ersatzregel verweist auf sich selbst bei '{rule.Name}'."); issues++; }
             if (string.Equals(rule.RollbackRuleId, rule.Id, StringComparison.OrdinalIgnoreCase)) { AddTimedAutomationDiagnostic($"Rückabwicklungsregel verweist auf sich selbst bei '{rule.Name}'."); issues++; }
         }
-        foreach (var rule in _timedAutomationRules)
+        foreach (TimedAutomationRuleSettings rule in _timedAutomationRules)
         {
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var current = rule;
+            TimedAutomationRuleSettings? current = rule;
             while (!string.IsNullOrWhiteSpace(current.NextRuleId))
             {
                 if (!seen.Add(current.Id)) { AddTimedAutomationDiagnostic($"Schleife erkannt, beginnend bei '{rule.Name}'."); issues++; break; }
                 current = _timedAutomationRules.FirstOrDefault(x => string.Equals(x.Id, current.NextRuleId, StringComparison.OrdinalIgnoreCase))!;
-                if (current is null) break;
+                if (current is null)
+                {
+                    break;
+                }
             }
         }
-        if (issues == 0) AddTimedAutomationDiagnostic($"Prüfung abgeschlossen: {_timedAutomationRules.Count} Regeln, keine Fehler gefunden.");
+        if (issues == 0)
+        {
+            AddTimedAutomationDiagnostic($"Prüfung abgeschlossen: {_timedAutomationRules.Count} Regeln, keine Fehler gefunden.");
+        }
+
         TimedAutomationTestStatusText.Text = issues == 0 ? "Alle Regeln sind gültig." : $"Regelprüfung: {issues} Hinweis(e).";
     }
 
@@ -21771,9 +23727,13 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task ResetTimedAutomationsAtStreamEndAsync()
     {
         _executedTimedAutomationRuleIds.Clear();
-        foreach (var rule in _settings.Workflow.TimedAutomations.Where(x => x.Enabled && x.ResetSourceAtStreamEnd))
+        foreach (TimedAutomationRuleSettings? rule in _settings.Workflow.TimedAutomations.Where(x => x.Enabled && x.ResetSourceAtStreamEnd))
         {
-            if (!_obsClient.IsConnected || string.IsNullOrWhiteSpace(rule.ObsScene) || string.IsNullOrWhiteSpace(rule.ObsSource)) continue;
+            if (!_obsClient.IsConnected || string.IsNullOrWhiteSpace(rule.ObsScene) || string.IsNullOrWhiteSpace(rule.ObsSource))
+            {
+                continue;
+            }
+
             try { await _obsClient.SetSceneItemEnabledAsync(rule.ObsScene, rule.ObsSource, rule.ResetSourceVisible); }
             catch (Exception ex) { _appLogger.Write(AppLogLevel.Warning, "Automation", $"Rücksetzen fehlgeschlagen ({rule.Name}): {ex.Message}"); }
         }
@@ -21812,7 +23772,7 @@ private Task ApplyCombinedAlertDuckingAsync()
             .OrderBy(name => name)
             .ToList();
 
-        var selected = WorkflowDesignerGroupBox.Text?.Trim() ?? "";
+        string selected = WorkflowDesignerGroupBox.Text?.Trim() ?? "";
         WorkflowDesignerGroupBox.ItemsSource = groups;
         if (string.IsNullOrWhiteSpace(selected) && groups.Count > 0)
         {
@@ -21843,32 +23803,32 @@ private Task ApplyCombinedAlertDuckingAsync()
             return;
         }
 
-        for (var index = 0; index < rules.Count; index++)
+        for (int index = 0; index < rules.Count; index++)
         {
-            var rule = rules[index];
+            TimedAutomationRuleSettings rule = rules[index];
             if (rule.DesignerX <= 0 && rule.DesignerY <= 0)
             {
-                rule.DesignerX = 80 + index * 250;
+                rule.DesignerX = 80 + (index * 250);
                 rule.DesignerY = 120;
             }
         }
 
-        foreach (var rule in rules)
+        foreach (TimedAutomationRuleSettings? rule in rules)
         {
-            var next = ResolveWorkflowDesignerNextRule(rule, rules);
+            TimedAutomationRuleSettings? next = ResolveWorkflowDesignerNextRule(rule, rules);
             if (next is not null)
             {
                 DrawWorkflowDesignerConnection(rule, next, "Erfolg", Brushes.SeaGreen);
             }
 
-            var failure = rules.FirstOrDefault(candidate => candidate.Id == rule.FailureRuleId);
+            TimedAutomationRuleSettings? failure = rules.FirstOrDefault(candidate => candidate.Id == rule.FailureRuleId);
             if (failure is not null)
             {
                 DrawWorkflowDesignerConnection(rule, failure, "Fehler", Brushes.IndianRed);
             }
         }
 
-        foreach (var rule in rules)
+        foreach (TimedAutomationRuleSettings? rule in rules)
         {
             DrawWorkflowDesignerNode(rule);
         }
@@ -21880,8 +23840,11 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         if (!string.IsNullOrWhiteSpace(rule.NextRuleId))
         {
-            var explicitNext = groupRules.FirstOrDefault(candidate => candidate.Id == rule.NextRuleId);
-            if (explicitNext is not null) return explicitNext;
+            TimedAutomationRuleSettings? explicitNext = groupRules.FirstOrDefault(candidate => candidate.Id == rule.NextRuleId);
+            if (explicitNext is not null)
+            {
+                return explicitNext;
+            }
         }
 
         return groupRules
@@ -21892,10 +23855,10 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void DrawWorkflowDesignerConnection(TimedAutomationRuleSettings from, TimedAutomationRuleSettings to, string label, Brush brush)
     {
-        var x1 = from.DesignerX + 210;
-        var y1 = from.DesignerY + 42;
-        var x2 = to.DesignerX;
-        var y2 = to.DesignerY + 42;
+        double x1 = from.DesignerX + 210;
+        double y1 = from.DesignerY + 42;
+        double x2 = to.DesignerX;
+        double y2 = to.DesignerY + 42;
         var line = new System.Windows.Shapes.Line
         {
             X1 = x1,
@@ -21908,14 +23871,14 @@ private Task ApplyCombinedAlertDuckingAsync()
         WorkflowDesignerCanvas.Children.Add(line);
 
         var text = new TextBlock { Text = label, Foreground = brush, FontWeight = FontWeights.SemiBold, Background = Brushes.Black };
-        Canvas.SetLeft(text, (x1 + x2) / 2 - 20);
-        Canvas.SetTop(text, (y1 + y2) / 2 - 18);
+        Canvas.SetLeft(text, ((x1 + x2) / 2) - 20);
+        Canvas.SetTop(text, ((y1 + y2) / 2) - 18);
         WorkflowDesignerCanvas.Children.Add(text);
     }
 
     private void DrawWorkflowDesignerNode(TimedAutomationRuleSettings rule)
     {
-        var statusBrush = rule.LastRunStatus.Contains("Erfolg", StringComparison.OrdinalIgnoreCase)
+        SolidColorBrush statusBrush = rule.LastRunStatus.Contains("Erfolg", StringComparison.OrdinalIgnoreCase)
             ? Brushes.SeaGreen
             : rule.LastRunStatus.Contains("Fehler", StringComparison.OrdinalIgnoreCase)
                 ? Brushes.IndianRed
@@ -21951,14 +23914,22 @@ private Task ApplyCombinedAlertDuckingAsync()
         };
         border.MouseMove += (_, args) =>
         {
-            if (!border.IsMouseCaptured || args.LeftButton != MouseButtonState.Pressed) return;
-            var position = args.GetPosition(WorkflowDesignerCanvas);
+            if (!border.IsMouseCaptured || args.LeftButton != MouseButtonState.Pressed)
+            {
+                return;
+            }
+
+            Point position = args.GetPosition(WorkflowDesignerCanvas);
             Canvas.SetLeft(border, Math.Max(0, position.X - dragOffset.X));
             Canvas.SetTop(border, Math.Max(0, position.Y - dragOffset.Y));
         };
         border.MouseLeftButtonUp += async (_, args) =>
         {
-            if (!border.IsMouseCaptured) return;
+            if (!border.IsMouseCaptured)
+            {
+                return;
+            }
+
             border.ReleaseMouseCapture();
             rule.DesignerX = Canvas.GetLeft(border);
             rule.DesignerY = Canvas.GetTop(border);
@@ -21972,16 +23943,16 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task AutoLayoutWorkflowDesignerAsync()
     {
-        var group = WorkflowDesignerGroupBox.Text?.Trim() ?? "";
+        string group = WorkflowDesignerGroupBox.Text?.Trim() ?? "";
         var rules = _timedAutomationRules
             .Where(rule => string.Equals(rule.WorkflowGroup?.Trim(), group, StringComparison.OrdinalIgnoreCase))
             .OrderBy(rule => rule.WorkflowOrder)
             .ThenBy(rule => rule.Name)
             .ToList();
-        for (var index = 0; index < rules.Count; index++)
+        for (int index = 0; index < rules.Count; index++)
         {
-            rules[index].DesignerX = 70 + (index % 5) * 280;
-            rules[index].DesignerY = 90 + (index / 5) * 170;
+            rules[index].DesignerX = 70 + (index % 5 * 280);
+            rules[index].DesignerY = 90 + (index / 5 * 170);
         }
         await _settingsStore.SaveAsync(_settings);
         RefreshWorkflowDesigner();
@@ -21997,20 +23968,32 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ValidateWorkflowDesigner()
     {
-        var group = WorkflowDesignerGroupBox.Text?.Trim() ?? "";
+        string group = WorkflowDesignerGroupBox.Text?.Trim() ?? "";
         var rules = _timedAutomationRules
             .Where(rule => string.Equals(rule.WorkflowGroup?.Trim(), group, StringComparison.OrdinalIgnoreCase))
             .ToList();
         var issues = new List<string>();
-        if (rules.Count == 0) issues.Add("Die ausgewählte Gruppe enthält keine Regeln.");
-        foreach (var duplicate in rules.GroupBy(rule => rule.WorkflowOrder).Where(g => g.Count() > 1))
+        if (rules.Count == 0)
+        {
+            issues.Add("Die ausgewählte Gruppe enthält keine Regeln.");
+        }
+
+        foreach (IGrouping<int, TimedAutomationRuleSettings>? duplicate in rules.GroupBy(rule => rule.WorkflowOrder).Where(g => g.Count() > 1))
+        {
             issues.Add($"Reihenfolge {duplicate.Key} ist mehrfach vergeben.");
-        foreach (var rule in rules)
+        }
+
+        foreach (TimedAutomationRuleSettings? rule in rules)
         {
             if (!string.IsNullOrWhiteSpace(rule.NextRuleId) && rules.All(candidate => candidate.Id != rule.NextRuleId))
+            {
                 issues.Add($"{rule.Name}: Erfolgspfad zeigt außerhalb der Gruppe.");
+            }
+
             if (!string.IsNullOrWhiteSpace(rule.FailureRuleId) && rules.All(candidate => candidate.Id != rule.FailureRuleId))
+            {
                 issues.Add($"{rule.Name}: Fehlerpfad zeigt außerhalb der Gruppe.");
+            }
         }
         WorkflowDesignerStatusText.Text = issues.Count == 0
             ? $"Graph ‘{group}’ ist gültig: {rules.Count} erreichbare Knoten, keine doppelten Reihenfolgen."
@@ -22020,13 +24003,13 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task LoadRemoteObsConfigurationAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Kein Remote-Gerät ausgewählt."; return; }
         try
         {
-            using var client = CreateTrustedAgentClient(device);
+            using HttpClient client = CreateTrustedAgentClient(device);
             client.DefaultRequestHeaders.Add("X-Agent-Key", device.AgentKey);
-            var data = await client.GetFromJsonAsync<RemoteObsConfiguration>($"https://{device.Host}:{GetMultiPcAgentPort()}/api/obs/configuration");
+            RemoteObsConfiguration? data = await client.GetFromJsonAsync<RemoteObsConfiguration>($"https://{device.Host}:{GetMultiPcAgentPort()}/api/obs/configuration");
             MultiPcObsProfilesBox.ItemsSource = data?.Profiles ?? [];
             MultiPcObsSceneCollectionsBox.ItemsSource = data?.SceneCollections ?? [];
             MultiPcObsProfilesBox.SelectedItem = data?.CurrentProfile;
@@ -22038,16 +24021,24 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ApplyRemoteObsConfigurationAsync(bool profile)
     {
-        var device = GetSelectedRemoteDevice();
-        if (device is null) return;
-        var profileName = profile ? MultiPcObsProfilesBox.SelectedItem?.ToString() ?? "" : "";
-        var collectionName = profile ? "" : MultiPcObsSceneCollectionsBox.SelectedItem?.ToString() ?? "";
-        if (string.IsNullOrWhiteSpace(profileName) && string.IsNullOrWhiteSpace(collectionName)) return;
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
+        if (device is null)
+        {
+            return;
+        }
+
+        string profileName = profile ? MultiPcObsProfilesBox.SelectedItem?.ToString() ?? "" : "";
+        string collectionName = profile ? "" : MultiPcObsSceneCollectionsBox.SelectedItem?.ToString() ?? "";
+        if (string.IsNullOrWhiteSpace(profileName) && string.IsNullOrWhiteSpace(collectionName))
+        {
+            return;
+        }
+
         try
         {
-            using var client = CreateTrustedAgentClient(device);
+            using HttpClient client = CreateTrustedAgentClient(device);
             client.DefaultRequestHeaders.Add("X-Agent-Key", device.AgentKey);
-            var response = await client.PostAsJsonAsync($"https://{device.Host}:{GetMultiPcAgentPort()}/api/obs/configuration", new { ProfileName = profileName, SceneCollectionName = collectionName });
+            HttpResponseMessage response = await client.PostAsJsonAsync($"https://{device.Host}:{GetMultiPcAgentPort()}/api/obs/configuration", new { ProfileName = profileName, SceneCollectionName = collectionName });
             response.EnsureSuccessStatusCode();
             MultiPcStatusText.Text = profile ? $"OBS-Profil aktiviert: {profileName}" : $"OBS-Szenensammlung aktiviert: {collectionName}";
             await Task.Delay(750);
@@ -22058,18 +24049,22 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task LoadRemoteObsPresetsAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/presets");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            using var response = await client.SendAsync(request);
-            var presets = await response.Content.ReadFromJsonAsync<RemoteObsPresetInfo[]>();
+            using HttpResponseMessage response = await client.SendAsync(request);
+            RemoteObsPresetInfo[]? presets = await response.Content.ReadFromJsonAsync<RemoteObsPresetInfo[]>();
             if (!response.IsSuccessStatusCode) { MultiPcStatusText.Text = "OBS-Presets konnten nicht geladen werden."; return; }
             MultiPcObsPresetsBox.ItemsSource = presets?.Select(x => x.Name + " · " + x.CreatedAt.LocalDateTime.ToString("g")).ToArray() ?? [];
-            if (MultiPcObsPresetsBox.Items.Count > 0) MultiPcObsPresetsBox.SelectedIndex = 0;
+            if (MultiPcObsPresetsBox.Items.Count > 0)
+            {
+                MultiPcObsPresetsBox.SelectedIndex = 0;
+            }
+
             MultiPcStatusText.Text = $"{presets?.Length ?? 0} Remote-OBS-Preset(s) geladen.";
         }
         catch (Exception ex) { MultiPcStatusText.Text = "OBS-Presets konnten nicht geladen werden: " + ex.Message; }
@@ -22077,7 +24072,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task SaveRemoteObsPresetAsync()
     {
-        var name = MultiPcObsPresetNameBox.Text.Trim();
+        string name = MultiPcObsPresetNameBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(name)) { MultiPcStatusText.Text = "Bitte einen Preset-Namen eingeben."; return; }
         await PostRemoteObsAsync("presets/save", new { name }, $"OBS-Preset „{name}“ wurde gespeichert");
         await LoadRemoteObsPresetsAsync();
@@ -22087,7 +24082,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ApplyRemoteObsPresetAsync()
     {
-        var name = SelectedRemoteObsPresetName();
+        string? name = SelectedRemoteObsPresetName();
         if (string.IsNullOrWhiteSpace(name)) { MultiPcStatusText.Text = "Bitte ein OBS-Preset auswählen."; return; }
         await PostRemoteObsAsync("presets/apply", new { name }, $"OBS-Preset „{name}“ wurde wiederhergestellt");
         await Task.Delay(750);
@@ -22097,7 +24092,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task DeleteRemoteObsPresetAsync()
     {
-        var name = SelectedRemoteObsPresetName();
+        string? name = SelectedRemoteObsPresetName();
         if (string.IsNullOrWhiteSpace(name)) { MultiPcStatusText.Text = "Bitte ein OBS-Preset auswählen."; return; }
         await PostRemoteObsAsync("presets/delete", new { name }, $"OBS-Preset „{name}“ wurde gelöscht");
         await LoadRemoteObsPresetsAsync();
@@ -22105,15 +24100,15 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task LoadRemoteAgentLogsAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/logs?lines=500");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            using var response = await client.SendAsync(request);
-            var lines = await response.Content.ReadFromJsonAsync<string[]>();
+            using HttpResponseMessage response = await client.SendAsync(request);
+            string[]? lines = await response.Content.ReadFromJsonAsync<string[]>();
             MultiPcAgentLogsBox.Text = response.IsSuccessStatusCode ? string.Join(Environment.NewLine, lines ?? []) : await response.Content.ReadAsStringAsync();
             MultiPcStatusText.Text = response.IsSuccessStatusCode ? $"{lines?.Length ?? 0} Agent-Logzeilen geladen." : "Agent-Logs konnten nicht geladen werden.";
         }
@@ -22122,42 +24117,49 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task DeployRemotePackageAsync(string endpoint, string title, string successText)
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
-        var requiredPermission = endpoint.StartsWith("update", StringComparison.OrdinalIgnoreCase) ? "updates.stage" : "files.deploy";
+        string requiredPermission = endpoint.StartsWith("update", StringComparison.OrdinalIgnoreCase) ? "updates.stage" : "files.deploy";
         if (!(device.AllowedCommands ?? []).Contains(requiredPermission, StringComparer.OrdinalIgnoreCase))
         { MultiPcStatusText.Text = $"Der Agent hat die Berechtigung {requiredPermission} nicht freigegeben."; return; }
         var dialog = new OpenFileDialog { Title = title, Filter = "ZIP-Archive (*.zip)|*.zip", CheckFileExists = true, Multiselect = false };
-        if (dialog.ShowDialog() != true) return;
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
         try
         {
-            var bytes = await File.ReadAllBytesAsync(dialog.FileName);
+            byte[] bytes = await File.ReadAllBytesAsync(dialog.FileName);
             if (bytes.Length > 100 * 1024 * 1024) { MultiPcStatusText.Text = "Das Paket ist größer als 100 MB und wurde nicht übertragen."; return; }
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             client.Timeout = TimeSpan.FromMinutes(5);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/{endpoint}");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { fileName = Path.GetFileName(dialog.FileName), base64Zip = Convert.ToBase64String(bytes) });
-            using var response = await client.SendAsync(request);
-            var result = await response.Content.ReadAsStringAsync();
+            using HttpResponseMessage response = await client.SendAsync(request);
+            string result = await response.Content.ReadAsStringAsync();
             MultiPcStatusText.Text = response.IsSuccessStatusCode ? $"{device.Name}: {successText}." : "Remote-Dateifehler: " + result;
             AddMultiPcHistory(device.Name, endpoint, response.IsSuccessStatusCode ? "erfolgreich" : "Fehler");
-            if (response.IsSuccessStatusCode) await LoadRemoteAgentLogsAsync();
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadRemoteAgentLogsAsync();
+            }
         }
         catch (Exception ex) { MultiPcStatusText.Text = "Paket konnte nicht übertragen werden: " + ex.Message; }
     }
 
     private async Task LoadRemoteUpdateStatusAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/status");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            using var response = await client.SendAsync(request);
-            var state = await response.Content.ReadFromJsonAsync<RemoteUpdateState>();
+            using HttpResponseMessage response = await client.SendAsync(request);
+            RemoteUpdateState? state = await response.Content.ReadFromJsonAsync<RemoteUpdateState>();
             if (!response.IsSuccessStatusCode || state is null) { MultiPcUpdateStatusText.Text = "Update-Status konnte nicht geladen werden."; return; }
             MultiPcUpdateStatusText.Text = string.Join(Environment.NewLine,
                 $"Status: {state.Status} · Paket: {state.PackageName}",
@@ -22175,15 +24177,15 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task LoadRemoteUpdateHistoryAsync()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/history");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            using var response = await client.SendAsync(request);
-            var history = await response.Content.ReadFromJsonAsync<RemoteUpdateHistoryEntry[]>();
+            using HttpResponseMessage response = await client.SendAsync(request);
+            RemoteUpdateHistoryEntry[]? history = await response.Content.ReadFromJsonAsync<RemoteUpdateHistoryEntry[]>();
             if (!response.IsSuccessStatusCode || history is null) { MultiPcStatusText.Text = "Update-Historie konnte nicht geladen werden."; return; }
             MultiPcUpdateHistoryList.ItemsSource = history.Select(entry => $"{entry.At.LocalDateTime:g} · {entry.Action} · {entry.PackageVersion} · {(entry.Success ? "OK" : "Fehler")} · {entry.Message}").ToArray();
             MultiPcStatusText.Text = $"{history.Length} Update-Einträge geladen.";
@@ -22193,19 +24195,19 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task ExecuteRemoteUpdateActionAsync(string action)
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null) { MultiPcStatusText.Text = "Bitte ein Remote-Gerät auswählen."; return; }
         if (!(device.AllowedCommands ?? []).Contains("updates.apply", StringComparer.OrdinalIgnoreCase))
         { MultiPcStatusText.Text = "Der Agent hat die Berechtigung updates.apply nicht freigegeben."; return; }
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             client.Timeout = TimeSpan.FromMinutes(2);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/{action}");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { restartSuite = MultiPcRestartSuiteAfterUpdateCheckBox.IsChecked == true, automaticRollback = MultiPcAutomaticRollbackCheckBox.IsChecked == true });
-            using var response = await client.SendAsync(request);
-            var result = await response.Content.ReadAsStringAsync();
+            using HttpResponseMessage response = await client.SendAsync(request);
+            string result = await response.Content.ReadAsStringAsync();
             MultiPcStatusText.Text = response.IsSuccessStatusCode
                 ? action == "apply" ? "Remote-Update wird angewendet. Die Verbindung zum Agent kann kurz abbrechen." : action == "validate" ? "Remote-Updatepaket wurde geprüft." : "Remote-Rollback wird angewendet. Die Verbindung zum Agent kann kurz abbrechen."
                 : "Remote-Updatefehler: " + result;
@@ -22222,56 +24224,59 @@ private Task ApplyCombinedAlertDuckingAsync()
             MultiPcStatusText.Text = "Es läuft bereits ein Update-Rollout.";
             return;
         }
-        var selectedGroup = (MultiPcRolloutTargetGroupBox.Text ?? "Alle").Trim();
-        var targets = _multiPcDevices
+        string selectedGroup = (MultiPcRolloutTargetGroupBox.Text ?? "Alle").Trim();
+        MultiPcDeviceRecord[] targets = [.. _multiPcDevices
             .Where(device => (device.AllowedCommands ?? []).Contains("updates.stage", StringComparer.OrdinalIgnoreCase)
                           && (device.AllowedCommands ?? []).Contains("updates.apply", StringComparer.OrdinalIgnoreCase))
             .Where(device => string.IsNullOrWhiteSpace(selectedGroup) || selectedGroup.Equals("Alle", StringComparison.OrdinalIgnoreCase)
-                          || (_multiPcRolloutGroups.TryGetValue(device.Id, out var group) && group.Equals(selectedGroup, StringComparison.OrdinalIgnoreCase)))
-            .OrderBy(device => device.Name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+                          || (_multiPcRolloutGroups.TryGetValue(device.Id, out string? group) && group.Equals(selectedGroup, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(device => device.Name, StringComparer.OrdinalIgnoreCase)];
         if (targets.Length == 0)
         {
             MultiPcStatusText.Text = "Für die gewählte Rollout-Gruppe wurde kein geeigneter Agent gefunden.";
             return;
         }
-        var packagePath = scheduledPackagePath;
+        string? packagePath = scheduledPackagePath;
         if (string.IsNullOrWhiteSpace(packagePath))
         {
             var dialog = new OpenFileDialog { Title = "Update-ZIP für gestaffelten Rollout auswählen", Filter = "ZIP-Archive (*.zip)|*.zip", CheckFileExists = true, Multiselect = false };
-            if (dialog.ShowDialog() != true) return;
+            if (dialog.ShowDialog() != true)
+            {
+                return;
+            }
+
             packagePath = dialog.FileName;
         }
         if (!File.Exists(packagePath)) { MultiPcStatusText.Text = "Das ausgewählte Update-Paket wurde nicht gefunden."; return; }
-        var bytes = await File.ReadAllBytesAsync(packagePath);
+        byte[] bytes = await File.ReadAllBytesAsync(packagePath);
         if (bytes.Length > 100 * 1024 * 1024)
         {
             MultiPcStatusText.Text = "Das Update-Paket ist größer als 100 MB.";
             return;
         }
-        var delaySeconds = int.TryParse(MultiPcRolloutDelayBox.Text, out var parsedDelay) ? Math.Clamp(parsedDelay, 0, 600) : 20;
-        var canaryCount = int.TryParse(MultiPcCanaryCountBox.Text, out var parsedCanary) ? Math.Clamp(parsedCanary, 0, targets.Length) : Math.Min(1, targets.Length);
-        var maxFailurePercent = int.TryParse(MultiPcMaxFailurePercentBox.Text, out var parsedFailure) ? Math.Clamp(parsedFailure, 0, 100) : 25;
-        var stopOnThreshold = MultiPcStopOnFailureThresholdCheckBox.IsChecked == true;
+        int delaySeconds = int.TryParse(MultiPcRolloutDelayBox.Text, out int parsedDelay) ? Math.Clamp(parsedDelay, 0, 600) : 20;
+        int canaryCount = int.TryParse(MultiPcCanaryCountBox.Text, out int parsedCanary) ? Math.Clamp(parsedCanary, 0, targets.Length) : Math.Min(1, targets.Length);
+        int maxFailurePercent = int.TryParse(MultiPcMaxFailurePercentBox.Text, out int parsedFailure) ? Math.Clamp(parsedFailure, 0, 100) : 25;
+        bool stopOnThreshold = MultiPcStopOnFailureThresholdCheckBox.IsChecked == true;
         _multiPcRolloutCts = new CancellationTokenSource();
-        var token = _multiPcRolloutCts.Token;
+        CancellationToken token = _multiPcRolloutCts.Token;
         _multiPcRolloutItems.Clear();
         MultiPcStartRolloutButton.IsEnabled = false;
         MultiPcStatusText.Text = $"Rollout '{selectedGroup}' an {targets.Length} Remote-PC(s) gestartet · Canary: {canaryCount}.";
-        var attempted = 0;
-        var succeeded = 0;
-        var failed = 0;
+        int attempted = 0;
+        int succeeded = 0;
+        int failed = 0;
         try
         {
-            for (var index = 0; index < targets.Length; index++)
+            for (int index = 0; index < targets.Length; index++)
             {
                 token.ThrowIfCancellationRequested();
                 await WaitForMaintenanceWindowAsync(token);
-                var device = targets[index];
-                var phase = index < canaryCount ? "CANARY" : "ROLLOUT";
+                MultiPcDeviceRecord device = targets[index];
+                string phase = index < canaryCount ? "CANARY" : "ROLLOUT";
                 UpdateRolloutLine(device.Name, $"{phase} · Paket wird übertragen …");
                 attempted++;
-                var staged = await StageUpdateForRolloutAsync(device, packagePath, bytes, token);
+                bool staged = await StageUpdateForRolloutAsync(device, packagePath, bytes, token);
                 if (!staged)
                 {
                     failed++;
@@ -22280,7 +24285,7 @@ private Task ApplyCombinedAlertDuckingAsync()
                 else
                 {
                     UpdateRolloutLine(device.Name, $"{phase} · Paket wird validiert …");
-                    var validated = await SendRolloutUpdateActionAsync(device, "validate", token);
+                    bool validated = await SendRolloutUpdateActionAsync(device, "validate", token);
                     if (!validated)
                     {
                         failed++;
@@ -22289,14 +24294,22 @@ private Task ApplyCombinedAlertDuckingAsync()
                     else
                     {
                         UpdateRolloutLine(device.Name, $"{phase} · Installation wird gestartet …");
-                        var applied = await SendRolloutUpdateActionAsync(device, "apply", token);
-                        if (applied) succeeded++; else failed++;
+                        bool applied = await SendRolloutUpdateActionAsync(device, "apply", token);
+                        if (applied)
+                        {
+                            succeeded++;
+                        }
+                        else
+                        {
+                            failed++;
+                        }
+
                         UpdateRolloutLine(device.Name, applied ? $"{phase} · Installation gestartet" : $"{phase} · FEHLER beim Installationsstart");
                         AddMultiPcHistory(device.Name, "rollout", applied ? $"{phase}: Installation gestartet" : $"{phase}: Fehler");
                     }
                 }
 
-                var failurePercent = attempted == 0 ? 0 : (int)Math.Round(failed * 100d / attempted);
+                int failurePercent = attempted == 0 ? 0 : (int)Math.Round(failed * 100d / attempted);
                 MultiPcStatusText.Text = $"Rollout läuft · {attempted}/{targets.Length} bearbeitet · {succeeded} erfolgreich · {failed} Fehler ({failurePercent} %).";
                 if (stopOnThreshold && failed > 0 && failurePercent > maxFailurePercent)
                 {
@@ -22311,12 +24324,18 @@ private Task ApplyCombinedAlertDuckingAsync()
                     break;
                 }
                 if (index < targets.Length - 1 && delaySeconds > 0)
+                {
                     await Task.Delay(TimeSpan.FromSeconds(delaySeconds), token);
+                }
             }
             if (attempted == targets.Length && failed == 0)
+            {
                 MultiPcStatusText.Text = $"Rollout erfolgreich abgeschlossen: {succeeded}/{targets.Length} Geräte.";
+            }
             else if (attempted == targets.Length)
+            {
                 MultiPcStatusText.Text = $"Rollout abgeschlossen: {succeeded} erfolgreich, {failed} fehlgeschlagen.";
+            }
         }
         catch (OperationCanceledException)
         {
@@ -22338,14 +24357,18 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task ScheduleRemoteUpdateRolloutAsync()
     {
         if (_scheduledMultiPcRolloutCts is not null) { MultiPcStatusText.Text = "Es ist bereits ein Rollout geplant."; return; }
-        var when = ParseRolloutSchedule(MultiPcRolloutScheduleBox.Text);
+        DateTimeOffset? when = ParseRolloutSchedule(MultiPcRolloutScheduleBox.Text);
         if (when is null || when <= DateTimeOffset.Now) { MultiPcStatusText.Text = "Bitte einen zukünftigen Zeitpunkt eingeben, z. B. 'morgen 02:00' oder '21.07.2026 02:00'."; return; }
         var dialog = new OpenFileDialog { Title = "Update-ZIP für geplanten Rollout auswählen", Filter = "ZIP-Archive (*.zip)|*.zip", CheckFileExists = true, Multiselect = false };
-        if (dialog.ShowDialog() != true) return;
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
         Directory.CreateDirectory(MultiPcScheduledPackagesDirectory);
-        var storedPackagePath = Path.Combine(MultiPcScheduledPackagesDirectory, $"{when.Value:yyyyMMdd-HHmmss}-{Path.GetFileName(dialog.FileName)}");
+        string storedPackagePath = Path.Combine(MultiPcScheduledPackagesDirectory, $"{when.Value:yyyyMMdd-HHmmss}-{Path.GetFileName(dialog.FileName)}");
         File.Copy(dialog.FileName, storedPackagePath, true);
-        var job = CaptureScheduledRolloutJob(when.Value, storedPackagePath);
+        ScheduledMultiPcRolloutJob job = CaptureScheduledRolloutJob(when.Value, storedPackagePath);
         SaveScheduledRolloutJob(job);
         AddMultiPcHistory("Rollout", job.TargetGroup, $"geplant für {job.ScheduledAt.LocalDateTime:g}");
         await StartScheduledRolloutWaitAsync(job);
@@ -22364,10 +24387,14 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private async Task RestoreScheduledRemoteUpdateRolloutAsync()
     {
-        if (MultiPcResumePausedRolloutCheckBox.IsChecked != true || _scheduledMultiPcRolloutCts is not null || !File.Exists(MultiPcScheduledRolloutPath)) return;
+        if (MultiPcResumePausedRolloutCheckBox.IsChecked != true || _scheduledMultiPcRolloutCts is not null || !File.Exists(MultiPcScheduledRolloutPath))
+        {
+            return;
+        }
+
         try
         {
-            var job = System.Text.Json.JsonSerializer.Deserialize<ScheduledMultiPcRolloutJob>(File.ReadAllText(MultiPcScheduledRolloutPath));
+            ScheduledMultiPcRolloutJob? job = System.Text.Json.JsonSerializer.Deserialize<ScheduledMultiPcRolloutJob>(File.ReadAllText(MultiPcScheduledRolloutPath));
             if (job is null || !File.Exists(job.PackagePath)) { File.Delete(MultiPcScheduledRolloutPath); return; }
             ApplyScheduledRolloutJobToUi(job);
             AddMultiPcHistory("Rollout", job.TargetGroup, "Planung nach Suite-Neustart wiederhergestellt");
@@ -22391,18 +24418,25 @@ private Task ApplyCombinedAlertDuckingAsync()
     private async Task StartScheduledRolloutWaitAsync(ScheduledMultiPcRolloutJob job)
     {
         _scheduledMultiPcRolloutCts = new CancellationTokenSource();
-        var token = _scheduledMultiPcRolloutCts.Token;
+        CancellationToken token = _scheduledMultiPcRolloutCts.Token;
         MultiPcScheduledRolloutStatusText.Text = $"Gespeichert: {job.ScheduledAt.LocalDateTime:g} · {Path.GetFileName(job.PackagePath)}";
         MultiPcStatusText.Text = "Der Update-Rollout wurde dauerhaft geplant.";
         try
         {
-            var delay = job.ScheduledAt - DateTimeOffset.Now;
-            if (delay > TimeSpan.Zero) await Task.Delay(delay, token);
+            TimeSpan delay = job.ScheduledAt - DateTimeOffset.Now;
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, token);
+            }
+
             MultiPcScheduledRolloutStatusText.Text = "Planung wird jetzt ausgeführt …";
             ApplyScheduledRolloutJobToUi(job);
             await StartRemoteUpdateRolloutAsync(job.PackagePath);
             AddMultiPcHistory("Rollout", job.TargetGroup, "gespeicherter Auftrag ausgeführt");
-            if (File.Exists(MultiPcScheduledRolloutPath)) File.Delete(MultiPcScheduledRolloutPath);
+            if (File.Exists(MultiPcScheduledRolloutPath))
+            {
+                File.Delete(MultiPcScheduledRolloutPath);
+            }
         }
         catch (OperationCanceledException) { MultiPcScheduledRolloutStatusText.Text = "Kein Rollout geplant."; }
         finally { _scheduledMultiPcRolloutCts?.Dispose(); _scheduledMultiPcRolloutCts = null; }
@@ -22412,30 +24446,49 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         if (_scheduledMultiPcRolloutCts is null) { MultiPcStatusText.Text = "Aktuell ist kein Rollout geplant."; return; }
         _scheduledMultiPcRolloutCts.Cancel();
-        try { if (File.Exists(MultiPcScheduledRolloutPath)) File.Delete(MultiPcScheduledRolloutPath); } catch { }
+        try { if (File.Exists(MultiPcScheduledRolloutPath)) { File.Delete(MultiPcScheduledRolloutPath); } } catch { }
         AddMultiPcHistory("Rollout", "Planung", "aufgehoben");
         MultiPcStatusText.Text = "Die Rollout-Planung wurde aufgehoben.";
     }
 
     private DateTimeOffset? ParseRolloutSchedule(string? value)
     {
-        var text = (value ?? string.Empty).Trim();
-        if (text.StartsWith("morgen ", StringComparison.OrdinalIgnoreCase) && TimeOnly.TryParse(text[7..], out var tomorrowTime))
+        string text = (value ?? string.Empty).Trim();
+        if (text.StartsWith("morgen ", StringComparison.OrdinalIgnoreCase) && TimeOnly.TryParse(text[7..], out TimeOnly tomorrowTime))
+        {
             return new DateTimeOffset(DateTime.Today.AddDays(1).Add(tomorrowTime.ToTimeSpan()));
-        if (DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.CurrentCulture, System.Globalization.DateTimeStyles.AssumeLocal, out var parsed)) return parsed;
+        }
+
+        if (DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.CurrentCulture, System.Globalization.DateTimeStyles.AssumeLocal, out DateTimeOffset parsed))
+        {
+            return parsed;
+        }
+
         return null;
     }
 
     private async Task WaitForMaintenanceWindowAsync(CancellationToken token)
     {
-        if (MultiPcUseMaintenanceWindowCheckBox.IsChecked != true) return;
-        if (!TimeOnly.TryParse(MultiPcMaintenanceStartBox.Text, out var start) || !TimeOnly.TryParse(MultiPcMaintenanceEndBox.Text, out var end)) return;
+        if (MultiPcUseMaintenanceWindowCheckBox.IsChecked != true)
+        {
+            return;
+        }
+
+        if (!TimeOnly.TryParse(MultiPcMaintenanceStartBox.Text, out TimeOnly start) || !TimeOnly.TryParse(MultiPcMaintenanceEndBox.Text, out TimeOnly end))
+        {
+            return;
+        }
+
         while (true)
         {
             token.ThrowIfCancellationRequested();
             var now = TimeOnly.FromDateTime(DateTime.Now);
-            var inside = start <= end ? now >= start && now <= end : now >= start || now <= end;
-            if (inside) return;
+            bool inside = start <= end ? now >= start && now <= end : now >= start || now <= end;
+            if (inside)
+            {
+                return;
+            }
+
             MultiPcStatusText.Text = $"Rollout pausiert: Wartungsfenster {start:HH\\:mm}–{end:HH\\:mm}. Automatische Fortsetzung folgt.";
             await Task.Delay(TimeSpan.FromSeconds(30), token);
         }
@@ -22445,12 +24498,22 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            if (!File.Exists(MultiPcRolloutGroupsPath)) return;
-            var values = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(MultiPcRolloutGroupsPath));
-            if (values is null) return;
+            if (!File.Exists(MultiPcRolloutGroupsPath))
+            {
+                return;
+            }
+
+            Dictionary<string, string>? values = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(MultiPcRolloutGroupsPath));
+            if (values is null)
+            {
+                return;
+            }
+
             _multiPcRolloutGroups.Clear();
-            foreach (var pair in values.Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value)))
+            foreach (KeyValuePair<string, string> pair in values.Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value)))
+            {
                 _multiPcRolloutGroups[pair.Key] = pair.Value.Trim();
+            }
         }
         catch { }
     }
@@ -22467,21 +24530,25 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void RefreshMultiPcRolloutGroupChoices()
     {
-        var current = MultiPcRolloutTargetGroupBox.Text;
-        var groups = new[] { "Alle" }.Concat(_multiPcRolloutGroups.Values.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.OrdinalIgnoreCase)).ToArray();
+        string current = MultiPcRolloutTargetGroupBox.Text;
+        string[] groups =
+        [
+            "Alle",
+            .. _multiPcRolloutGroups.Values.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.OrdinalIgnoreCase),
+        ];
         MultiPcRolloutTargetGroupBox.ItemsSource = groups;
         MultiPcRolloutTargetGroupBox.Text = string.IsNullOrWhiteSpace(current) ? "Alle" : current;
     }
 
     private void AssignSelectedDeviceToRolloutGroup()
     {
-        var device = GetSelectedRemoteDevice();
+        MultiPcDeviceRecord? device = GetSelectedRemoteDevice();
         if (device is null)
         {
             MultiPcStatusText.Text = "Bitte zuerst einen Remote-PC auswählen.";
             return;
         }
-        var group = (MultiPcDeviceRolloutGroupBox.Text ?? string.Empty).Trim();
+        string group = (MultiPcDeviceRolloutGroupBox.Text ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(group))
         {
             _multiPcRolloutGroups.Remove(device.Id);
@@ -22510,12 +24577,12 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             client.Timeout = TimeSpan.FromMinutes(5);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/stage");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { fileName = Path.GetFileName(filePath), base64Zip = Convert.ToBase64String(bytes) });
-            using var response = await client.SendAsync(request, token);
+            using HttpResponseMessage response = await client.SendAsync(request, token);
             return response.IsSuccessStatusCode;
         }
         catch when (!token.IsCancellationRequested) { return false; }
@@ -22525,12 +24592,12 @@ private Task ApplyCombinedAlertDuckingAsync()
     {
         try
         {
-            using var client = CreateTrustedMultiPcClient(device);
+            using HttpClient client = CreateTrustedMultiPcClient(device);
             client.Timeout = TimeSpan.FromMinutes(2);
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/{action}");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { restartSuite = MultiPcRestartSuiteAfterUpdateCheckBox.IsChecked == true, automaticRollback = MultiPcAutomaticRollbackCheckBox.IsChecked == true });
-            using var response = await client.SendAsync(request, token);
+            using HttpResponseMessage response = await client.SendAsync(request, token);
             return response.IsSuccessStatusCode;
         }
         catch when (!token.IsCancellationRequested) { return false; }
@@ -22538,11 +24605,17 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void UpdateRolloutLine(string deviceName, string status)
     {
-        var prefix = deviceName + " · ";
-        var existing = _multiPcRolloutItems.FirstOrDefault(item => item.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-        var line = $"{deviceName} · {status}";
-        if (existing is null) _multiPcRolloutItems.Add(line);
-        else _multiPcRolloutItems[_multiPcRolloutItems.IndexOf(existing)] = line;
+        string prefix = deviceName + " · ";
+        string? existing = _multiPcRolloutItems.FirstOrDefault(item => item.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+        string line = $"{deviceName} · {status}";
+        if (existing is null)
+        {
+            _multiPcRolloutItems.Add(line);
+        }
+        else
+        {
+            _multiPcRolloutItems[_multiPcRolloutItems.IndexOf(existing)] = line;
+        }
     }
 
     private async Task ExecuteUiActionAsync(Button button, string actionName, Func<Task> action)
@@ -22550,7 +24623,7 @@ private Task ApplyCombinedAlertDuckingAsync()
         ArgumentNullException.ThrowIfNull(button);
         ArgumentNullException.ThrowIfNull(action);
 
-        var wasEnabled = button.IsEnabled;
+        bool wasEnabled = button.IsEnabled;
         try
         {
             button.IsEnabled = false;
@@ -22568,7 +24641,7 @@ private Task ApplyCombinedAlertDuckingAsync()
 
     private void ShowError(string title, Exception exception)
     {
-        var safeTitle = string.IsNullOrWhiteSpace(title) ? "Fehler" : title.Trim();
+        string safeTitle = string.IsNullOrWhiteSpace(title) ? "Fehler" : title.Trim();
         _appLogger.Write(AppLogLevel.Error, "UI", $"{safeTitle}: {exception.Message}", exception);
         MessageBox.Show(exception.Message, safeTitle, MessageBoxButton.OK, MessageBoxImage.Error);
     }

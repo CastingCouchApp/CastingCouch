@@ -7,7 +7,7 @@ public sealed class CrashReporterTests
     [Fact]
     public async Task WritesCrashReport()
     {
-        var root = Path.Combine(
+        string root = Path.Combine(
             Path.GetTempPath(),
             "CreatorControlSuite.CrashTests",
             Guid.NewGuid().ToString("N"));
@@ -17,7 +17,7 @@ public sealed class CrashReporterTests
         try
         {
             var reporter = new FileCrashReporter(root);
-            var path = await reporter.WriteAsync(
+            string path = await reporter.WriteAsync(
                 new InvalidOperationException("Testfehler"));
 
             Assert.True(File.Exists(path));

@@ -23,7 +23,7 @@ public sealed class FileCrashReporter : ICrashReporter
         IReadOnlyDictionary<string, string>? context = null,
         CancellationToken cancellationToken = default)
     {
-        var id = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss-fff");
+        string id = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss-fff");
         var report = new CrashReport(
             id,
             DateTimeOffset.Now,
@@ -39,7 +39,7 @@ public sealed class FileCrashReporter : ICrashReporter
                 new Dictionary<string, string>(
                     StringComparer.OrdinalIgnoreCase));
 
-        var path = Path.Combine(
+        string path = Path.Combine(
             _crashRoot,
             "crash-" + id + ".json");
 
@@ -55,12 +55,11 @@ public sealed class FileCrashReporter : ICrashReporter
         CancellationToken cancellationToken = default)
     {
         IReadOnlyList<string> reports =
-            Directory.GetFiles(
+            [.. Directory.GetFiles(
                     _crashRoot,
                     "crash-*.json",
                     SearchOption.TopDirectoryOnly)
-                .OrderByDescending(path => path)
-                .ToList();
+                .OrderByDescending(path => path)];
 
         return Task.FromResult(reports);
     }

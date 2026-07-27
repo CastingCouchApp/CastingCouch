@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Media;
 
@@ -14,20 +15,20 @@ public sealed class ThemeService : IThemeService
 
     public ThemeDefinition Apply(string? themeId)
     {
-        var theme = ThemeCatalog.Resolve(themeId);
-        var app = Application.Current;
+        ThemeDefinition theme = ThemeCatalog.Resolve(themeId);
+        Application? app = Application.Current;
         if (app is null)
         {
             CurrentTheme = theme;
             return theme;
         }
 
-        var dictionary = LoadDictionary(theme);
-        var merged = app.Resources.MergedDictionaries;
+        ResourceDictionary dictionary = LoadDictionary(theme);
+        Collection<ResourceDictionary> merged = app.Resources.MergedDictionaries;
 
-        for (var i = merged.Count - 1; i >= 0; i--)
+        for (int i = merged.Count - 1; i >= 0; i--)
         {
-            var candidate = merged[i];
+            ResourceDictionary candidate = merged[i];
             if (ReferenceEquals(candidate, _currentDictionary)
                 || IsThemeDictionary(candidate))
             {
@@ -62,7 +63,7 @@ public sealed class ThemeService : IThemeService
 
     private static bool IsThemeDictionary(ResourceDictionary dictionary)
     {
-        var source = dictionary.Source?.OriginalString ?? string.Empty;
+        string source = dictionary.Source?.OriginalString ?? string.Empty;
         return source.Contains("/Themes/", StringComparison.OrdinalIgnoreCase)
                || source.StartsWith("Themes/", StringComparison.OrdinalIgnoreCase)
                || source.Contains("Themes\\", StringComparison.OrdinalIgnoreCase);
@@ -72,10 +73,7 @@ public sealed class ThemeService : IThemeService
     {
         if (dictionary["AppFontFamily"] is FontFamily fontFamily)
         {
-            if (app.MainWindow is not null)
-            {
-                app.MainWindow.FontFamily = fontFamily;
-            }
+            app.MainWindow?.FontFamily = fontFamily;
 
             foreach (Window window in app.Windows)
             {

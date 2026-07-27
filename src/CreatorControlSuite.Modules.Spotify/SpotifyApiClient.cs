@@ -1,32 +1,26 @@
 using System.Diagnostics;
 using System.Net;
-using CreatorControlSuite.Core.Logging;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CreatorControlSuite.Core.Logging;
 using CreatorControlSuite.Modules.Spotify.Models;
 
 namespace CreatorControlSuite.Modules.Spotify;
 
-public sealed class SpotifyApiClient : ISpotifyApiClient
+public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) : ISpotifyApiClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly HttpClient _httpClient;
-    private readonly IAppLogger _logger;
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly IAppLogger _logger = logger;
     private string _accessToken = "";
     private long _requestSequence;
     private readonly SemaphoreSlim _requestGate = new(1, 1);
     private DateTimeOffset _rateLimitUntil = DateTimeOffset.MinValue;
-
-    public SpotifyApiClient(HttpClient httpClient, IAppLogger logger)
-    {
-        _httpClient = httpClient;
-        _logger = logger;
-    }
 
     public void Configure(string accessToken)
     {
@@ -36,13 +30,13 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
     public async Task<string> GetCurrentUserDisplayNameAsync(
         CancellationToken cancellationToken = default)
     {
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Get,
             "me",
             body: null,
             cancellationToken);
 
-        var user = await response.Content.ReadFromJsonAsync<UserResponse>(
+        UserResponse user = await response.Content.ReadFromJsonAsync<UserResponse>(
             JsonOptions,
             cancellationToken)
             ?? throw new InvalidOperationException(
@@ -56,26 +50,24 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
     public async Task<IReadOnlyList<SpotifyDevice>> GetDevicesAsync(
         CancellationToken cancellationToken = default)
     {
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Get,
             "me/player/devices",
             body: null,
             cancellationToken);
 
-        var result = await response.Content.ReadFromJsonAsync<DevicesResponse>(
+        DevicesResponse result = await response.Content.ReadFromJsonAsync<DevicesResponse>(
             JsonOptions,
             cancellationToken)
             ?? new DevicesResponse();
 
-        return result.Devices
-            .Select(ToDevice)
-            .ToList();
+        return [.. result.Devices.Select(ToDevice)];
     }
 
     public async Task<SpotifyPlaybackState> GetPlaybackStateAsync(
         CancellationToken cancellationToken = default)
     {
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Get,
             "me/player",
             body: null,
@@ -95,7 +87,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 ContextUri: "");
         }
 
-        var state = await response.Content.ReadFromJsonAsync<PlaybackResponse>(
+        PlaybackResponse? state = await response.Content.ReadFromJsonAsync<PlaybackResponse>(
             JsonOptions,
             cancellationToken);
 
@@ -130,19 +122,19 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
     public async Task<SpotifyQueue> GetQueueAsync(
         CancellationToken cancellationToken = default)
     {
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Get,
             "me/player/queue",
             body: null,
             cancellationToken);
 
-        var result = await response.Content.ReadFromJsonAsync<QueueResponse>(
+        QueueResponse result = await response.Content.ReadFromJsonAsync<QueueResponse>(
             JsonOptions,
             cancellationToken) ?? new QueueResponse();
 
         return new SpotifyQueue(
             result.CurrentlyPlaying is null ? null : ToTrack(result.CurrentlyPlaying),
-            result.Queue.Select(ToTrack).ToList());
+            [.. result.Queue.Select(ToTrack)]);
     }
 
 
@@ -150,23 +142,22 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         int limit = 20,
         CancellationToken cancellationToken = default)
     {
-        var safeLimit = Math.Clamp(limit, 1, 50);
-        using var response = await SendAsync(
+        int safeLimit = Math.Clamp(limit, 1, 50);
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Get,
             $"me/player/recently-played?limit={safeLimit}",
             body: null,
             cancellationToken);
 
-        var result = await response.Content.ReadFromJsonAsync<RecentlyPlayedResponse>(
+        RecentlyPlayedResponse result = await response.Content.ReadFromJsonAsync<RecentlyPlayedResponse>(
             JsonOptions,
             cancellationToken) ?? new RecentlyPlayedResponse();
 
-        return result.Items
+        return [.. result.Items
             .Where(item => item.Track is not null)
             .Select(item => new SpotifyRecentlyPlayedItem(
                 ToTrack(item.Track!),
-                item.PlayedAt))
-            .ToList();
+                item.PlayedAt))];
     }
 
     public async Task<IReadOnlyList<SpotifyTrack>> SearchTracksAsync(
@@ -181,39 +172,43 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
 
         // Spotify reduced the Search endpoint maximum to 10 for Development
         // Mode apps in February 2026. Higher values return HTTP 400 "Invalid limit".
-        var safeLimit = Math.Clamp(limit, 1, 10);
-        var url = "search?type=track&limit=" + safeLimit +
+        int safeLimit = Math.Clamp(limit, 1, 10);
+        string url = "search?type=track&limit=" + safeLimit +
                   "&q=" + Uri.EscapeDataString(query.Trim());
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Get,
             url,
             body: null,
             cancellationToken);
 
-        var result = await response.Content.ReadFromJsonAsync<SearchResponse>(
+        SearchResponse result = await response.Content.ReadFromJsonAsync<SearchResponse>(
             JsonOptions,
             cancellationToken) ?? new SearchResponse();
 
-        return result.Tracks.Items.Select(ToTrack).ToList();
+        return [.. result.Tracks.Items.Select(ToTrack)];
     }
 
     public async Task<IReadOnlyList<SpotifyTrack>> GetSavedTracksAsync(
         int limit = 50,
         CancellationToken cancellationToken = default)
     {
-        var requestedLimit = Math.Clamp(limit, 1, 500);
+        int requestedLimit = Math.Clamp(limit, 1, 500);
         var tracks = new List<SpotifyTrack>();
-        var offset = 0;
+        int offset = 0;
         while (tracks.Count < requestedLimit)
         {
-            var pageSize = Math.Min(50, requestedLimit - tracks.Count);
-            using var response = await SendAsync(HttpMethod.Get,
+            int pageSize = Math.Min(50, requestedLimit - tracks.Count);
+            using HttpResponseMessage response = await SendAsync(HttpMethod.Get,
                 $"me/tracks?limit={pageSize}&offset={offset}", null, cancellationToken);
-            var result = await response.Content.ReadFromJsonAsync<SavedTracksResponse>(JsonOptions, cancellationToken)
+            SavedTracksResponse result = await response.Content.ReadFromJsonAsync<SavedTracksResponse>(JsonOptions, cancellationToken)
                          ?? new SavedTracksResponse();
             tracks.AddRange(result.Items.Where(item => item.Track is not null).Select(item => ToTrack(item.Track!)));
-            if (string.IsNullOrWhiteSpace(result.Next) || result.Items.Length == 0) break;
+            if (string.IsNullOrWhiteSpace(result.Next) || result.Items.Length == 0)
+            {
+                break;
+            }
+
             offset += result.Items.Length;
         }
         return tracks;
@@ -221,21 +216,21 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
 
     public async Task<bool> IsTrackSavedAsync(string trackId, CancellationToken cancellationToken = default)
     {
-        using var response = await SendAsync(HttpMethod.Get,
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Get,
             "me/tracks/contains?ids=" + Uri.EscapeDataString(trackId), null, cancellationToken);
-        var result = await response.Content.ReadFromJsonAsync<bool[]>(JsonOptions, cancellationToken) ?? [];
+        bool[] result = await response.Content.ReadFromJsonAsync<bool[]>(JsonOptions, cancellationToken) ?? [];
         return result.FirstOrDefault();
     }
 
     public async Task SaveTrackAsync(string trackId, CancellationToken cancellationToken = default)
     {
-        using var response = await SendAsync(HttpMethod.Put,
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Put,
             "me/tracks?ids=" + Uri.EscapeDataString(trackId), null, cancellationToken, allowNoContent: true);
     }
 
     public async Task RemoveSavedTrackAsync(string trackId, CancellationToken cancellationToken = default)
     {
-        using var response = await SendAsync(HttpMethod.Delete,
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Delete,
             "me/tracks?ids=" + Uri.EscapeDataString(trackId), null, cancellationToken, allowNoContent: true);
     }
 
@@ -249,13 +244,13 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
             throw new ArgumentException("Spotify-Titel-URI fehlt.", nameof(trackUri));
         }
 
-        var url = "me/player/queue?uri=" + Uri.EscapeDataString(trackUri.Trim());
+        string url = "me/player/queue?uri=" + Uri.EscapeDataString(trackUri.Trim());
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
             url += "&device_id=" + Uri.EscapeDataString(deviceId);
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Post,
             url,
             body: null,
@@ -267,17 +262,17 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         CancellationToken cancellationToken = default)
     {
         var playlists = new List<SpotifyPlaylist>();
-        var offset = 0;
+        int offset = 0;
 
         while (true)
         {
-            using var response = await SendAsync(
+            using HttpResponseMessage response = await SendAsync(
                 HttpMethod.Get,
                 $"me/playlists?limit=50&offset={offset}",
                 body: null,
                 cancellationToken);
 
-            var result = await response.Content.ReadFromJsonAsync<PlaylistPageResponse>(
+            PlaylistPageResponse result = await response.Content.ReadFromJsonAsync<PlaylistPageResponse>(
                 JsonOptions, cancellationToken) ?? new PlaylistPageResponse();
 
             playlists.AddRange(result.Items.Select(playlist => new SpotifyPlaylist(
@@ -286,15 +281,18 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 playlist.Images.FirstOrDefault()?.Url ?? "",
                 playlist.Tracks?.Total ?? 0)));
 
-            if (string.IsNullOrWhiteSpace(result.Next) || result.Items.Length == 0) break;
+            if (string.IsNullOrWhiteSpace(result.Next) || result.Items.Length == 0)
+            {
+                break;
+            }
+
             offset += result.Items.Length;
         }
 
-        return playlists
+        return [.. playlists
             .GroupBy(playlist => playlist.Id, StringComparer.Ordinal)
             .Select(group => group.First())
-            .OrderBy(playlist => playlist.Name, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+            .OrderBy(playlist => playlist.Name, StringComparer.CurrentCultureIgnoreCase)];
     }
 
     public async Task<IReadOnlyList<SpotifyTrack>> GetPlaylistTracksAsync(
@@ -307,26 +305,30 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
             throw new ArgumentException("Spotify-Playlist-ID fehlt.", nameof(playlistId));
         }
 
-        var requestedLimit = Math.Clamp(limit, 1, 500);
+        int requestedLimit = Math.Clamp(limit, 1, 500);
         var tracks = new List<SpotifyTrack>();
-        var offset = 0;
+        int offset = 0;
 
         while (tracks.Count < requestedLimit)
         {
-            var pageSize = Math.Min(50, requestedLimit - tracks.Count);
-            using var response = await SendAsync(
+            int pageSize = Math.Min(50, requestedLimit - tracks.Count);
+            using HttpResponseMessage response = await SendAsync(
                 HttpMethod.Get,
                 $"playlists/{Uri.EscapeDataString(playlistId.Trim())}/tracks?limit={pageSize}&offset={offset}",
                 body: null,
                 cancellationToken);
 
-            var result = await response.Content.ReadFromJsonAsync<PlaylistTracksResponse>(
+            PlaylistTracksResponse result = await response.Content.ReadFromJsonAsync<PlaylistTracksResponse>(
                 JsonOptions, cancellationToken) ?? new PlaylistTracksResponse();
             tracks.AddRange(result.Items
                 .Where(item => item.Track is not null)
                 .Select(item => ToTrack(item.Track!)));
 
-            if (string.IsNullOrWhiteSpace(result.Next) || result.Items.Length == 0) break;
+            if (string.IsNullOrWhiteSpace(result.Next) || result.Items.Length == 0)
+            {
+                break;
+            }
+
             offset += result.Items.Length;
         }
 
@@ -338,7 +340,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         bool play,
         CancellationToken cancellationToken = default)
     {
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Put,
             "me/player",
             new
@@ -356,7 +358,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         string? offsetTrackUri = null,
         CancellationToken cancellationToken = default)
     {
-        var url = "me/player/play";
+        string url = "me/player/play";
 
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
@@ -376,7 +378,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 };
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Put,
             url,
             body,
@@ -395,13 +397,13 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
             throw new ArgumentException("Spotify-Titel-URI fehlt.", nameof(trackUri));
         }
 
-        var url = "me/player/play";
+        string url = "me/player/play";
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
             url += "?device_id=" + Uri.EscapeDataString(deviceId);
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Put,
             url,
             new { uris = new[] { trackUri.Trim() } },
@@ -413,7 +415,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         string? deviceId,
         CancellationToken cancellationToken = default)
     {
-        var url = "me/player/pause";
+        string url = "me/player/pause";
 
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
@@ -421,7 +423,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 Uri.EscapeDataString(deviceId);
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Put,
             url,
             body: null,
@@ -434,9 +436,9 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         string? deviceId,
         CancellationToken cancellationToken = default)
     {
-        var clamped = Math.Clamp(volumePercent, 0, 100);
+        int clamped = Math.Clamp(volumePercent, 0, 100);
 
-        var url =
+        string url =
             "me/player/volume?volume_percent=" +
             clamped;
 
@@ -446,7 +448,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 Uri.EscapeDataString(deviceId);
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Put,
             url,
             body: null,
@@ -459,7 +461,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         string? deviceId,
         CancellationToken cancellationToken = default)
     {
-        var url = "me/player/shuffle?state=" +
+        string url = "me/player/shuffle?state=" +
             enabled.ToString().ToLowerInvariant();
 
         if (!string.IsNullOrWhiteSpace(deviceId))
@@ -468,7 +470,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 Uri.EscapeDataString(deviceId);
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Put,
             url,
             body: null,
@@ -481,20 +483,20 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         string? deviceId,
         CancellationToken cancellationToken = default)
     {
-        var normalized = repeatMode?.Trim().ToLowerInvariant() switch
+        string normalized = repeatMode?.Trim().ToLowerInvariant() switch
         {
             "track" => "track",
             "context" => "context",
             _ => "off"
         };
 
-        var url = "me/player/repeat?state=" + Uri.EscapeDataString(normalized);
+        string url = "me/player/repeat?state=" + Uri.EscapeDataString(normalized);
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
             url += "&device_id=" + Uri.EscapeDataString(deviceId);
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Put,
             url,
             body: null,
@@ -507,14 +509,14 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         string? deviceId,
         CancellationToken cancellationToken = default)
     {
-        var url = "me/player/seek?position_ms=" + Math.Max(0, positionMs);
+        string url = "me/player/seek?position_ms=" + Math.Max(0, positionMs);
 
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
             url += "&device_id=" + Uri.EscapeDataString(deviceId);
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Put,
             url,
             body: null,
@@ -526,7 +528,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         string? deviceId,
         CancellationToken cancellationToken = default)
     {
-        var url = "me/player/next";
+        string url = "me/player/next";
 
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
@@ -534,7 +536,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 Uri.EscapeDataString(deviceId);
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Post,
             url,
             body: null,
@@ -546,7 +548,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         string? deviceId,
         CancellationToken cancellationToken = default)
     {
-        var url = "me/player/previous";
+        string url = "me/player/previous";
 
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
@@ -554,7 +556,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 Uri.EscapeDataString(deviceId);
         }
 
-        using var response = await SendAsync(
+        using HttpResponseMessage response = await SendAsync(
             HttpMethod.Post,
             url,
             body: null,
@@ -578,7 +580,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
         await _requestGate.WaitAsync(cancellationToken);
         try
         {
-            var now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
             if (now < _rateLimitUntil)
             {
                 throw new SpotifyRateLimitException(_rateLimitUntil - now);
@@ -598,7 +600,7 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
                 request.Content = JsonContent.Create(body);
             }
 
-            var requestNumber = Interlocked.Increment(ref _requestSequence);
+            long requestNumber = Interlocked.Increment(ref _requestSequence);
             var stopwatch = Stopwatch.StartNew();
             HttpResponseMessage response;
 
@@ -621,8 +623,8 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
             }
 
             stopwatch.Stop();
-            var retryAfter = GetRetryAfter(response);
-            var logLevel = response.StatusCode == HttpStatusCode.TooManyRequests
+            TimeSpan? retryAfter = GetRetryAfter(response);
+            AppLogLevel logLevel = response.StatusCode == HttpStatusCode.TooManyRequests
                 ? AppLogLevel.Warning
                 : response.IsSuccessStatusCode
                     ? AppLogLevel.Debug
@@ -641,11 +643,11 @@ public sealed class SpotifyApiClient : ISpotifyApiClient
 
             if (!response.IsSuccessStatusCode)
             {
-                var error = await response.Content.ReadAsStringAsync(cancellationToken);
+                string error = await response.Content.ReadAsStringAsync(cancellationToken);
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 {
-                    var effectiveRetryAfter = retryAfter ?? TimeSpan.FromSeconds(5);
+                    TimeSpan effectiveRetryAfter = retryAfter ?? TimeSpan.FromSeconds(5);
                     if (effectiveRetryAfter <= TimeSpan.Zero)
                     {
                         effectiveRetryAfter = TimeSpan.FromSeconds(5);

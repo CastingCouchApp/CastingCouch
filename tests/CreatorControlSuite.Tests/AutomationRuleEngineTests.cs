@@ -114,11 +114,9 @@ public sealed class AutomationRuleEngineTests
         Assert.Equal(0, handler.ExecuteCalls);
     }
 
-    private sealed class FakeActionHandler : IAutomationActionHandler
+    private sealed class FakeActionHandler(string actionType) : IAutomationActionHandler
     {
-        public FakeActionHandler(string actionType) => ActionType = actionType;
-
-        public string ActionType { get; }
+        public string ActionType { get; } = actionType;
         public int ExecuteCalls { get; private set; }
 
         public Task ExecuteAsync(

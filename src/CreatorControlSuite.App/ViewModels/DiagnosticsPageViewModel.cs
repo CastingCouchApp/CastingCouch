@@ -9,8 +9,6 @@ public sealed class DiagnosticsPageViewModel : ViewModelBase, IPageViewModel
 {
     private readonly DiagnosticService _diagnostics;
     private readonly IEnumerable<IStreamingModule> _modules;
-    private bool _isLoading;
-    private string _statusMessage = "Bereit.";
 
     public DiagnosticsPageViewModel(
         DiagnosticService diagnostics,
@@ -28,15 +26,15 @@ public sealed class DiagnosticsPageViewModel : ViewModelBase, IPageViewModel
 
     public bool IsLoading
     {
-        get => _isLoading;
-        private set => SetProperty(ref _isLoading, value);
+        get;
+        private set => SetProperty(ref field, value);
     }
 
     public string StatusMessage
     {
-        get => _statusMessage;
-        private set => SetProperty(ref _statusMessage, value);
-    }
+        get;
+        private set => SetProperty(ref field, value);
+    } = "Bereit.";
 
     public AsyncRelayCommand RefreshCommand { get; }
 
@@ -49,14 +47,16 @@ public sealed class DiagnosticsPageViewModel : ViewModelBase, IPageViewModel
         StatusMessage = "Lade Modulstatus…";
         try
         {
-            var statuses = await _diagnostics.RunAsync(cancellationToken);
+            IReadOnlyList<ModuleStatus> statuses = await _diagnostics.RunAsync(cancellationToken);
             ModuleStatuses.Clear();
-            foreach (var status in statuses)
+            foreach (ModuleStatus status in statuses)
+            {
                 ModuleStatuses.Add(status);
+            }
 
             if (ModuleStatuses.Count == 0)
             {
-                foreach (var module in _modules)
+                foreach (IStreamingModule module in _modules)
                 {
                     ModuleStatuses.Add(new ModuleStatus(
                         module.Id,

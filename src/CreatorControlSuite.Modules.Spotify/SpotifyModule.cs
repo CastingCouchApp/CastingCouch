@@ -4,12 +4,16 @@ using CreatorControlSuite.Modules.Spotify.Models;
 
 namespace CreatorControlSuite.Modules.Spotify;
 
-public sealed class SpotifyModule : IConnectableModule
+public sealed class SpotifyModule(
+    ISettingsStore settingsStore,
+    ISpotifyOAuthClient oauthClient,
+    ISpotifyApiClient apiClient,
+    SpotifyTokenRepository tokenRepository) : IConnectableModule
 {
-    private readonly ISettingsStore _settingsStore;
-    private readonly ISpotifyOAuthClient _oauthClient;
-    private readonly ISpotifyApiClient _apiClient;
-    private readonly SpotifyTokenRepository _tokenRepository;
+    private readonly ISettingsStore _settingsStore = settingsStore;
+    private readonly ISpotifyOAuthClient _oauthClient = oauthClient;
+    private readonly ISpotifyApiClient _apiClient = apiClient;
+    private readonly SpotifyTokenRepository _tokenRepository = tokenRepository;
 
     private SpotifyTokenSet? _token;
     private string _displayName = "";
@@ -27,25 +31,13 @@ public sealed class SpotifyModule : IConnectableModule
     private static readonly TimeSpan PlaybackEmptyGracePeriod = TimeSpan.FromSeconds(15);
     private const int EmptyPlaybackConfirmationCount = 5;
     private const int PlayerControlDebounceMilliseconds = 1000;
-    private readonly object _playerControlDebounceSync = new();
+    private readonly Lock _playerControlDebounceSync = new();
     private CancellationTokenSource? _volumeDebounceCts;
     private CancellationTokenSource? _seekDebounceCts;
     private int _pendingVolumePercent;
     private int _pendingSeekPositionMs;
 
     public IReadOnlyDictionary<string, string> LastRefreshErrors => _lastRefreshErrors;
-
-    public SpotifyModule(
-        ISettingsStore settingsStore,
-        ISpotifyOAuthClient oauthClient,
-        ISpotifyApiClient apiClient,
-        SpotifyTokenRepository tokenRepository)
-    {
-        _settingsStore = settingsStore;
-        _oauthClient = oauthClient;
-        _apiClient = apiClient;
-        _tokenRepository = tokenRepository;
-    }
 
     public string Id => "spotify";
     public string DisplayName => "Spotify";
@@ -58,7 +50,7 @@ public sealed class SpotifyModule : IConnectableModule
     public async Task AuthorizeAsync(
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
         if (string.IsNullOrWhiteSpace(settings.Spotify.ClientId))
@@ -67,7 +59,7 @@ public sealed class SpotifyModule : IConnectableModule
                 "Bitte zuerst die Spotify Client-ID eintragen.");
         }
 
-        var token = await _oauthClient.AuthorizeAsync(
+        SpotifyTokenSet token = await _oauthClient.AuthorizeAsync(
             settings.Spotify.ClientId,
             settings.Spotify.RedirectUri,
             settings.Spotify.Scopes,
@@ -82,7 +74,7 @@ public sealed class SpotifyModule : IConnectableModule
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
         _token = await GetValidTokenAsync(
@@ -180,13 +172,26 @@ public sealed class SpotifyModule : IConnectableModule
 
     private static string NormalizeApiError(string message)
     {
-        if (string.IsNullOrWhiteSpace(message)) return "Unbekannter Spotify-Fehler.";
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return "Unbekannter Spotify-Fehler.";
+        }
+
         if (message.Contains("403", StringComparison.OrdinalIgnoreCase))
+        {
             return "Zugriff verweigert. Spotify-Premium und die erforderlichen Berechtigungen prüfen; anschließend Spotify neu autorisieren.";
+        }
+
         if (message.Contains("401", StringComparison.OrdinalIgnoreCase))
+        {
             return "Anmeldung abgelaufen oder Berechtigung fehlt. Spotify neu autorisieren.";
+        }
+
         if (message.Contains("429", StringComparison.OrdinalIgnoreCase))
+        {
             return "Spotify begrenzt die Anfragen vorübergehend. Bitte später erneut aktualisieren.";
+        }
+
         return message.Length > 260 ? message[..260] + "…" : message;
     }
 
@@ -233,7 +238,7 @@ public sealed class SpotifyModule : IConnectableModule
         }
 
         _consecutiveEmptyPlaybackSnapshots++;
-        var withinGracePeriod =
+        bool withinGracePeriod =
             _lastValidPlaybackAt != DateTimeOffset.MinValue &&
             DateTimeOffset.UtcNow - _lastValidPlaybackAt < PlaybackEmptyGracePeriod;
 
@@ -281,8 +286,15 @@ public sealed class SpotifyModule : IConnectableModule
     {
         ArgumentNullException.ThrowIfNull(track);
         EnsureConnected();
-        if (saved) await _apiClient.SaveTrackAsync(track.Id, cancellationToken);
-        else await _apiClient.RemoveSavedTrackAsync(track.Id, cancellationToken);
+        if (saved)
+        {
+            await _apiClient.SaveTrackAsync(track.Id, cancellationToken);
+        }
+        else
+        {
+            await _apiClient.RemoveSavedTrackAsync(track.Id, cancellationToken);
+        }
+
         await RefreshSavedTracksAsync(cancellationToken);
     }
 
@@ -320,8 +332,8 @@ public sealed class SpotifyModule : IConnectableModule
         ArgumentNullException.ThrowIfNull(track);
         EnsureConnected();
 
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var deviceId = string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId)
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        string? deviceId = string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId)
             ? GetRuntimeDeviceId()
             : settings.Spotify.PreferredDeviceId;
 
@@ -346,8 +358,8 @@ public sealed class SpotifyModule : IConnectableModule
         ArgumentNullException.ThrowIfNull(track);
         EnsureConnected();
 
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var deviceId = string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId)
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        string? deviceId = string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId)
             ? GetRuntimeDeviceId()
             : settings.Spotify.PreferredDeviceId;
 
@@ -374,8 +386,8 @@ public sealed class SpotifyModule : IConnectableModule
             return;
         }
 
-        var devicesTask = _apiClient.GetDevicesAsync(cancellationToken);
-        var playlistsTask = _apiClient.GetCurrentUserPlaylistsAsync(cancellationToken);
+        Task<IReadOnlyList<SpotifyDevice>> devicesTask = _apiClient.GetDevicesAsync(cancellationToken);
+        Task<IReadOnlyList<SpotifyPlaylist>> playlistsTask = _apiClient.GetCurrentUserPlaylistsAsync(cancellationToken);
         await Task.WhenAll(devicesTask, playlistsTask);
         _devices = await devicesTask;
         _playlists = await playlistsTask;
@@ -431,7 +443,7 @@ public sealed class SpotifyModule : IConnectableModule
         CancellationToken cancellationToken = default)
     {
         EnsureConnected();
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
         await RefreshDevicesAsync(cancellationToken);
 
         SpotifyDevice? device = null;
@@ -473,7 +485,7 @@ public sealed class SpotifyModule : IConnectableModule
     {
         EnsureConnected();
 
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
         await StartPlaylistAsync(
@@ -489,8 +501,8 @@ public sealed class SpotifyModule : IConnectableModule
         string? offsetTrackUri = null,
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var startVolumePercent = applyConfiguredStartVolume
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        int? startVolumePercent = applyConfiguredStartVolume
             ? settings.Spotify.StartVolumePercent
             : (int?)null;
 
@@ -548,14 +560,14 @@ public sealed class SpotifyModule : IConnectableModule
         string? offsetTrackUri,
         CancellationToken cancellationToken)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var deviceId = string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId)
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        string? deviceId = string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId)
             ? GetRuntimeDeviceId()
             : settings.Spotify.PreferredDeviceId;
 
         if (settings.Spotify.AutoTransferToPreferredDevice)
         {
-            var activated = await ActivatePreferredDeviceAsync(play: false, cancellationToken);
+            SpotifyDevice activated = await ActivatePreferredDeviceAsync(play: false, cancellationToken);
             deviceId = activated.Id;
         }
         else if (!string.IsNullOrWhiteSpace(deviceId) && _playback.Device?.Id != deviceId)
@@ -574,12 +586,12 @@ public sealed class SpotifyModule : IConnectableModule
 
         if (startVolumePercent.HasValue)
         {
-            var volume = Math.Clamp(startVolumePercent.Value, 0, 100);
+            int volume = Math.Clamp(startVolumePercent.Value, 0, 100);
             await _apiClient.SetVolumeAsync(volume, deviceId, cancellationToken);
             PatchPlaybackVolume(volume);
         }
 
-        var shuffleEnabled = shuffleOverride ?? settings.Spotify.ShuffleSelectedPlaylist;
+        bool shuffleEnabled = shuffleOverride ?? settings.Spotify.ShuffleSelectedPlaylist;
         await _apiClient.SetShuffleAsync(shuffleEnabled, deviceId, cancellationToken);
         PatchPlaybackIsPlaying(true);
         _playback = _playback with { ShuffleEnabled = shuffleEnabled };
@@ -587,8 +599,8 @@ public sealed class SpotifyModule : IConnectableModule
 
     private async Task EnsureApiTokenAsync(bool forceRefresh, CancellationToken cancellationToken)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var saved = await _tokenRepository.LoadAsync(cancellationToken)
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        SpotifyTokenSet saved = await _tokenRepository.LoadAsync(cancellationToken)
             ?? throw new InvalidOperationException("Spotify wurde noch nicht autorisiert.");
 
         if (!forceRefresh && saved.ExpiresAt > DateTimeOffset.UtcNow.AddMinutes(2))
@@ -604,7 +616,7 @@ public sealed class SpotifyModule : IConnectableModule
                 "Die Spotify-Anmeldung ist abgelaufen. Bitte Spotify unter Einstellungen einmal neu autorisieren.");
         }
 
-        var refreshed = await _oauthClient.RefreshAsync(
+        SpotifyTokenSet refreshed = await _oauthClient.RefreshAsync(
             settings.Spotify.ClientId,
             saved.RefreshToken,
             cancellationToken);
@@ -646,9 +658,13 @@ public sealed class SpotifyModule : IConnectableModule
         EnsureConnected();
         await RefreshPlaybackAsync(cancellationToken);
         if (_playback.IsPlaying)
+        {
             await PauseAsync(cancellationToken);
+        }
         else
+        {
             await ResumeAsync(cancellationToken);
+        }
     }
 
     public async Task NextAsync(
@@ -682,7 +698,7 @@ public sealed class SpotifyModule : IConnectableModule
         bool debounce,
         CancellationToken cancellationToken)
     {
-        var clamped = Math.Clamp(volumePercent, 0, 100);
+        int clamped = Math.Clamp(volumePercent, 0, 100);
         _pendingVolumePercent = clamped;
         PatchPlaybackVolume(clamped);
 
@@ -700,7 +716,7 @@ public sealed class SpotifyModule : IConnectableModule
             cts => _volumeDebounceCts = cts,
             async ct =>
             {
-                var volume = _pendingVolumePercent;
+                int volume = _pendingVolumePercent;
                 await ExecutePlayerCommandAsync(
                     (deviceId, token) => _apiClient.SetVolumeAsync(volume, deviceId, token),
                     ct);
@@ -714,7 +730,7 @@ public sealed class SpotifyModule : IConnectableModule
         CancellationToken cancellationToken = default)
     {
         EnsureConnected();
-        var current = _playback.Device?.VolumePercent ?? _pendingVolumePercent;
+        int current = _playback.Device?.VolumePercent ?? _pendingVolumePercent;
         await SetVolumeAsync(current + deltaPercent, cancellationToken);
     }
 
@@ -755,8 +771,8 @@ public sealed class SpotifyModule : IConnectableModule
     {
         EnsureConnected();
 
-        var durationMs = Math.Max(0, _playback.Track?.DurationMs ?? 0);
-        var clampedPosition = durationMs > 0
+        int durationMs = Math.Max(0, _playback.Track?.DurationMs ?? 0);
+        int clampedPosition = durationMs > 0
             ? Math.Clamp(positionMs, 0, durationMs)
             : Math.Max(0, positionMs);
 
@@ -777,7 +793,7 @@ public sealed class SpotifyModule : IConnectableModule
             cts => _seekDebounceCts = cts,
             async ct =>
             {
-                var position = _pendingSeekPositionMs;
+                int position = _pendingSeekPositionMs;
                 await ExecutePlayerCommandAsync(
                     (deviceId, token) => _apiClient.SeekPlaybackAsync(position, deviceId, token),
                     ct);
@@ -794,26 +810,26 @@ public sealed class SpotifyModule : IConnectableModule
     {
         EnsureConnected();
 
-        var currentVolume =
+        int currentVolume =
             _playback.Device?.VolumePercent ?? 100;
 
-        var target = Math.Clamp(
+        int target = Math.Clamp(
             targetVolumePercent,
             0,
             100);
 
-        var steps = Math.Max(
+        int steps = Math.Max(
             1,
             (int)Math.Ceiling(duration.TotalMilliseconds / 150));
 
-        for (var step = 1; step <= steps; step++)
+        for (int step = 1; step <= steps; step++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var progress = step / (double)steps;
-            var volume = (int)Math.Round(
+            double progress = step / (double)steps;
+            int volume = (int)Math.Round(
                 currentVolume +
-                (target - currentVolume) * progress);
+                ((target - currentVolume) * progress));
 
             await SetVolumeImmediateAsync(volume, cancellationToken);
 
@@ -840,7 +856,7 @@ public sealed class SpotifyModule : IConnectableModule
         CancellationTokenSource next;
         lock (_playerControlDebounceSync)
         {
-            var previous = getCts();
+            CancellationTokenSource? previous = getCts();
             previous?.Cancel();
             previous?.Dispose();
             next = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -875,7 +891,7 @@ public sealed class SpotifyModule : IConnectableModule
         {
             await RefreshPlaybackAsync(cancellationToken);
 
-            var detail = _playback.Track is null
+            string detail = _playback.Track is null
                 ? _displayName + " · Pause"
                 : _displayName + " · " +
                   (_playback.IsPlaying ? "Spielt: " : "Pause: ") +
@@ -904,7 +920,7 @@ public sealed class SpotifyModule : IConnectableModule
         string clientId,
         CancellationToken cancellationToken)
     {
-        var token = await _tokenRepository.LoadAsync(
+        SpotifyTokenSet token = await _tokenRepository.LoadAsync(
             cancellationToken)
             ?? throw new InvalidOperationException(
                 "Spotify wurde noch nicht autorisiert.");
@@ -920,7 +936,7 @@ public sealed class SpotifyModule : IConnectableModule
                 "Der Spotify-Token ist abgelaufen. Bitte Spotify neu autorisieren.");
         }
 
-        var refreshed = await _oauthClient.RefreshAsync(
+        SpotifyTokenSet refreshed = await _oauthClient.RefreshAsync(
             clientId,
             token.RefreshToken,
             cancellationToken);
@@ -947,7 +963,7 @@ public sealed class SpotifyModule : IConnectableModule
     {
         EnsureConnected();
         await EnsureApiTokenAsync(forceRefresh: false, cancellationToken: cancellationToken);
-        var deviceId = await ResolveControlDeviceIdAsync(cancellationToken);
+        string? deviceId = await ResolveControlDeviceIdAsync(cancellationToken);
         try
         {
             await action(deviceId, cancellationToken);
@@ -962,7 +978,7 @@ public sealed class SpotifyModule : IConnectableModule
 
     private async Task<string?> ResolveControlDeviceIdAsync(CancellationToken cancellationToken)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
         if (!string.IsNullOrWhiteSpace(settings.Spotify.PreferredDeviceId))
         {
             return settings.Spotify.PreferredDeviceId;
@@ -990,7 +1006,7 @@ public sealed class SpotifyModule : IConnectableModule
 
     private void PatchPlaybackVolume(int volumePercent)
     {
-        var clamped = Math.Clamp(volumePercent, 0, 100);
+        int clamped = Math.Clamp(volumePercent, 0, 100);
         if (_playback.Device is null)
         {
             return;

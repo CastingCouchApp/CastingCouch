@@ -4,10 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace CreatorControlSuite.App.Services;
 
-public sealed class StartupDependencyValidationService : IStartupDependencyValidationService
+public sealed class StartupDependencyValidationService(IServiceProvider services) : IStartupDependencyValidationService
 {
-    private readonly IServiceProvider _services;
-    public StartupDependencyValidationService(IServiceProvider services) => _services = services;
+    private readonly IServiceProvider _services = services;
 
     public Task<IReadOnlyList<string>> ValidateAsync(CancellationToken cancellationToken = default)
     {

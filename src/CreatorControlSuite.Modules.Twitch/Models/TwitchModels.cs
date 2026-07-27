@@ -55,8 +55,8 @@ public sealed record TwitchChannelSuggestion(
     {
         get
         {
-            var live = IsLive ? " · Live" : "";
-            var loginSuffix = string.Equals(Login, DisplayName, StringComparison.OrdinalIgnoreCase)
+            string live = IsLive ? " · Live" : "";
+            string loginSuffix = string.Equals(Login, DisplayName, StringComparison.OrdinalIgnoreCase)
                 ? ""
                 : $" ({Login})";
             return $"{DisplayName}{loginSuffix} · {SourceLabel}{live}";

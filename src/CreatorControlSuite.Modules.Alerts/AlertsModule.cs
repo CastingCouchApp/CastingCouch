@@ -3,14 +3,9 @@ using CreatorControlSuite.Modules.Alerts.Models;
 
 namespace CreatorControlSuite.Modules.Alerts;
 
-public sealed class AlertsModule : IConnectableModule
+public sealed class AlertsModule(IAlertEngine engine) : IConnectableModule
 {
-    private readonly IAlertEngine _engine;
-
-    public AlertsModule(IAlertEngine engine)
-    {
-        _engine = engine;
-    }
+    private readonly IAlertEngine _engine = engine;
 
     public string Id => "alerts";
     public string DisplayName => "Alerts";
@@ -102,7 +97,7 @@ public sealed class AlertsModule : IConnectableModule
     public Task<ModuleStatus> GetStatusAsync(
         CancellationToken cancellationToken)
     {
-        var state = _engine.State;
+        AlertPlaybackState state = _engine.State;
 
         return Task.FromResult(
             new ModuleStatus(

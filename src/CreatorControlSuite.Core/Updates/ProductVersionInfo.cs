@@ -3,33 +3,24 @@ using System.Text.RegularExpressions;
 
 namespace CreatorControlSuite.Core.Updates;
 
-public sealed partial class ProductVersionInfo :
+public sealed partial class ProductVersionInfo(
+    int major,
+    int minor,
+    int patch,
+    string? preReleaseLabel = null,
+    int preReleaseNumber = 0) :
     IComparable<ProductVersionInfo>,
     IEquatable<ProductVersionInfo>
 {
     private static readonly Regex SemVerRegex = SemVerPattern();
 
-    public ProductVersionInfo(
-        int major,
-        int minor,
-        int patch,
-        string? preReleaseLabel = null,
-        int preReleaseNumber = 0)
-    {
-        Major = major;
-        Minor = minor;
-        Patch = patch;
-        PreReleaseLabel = string.IsNullOrWhiteSpace(preReleaseLabel)
+    public int Major { get; } = major;
+    public int Minor { get; } = minor;
+    public int Patch { get; } = patch;
+    public string? PreReleaseLabel { get; } = string.IsNullOrWhiteSpace(preReleaseLabel)
             ? null
             : preReleaseLabel.Trim().ToLowerInvariant();
-        PreReleaseNumber = Math.Max(0, preReleaseNumber);
-    }
-
-    public int Major { get; }
-    public int Minor { get; }
-    public int Patch { get; }
-    public string? PreReleaseLabel { get; }
-    public int PreReleaseNumber { get; }
+    public int PreReleaseNumber { get; } = Math.Max(0, preReleaseNumber);
     public bool IsPrerelease => PreReleaseLabel is not null;
 
     public static bool TryParse(string? value, out ProductVersionInfo version)
@@ -40,24 +31,24 @@ public sealed partial class ProductVersionInfo :
             return false;
         }
 
-        var trimmed = value.Trim();
-        var plus = trimmed.IndexOf('+');
+        string trimmed = value.Trim();
+        int plus = trimmed.IndexOf('+');
         if (plus >= 0)
         {
             trimmed = trimmed[..plus];
         }
 
-        var match = SemVerRegex.Match(trimmed);
+        Match match = SemVerRegex.Match(trimmed);
         if (!match.Success)
         {
             return false;
         }
 
-        var major = int.Parse(match.Groups["major"].Value, CultureInfo.InvariantCulture);
-        var minor = int.Parse(match.Groups["minor"].Value, CultureInfo.InvariantCulture);
-        var patch = int.Parse(match.Groups["patch"].Value, CultureInfo.InvariantCulture);
+        int major = int.Parse(match.Groups["major"].Value, CultureInfo.InvariantCulture);
+        int minor = int.Parse(match.Groups["minor"].Value, CultureInfo.InvariantCulture);
+        int patch = int.Parse(match.Groups["patch"].Value, CultureInfo.InvariantCulture);
         string? label = null;
-        var preNumber = 0;
+        int preNumber = 0;
 
         if (match.Groups["pre"].Success)
         {
@@ -76,7 +67,7 @@ public sealed partial class ProductVersionInfo :
 
     public static ProductVersionInfo Parse(string value)
     {
-        if (!TryParse(value, out var version))
+        if (!TryParse(value, out ProductVersionInfo? version))
         {
             throw new FormatException($"Ungültige Produktversion: '{value}'.");
         }
@@ -124,7 +115,7 @@ public sealed partial class ProductVersionInfo :
             return 1;
         }
 
-        var core = Major.CompareTo(other.Major);
+        int core = Major.CompareTo(other.Major);
         if (core != 0)
         {
             return core;
@@ -157,7 +148,7 @@ public sealed partial class ProductVersionInfo :
             return -1;
         }
 
-        var label = PreReleaseRank(PreReleaseLabel)
+        int label = PreReleaseRank(PreReleaseLabel)
             .CompareTo(PreReleaseRank(other.PreReleaseLabel));
         if (label != 0)
         {

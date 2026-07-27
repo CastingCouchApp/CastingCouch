@@ -10,10 +10,10 @@ public sealed class SpotifyPkceTests
         const string verifier =
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
 
-        var first =
+        string first =
             SpotifyOAuthClient.CreateCodeChallenge(verifier);
 
-        var second =
+        string second =
             SpotifyOAuthClient.CreateCodeChallenge(verifier);
 
         Assert.Equal(first, second);

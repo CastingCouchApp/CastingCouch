@@ -8,7 +8,9 @@ public static class MusicProviderIds
     public static string Normalize(string? providerId)
     {
         if (string.Equals(providerId, YouTubeMusic, StringComparison.OrdinalIgnoreCase))
+        {
             return YouTubeMusic;
+        }
 
         return Spotify;
     }

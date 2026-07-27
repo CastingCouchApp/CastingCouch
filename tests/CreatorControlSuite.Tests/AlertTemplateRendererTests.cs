@@ -7,7 +7,7 @@ public sealed class AlertTemplateRendererTests
     [Fact]
     public void ReplacesUserAndVariables()
     {
-        var result = AlertTemplateRenderer.Render(
+        string result = AlertTemplateRenderer.Render(
             "{user} raidet mit {viewers} Zuschauern!",
             "TestRaid",
             new Dictionary<string, string>
@@ -23,7 +23,7 @@ public sealed class AlertTemplateRendererTests
     [Fact]
     public void LeavesUnknownVariablesUntouched()
     {
-        var result = AlertTemplateRenderer.Render(
+        string result = AlertTemplateRenderer.Render(
             "{user} {unknown}",
             "TestUser",
             new Dictionary<string, string>());

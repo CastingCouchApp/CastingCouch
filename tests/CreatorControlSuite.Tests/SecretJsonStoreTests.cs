@@ -12,7 +12,7 @@ public sealed class SecretJsonStoreTests
 
         await store.SaveAsync(new SamplePayload("alpha", 7));
 
-        var loaded = await store.LoadAsync();
+        SamplePayload? loaded = await store.LoadAsync();
 
         Assert.NotNull(loaded);
         Assert.Equal("alpha", loaded.Name);
@@ -37,7 +37,7 @@ public sealed class SecretJsonStoreTests
 
     private sealed class MemorySecretStore : ISecretStore
     {
-        private readonly Dictionary<string, string> _values = new();
+        private readonly Dictionary<string, string> _values = [];
 
         public Task SaveAsync(
             string key,
@@ -52,7 +52,7 @@ public sealed class SecretJsonStoreTests
             string key,
             CancellationToken cancellationToken = default)
         {
-            _values.TryGetValue(key, out var value);
+            _values.TryGetValue(key, out string? value);
             return Task.FromResult(value);
         }
 

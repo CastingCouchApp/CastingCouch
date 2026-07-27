@@ -57,16 +57,10 @@ public sealed class MusicPlayerRouterTests
         }
     }
 
-    private sealed class FakeMusicPlayer : IMusicPlayer
+    private sealed class FakeMusicPlayer(string id, string displayName) : IMusicPlayer
     {
-        public FakeMusicPlayer(string id, string displayName)
-        {
-            Id = id;
-            DisplayName = displayName;
-        }
-
-        public string Id { get; }
-        public string DisplayName { get; }
+        public string Id { get; } = id;
+        public string DisplayName { get; } = displayName;
         public bool SupportsSeek => false;
         public bool SupportsVolume => false;
         public int DisconnectCalls { get; private set; }

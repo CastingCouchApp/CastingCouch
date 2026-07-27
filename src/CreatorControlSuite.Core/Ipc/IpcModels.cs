@@ -3,14 +3,14 @@ namespace CreatorControlSuite.Core.Ipc;
 public sealed record IpcCommand(
     string Id,
     string Command,
-    IReadOnlyDictionary<string,string> Arguments,
+    IReadOnlyDictionary<string, string> Arguments,
     DateTimeOffset SentAt);
 
 public sealed record IpcResponse(
     string Id,
     bool Success,
     string Message,
-    IReadOnlyDictionary<string,string> Data);
+    IReadOnlyDictionary<string, string> Data);
 
 public static class IpcCommandNames
 {

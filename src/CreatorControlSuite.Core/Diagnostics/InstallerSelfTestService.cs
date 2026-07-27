@@ -3,51 +3,53 @@ using CreatorControlSuite.Core.Legal;
 using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Validation;
 namespace CreatorControlSuite.Core.Diagnostics;
-public sealed class InstallerSelfTestService : IInstallerSelfTestService
-{
-    private readonly ISettingsStore _settings; private readonly ISettingsValidator _validator;
-    private readonly ILegalConsentService _legal; private readonly ILicenseService _license; private readonly string _dataRoot;
-    public InstallerSelfTestService(ISettingsStore settings,ISettingsValidator validator,ILegalConsentService legal,ILicenseService license,string dataRoot)
-    { _settings=settings;_validator=validator;_legal=legal;_license=license;_dataRoot=dataRoot; }
 
-    public async Task<InstallerSelfTestReport> RunAsync(CancellationToken ct=default)
+public sealed class InstallerSelfTestService(ISettingsStore settings, ISettingsValidator validator, ILegalConsentService legal, ILicenseService license, string dataRoot) : IInstallerSelfTestService
+{
+    private readonly ISettingsStore _settings = settings; private readonly ISettingsValidator _validator = validator;
+    private readonly ILegalConsentService _legal = legal; private readonly ILicenseService _license = license; private readonly string _dataRoot = dataRoot;
+
+    public async Task<InstallerSelfTestReport> RunAsync(CancellationToken ct = default)
     {
-        var started=DateTimeOffset.Now;var items=new List<InstallerSelfTestItem>();
-        FileCheck(items,"Hauptprogramm","CreatorControlSuite.App.exe");
-        FileCheck(items,"CommandClient","CreatorControlSuite.CommandClient.exe");
-        FileCheck(items,"Updater","CreatorControlSuite.Updater.exe");
-        DirCheck(items,"Legal-Ordner","Legal");DirCheck(items,"Keys-Ordner","Keys");
-        CheckWritableDirectory(items,"Lokaler Datenordner",_dataRoot);
-        var validation=_validator.Validate(await _settings.LoadAsync(ct));
-        items.Add(new("Konfiguration",validation.IsValid?InstallerSelfTestStatus.Passed:InstallerSelfTestStatus.Failed,
-            validation.IsValid?"Konfiguration ist gültig.":$"{validation.Issues.Count} Problem(e) erkannt.",
-            validation.IsValid?"":"Systemdiagnose → Konfiguration öffnen."));
-        var legal=await _legal.IsConsentRequiredAsync(ct);
-        items.Add(new("Rechtliche Bestätigung",legal?InstallerSelfTestStatus.Warning:InstallerSelfTestStatus.Passed,
-            legal?"Aktuelle Rechtstexte wurden noch nicht bestätigt.":"Bestätigung ist aktuell.",
-            legal?"EULA und Datenschutzhinweise bestätigen.":""));
-        var license=await _license.GetStatusAsync(ct);
-        items.Add(new("Lizenzstatus",license.IsUsable?InstallerSelfTestStatus.Passed:InstallerSelfTestStatus.Warning,
-            license.Detail,license.IsUsable?"":"Lizenz aktivieren oder Entwicklungsmodus verwenden."));
-        return new(started,DateTimeOffset.Now,!items.Any(x=>x.Status==InstallerSelfTestStatus.Failed),items);
+        DateTimeOffset started = DateTimeOffset.Now; var items = new List<InstallerSelfTestItem>();
+        FileCheck(items, "Hauptprogramm", "CreatorControlSuite.App.exe");
+        FileCheck(items, "CommandClient", "CreatorControlSuite.CommandClient.exe");
+        FileCheck(items, "Updater", "CreatorControlSuite.Updater.exe");
+        DirCheck(items, "Legal-Ordner", "Legal"); DirCheck(items, "Keys-Ordner", "Keys");
+        CheckWritableDirectory(items, "Lokaler Datenordner", _dataRoot);
+        ValidationReport validation = _validator.Validate(await _settings.LoadAsync(ct));
+        items.Add(new("Konfiguration", validation.IsValid ? InstallerSelfTestStatus.Passed : InstallerSelfTestStatus.Failed,
+            validation.IsValid ? "Konfiguration ist gültig." : $"{validation.Issues.Count} Problem(e) erkannt.",
+            validation.IsValid ? "" : "Systemdiagnose → Konfiguration öffnen."));
+        bool legal = await _legal.IsConsentRequiredAsync(ct);
+        items.Add(new("Rechtliche Bestätigung", legal ? InstallerSelfTestStatus.Warning : InstallerSelfTestStatus.Passed,
+            legal ? "Aktuelle Rechtstexte wurden noch nicht bestätigt." : "Bestätigung ist aktuell.",
+            legal ? "EULA und Datenschutzhinweise bestätigen." : ""));
+        LicenseStatus license = await _license.GetStatusAsync(ct);
+        items.Add(new("Lizenzstatus", license.IsUsable ? InstallerSelfTestStatus.Passed : InstallerSelfTestStatus.Warning,
+            license.Detail, license.IsUsable ? "" : "Lizenz aktivieren oder Entwicklungsmodus verwenden."));
+        return new(started, DateTimeOffset.Now, !items.Any(x => x.Status == InstallerSelfTestStatus.Failed), items);
     }
-    private static void FileCheck(ICollection<InstallerSelfTestItem> items,string name,string file)
+    private static void FileCheck(ICollection<InstallerSelfTestItem> items, string name, string file)
     {
-        var path=Path.Combine(AppContext.BaseDirectory,file);var ok=File.Exists(path);
-        items.Add(new(name,ok?InstallerSelfTestStatus.Passed:InstallerSelfTestStatus.Failed,
-            ok?path:"Datei fehlt: "+path,ok?"":"Release-Build und Installer-Dateierfassung prüfen."));
+        string path = Path.Combine(AppContext.BaseDirectory, file); bool ok = File.Exists(path);
+        items.Add(new(name, ok ? InstallerSelfTestStatus.Passed : InstallerSelfTestStatus.Failed,
+            ok ? path : "Datei fehlt: " + path, ok ? "" : "Release-Build und Installer-Dateierfassung prüfen."));
     }
-    private static void DirCheck(ICollection<InstallerSelfTestItem> items,string name,string dir)
+    private static void DirCheck(ICollection<InstallerSelfTestItem> items, string name, string dir)
     {
-        var path=Path.Combine(AppContext.BaseDirectory,dir);var ok=Directory.Exists(path);
-        items.Add(new(name,ok?InstallerSelfTestStatus.Passed:InstallerSelfTestStatus.Failed,
-            ok?path:"Ordner fehlt: "+path,ok?"":"Installer-Inhalt prüfen."));
+        string path = Path.Combine(AppContext.BaseDirectory, dir); bool ok = Directory.Exists(path);
+        items.Add(new(name, ok ? InstallerSelfTestStatus.Passed : InstallerSelfTestStatus.Failed,
+            ok ? path : "Ordner fehlt: " + path, ok ? "" : "Installer-Inhalt prüfen."));
     }
-    private static void CheckWritableDirectory(ICollection<InstallerSelfTestItem> items,string name,string path)
+    private static void CheckWritableDirectory(ICollection<InstallerSelfTestItem> items, string name, string path)
     {
-        try { Directory.CreateDirectory(path);var probe=Path.Combine(path,".write-test-"+Guid.NewGuid().ToString("N"));
-            File.WriteAllText(probe,"ok");File.Delete(probe);
-            items.Add(new(name,InstallerSelfTestStatus.Passed,"Schreibzugriff vorhanden: "+path,"")); }
-        catch(Exception ex){ items.Add(new(name,InstallerSelfTestStatus.Failed,ex.Message,"Berechtigungen des Benutzerprofils prüfen.")); }
+        try
+        {
+            Directory.CreateDirectory(path); string probe = Path.Combine(path, ".write-test-" + Guid.NewGuid().ToString("N"));
+            File.WriteAllText(probe, "ok"); File.Delete(probe);
+            items.Add(new(name, InstallerSelfTestStatus.Passed, "Schreibzugriff vorhanden: " + path, ""));
+        }
+        catch (Exception ex) { items.Add(new(name, InstallerSelfTestStatus.Failed, ex.Message, "Berechtigungen des Benutzerprofils prüfen.")); }
     }
 }

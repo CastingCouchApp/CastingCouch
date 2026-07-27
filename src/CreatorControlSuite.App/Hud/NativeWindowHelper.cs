@@ -17,26 +17,31 @@ internal static class NativeWindowHelper
 
     public static void ExcludeFromCapture(Window window)
     {
-        var hwnd = new WindowInteropHelper(window).EnsureHandle();
+        nint hwnd = new WindowInteropHelper(window).EnsureHandle();
         SetWindowDisplayAffinity(hwnd, WdaExcludeFromCapture);
     }
 
     public static void ApplyToolWindowStyles(Window window)
     {
-        var hwnd = new WindowInteropHelper(window).EnsureHandle();
-        var style = GetWindowLongPtr(hwnd, GwlExstyle).ToInt64();
+        nint hwnd = new WindowInteropHelper(window).EnsureHandle();
+        long style = GetWindowLongPtr(hwnd, GwlExstyle).ToInt64();
         style |= WsExToolwindow | WsExNoactivate | WsExLayered;
         SetWindowLongPtr(hwnd, GwlExstyle, new IntPtr(style));
     }
 
     public static void SetClickThrough(Window window, bool enabled)
     {
-        var hwnd = new WindowInteropHelper(window).EnsureHandle();
-        var style = GetWindowLongPtr(hwnd, GwlExstyle).ToInt64();
+        nint hwnd = new WindowInteropHelper(window).EnsureHandle();
+        long style = GetWindowLongPtr(hwnd, GwlExstyle).ToInt64();
         if (enabled)
+        {
             style |= WsExTransparent | WsExLayered;
+        }
         else
+        {
             style &= ~WsExTransparent;
+        }
+
         SetWindowLongPtr(hwnd, GwlExstyle, new IntPtr(style));
     }
 
@@ -47,18 +52,27 @@ internal static class NativeWindowHelper
         {
             var info = new MonitorInfoNative { Size = Marshal.SizeOf<MonitorInfoNative>() };
             if (!GetMonitorInfo(hMonitor, ref info))
+            {
                 return true;
+            }
 
-            GetDpiForMonitor(hMonitor, 0, out var dpiX, out var dpiY);
-            if (dpiX == 0) dpiX = 96;
-            if (dpiY == 0) dpiY = 96;
+            GetDpiForMonitor(hMonitor, 0, out uint dpiX, out uint dpiY);
+            if (dpiX == 0)
+            {
+                dpiX = 96;
+            }
 
-            var left = info.Monitor.Left * 96.0 / dpiX;
-            var top = info.Monitor.Top * 96.0 / dpiY;
-            var width = (info.Monitor.Right - info.Monitor.Left) * 96.0 / dpiX;
-            var height = (info.Monitor.Bottom - info.Monitor.Top) * 96.0 / dpiY;
-            var isPrimary = (info.Flags & 1) != 0;
-            var name = string.IsNullOrWhiteSpace(info.Device)
+            if (dpiY == 0)
+            {
+                dpiY = 96;
+            }
+
+            double left = info.Monitor.Left * 96.0 / dpiX;
+            double top = info.Monitor.Top * 96.0 / dpiY;
+            double width = (info.Monitor.Right - info.Monitor.Left) * 96.0 / dpiX;
+            double height = (info.Monitor.Bottom - info.Monitor.Top) * 96.0 / dpiY;
+            bool isPrimary = (info.Flags & 1) != 0;
+            string name = string.IsNullOrWhiteSpace(info.Device)
                 ? $"Monitor {monitors.Count + 1}"
                 : info.Device.TrimEnd('\0');
 
@@ -84,14 +98,18 @@ internal static class NativeWindowHelper
 
     public static MonitorInfo ResolveMonitor(int monitorIndex)
     {
-        var monitors = GetMonitors();
+        IReadOnlyList<MonitorInfo> monitors = GetMonitors();
         if (monitorIndex >= 0 && monitorIndex < monitors.Count)
+        {
             return monitors[monitorIndex];
+        }
 
-        foreach (var monitor in monitors)
+        foreach (MonitorInfo monitor in monitors)
         {
             if (monitor.IsPrimary)
+            {
                 return monitor;
+            }
         }
 
         return monitors[0];

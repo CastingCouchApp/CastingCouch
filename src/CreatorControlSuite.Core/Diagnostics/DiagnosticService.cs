@@ -2,21 +2,16 @@ using CreatorControlSuite.Core.Modules;
 
 namespace CreatorControlSuite.Core.Diagnostics;
 
-public sealed class DiagnosticService
+public sealed class DiagnosticService(IEnumerable<IStreamingModule> modules)
 {
-    private readonly IReadOnlyList<IStreamingModule> _modules;
-
-    public DiagnosticService(IEnumerable<IStreamingModule> modules)
-    {
-        _modules = modules.ToList();
-    }
+    private readonly IReadOnlyList<IStreamingModule> _modules = [.. modules];
 
     public async Task<IReadOnlyList<ModuleStatus>> RunAsync(
         CancellationToken cancellationToken = default)
     {
         var results = new List<ModuleStatus>();
 
-        foreach (var module in _modules)
+        foreach (IStreamingModule module in _modules)
         {
             try
             {

@@ -18,7 +18,7 @@ public sealed class ProductVersionInfoTests
         string? label,
         int preNumber)
     {
-        Assert.True(ProductVersionInfo.TryParse(input, out var version));
+        Assert.True(ProductVersionInfo.TryParse(input, out ProductVersionInfo? version));
         Assert.Equal(major, version.Major);
         Assert.Equal(minor, version.Minor);
         Assert.Equal(patch, version.Patch);
@@ -51,10 +51,10 @@ public sealed class UpdateManifestSignatureTests
     public void RoundTrip_SignsAndVerifiesManifest()
     {
         using var rsa = RSA.Create(2048);
-        var publicPem = rsa.ExportSubjectPublicKeyInfoPem();
-        var privatePem = rsa.ExportPkcs8PrivateKeyPem();
+        string publicPem = rsa.ExportSubjectPublicKeyInfoPem();
+        string privatePem = rsa.ExportPkcs8PrivateKeyPem();
 
-        var directory = Path.Combine(
+        string directory = Path.Combine(
             Path.GetTempPath(),
             "CreatorControlSuite.Tests",
             Guid.NewGuid().ToString("N"));
@@ -62,7 +62,7 @@ public sealed class UpdateManifestSignatureTests
 
         try
         {
-            var publicKeyPath = Path.Combine(directory, "update-public.pem");
+            string publicKeyPath = Path.Combine(directory, "update-public.pem");
             File.WriteAllText(publicKeyPath, publicPem);
 
             var unsigned = new SignedUpdateManifest(
@@ -77,23 +77,23 @@ public sealed class UpdateManifestSignatureTests
                 "Test notes",
                 string.Empty);
 
-            var payload = Encoding.UTF8.GetBytes(
+            byte[] payload = Encoding.UTF8.GetBytes(
                 UpdateManifestCanonical.GetPayload(unsigned));
 
             using var signRsa = RSA.Create();
             signRsa.ImportFromPem(privatePem);
-            var signature = Convert.ToBase64String(
+            string signature = Convert.ToBase64String(
                 signRsa.SignData(
                     payload,
                     HashAlgorithmName.SHA256,
                     RSASignaturePadding.Pkcs1));
 
-            var signed = unsigned with { Signature = signature };
+            SignedUpdateManifest signed = unsigned with { Signature = signature };
             var verifier = new RsaUpdateSignatureVerifier(publicKeyPath);
 
             Assert.True(verifier.VerifyManifest(signed));
 
-            var tampered = signed with { Version = "9.0.0" };
+            SignedUpdateManifest tampered = signed with { Version = "9.0.0" };
             Assert.False(verifier.VerifyManifest(tampered));
         }
         finally
@@ -122,8 +122,8 @@ public sealed class UpdateManifestSignatureTests
             "line1\r\nline2",
             "sig");
 
-        var payload = UpdateManifestCanonical.GetPayload(manifest);
-        var expectedPublished = publishedAt.ToUniversalTime()
+        string payload = UpdateManifestCanonical.GetPayload(manifest);
+        string expectedPublished = publishedAt.ToUniversalTime()
             .ToString("o", System.Globalization.CultureInfo.InvariantCulture);
 
         Assert.Equal(
@@ -164,13 +164,13 @@ public sealed class UpdateChannelSelectionTests
             }
         };
 
-        var alpha = LocalUpdateService.SelectRelease(releases, "Alpha");
+        LocalUpdateService.GitHubRelease? alpha = LocalUpdateService.SelectRelease(releases, "Alpha");
         Assert.Equal("v8.0.0-alpha101", alpha?.TagName);
 
-        var beta = LocalUpdateService.SelectRelease(releases, "Beta");
+        LocalUpdateService.GitHubRelease? beta = LocalUpdateService.SelectRelease(releases, "Beta");
         Assert.Equal("v8.0.0-beta1", beta?.TagName);
 
-        var stable = LocalUpdateService.SelectRelease(releases, "Stable");
+        LocalUpdateService.GitHubRelease? stable = LocalUpdateService.SelectRelease(releases, "Stable");
         Assert.Equal("v8.0.0", stable?.TagName);
     }
 }

@@ -13,7 +13,9 @@ public abstract class ViewModelBase : INotifyPropertyChanged
         [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value))
+        {
             return false;
+        }
 
         field = value;
         OnPropertyChanged(propertyName);

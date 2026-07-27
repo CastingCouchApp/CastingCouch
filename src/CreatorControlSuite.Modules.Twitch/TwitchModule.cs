@@ -4,31 +4,22 @@ using CreatorControlSuite.Modules.Twitch.Models;
 
 namespace CreatorControlSuite.Modules.Twitch;
 
-public sealed class TwitchModule : IConnectableModule
+public sealed class TwitchModule(
+    ISettingsStore settingsStore,
+    ITwitchOAuthClient oauthClient,
+    ITwitchApiClient apiClient,
+    ITwitchEventSubClient eventSubClient,
+    TwitchTokenRepository tokenRepository) : IConnectableModule
 {
-    private readonly ISettingsStore _settingsStore;
-    private readonly ITwitchOAuthClient _oauthClient;
-    private readonly ITwitchApiClient _apiClient;
-    private readonly ITwitchEventSubClient _eventSubClient;
-    private readonly TwitchTokenRepository _tokenRepository;
+    private readonly ISettingsStore _settingsStore = settingsStore;
+    private readonly ITwitchOAuthClient _oauthClient = oauthClient;
+    private readonly ITwitchApiClient _apiClient = apiClient;
+    private readonly ITwitchEventSubClient _eventSubClient = eventSubClient;
+    private readonly TwitchTokenRepository _tokenRepository = tokenRepository;
 
     private TwitchTokenValidation? _validation;
     private TwitchUser? _currentUser;
     private TwitchChannelInformation? _channel;
-
-    public TwitchModule(
-        ISettingsStore settingsStore,
-        ITwitchOAuthClient oauthClient,
-        ITwitchApiClient apiClient,
-        ITwitchEventSubClient eventSubClient,
-        TwitchTokenRepository tokenRepository)
-    {
-        _settingsStore = settingsStore;
-        _oauthClient = oauthClient;
-        _apiClient = apiClient;
-        _eventSubClient = eventSubClient;
-        _tokenRepository = tokenRepository;
-    }
 
     public string Id => "twitch";
     public string DisplayName => "Twitch";
@@ -53,7 +44,7 @@ public sealed class TwitchModule : IConnectableModule
     public async Task<TwitchDeviceCode> StartAuthorizationAsync(
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
 
         if (string.IsNullOrWhiteSpace(settings.Twitch.ClientId))
         {
@@ -72,9 +63,9 @@ public sealed class TwitchModule : IConnectableModule
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
 
-        var tokenSet =
+        TwitchTokenSet tokenSet =
             await _oauthClient.WaitForDeviceAuthorizationAsync(
                 settings.Twitch.ClientId,
                 deviceCode,
@@ -90,8 +81,8 @@ public sealed class TwitchModule : IConnectableModule
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var tokenSet = await GetValidTokenAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        TwitchTokenSet tokenSet = await GetValidTokenAsync(
             settings.Twitch.ClientId,
             cancellationToken);
 
@@ -106,7 +97,7 @@ public sealed class TwitchModule : IConnectableModule
         _currentUser = await _apiClient.GetCurrentUserAsync(
             cancellationToken);
 
-        var broadcaster = string.IsNullOrWhiteSpace(
+        TwitchUser broadcaster = string.IsNullOrWhiteSpace(
             settings.Twitch.ChannelName)
             ? _currentUser
             : await _apiClient.GetUserByLoginAsync(
@@ -158,7 +149,7 @@ public sealed class TwitchModule : IConnectableModule
             throw new InvalidOperationException("Twitch ist nicht verbunden.");
         }
 
-        var target = await _apiClient.GetUserByLoginAsync(
+        TwitchUser target = await _apiClient.GetUserByLoginAsync(
             targetLogin.Trim().TrimStart('@'),
             cancellationToken)
             ?? throw new InvalidOperationException(
@@ -261,7 +252,7 @@ public sealed class TwitchModule : IConnectableModule
             throw new InvalidOperationException("Twitch ist nicht verbunden.");
         }
 
-        var target = await _apiClient.GetUserByLoginAsync(
+        TwitchUser target = await _apiClient.GetUserByLoginAsync(
             userLogin.Trim().TrimStart('@'),
             cancellationToken)
             ?? throw new InvalidOperationException("Der Twitch-Benutzer wurde nicht gefunden.");
@@ -289,7 +280,7 @@ public sealed class TwitchModule : IConnectableModule
             throw new InvalidOperationException("Twitch ist nicht verbunden.");
         }
 
-        var target = await _apiClient.GetUserByLoginAsync(
+        TwitchUser target = await _apiClient.GetUserByLoginAsync(
             userLogin.Trim().TrimStart('@'),
             cancellationToken)
             ?? throw new InvalidOperationException("Der Twitch-Benutzer wurde nicht gefunden.");
@@ -304,49 +295,81 @@ public sealed class TwitchModule : IConnectableModule
 
     public Task<IReadOnlyList<TwitchChannelPointReward>> GetCustomRewardsAsync(CancellationToken cancellationToken = default)
     {
-        if (_channel is null) throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        if (_channel is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
         return _apiClient.GetCustomRewardsAsync(_channel.BroadcasterId, cancellationToken);
     }
 
     public Task<TwitchChannelPointReward> CreateCustomRewardAsync(string title, int cost, string? prompt, CancellationToken cancellationToken = default)
     {
-        if (_channel is null) throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        if (_channel is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
         return _apiClient.CreateCustomRewardAsync(_channel.BroadcasterId, title, cost, prompt, cancellationToken);
     }
 
     public Task<TwitchPoll> CreatePollAsync(string title, IReadOnlyList<string> choices, int durationSeconds, CancellationToken cancellationToken = default)
     {
-        if (_channel is null) throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        if (_channel is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
         return _apiClient.CreatePollAsync(_channel.BroadcasterId, title, choices, durationSeconds, cancellationToken);
     }
 
     public Task<TwitchPrediction> CreatePredictionAsync(string title, IReadOnlyList<string> outcomes, int windowSeconds, CancellationToken cancellationToken = default)
     {
-        if (_channel is null) throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        if (_channel is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
         return _apiClient.CreatePredictionAsync(_channel.BroadcasterId, title, outcomes, windowSeconds, cancellationToken);
     }
 
     public Task<TwitchPoll> EndPollAsync(string pollId, string status, CancellationToken cancellationToken = default)
     {
-        if (_channel is null) throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        if (_channel is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
         return _apiClient.EndPollAsync(_channel.BroadcasterId, pollId, status, cancellationToken);
     }
 
     public Task<TwitchPrediction> EndPredictionAsync(string predictionId, string status, string? winningOutcomeId, CancellationToken cancellationToken = default)
     {
-        if (_channel is null) throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        if (_channel is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
         return _apiClient.EndPredictionAsync(_channel.BroadcasterId, predictionId, status, winningOutcomeId, cancellationToken);
     }
 
     public Task<IReadOnlyList<TwitchRewardRedemption>> GetRewardRedemptionsAsync(string rewardId, string status = "UNFULFILLED", CancellationToken cancellationToken = default)
     {
-        if (_channel is null) throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        if (_channel is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
         return _apiClient.GetRewardRedemptionsAsync(_channel.BroadcasterId, rewardId, status, cancellationToken);
     }
 
     public Task UpdateRewardRedemptionStatusAsync(string rewardId, string redemptionId, string status, CancellationToken cancellationToken = default)
     {
-        if (_channel is null) throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        if (_channel is null)
+        {
+            throw new InvalidOperationException("Twitch ist nicht verbunden.");
+        }
+
         return _apiClient.UpdateRewardRedemptionStatusAsync(_channel.BroadcasterId, rewardId, redemptionId, status, cancellationToken);
     }
 
@@ -444,7 +467,7 @@ public sealed class TwitchModule : IConnectableModule
     public Task<ModuleStatus> GetStatusAsync(
         CancellationToken cancellationToken)
     {
-        var snapshot = GetSnapshot();
+        TwitchConnectionSnapshot snapshot = GetSnapshot();
 
         return Task.FromResult(
             new ModuleStatus(
@@ -464,14 +487,14 @@ public sealed class TwitchModule : IConnectableModule
         string clientId,
         CancellationToken cancellationToken)
     {
-        var tokenSet =
+        TwitchTokenSet tokenSet =
             await _tokenRepository.LoadAsync(cancellationToken)
             ?? throw new InvalidOperationException(
                 "Twitch wurde noch nicht autorisiert.");
 
         try
         {
-            var validation = await _oauthClient.ValidateAsync(
+            TwitchTokenValidation validation = await _oauthClient.ValidateAsync(
                 tokenSet.AccessToken,
                 cancellationToken);
 
@@ -490,7 +513,7 @@ public sealed class TwitchModule : IConnectableModule
                 "Der Twitch-Token ist abgelaufen. Bitte Twitch neu autorisieren.");
         }
 
-        var refreshed = await _oauthClient.RefreshAsync(
+        TwitchTokenSet refreshed = await _oauthClient.RefreshAsync(
             clientId,
             tokenSet.RefreshToken,
             cancellationToken);

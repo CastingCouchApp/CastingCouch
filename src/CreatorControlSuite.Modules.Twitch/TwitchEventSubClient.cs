@@ -34,12 +34,12 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
             new Uri(TwitchConstants.EventSubWebSocketUrl),
             cancellationToken);
 
-        var welcome = await ReceiveDocumentAsync(
+        JsonDocument welcome = await ReceiveDocumentAsync(
             _socket,
             cancellationToken);
 
-        var metadata = welcome.RootElement.GetProperty("metadata");
-        var messageType = metadata
+        JsonElement metadata = welcome.RootElement.GetProperty("metadata");
+        string? messageType = metadata
             .GetProperty("message_type")
             .GetString();
 
@@ -52,7 +52,7 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
                 "Twitch EventSub sendete keine session_welcome-Nachricht.");
         }
 
-        var sessionId = welcome.RootElement
+        string sessionId = welcome.RootElement
             .GetProperty("payload")
             .GetProperty("session")
             .GetProperty("id")
@@ -60,7 +60,7 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
             ?? throw new InvalidOperationException(
                 "Twitch EventSub Session-ID fehlt.");
 
-        var activeSubscriptions = 0;
+        int activeSubscriptions = 0;
 
         if (enableChat)
         {
@@ -162,8 +162,8 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
         string sessionId,
         CancellationToken cancellationToken)
     {
-        var subscriptions = new[]
-        {
+        Subscription[] subscriptions =
+        [
             new Subscription(
                 "channel.follow",
                 "2",
@@ -237,11 +237,11 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
                 {
                     broadcaster_user_id = broadcasterUserId
                 })
-        };
+        ];
 
-        var activeSubscriptions = 0;
+        int activeSubscriptions = 0;
 
-        foreach (var subscription in subscriptions)
+        foreach (Subscription? subscription in subscriptions)
         {
             if (await TryCreateSubscriptionAsync(
                     apiClient,
@@ -315,7 +315,7 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
         string userId,
         CancellationToken cancellationToken)
     {
-        var socket = _socket
+        ClientWebSocket socket = _socket
                      ?? throw new InvalidOperationException(
                          "Twitch EventSub ist nicht initialisiert.");
 
@@ -324,13 +324,13 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
             while (!cancellationToken.IsCancellationRequested &&
                    socket.State == WebSocketState.Open)
             {
-                using var document = await ReceiveDocumentAsync(
+                using JsonDocument document = await ReceiveDocumentAsync(
                     socket,
                     cancellationToken);
 
-                var root = document.RootElement;
-                var metadata = root.GetProperty("metadata");
-                var messageType = metadata
+                JsonElement root = document.RootElement;
+                JsonElement metadata = root.GetProperty("metadata");
+                string? messageType = metadata
                     .GetProperty("message_type")
                     .GetString();
 
@@ -341,25 +341,25 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
                         break;
 
                     case "session_reconnect":
-                    {
-                        var reconnectUrl = root
-                            .GetProperty("payload")
-                            .GetProperty("session")
-                            .GetProperty("reconnect_url")
-                            .GetString();
-
-                        if (!string.IsNullOrWhiteSpace(reconnectUrl))
                         {
-                            await ReconnectAsync(
-                                apiClient,
-                                broadcasterUserId,
-                                userId,
-                                reconnectUrl,
-                                cancellationToken);
-                        }
+                            string? reconnectUrl = root
+                                .GetProperty("payload")
+                                .GetProperty("session")
+                                .GetProperty("reconnect_url")
+                                .GetString();
 
-                        break;
-                    }
+                            if (!string.IsNullOrWhiteSpace(reconnectUrl))
+                            {
+                                await ReconnectAsync(
+                                    apiClient,
+                                    broadcasterUserId,
+                                    userId,
+                                    reconnectUrl,
+                                    cancellationToken);
+                            }
+
+                            break;
+                        }
 
                     case "revocation":
                         EventReceived?.Invoke(
@@ -384,26 +384,26 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
 
     private void HandleNotification(JsonElement root)
     {
-        var payload = root.GetProperty("payload");
-        var subscription = payload.GetProperty("subscription");
-        var eventType = subscription.GetProperty("type").GetString() ?? "";
-        var eventData = payload.GetProperty("event");
+        JsonElement payload = root.GetProperty("payload");
+        JsonElement subscription = payload.GetProperty("subscription");
+        string eventType = subscription.GetProperty("type").GetString() ?? "";
+        JsonElement eventData = payload.GetProperty("event");
 
         if (string.Equals(
                 eventType,
                 "channel.chat.message",
                 StringComparison.Ordinal))
         {
-            var message = eventData
+            string message = eventData
                 .GetProperty("message")
                 .GetProperty("text")
                 .GetString()
                 ?? "";
 
-            var badges =
-                eventData.TryGetProperty("badges", out var badgesElement) &&
+            string[] badges =
+                eventData.TryGetProperty("badges", out JsonElement badgesElement) &&
                 badgesElement.ValueKind == JsonValueKind.Array
-                    ? badgesElement
+                    ? [.. badgesElement
                         .EnumerateArray()
                         .Select(
                             badge =>
@@ -413,9 +413,8 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
                         .Where(
                             badge =>
                                 !string.IsNullOrWhiteSpace(
-                                    badge))
-                        .ToArray()
-                    : Array.Empty<string>();
+                                    badge))]
+                    : [];
 
             var chatMessage = new TwitchChatMessage(
                 GetString(eventData, "message_id"),
@@ -438,7 +437,7 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
         var data = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase);
 
-        foreach (var property in eventData.EnumerateObject())
+        foreach (JsonProperty property in eventData.EnumerateObject())
         {
             data[property.Name] =
                 property.Value.ValueKind == JsonValueKind.String
@@ -468,12 +467,12 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
             new Uri(reconnectUrl),
             cancellationToken);
 
-        using var welcome = await ReceiveDocumentAsync(
+        using JsonDocument welcome = await ReceiveDocumentAsync(
             replacement,
             cancellationToken);
 
-        var newSocket = replacement;
-        var oldSocket = _socket;
+        ClientWebSocket newSocket = replacement;
+        ClientWebSocket? oldSocket = _socket;
         _socket = newSocket;
 
         if (oldSocket is not null)
@@ -499,11 +498,11 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
         CancellationToken cancellationToken)
     {
         using var stream = new MemoryStream();
-        var buffer = new byte[16 * 1024];
+        byte[] buffer = new byte[16 * 1024];
 
         while (true)
         {
-            var result = await socket.ReceiveAsync(
+            WebSocketReceiveResult result = await socket.ReceiveAsync(
                 buffer,
                 cancellationToken);
 
@@ -584,7 +583,7 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
         IReadOnlyDictionary<string, string> data,
         string key)
     {
-        return data.TryGetValue(key, out var value)
+        return data.TryGetValue(key, out string? value)
             ? value
             : "";
     }
@@ -593,7 +592,7 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
         JsonElement element,
         string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var property)
+        return element.TryGetProperty(propertyName, out JsonElement property)
             ? property.GetString() ?? ""
             : "";
     }

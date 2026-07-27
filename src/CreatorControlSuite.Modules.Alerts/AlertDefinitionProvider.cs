@@ -3,25 +3,20 @@ using CreatorControlSuite.Modules.Alerts.Models;
 
 namespace CreatorControlSuite.Modules.Alerts;
 
-public sealed class AlertDefinitionProvider
+public sealed class AlertDefinitionProvider(ISettingsStore settingsStore)
 {
-    private readonly ISettingsStore _settingsStore;
-
-    public AlertDefinitionProvider(ISettingsStore settingsStore)
-    {
-        _settingsStore = settingsStore;
-    }
+    private readonly ISettingsStore _settingsStore = settingsStore;
 
     public async Task<AlertDefinition> GetAsync(
         string type,
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
         if (!settings.Alerts.Definitions.TryGetValue(
                 type,
-                out var definition))
+                out AlertDefinitionSettings? definition))
         {
             throw new InvalidOperationException(
                 "Unbekannter Alert-Typ: " + type);
@@ -50,10 +45,10 @@ public sealed class AlertDefinitionProvider
     public async Task<IReadOnlyList<AlertDefinition>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
-        return settings.Alerts.Definitions.Values
+        return [.. settings.Alerts.Definitions.Values
             .Select(definition => new AlertDefinition(
                 definition.Type,
                 definition.Enabled,
@@ -72,7 +67,6 @@ public sealed class AlertDefinitionProvider
                 definition.Width,
                 definition.Height,
                 definition.VolumePercent))
-            .OrderBy(definition => definition.Priority)
-            .ToList();
+            .OrderBy(definition => definition.Priority)];
     }
 }

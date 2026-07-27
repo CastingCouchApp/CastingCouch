@@ -10,7 +10,7 @@ public sealed class EventBusTests
         var bus = new EventBus();
         string? received = null;
 
-        using var subscription = bus.Subscribe<string>(evt => received = evt);
+        using IDisposable subscription = bus.Subscribe<string>(evt => received = evt);
 
         bus.Publish("obs-connected");
 
@@ -21,8 +21,8 @@ public sealed class EventBusTests
     public void Dispose_UnsubscribesHandler()
     {
         var bus = new EventBus();
-        var count = 0;
-        var subscription = bus.Subscribe<string>(_ => count++);
+        int count = 0;
+        IDisposable subscription = bus.Subscribe<string>(_ => count++);
 
         subscription.Dispose();
         bus.Publish("ignored");

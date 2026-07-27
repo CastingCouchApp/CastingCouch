@@ -61,18 +61,24 @@ public partial class NowPlayingWidget : UserControl
     private static void OnTitleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is NowPlayingWidget widget)
+        {
             widget.TitleText.Text = e.NewValue as string ?? "Kein Titel";
+        }
     }
 
     private static void OnArtistChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is NowPlayingWidget widget)
+        {
             widget.ArtistText.Text = e.NewValue as string ?? "-";
+        }
     }
 
     private static void OnIsPlayingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is NowPlayingWidget widget)
+        {
             widget.PlayingGlyph.Text = (bool)e.NewValue! ? "Ⅱ" : "▶";
+        }
     }
 }

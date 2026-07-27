@@ -1,57 +1,61 @@
-using CreatorControlSuite.Modules.OBS;
-using CreatorControlSuite.Modules.OBS.Models;
 using System.Diagnostics;
+using System.IO.Compression;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
-using System.IO.Compression;
-using System.Reflection;
+using CreatorControlSuite.Modules.OBS;
+using CreatorControlSuite.Modules.OBS.Models;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
+using Microsoft.Extensions.Primitives;
 
-var agentVersion = Assembly.GetExecutingAssembly()
+string agentVersion = Assembly.GetExecutingAssembly()
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
     .InformationalVersion?
     .Split('+', 2)[0]
     ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
     ?? "unknown";
 const int agentPort = 47631;
-var dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "Agent");
+string dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "Agent");
 Directory.CreateDirectory(dataDirectory);
-var keyPath = Path.Combine(dataDirectory, "agent-key.txt");
-var certificatePath = Path.Combine(dataDirectory, "agent-certificate.pfx");
-var permissionsPath = Path.Combine(dataDirectory, "agent-permissions.json");
-var settingsPath = Path.Combine(dataDirectory, "agent-settings.json");
-var obsPresetsPath = Path.Combine(dataDirectory, "obs-presets.json");
-var agentLogPath = Path.Combine(dataDirectory, "agent.log");
-var updateStatePath = Path.Combine(dataDirectory, "update-state.json");
-var maintenancePath = Path.Combine(dataDirectory, "maintenance.flag");
-var updateHistoryPath = Path.Combine(dataDirectory, "update-history.json");
+string keyPath = Path.Combine(dataDirectory, "agent-key.txt");
+string certificatePath = Path.Combine(dataDirectory, "agent-certificate.pfx");
+string permissionsPath = Path.Combine(dataDirectory, "agent-permissions.json");
+string settingsPath = Path.Combine(dataDirectory, "agent-settings.json");
+string obsPresetsPath = Path.Combine(dataDirectory, "obs-presets.json");
+string agentLogPath = Path.Combine(dataDirectory, "agent.log");
+string updateStatePath = Path.Combine(dataDirectory, "update-state.json");
+string maintenancePath = Path.Combine(dataDirectory, "maintenance.flag");
+string updateHistoryPath = Path.Combine(dataDirectory, "update-history.json");
 
-var agentKey = File.Exists(keyPath)
+string agentKey = File.Exists(keyPath)
     ? File.ReadAllText(keyPath).Trim()
     : Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-if (!File.Exists(keyPath)) File.WriteAllText(keyPath, agentKey);
+if (!File.Exists(keyPath))
+{
+    File.WriteAllText(keyPath, agentKey);
+}
 
-var certificate = LoadOrCreateCertificate(certificatePath);
-var certificateFingerprint = certificate.GetCertHashString(HashAlgorithmName.SHA256);
-var permissions = LoadPermissions(permissionsPath);
-var agentSettings = LoadSettings(settingsPath);
+X509Certificate2 certificate = LoadOrCreateCertificate(certificatePath);
+string certificateFingerprint = certificate.GetCertHashString(HashAlgorithmName.SHA256);
+AgentPermissions permissions = LoadPermissions(permissionsPath);
+AgentSettings agentSettings = LoadSettings(settingsPath);
 var commandHistory = new System.Collections.Concurrent.ConcurrentQueue<CommandHistoryEntry>();
-var pairingCode = NewPairingCode();
-var startedAt = DateTimeOffset.UtcNow;
-var lastUpdateResultPath = Path.Combine(dataDirectory, "last-update-result.txt");
+string pairingCode = NewPairingCode();
+DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+string lastUpdateResultPath = Path.Combine(dataDirectory, "last-update-result.txt");
 if (File.Exists(lastUpdateResultPath))
 {
-    var result = File.ReadAllText(lastUpdateResultPath).Trim();
-    var previous = LoadUpdateState(updateStatePath);
-    var message = result == "automatic-rollback" ? "Health-Check fehlgeschlagen; automatisches Rollback wurde ausgeführt."
+    string result = File.ReadAllText(lastUpdateResultPath).Trim();
+    AgentUpdateState previous = LoadUpdateState(updateStatePath);
+    string message = result == "automatic-rollback" ? "Health-Check fehlgeschlagen; automatisches Rollback wurde ausgeführt."
         : result == "healthy" ? "Update erfolgreich; Health-Check bestanden."
         : "Update wurde angewendet.";
     SaveUpdateState(updateStatePath, previous with { Status = result == "automatic-rollback" ? "rolled-back" : "healthy", MaintenanceMode = false, Message = message });
     File.Delete(lastUpdateResultPath);
 }
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(agentPort, listen => listen.UseHttps(new HttpsConnectionAdapterOptions
@@ -59,25 +63,32 @@ builder.WebHost.ConfigureKestrel(options =>
         ServerCertificate = certificate
     }));
 });
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 Console.WriteLine($"Creator Control Agent {agentVersion} läuft verschlüsselt auf Port {agentPort}.");
 Console.WriteLine($"Pairing-Code: {pairingCode}");
 Console.WriteLine($"Zertifikat-Fingerabdruck: {certificateFingerprint}");
 Console.WriteLine($"Berechtigungsdatei: {permissionsPath}");
 
-bool Authorized(HttpRequest request) => request.Headers.TryGetValue("X-CCS-Agent-Key", out var value) && CryptographicOperations.FixedTimeEquals(
+bool Authorized(HttpRequest request) => request.Headers.TryGetValue("X-CCS-Agent-Key", out StringValues value) && CryptographicOperations.FixedTimeEquals(
     System.Text.Encoding.UTF8.GetBytes(value.ToString()), System.Text.Encoding.UTF8.GetBytes(agentKey));
 bool Running(string name) => Process.GetProcessesByName(name).Length > 0;
 
 async Task<IResult> WithObsControl(HttpRequest request, AgentPermissions permissions, Func<IObsWebSocketClient, Task<IResult>> action)
 {
-    if (!Authorized(request)) return Results.Unauthorized();
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
     if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
         return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
     try
     {
-        await using var obs = await ConnectObsAsync(agentSettings);
+        await using ObsWebSocketClient obs = await ConnectObsAsync(agentSettings);
         return await action(obs);
     }
     catch (Exception ex)
@@ -88,7 +99,11 @@ async Task<IResult> WithObsControl(HttpRequest request, AgentPermissions permiss
 
 app.MapGet("/api/status", (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
     var current = Process.GetCurrentProcess();
     return Results.Ok(new
     {
@@ -108,27 +123,42 @@ app.MapGet("/api/status", (HttpRequest request) =>
 
 app.MapPost("/api/command", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    var payload = await JsonSerializer.DeserializeAsync<CommandRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.Command)) return Results.BadRequest("command fehlt");
-    var command = payload.Command.Trim().ToLowerInvariant();
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    CommandRequest? payload = await JsonSerializer.DeserializeAsync<CommandRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.Command))
+    {
+        return Results.BadRequest("command fehlt");
+    }
+
+    string command = payload.Command.Trim().ToLowerInvariant();
     if (!permissions.AllowedCommands.Contains(command, StringComparer.OrdinalIgnoreCase))
+    {
         return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
     try
     {
         switch (command)
         {
             case "obs.start": StartConfigured(agentSettings.ObsPath, "obs64.exe"); break;
-            case "obs.stop": foreach (var p in Process.GetProcessesByName("obs64")) p.CloseMainWindow(); break;
+            case "obs.stop": foreach (Process p in Process.GetProcessesByName("obs64")) { p.CloseMainWindow(); } break;
             case "spotify.playpause": Process.Start(new ProcessStartInfo("spotify:playpause") { UseShellExecute = true }); break;
             case "streamerbot.start": StartConfigured(agentSettings.StreamerBotPath, "Streamer.bot.exe"); break;
             case "system.restart": Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 5 /c \"Creator Control Suite Remote-Neustart\"") { UseShellExecute = false, CreateNoWindow = true }); break;
             case "system.shutdown": Process.Start(new ProcessStartInfo("shutdown.exe", "/s /t 5 /c \"Creator Control Suite Remote-Herunterfahren\"") { UseShellExecute = false, CreateNoWindow = true }); break;
             default: return Results.BadRequest("unbekannter Befehl");
         }
-        var acceptedAt = DateTimeOffset.UtcNow;
+        DateTimeOffset acceptedAt = DateTimeOffset.UtcNow;
         commandHistory.Enqueue(new CommandHistoryEntry(acceptedAt, command, "accepted"));
-        while (commandHistory.Count > 100) commandHistory.TryDequeue(out _);
+        while (commandHistory.Count > 100)
+        {
+            commandHistory.TryDequeue(out _);
+        }
+
         return Results.Ok(new { accepted = true, command, acceptedAt });
     }
     catch (Exception ex) { commandHistory.Enqueue(new CommandHistoryEntry(DateTimeOffset.UtcNow, command, "error: " + ex.Message)); return Results.Problem(ex.Message); }
@@ -136,7 +166,11 @@ app.MapPost("/api/command", async (HttpRequest request) =>
 
 app.MapGet("/api/pair", (string code) =>
 {
-    if (!string.Equals(code, pairingCode, StringComparison.Ordinal)) return Results.Unauthorized();
+    if (!string.Equals(code, pairingCode, StringComparison.Ordinal))
+    {
+        return Results.Unauthorized();
+    }
+
     pairingCode = NewPairingCode();
     Console.WriteLine($"Gerät gekoppelt. Neuer Pairing-Code: {pairingCode}");
     return Results.Ok(new
@@ -154,27 +188,31 @@ app.MapGet("/api/pair", (string code) =>
 app.MapGet("/api/obs/state", async (HttpRequest request) =>
     await WithObsControl(request, permissions, async obs =>
     {
-        var scenes = await obs.GetSceneListAsync();
-        var currentScene = await obs.GetCurrentProgramSceneAsync();
-        var inputs = await obs.GetInputListAsync();
+        IReadOnlyList<ObsSceneInfo> scenes = await obs.GetSceneListAsync();
+        string currentScene = await obs.GetCurrentProgramSceneAsync();
+        IReadOnlyList<ObsInputInfo> inputs = await obs.GetInputListAsync();
         var audio = new List<object>();
-        foreach (var input in inputs)
+        foreach (ObsInputInfo input in inputs)
         {
             try
             {
-                var state = await obs.GetInputAudioStateAsync(input.Name);
+                ObsInputAudioState state = await obs.GetInputAudioStateAsync(input.Name);
                 audio.Add(new { name = input.Name, muted = state.Muted, volumeDb = state.VolumeDb });
             }
             catch { }
         }
-        var sceneItems = await obs.GetSceneItemListAsync(currentScene);
+        IReadOnlyList<ObsSceneItemInfo> sceneItems = await obs.GetSceneItemListAsync(currentScene);
         return Results.Ok(new { connected = true, currentScene, scenes = scenes.Select(x => x.Name).ToArray(), audioInputs = audio, sceneItems = sceneItems.Select(x => new { sourceName = x.SourceName, enabled = x.Enabled }).ToArray() });
     }));
 
 app.MapPost("/api/obs/scene", async (HttpRequest request) =>
 {
-    var payload = await JsonSerializer.DeserializeAsync<ObsSceneRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName)) return Results.BadRequest("sceneName fehlt");
+    ObsSceneRequest? payload = await JsonSerializer.DeserializeAsync<ObsSceneRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName))
+    {
+        return Results.BadRequest("sceneName fehlt");
+    }
+
     return await WithObsControl(request, permissions, async obs =>
     {
         await obs.SetCurrentProgramSceneAsync(payload.SceneName);
@@ -184,8 +222,12 @@ app.MapPost("/api/obs/scene", async (HttpRequest request) =>
 
 app.MapPost("/api/obs/mute", async (HttpRequest request) =>
 {
-    var payload = await JsonSerializer.DeserializeAsync<ObsMuteRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.InputName)) return Results.BadRequest("inputName fehlt");
+    ObsMuteRequest? payload = await JsonSerializer.DeserializeAsync<ObsMuteRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.InputName))
+    {
+        return Results.BadRequest("inputName fehlt");
+    }
+
     return await WithObsControl(request, permissions, async obs =>
     {
         await obs.SetInputMuteAsync(payload.InputName, payload.Muted);
@@ -196,8 +238,12 @@ app.MapPost("/api/obs/mute", async (HttpRequest request) =>
 
 app.MapPost("/api/obs/volume", async (HttpRequest request) =>
 {
-    var payload = await JsonSerializer.DeserializeAsync<ObsVolumeRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.InputName) || payload.VolumeDb is < -100 or > 26) return Results.BadRequest("Ungültige Lautstärke");
+    ObsVolumeRequest? payload = await JsonSerializer.DeserializeAsync<ObsVolumeRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.InputName) || payload.VolumeDb is < -100 or > 26)
+    {
+        return Results.BadRequest("Ungültige Lautstärke");
+    }
+
     return await WithObsControl(request, permissions, async obs =>
     {
         await obs.SetInputVolumeDbAsync(payload.InputName, payload.VolumeDb);
@@ -207,8 +253,12 @@ app.MapPost("/api/obs/volume", async (HttpRequest request) =>
 
 app.MapPost("/api/obs/scene-item", async (HttpRequest request) =>
 {
-    var payload = await JsonSerializer.DeserializeAsync<ObsSceneItemRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName) || string.IsNullOrWhiteSpace(payload.SourceName)) return Results.BadRequest("Szene oder Quelle fehlt");
+    ObsSceneItemRequest? payload = await JsonSerializer.DeserializeAsync<ObsSceneItemRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName) || string.IsNullOrWhiteSpace(payload.SourceName))
+    {
+        return Results.BadRequest("Szene oder Quelle fehlt");
+    }
+
     return await WithObsControl(request, permissions, async obs =>
     {
         await obs.SetSceneItemEnabledAsync(payload.SceneName, payload.SourceName, payload.Enabled);
@@ -222,9 +272,12 @@ app.MapGet("/api/obs/filters", async (HttpRequest request, string sourceName) =>
 
 app.MapPost("/api/obs/filter", async (HttpRequest request) =>
 {
-    var payload = await JsonSerializer.DeserializeAsync<ObsFilterRequest>(request.Body);
+    ObsFilterRequest? payload = await JsonSerializer.DeserializeAsync<ObsFilterRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.SourceName) || string.IsNullOrWhiteSpace(payload.FilterName))
+    {
         return Results.BadRequest();
+    }
+
     return await WithObsControl(request, permissions, async obs =>
     {
         await obs.SetSourceFilterEnabledAsync(payload.SourceName, payload.FilterName, payload.Enabled);
@@ -234,14 +287,20 @@ app.MapPost("/api/obs/filter", async (HttpRequest request) =>
 
 app.MapPost("/api/obs/transform", async (HttpRequest request) =>
 {
-    var payload = await JsonSerializer.DeserializeAsync<ObsTransformRequest>(request.Body);
+    ObsTransformRequest? payload = await JsonSerializer.DeserializeAsync<ObsTransformRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName) || string.IsNullOrWhiteSpace(payload.SourceName))
+    {
         return Results.BadRequest();
+    }
+
     return await WithObsControl(request, permissions, async obs =>
     {
         if (payload.Reset)
+        {
             await obs.ResetSceneItemTransformAsync(payload.SceneName, payload.SourceName);
+        }
         else
+        {
             await obs.SetSceneItemDetailedTransformAsync(
                 payload.SceneName,
                 payload.SourceName,
@@ -254,23 +313,28 @@ app.MapPost("/api/obs/transform", async (HttpRequest request) =>
                 0,
                 0,
                 0);
+        }
+
         return Results.Ok(new { accepted = true });
     });
 });
 
 app.MapPost("/api/obs/volume-fade", async (HttpRequest request) =>
 {
-    var payload = await JsonSerializer.DeserializeAsync<ObsVolumeFadeRequest>(request.Body);
+    ObsVolumeFadeRequest? payload = await JsonSerializer.DeserializeAsync<ObsVolumeFadeRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.InputName))
+    {
         return Results.BadRequest();
+    }
+
     return await WithObsControl(request, permissions, async obs =>
     {
-        var current = await obs.GetInputAudioStateAsync(payload.InputName);
-        var duration = Math.Clamp(payload.DurationMilliseconds, 100, 30000);
-        var steps = Math.Clamp(duration / 50, 2, 200);
-        for (var i = 1; i <= steps; i++)
+        ObsInputAudioState current = await obs.GetInputAudioStateAsync(payload.InputName);
+        int duration = Math.Clamp(payload.DurationMilliseconds, 100, 30000);
+        int steps = Math.Clamp(duration / 50, 2, 200);
+        for (int i = 1; i <= steps; i++)
         {
-            var value = current.VolumeDb + ((payload.TargetVolumeDb - current.VolumeDb) * i / steps);
+            double value = current.VolumeDb + ((payload.TargetVolumeDb - current.VolumeDb) * i / steps);
             await obs.SetInputVolumeDbAsync(payload.InputName, value);
             await Task.Delay(Math.Max(10, duration / steps));
         }
@@ -280,29 +344,57 @@ app.MapPost("/api/obs/volume-fade", async (HttpRequest request) =>
 
 app.MapGet("/api/obs/configuration", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
     try
     {
-        await using var obs = await ConnectObsAsync(agentSettings);
-        var profiles = await obs.GetProfileListAsync();
-        var collections = await obs.GetSceneCollectionListAsync();
-        return Results.Ok(new { currentProfile = profiles.CurrentProfile, profiles = profiles.Profiles, currentSceneCollection = collections.CurrentSceneCollection, sceneCollections = collections.SceneCollections });
+        await using ObsWebSocketClient obs = await ConnectObsAsync(agentSettings);
+        (string CurrentProfile, IReadOnlyList<string> Profiles) = await obs.GetProfileListAsync();
+        (string CurrentSceneCollection, IReadOnlyList<string> SceneCollections) = await obs.GetSceneCollectionListAsync();
+        return Results.Ok(new { currentProfile = CurrentProfile, profiles = Profiles, currentSceneCollection = CurrentSceneCollection, sceneCollections = SceneCollections });
     }
     catch (Exception ex) { return Results.Problem(ex.Message); }
 });
 
 app.MapPost("/api/obs/configuration", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var payload = await JsonSerializer.DeserializeAsync<ObsConfigurationRequest>(request.Body);
-    if (payload is null || (string.IsNullOrWhiteSpace(payload.ProfileName) && string.IsNullOrWhiteSpace(payload.SceneCollectionName))) return Results.BadRequest("Profil oder Szenensammlung fehlt");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    ObsConfigurationRequest? payload = await JsonSerializer.DeserializeAsync<ObsConfigurationRequest>(request.Body);
+    if (payload is null || (string.IsNullOrWhiteSpace(payload.ProfileName) && string.IsNullOrWhiteSpace(payload.SceneCollectionName)))
+    {
+        return Results.BadRequest("Profil oder Szenensammlung fehlt");
+    }
+
     try
     {
-        await using var obs = await ConnectObsAsync(agentSettings);
-        if (!string.IsNullOrWhiteSpace(payload.ProfileName)) await obs.SetCurrentProfileAsync(payload.ProfileName);
-        if (!string.IsNullOrWhiteSpace(payload.SceneCollectionName)) await obs.SetCurrentSceneCollectionAsync(payload.SceneCollectionName);
+        await using ObsWebSocketClient obs = await ConnectObsAsync(agentSettings);
+        if (!string.IsNullOrWhiteSpace(payload.ProfileName))
+        {
+            await obs.SetCurrentProfileAsync(payload.ProfileName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(payload.SceneCollectionName))
+        {
+            await obs.SetCurrentSceneCollectionAsync(payload.SceneCollectionName);
+        }
+
         return Results.Ok(new { accepted = true, payload.ProfileName, payload.SceneCollectionName });
     }
     catch (Exception ex) { return Results.Problem(ex.Message); }
@@ -310,33 +402,53 @@ app.MapPost("/api/obs/configuration", async (HttpRequest request) =>
 
 app.MapGet("/api/obs/presets", (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var presets = LoadObsPresets(obsPresetsPath);
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    List<ObsRemotePreset> presets = LoadObsPresets(obsPresetsPath);
     return Results.Ok(presets.OrderByDescending(x => x.CreatedAt).Select(x => new { x.Name, x.CreatedAt, x.ProfileName, x.SceneCollectionName, x.CurrentScene }).ToArray());
 });
 
 app.MapPost("/api/obs/presets/save", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var payload = await JsonSerializer.DeserializeAsync<ObsPresetRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.Name)) return Results.BadRequest("name fehlt");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    ObsPresetRequest? payload = await JsonSerializer.DeserializeAsync<ObsPresetRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.Name))
+    {
+        return Results.BadRequest("name fehlt");
+    }
+
     try
     {
-        await using var obs = await ConnectObsAsync(agentSettings);
-        var profiles = await obs.GetProfileListAsync();
-        var collections = await obs.GetSceneCollectionListAsync();
-        var currentScene = await obs.GetCurrentProgramSceneAsync();
-        var inputs = await obs.GetInputListAsync();
+        await using ObsWebSocketClient obs = await ConnectObsAsync(agentSettings);
+        (string CurrentProfile, IReadOnlyList<string> Profiles) = await obs.GetProfileListAsync();
+        (string CurrentSceneCollection, IReadOnlyList<string> SceneCollections) = await obs.GetSceneCollectionListAsync();
+        string currentScene = await obs.GetCurrentProgramSceneAsync();
+        IReadOnlyList<ObsInputInfo> inputs = await obs.GetInputListAsync();
         var audio = new List<ObsPresetAudio>();
-        foreach (var input in inputs)
+        foreach (ObsInputInfo input in inputs)
         {
-            try { var state = await obs.GetInputAudioStateAsync(input.Name); audio.Add(new ObsPresetAudio(input.Name, state.Muted, state.VolumeDb)); } catch { }
+            try { ObsInputAudioState state = await obs.GetInputAudioStateAsync(input.Name); audio.Add(new ObsPresetAudio(input.Name, state.Muted, state.VolumeDb)); } catch { }
         }
-        var items = await obs.GetSceneItemListAsync(currentScene);
-        var preset = new ObsRemotePreset(payload.Name.Trim(), DateTimeOffset.UtcNow, profiles.CurrentProfile, collections.CurrentSceneCollection, currentScene, audio.ToArray(), items.Select(x => new ObsPresetSceneItem(x.SourceName, x.Enabled)).ToArray());
-        var presets = LoadObsPresets(obsPresetsPath);
+        IReadOnlyList<ObsSceneItemInfo> items = await obs.GetSceneItemListAsync(currentScene);
+        var preset = new ObsRemotePreset(payload.Name.Trim(), DateTimeOffset.UtcNow, CurrentProfile, CurrentSceneCollection, currentScene, [.. audio], [.. items.Select(x => new ObsPresetSceneItem(x.SourceName, x.Enabled))]);
+        List<ObsRemotePreset> presets = LoadObsPresets(obsPresetsPath);
         presets.RemoveAll(x => string.Equals(x.Name, preset.Name, StringComparison.OrdinalIgnoreCase));
         presets.Add(preset);
         SaveObsPresets(obsPresetsPath, presets);
@@ -347,32 +459,57 @@ app.MapPost("/api/obs/presets/save", async (HttpRequest request) =>
 
 app.MapPost("/api/obs/presets/apply", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var payload = await JsonSerializer.DeserializeAsync<ObsPresetRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.Name)) return Results.BadRequest("name fehlt");
-    var preset = LoadObsPresets(obsPresetsPath).FirstOrDefault(x => string.Equals(x.Name, payload.Name, StringComparison.OrdinalIgnoreCase));
-    if (preset is null) return Results.NotFound("Preset nicht gefunden");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    ObsPresetRequest? payload = await JsonSerializer.DeserializeAsync<ObsPresetRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.Name))
+    {
+        return Results.BadRequest("name fehlt");
+    }
+
+    ObsRemotePreset? preset = LoadObsPresets(obsPresetsPath).FirstOrDefault(x => string.Equals(x.Name, payload.Name, StringComparison.OrdinalIgnoreCase));
+    if (preset is null)
+    {
+        return Results.NotFound("Preset nicht gefunden");
+    }
+
     try
     {
-        await using (var obs = await ConnectObsAsync(agentSettings))
+        await using (ObsWebSocketClient obs = await ConnectObsAsync(agentSettings))
         {
-            var profiles = await obs.GetProfileListAsync();
-            if (!string.IsNullOrWhiteSpace(preset.ProfileName) && !string.Equals(profiles.CurrentProfile, preset.ProfileName, StringComparison.Ordinal))
+            (string CurrentProfile, IReadOnlyList<string> Profiles) = await obs.GetProfileListAsync();
+            if (!string.IsNullOrWhiteSpace(preset.ProfileName) && !string.Equals(CurrentProfile, preset.ProfileName, StringComparison.Ordinal))
+            {
                 await obs.SetCurrentProfileAsync(preset.ProfileName);
-            var collections = await obs.GetSceneCollectionListAsync();
-            if (!string.IsNullOrWhiteSpace(preset.SceneCollectionName) && !string.Equals(collections.CurrentSceneCollection, preset.SceneCollectionName, StringComparison.Ordinal))
+            }
+
+            (string CurrentSceneCollection, IReadOnlyList<string> SceneCollections) = await obs.GetSceneCollectionListAsync();
+            if (!string.IsNullOrWhiteSpace(preset.SceneCollectionName) && !string.Equals(CurrentSceneCollection, preset.SceneCollectionName, StringComparison.Ordinal))
+            {
                 await obs.SetCurrentSceneCollectionAsync(preset.SceneCollectionName);
+            }
         }
         await Task.Delay(600);
-        await using (var obs = await ConnectObsAsync(agentSettings))
+        await using (ObsWebSocketClient obs = await ConnectObsAsync(agentSettings))
         {
-            if (!string.IsNullOrWhiteSpace(preset.CurrentScene)) await obs.SetCurrentProgramSceneAsync(preset.CurrentScene);
-            foreach (var item in preset.SceneItems)
+            if (!string.IsNullOrWhiteSpace(preset.CurrentScene))
+            {
+                await obs.SetCurrentProgramSceneAsync(preset.CurrentScene);
+            }
+
+            foreach (ObsPresetSceneItem item in preset.SceneItems)
             {
                 try { await obs.SetSceneItemEnabledAsync(preset.CurrentScene, item.SourceName, item.Enabled); } catch { }
             }
-            foreach (var input in preset.AudioInputs)
+            foreach (ObsPresetAudio input in preset.AudioInputs)
             {
                 try { await obs.SetInputVolumeDbAsync(input.Name, input.VolumeDb); await obs.SetInputMuteAsync(input.Name, input.Muted); } catch { }
             }
@@ -384,27 +521,51 @@ app.MapPost("/api/obs/presets/apply", async (HttpRequest request) =>
 
 app.MapPost("/api/obs/presets/delete", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var payload = await JsonSerializer.DeserializeAsync<ObsPresetRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.Name)) return Results.BadRequest("name fehlt");
-    var presets = LoadObsPresets(obsPresetsPath);
-    var removed = presets.RemoveAll(x => string.Equals(x.Name, payload.Name, StringComparison.OrdinalIgnoreCase));
-    if (removed == 0) return Results.NotFound("Preset nicht gefunden");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    ObsPresetRequest? payload = await JsonSerializer.DeserializeAsync<ObsPresetRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.Name))
+    {
+        return Results.BadRequest("name fehlt");
+    }
+
+    List<ObsRemotePreset> presets = LoadObsPresets(obsPresetsPath);
+    int removed = presets.RemoveAll(x => string.Equals(x.Name, payload.Name, StringComparison.OrdinalIgnoreCase));
+    if (removed == 0)
+    {
+        return Results.NotFound("Preset nicht gefunden");
+    }
+
     SaveObsPresets(obsPresetsPath, presets);
     return Results.Ok(new { accepted = true, payload.Name });
 });
 
 app.MapGet("/api/obs/output", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
     try
     {
-        await using var obs = await ConnectObsAsync(agentSettings);
-        var stream = await obs.GetStreamStatusAsync();
-        var record = await obs.GetRecordStatusAsync();
-        var transitions = await obs.GetSceneTransitionListAsync();
+        await using ObsWebSocketClient obs = await ConnectObsAsync(agentSettings);
+        ObsStreamStatus stream = await obs.GetStreamStatusAsync();
+        ObsOutputStatus record = await obs.GetRecordStatusAsync();
+        IReadOnlyList<ObsTransitionInfo> transitions = await obs.GetSceneTransitionListAsync();
         return Results.Ok(new { streamActive = stream.OutputActive, streamReconnecting = stream.OutputReconnecting, recordActive = record.Active, recordPaused = record.Paused, transitions = transitions.Select(x => x.Name).ToArray() });
     }
     catch (Exception ex) { return Results.Problem(ex.Message); }
@@ -412,13 +573,25 @@ app.MapGet("/api/obs/output", async (HttpRequest request) =>
 
 app.MapPost("/api/obs/output", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var payload = await JsonSerializer.DeserializeAsync<ObsOutputRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.Action)) return Results.BadRequest("action fehlt");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    ObsOutputRequest? payload = await JsonSerializer.DeserializeAsync<ObsOutputRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.Action))
+    {
+        return Results.BadRequest("action fehlt");
+    }
+
     try
     {
-        await using var obs = await ConnectObsAsync(agentSettings);
+        await using ObsWebSocketClient obs = await ConnectObsAsync(agentSettings);
         switch (payload.Action.Trim().ToLowerInvariant())
         {
             case "stream.start": await obs.StartStreamAsync(); break;
@@ -436,15 +609,31 @@ app.MapPost("/api/obs/output", async (HttpRequest request) =>
 
 app.MapPost("/api/obs/transition", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var payload = await JsonSerializer.DeserializeAsync<ObsTransitionRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.TransitionName)) return Results.BadRequest("transitionName fehlt");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    ObsTransitionRequest? payload = await JsonSerializer.DeserializeAsync<ObsTransitionRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.TransitionName))
+    {
+        return Results.BadRequest("transitionName fehlt");
+    }
+
     try
     {
-        await using var obs = await ConnectObsAsync(agentSettings);
+        await using ObsWebSocketClient obs = await ConnectObsAsync(agentSettings);
         await obs.SetCurrentSceneTransitionAsync(payload.TransitionName);
-        if (payload.DurationMilliseconds is > 0 and <= 20000) await obs.SetCurrentSceneTransitionDurationAsync(payload.DurationMilliseconds);
+        if (payload.DurationMilliseconds is > 0 and <= 20000)
+        {
+            await obs.SetCurrentSceneTransitionDurationAsync(payload.DurationMilliseconds);
+        }
+
         return Results.Ok(new { accepted = true, transitionName = payload.TransitionName, durationMilliseconds = payload.DurationMilliseconds });
     }
     catch (Exception ex) { return Results.Problem(ex.Message); }
@@ -452,13 +641,21 @@ app.MapPost("/api/obs/transition", async (HttpRequest request) =>
 
 app.MapGet("/api/obs/preview", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("obs.control", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
     try
     {
-        await using var obs = await ConnectObsAsync(agentSettings);
-        var scene = await obs.GetCurrentProgramSceneAsync();
-        var image = await obs.GetSourceScreenshotAsync(scene, 640, 360);
+        await using ObsWebSocketClient obs = await ConnectObsAsync(agentSettings);
+        string scene = await obs.GetCurrentProgramSceneAsync();
+        byte[] image = await obs.GetSourceScreenshotAsync(scene, 640, 360);
         return Results.File(image, "image/png");
     }
     catch (Exception ex) { return Results.Problem(ex.Message); }
@@ -466,26 +663,50 @@ app.MapGet("/api/obs/preview", async (HttpRequest request) =>
 
 app.MapGet("/api/logs", (HttpRequest request, int? lines) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    var take = Math.Clamp(lines ?? 200, 20, 2000);
-    if (!File.Exists(agentLogPath)) return Results.Ok(Array.Empty<string>());
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    int take = Math.Clamp(lines ?? 200, 20, 2000);
+    if (!File.Exists(agentLogPath))
+    {
+        return Results.Ok(Array.Empty<string>());
+    }
+
     return Results.Ok(File.ReadLines(agentLogPath).TakeLast(take).ToArray());
 });
 
 app.MapPost("/api/overlay/deploy", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("files.deploy", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var payload = await JsonSerializer.DeserializeAsync<FileDeployRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.Base64Zip)) return Results.BadRequest("ZIP-Daten fehlen");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("files.deploy", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    FileDeployRequest? payload = await JsonSerializer.DeserializeAsync<FileDeployRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.Base64Zip))
+    {
+        return Results.BadRequest("ZIP-Daten fehlen");
+    }
+
     try
     {
-        var target = string.IsNullOrWhiteSpace(agentSettings.OverlayDirectory)
+        string target = string.IsNullOrWhiteSpace(agentSettings.OverlayDirectory)
             ? Path.Combine(dataDirectory, "Overlays") : Path.GetFullPath(agentSettings.OverlayDirectory);
         Directory.CreateDirectory(target);
-        var backup = Path.Combine(dataDirectory, "overlay-backups", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
-        if (Directory.Exists(target) && Directory.EnumerateFileSystemEntries(target).Any()) CopyDirectory(target, backup);
-        var temp = Path.Combine(dataDirectory, "overlay-upload.zip");
+        string backup = Path.Combine(dataDirectory, "overlay-backups", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+        if (Directory.Exists(target) && Directory.EnumerateFileSystemEntries(target).Any())
+        {
+            CopyDirectory(target, backup);
+        }
+
+        string temp = Path.Combine(dataDirectory, "overlay-upload.zip");
         await File.WriteAllBytesAsync(temp, Convert.FromBase64String(payload.Base64Zip));
         SafeExtractZip(temp, target);
         File.Delete(temp);
@@ -497,26 +718,38 @@ app.MapPost("/api/overlay/deploy", async (HttpRequest request) =>
 
 app.MapPost("/api/update/stage", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("updates.stage", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var payload = await JsonSerializer.DeserializeAsync<FileDeployRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.Base64Zip)) return Results.BadRequest("Update-Daten fehlen");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("updates.stage", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    FileDeployRequest? payload = await JsonSerializer.DeserializeAsync<FileDeployRequest>(request.Body);
+    if (payload is null || string.IsNullOrWhiteSpace(payload.Base64Zip))
+    {
+        return Results.BadRequest("Update-Daten fehlen");
+    }
+
     try
     {
-        var target = string.IsNullOrWhiteSpace(agentSettings.UpdateStagingDirectory)
+        string target = string.IsNullOrWhiteSpace(agentSettings.UpdateStagingDirectory)
             ? Path.Combine(dataDirectory, "Updates", DateTime.Now.ToString("yyyyMMdd-HHmmss"))
             : Path.Combine(Path.GetFullPath(agentSettings.UpdateStagingDirectory), DateTime.Now.ToString("yyyyMMdd-HHmmss"));
         Directory.CreateDirectory(target);
-        var zipPath = Path.Combine(target, Path.GetFileName(payload.FileName ?? "update.zip"));
+        string zipPath = Path.Combine(target, Path.GetFileName(payload.FileName ?? "update.zip"));
         await File.WriteAllBytesAsync(zipPath, Convert.FromBase64String(payload.Base64Zip));
-        var packageDirectory = Path.Combine(target, "package");
+        string packageDirectory = Path.Combine(target, "package");
         SafeExtractZip(zipPath, packageDirectory);
-        var checksum = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(zipPath)));
-        var files = Directory.EnumerateFiles(packageDirectory, "*", SearchOption.AllDirectories).ToArray();
-        var fileCount = files.Length;
-        var packageVersion = DetectPackageVersion(packageDirectory);
-        var manifestPayload = $"{payload.FileName}|{checksum}|{fileCount}|{packageVersion}|{agentVersion}";
-        var manifestSignature = Convert.ToHexString(HMACSHA256.HashData(Convert.FromHexString(agentKey), System.Text.Encoding.UTF8.GetBytes(manifestPayload)));
+        string checksum = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(zipPath)));
+        string[] files = [.. Directory.EnumerateFiles(packageDirectory, "*", SearchOption.AllDirectories)];
+        int fileCount = files.Length;
+        string packageVersion = DetectPackageVersion(packageDirectory);
+        string manifestPayload = $"{payload.FileName}|{checksum}|{fileCount}|{packageVersion}|{agentVersion}";
+        string manifestSignature = Convert.ToHexString(HMACSHA256.HashData(Convert.FromHexString(agentKey), System.Text.Encoding.UTF8.GetBytes(manifestPayload)));
         var state = new AgentUpdateState("staged", payload.FileName ?? "update.zip", target, packageDirectory, "", DateTimeOffset.Now, null, "Update wurde bereitgestellt und mit dem Agent-Schlüssel signiert.", checksum, fileCount, false, false, null, packageVersion, agentVersion, manifestSignature, false);
         SaveUpdateState(updateStatePath, state);
         AppendUpdateHistory(updateHistoryPath, new AgentUpdateHistoryEntry(DateTimeOffset.Now, "stage", packageVersion, checksum, true, "Update bereitgestellt"));
@@ -528,33 +761,53 @@ app.MapPost("/api/update/stage", async (HttpRequest request) =>
 
 app.MapGet("/api/update/status", (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
     return Results.Ok(LoadUpdateState(updateStatePath));
 });
 
 app.MapGet("/api/update/history", (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
     return Results.Ok(LoadUpdateHistory(updateHistoryPath).OrderByDescending(entry => entry.At).Take(100));
 });
 
 app.MapPost("/api/update/validate", (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("updates.apply", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var state = LoadUpdateState(updateStatePath);
-    if (!Directory.Exists(state.PackageDirectory)) return Results.BadRequest("Kein Update-Paket vorhanden.");
-    var files = Directory.EnumerateFiles(state.PackageDirectory, "*", SearchOption.AllDirectories).ToArray();
-    var hasExecutable = files.Any(path => path.EndsWith("CreatorControlSuite.App.exe", StringComparison.OrdinalIgnoreCase));
-    var manifestPayload = $"{state.PackageName}|{state.Sha256}|{state.FileCount}|{state.PackageVersion}|{state.MinimumAgentVersion}";
-    var expectedSignature = Convert.ToHexString(HMACSHA256.HashData(Convert.FromHexString(agentKey), System.Text.Encoding.UTF8.GetBytes(manifestPayload)));
-    var signatureValid = !string.IsNullOrWhiteSpace(state.ManifestSignature) && CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expectedSignature), Convert.FromHexString(state.ManifestSignature));
-    var compatible = IsCompatibleVersion(agentVersion, state.MinimumAgentVersion);
-    var valid = files.Length > 0 && hasExecutable && signatureValid && compatible;
-    var message = valid
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("updates.apply", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    AgentUpdateState state = LoadUpdateState(updateStatePath);
+    if (!Directory.Exists(state.PackageDirectory))
+    {
+        return Results.BadRequest("Kein Update-Paket vorhanden.");
+    }
+
+    string[] files = [.. Directory.EnumerateFiles(state.PackageDirectory, "*", SearchOption.AllDirectories)];
+    bool hasExecutable = files.Any(path => path.EndsWith("CreatorControlSuite.App.exe", StringComparison.OrdinalIgnoreCase));
+    string manifestPayload = $"{state.PackageName}|{state.Sha256}|{state.FileCount}|{state.PackageVersion}|{state.MinimumAgentVersion}";
+    string expectedSignature = Convert.ToHexString(HMACSHA256.HashData(Convert.FromHexString(agentKey), System.Text.Encoding.UTF8.GetBytes(manifestPayload)));
+    bool signatureValid = !string.IsNullOrWhiteSpace(state.ManifestSignature) && CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expectedSignature), Convert.FromHexString(state.ManifestSignature));
+    bool compatible = IsCompatibleVersion(agentVersion, state.MinimumAgentVersion);
+    bool valid = files.Length > 0 && hasExecutable && signatureValid && compatible;
+    string message = valid
         ? $"Paket geprüft: {files.Length} Dateien, Version {state.PackageVersion}, Manifest-Signatur gültig und Agent kompatibel."
         : $"Paketprüfung fehlgeschlagen: Programm={hasExecutable}, Signatur={signatureValid}, kompatibel={compatible}.";
-    var updated = state with { Status = valid ? "validated" : "invalid", FileCount = files.Length, Validated = valid, Message = message, SignatureValid = signatureValid };
+    AgentUpdateState updated = state with { Status = valid ? "validated" : "invalid", FileCount = files.Length, Validated = valid, Message = message, SignatureValid = signatureValid };
     SaveUpdateState(updateStatePath, updated);
     AppendUpdateHistory(updateHistoryPath, new AgentUpdateHistoryEntry(DateTimeOffset.Now, "validate", state.PackageVersion, state.Sha256, valid, message));
     AppendAgentLog(agentLogPath, message);
@@ -563,28 +816,39 @@ app.MapPost("/api/update/validate", (HttpRequest request) =>
 
 app.MapPost("/api/update/apply", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("updates.apply", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var payload = await JsonSerializer.DeserializeAsync<UpdateApplyRequest>(request.Body) ?? new UpdateApplyRequest(false, true);
-    var state = LoadUpdateState(updateStatePath);
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("updates.apply", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    UpdateApplyRequest payload = await JsonSerializer.DeserializeAsync<UpdateApplyRequest>(request.Body) ?? new UpdateApplyRequest(false, true);
+    AgentUpdateState state = LoadUpdateState(updateStatePath);
     if (!(string.Equals(state.Status, "staged", StringComparison.OrdinalIgnoreCase) || string.Equals(state.Status, "validated", StringComparison.OrdinalIgnoreCase)) || !Directory.Exists(state.PackageDirectory))
+    {
         return Results.BadRequest("Es ist kein anwendbares Update bereitgestellt.");
+    }
+
     try
     {
-        var installDirectory = string.IsNullOrWhiteSpace(agentSettings.SuiteInstallDirectory) ? AppContext.BaseDirectory : Path.GetFullPath(agentSettings.SuiteInstallDirectory);
-        var executable = string.IsNullOrWhiteSpace(agentSettings.SuiteExecutablePath) ? Path.Combine(installDirectory, "CreatorControlSuite.App.exe") : Path.GetFullPath(agentSettings.SuiteExecutablePath);
-        var backupDirectory = Path.Combine(dataDirectory, "update-backups", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+        string installDirectory = string.IsNullOrWhiteSpace(agentSettings.SuiteInstallDirectory) ? AppContext.BaseDirectory : Path.GetFullPath(agentSettings.SuiteInstallDirectory);
+        string executable = string.IsNullOrWhiteSpace(agentSettings.SuiteExecutablePath) ? Path.Combine(installDirectory, "CreatorControlSuite.App.exe") : Path.GetFullPath(agentSettings.SuiteExecutablePath);
+        string backupDirectory = Path.Combine(dataDirectory, "update-backups", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
         Directory.CreateDirectory(Path.GetDirectoryName(backupDirectory)!);
         CopyDirectory(installDirectory, backupDirectory, path => !path.Contains(Path.Combine("Agent", "Updates"), StringComparison.OrdinalIgnoreCase));
-        var scriptPath = Path.Combine(dataDirectory, "apply-update-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".cmd");
-        var processName = Path.GetFileNameWithoutExtension(executable);
-        var restartLine = payload.RestartSuite ? $"if exist \"{executable}\" start \"\" \"{executable}\"" : "rem Suite-Neustart nicht angefordert";
-        var resultPath = Path.Combine(dataDirectory, "last-update-result.txt");
-        var healthBlock = payload.RestartSuite && payload.AutomaticRollback
+        string scriptPath = Path.Combine(dataDirectory, "apply-update-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".cmd");
+        string processName = Path.GetFileNameWithoutExtension(executable);
+        string restartLine = payload.RestartSuite ? $"if exist \"{executable}\" start \"\" \"{executable}\"" : "rem Suite-Neustart nicht angefordert";
+        string resultPath = Path.Combine(dataDirectory, "last-update-result.txt");
+        string healthBlock = payload.RestartSuite && payload.AutomaticRollback
             ? $"timeout /t 15 /nobreak >nul\r\ntasklist /FI \"IMAGENAME eq {processName}.exe\" | find /I \"{processName}.exe\" >nul\r\nif errorlevel 1 (\r\n  robocopy \"{backupDirectory}\" \"{installDirectory}\" /E /R:2 /W:1 /NFL /NDL /NJH /NJS\r\n  if exist \"{executable}\" start \"\" \"{executable}\"\r\n  echo automatic-rollback>\"{resultPath}\"\r\n) else (echo healthy>\"{resultPath}\")"
             : $"echo applied>\"{resultPath}\"";
         File.WriteAllText(maintenancePath, DateTimeOffset.Now.ToString("O"));
-        var script = $"@echo off\r\ntimeout /t 3 /nobreak >nul\r\nrobocopy \"{state.PackageDirectory}\" \"{installDirectory}\" /E /R:2 /W:1 /NFL /NDL /NJH /NJS\r\n{restartLine}\r\n{healthBlock}\r\ndel /q \"{maintenancePath}\" 2>nul\r\n";
+        string script = $"@echo off\r\ntimeout /t 3 /nobreak >nul\r\nrobocopy \"{state.PackageDirectory}\" \"{installDirectory}\" /E /R:2 /W:1 /NFL /NDL /NJH /NJS\r\n{restartLine}\r\n{healthBlock}\r\ndel /q \"{maintenancePath}\" 2>nul\r\n";
         await File.WriteAllTextAsync(scriptPath, script);
         SaveUpdateState(updateStatePath, state with { Status = "applying", BackupDirectory = backupDirectory, AppliedAt = DateTimeOffset.Now, Message = "Update wird im Wartungsmodus angewendet; anschließend folgt der Health-Check.", MaintenanceMode = true, AutomaticRollback = payload.AutomaticRollback });
         AppendUpdateHistory(updateHistoryPath, new AgentUpdateHistoryEntry(DateTimeOffset.Now, "apply", state.PackageVersion, state.Sha256, true, "Update-Anwendung gestartet"));
@@ -598,16 +862,28 @@ app.MapPost("/api/update/apply", async (HttpRequest request) =>
 
 app.MapPost("/api/update/rollback", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    if (!permissions.AllowedCommands.Contains("updates.apply", StringComparer.OrdinalIgnoreCase)) return Results.StatusCode(StatusCodes.Status403Forbidden);
-    var state = LoadUpdateState(updateStatePath);
-    if (string.IsNullOrWhiteSpace(state.BackupDirectory) || !Directory.Exists(state.BackupDirectory)) return Results.BadRequest("Kein Rollback-Backup verfügbar.");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!permissions.AllowedCommands.Contains("updates.apply", StringComparer.OrdinalIgnoreCase))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    AgentUpdateState state = LoadUpdateState(updateStatePath);
+    if (string.IsNullOrWhiteSpace(state.BackupDirectory) || !Directory.Exists(state.BackupDirectory))
+    {
+        return Results.BadRequest("Kein Rollback-Backup verfügbar.");
+    }
+
     try
     {
-        var installDirectory = string.IsNullOrWhiteSpace(agentSettings.SuiteInstallDirectory) ? AppContext.BaseDirectory : Path.GetFullPath(agentSettings.SuiteInstallDirectory);
-        var executable = string.IsNullOrWhiteSpace(agentSettings.SuiteExecutablePath) ? Path.Combine(installDirectory, "CreatorControlSuite.App.exe") : Path.GetFullPath(agentSettings.SuiteExecutablePath);
-        var scriptPath = Path.Combine(dataDirectory, "rollback-update-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".cmd");
-        var script = $"@echo off\r\ntimeout /t 3 /nobreak >nul\r\nrobocopy \"{state.BackupDirectory}\" \"{installDirectory}\" /E /R:2 /W:1 /NFL /NDL /NJH /NJS\r\nif exist \"{executable}\" start \"\" \"{executable}\"\r\n";
+        string installDirectory = string.IsNullOrWhiteSpace(agentSettings.SuiteInstallDirectory) ? AppContext.BaseDirectory : Path.GetFullPath(agentSettings.SuiteInstallDirectory);
+        string executable = string.IsNullOrWhiteSpace(agentSettings.SuiteExecutablePath) ? Path.Combine(installDirectory, "CreatorControlSuite.App.exe") : Path.GetFullPath(agentSettings.SuiteExecutablePath);
+        string scriptPath = Path.Combine(dataDirectory, "rollback-update-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".cmd");
+        string script = $"@echo off\r\ntimeout /t 3 /nobreak >nul\r\nrobocopy \"{state.BackupDirectory}\" \"{installDirectory}\" /E /R:2 /W:1 /NFL /NDL /NJH /NJS\r\nif exist \"{executable}\" start \"\" \"{executable}\"\r\n";
         await File.WriteAllTextAsync(scriptPath, script);
         SaveUpdateState(updateStatePath, state with { Status = "rolling-back", AppliedAt = DateTimeOffset.Now, Message = "Rollback wird angewendet." });
         AppendUpdateHistory(updateHistoryPath, new AgentUpdateHistoryEntry(DateTimeOffset.Now, "rollback", state.PackageVersion, state.Sha256, true, "Rollback gestartet"));
@@ -621,9 +897,17 @@ app.MapPost("/api/update/rollback", async (HttpRequest request) =>
 
 app.MapPost("/api/settings", async (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
-    var updated = await JsonSerializer.DeserializeAsync<AgentSettings>(request.Body);
-    if (updated is null || updated.ObsWebSocketPort is <= 0 or > 65535) return Results.BadRequest("Ungültige Einstellungen");
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    AgentSettings? updated = await JsonSerializer.DeserializeAsync<AgentSettings>(request.Body);
+    if (updated is null || updated.ObsWebSocketPort is <= 0 or > 65535)
+    {
+        return Results.BadRequest("Ungültige Einstellungen");
+    }
+
     agentSettings = updated;
     File.WriteAllText(settingsPath, JsonSerializer.Serialize(agentSettings, new JsonSerializerOptions { WriteIndented = true }));
     return Results.Ok(new { saved = true });
@@ -631,7 +915,11 @@ app.MapPost("/api/settings", async (HttpRequest request) =>
 
 app.MapGet("/api/history", (HttpRequest request) =>
 {
-    if (!Authorized(request)) return Results.Unauthorized();
+    if (!Authorized(request))
+    {
+        return Results.Unauthorized();
+    }
+
     return Results.Ok(commandHistory.Reverse().Take(50).ToArray());
 });
 
@@ -642,13 +930,17 @@ _ = Task.Run(async () =>
     {
         try
         {
-            var received = await udp.ReceiveAsync();
-            if (System.Text.Encoding.UTF8.GetString(received.Buffer) != "CCS_DISCOVER_V1") continue;
-            var mac = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+            System.Net.Sockets.UdpReceiveResult received = await udp.ReceiveAsync();
+            if (System.Text.Encoding.UTF8.GetString(received.Buffer) != "CCS_DISCOVER_V1")
+            {
+                continue;
+            }
+
+            string mac = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
                 .Where(x => x.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && x.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
                 .Select(x => x.GetPhysicalAddress().ToString())
                 .FirstOrDefault(x => x.Length == 12) ?? "";
-            var payload = JsonSerializer.SerializeToUtf8Bytes(new { machineName = Environment.MachineName, host = Environment.MachineName, port = agentPort, version = agentVersion, macAddress = mac });
+            byte[] payload = JsonSerializer.SerializeToUtf8Bytes(new { machineName = Environment.MachineName, host = Environment.MachineName, port = agentPort, version = agentVersion, macAddress = mac });
             await udp.SendAsync(payload, payload.Length, received.RemoteEndPoint);
         }
         catch (Exception ex) { Console.WriteLine("LAN-Erkennung: " + ex.Message); await Task.Delay(1000); }
@@ -674,11 +966,15 @@ static void AppendAgentLog(string path, string message)
 static void CopyDirectory(string source, string destination, Func<string, bool>? include = null)
 {
     Directory.CreateDirectory(destination);
-    foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+    foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
     {
-        var relative = Path.GetRelativePath(source, file);
-        if (include is not null && !include(relative)) continue;
-        var target = Path.Combine(destination, relative);
+        string relative = Path.GetRelativePath(source, file);
+        if (include is not null && !include(relative))
+        {
+            continue;
+        }
+
+        string target = Path.Combine(destination, relative);
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         File.Copy(file, target, true);
     }
@@ -687,7 +983,7 @@ static void CopyDirectory(string source, string destination, Func<string, bool>?
 
 static string DetectPackageVersion(string packageDirectory)
 {
-    var changelog = Directory.EnumerateFiles(packageDirectory, "CHANGELOG-8.0.0-alpha*.md", SearchOption.AllDirectories)
+    string? changelog = Directory.EnumerateFiles(packageDirectory, "CHANGELOG-8.0.0-alpha*.md", SearchOption.AllDirectories)
         .Select(Path.GetFileNameWithoutExtension)
         .OrderByDescending(name => name, StringComparer.OrdinalIgnoreCase)
         .FirstOrDefault();
@@ -696,43 +992,59 @@ static string DetectPackageVersion(string packageDirectory)
 
 static bool IsCompatibleVersion(string currentVersion, string minimumVersion)
 {
-    if (string.IsNullOrWhiteSpace(minimumVersion)) return true;
+    if (string.IsNullOrWhiteSpace(minimumVersion))
+    {
+        return true;
+    }
+
     static int AlphaNumber(string value)
     {
-        var marker = "alpha";
-        var index = value.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        return index >= 0 && int.TryParse(value[(index + marker.Length)..], out var number) ? number : 0;
+        string marker = "alpha";
+        int index = value.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        return index >= 0 && int.TryParse(value[(index + marker.Length)..], out int number) ? number : 0;
     }
     return AlphaNumber(currentVersion) >= AlphaNumber(minimumVersion);
 }
 
 static List<AgentUpdateHistoryEntry> LoadUpdateHistory(string path)
 {
-    if (!File.Exists(path)) return [];
+    if (!File.Exists(path))
+    {
+        return [];
+    }
+
     try { return JsonSerializer.Deserialize<List<AgentUpdateHistoryEntry>>(File.ReadAllText(path)) ?? []; }
     catch { return []; }
 }
 
 static void AppendUpdateHistory(string path, AgentUpdateHistoryEntry entry)
 {
-    var history = LoadUpdateHistory(path);
+    List<AgentUpdateHistoryEntry> history = LoadUpdateHistory(path);
     history.Add(entry);
-    if (history.Count > 250) history = history.OrderByDescending(item => item.At).Take(250).ToList();
-    var temp = path + ".tmp";
+    if (history.Count > 250)
+    {
+        history = [.. history.OrderByDescending(item => item.At).Take(250)];
+    }
+
+    string temp = path + ".tmp";
     File.WriteAllText(temp, JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true }));
     File.Move(temp, path, true);
 }
 
 static AgentUpdateState LoadUpdateState(string path)
 {
-    if (!File.Exists(path)) return AgentUpdateState.Empty;
+    if (!File.Exists(path))
+    {
+        return AgentUpdateState.Empty;
+    }
+
     try { return JsonSerializer.Deserialize<AgentUpdateState>(File.ReadAllText(path)) ?? AgentUpdateState.Empty; }
     catch { return AgentUpdateState.Empty with { Status = "error", Message = "Update-Statusdatei konnte nicht gelesen werden." }; }
 }
 
 static void SaveUpdateState(string path, AgentUpdateState state)
 {
-    var temp = path + ".tmp";
+    string temp = path + ".tmp";
     File.WriteAllText(temp, JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
     File.Move(temp, path, true);
 }
@@ -740,12 +1052,16 @@ static void SaveUpdateState(string path, AgentUpdateState state)
 static void SafeExtractZip(string zipPath, string destination)
 {
     Directory.CreateDirectory(destination);
-    var root = Path.GetFullPath(destination) + Path.DirectorySeparatorChar;
-    using var archive = ZipFile.OpenRead(zipPath);
-    foreach (var entry in archive.Entries)
+    string root = Path.GetFullPath(destination) + Path.DirectorySeparatorChar;
+    using ZipArchive archive = ZipFile.OpenRead(zipPath);
+    foreach (ZipArchiveEntry entry in archive.Entries)
     {
-        var target = Path.GetFullPath(Path.Combine(destination, entry.FullName));
-        if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Unsicherer ZIP-Pfad");
+        string target = Path.GetFullPath(Path.Combine(destination, entry.FullName));
+        if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("Unsicherer ZIP-Pfad");
+        }
+
         if (string.IsNullOrEmpty(entry.Name)) { Directory.CreateDirectory(target); continue; }
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         entry.ExtractToFile(target, true);
@@ -754,7 +1070,7 @@ static void SafeExtractZip(string zipPath, string destination)
 
 static void StartConfigured(string? configuredPath, string fallback)
 {
-    var target = !string.IsNullOrWhiteSpace(configuredPath) && File.Exists(configuredPath) ? configuredPath : fallback;
+    string target = !string.IsNullOrWhiteSpace(configuredPath) && File.Exists(configuredPath) ? configuredPath : fallback;
     Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
 }
 
@@ -773,28 +1089,36 @@ static string NewPairingCode() => Random.Shared.Next(100000, 1000000).ToString(S
 
 static X509Certificate2 LoadOrCreateCertificate(string path)
 {
-    if (File.Exists(path)) return X509CertificateLoader.LoadPkcs12FromFile(path, null, X509KeyStorageFlags.Exportable);
+    if (File.Exists(path))
+    {
+        return X509CertificateLoader.LoadPkcs12FromFile(path, null, X509KeyStorageFlags.Exportable);
+    }
+
     using var rsa = RSA.Create(3072);
     var request = new CertificateRequest("CN=CreatorControlSuite.Agent", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
     request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
     request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, false));
     request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
-    using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(5));
-    var bytes = generated.Export(X509ContentType.Pfx);
+    using X509Certificate2 generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(5));
+    byte[] bytes = generated.Export(X509ContentType.Pfx);
     File.WriteAllBytes(path, bytes);
     return X509CertificateLoader.LoadPkcs12(bytes, null, X509KeyStorageFlags.Exportable);
 }
 
 static List<ObsRemotePreset> LoadObsPresets(string path)
 {
-    if (!File.Exists(path)) return [];
+    if (!File.Exists(path))
+    {
+        return [];
+    }
+
     try { return JsonSerializer.Deserialize<List<ObsRemotePreset>>(File.ReadAllText(path)) ?? []; }
     catch { return []; }
 }
 
 static void SaveObsPresets(string path, List<ObsRemotePreset> presets)
 {
-    var tempPath = path + ".tmp";
+    string tempPath = path + ".tmp";
     File.WriteAllText(tempPath, JsonSerializer.Serialize(presets, new JsonSerializerOptions { WriteIndented = true }));
     File.Move(tempPath, path, true);
 }
@@ -806,7 +1130,7 @@ static AgentPermissions LoadPermissions(string path)
         try { return JsonSerializer.Deserialize<AgentPermissions>(File.ReadAllText(path)) ?? AgentPermissions.Default; }
         catch { }
     }
-    var defaults = AgentPermissions.Default;
+    AgentPermissions defaults = AgentPermissions.Default;
     File.WriteAllText(path, JsonSerializer.Serialize(defaults, new JsonSerializerOptions { WriteIndented = true }));
     return defaults;
 }
@@ -824,8 +1148,8 @@ internal sealed record ObsPresetAudio(string Name, bool Muted, double VolumeDb);
 internal sealed record ObsPresetSceneItem(string SourceName, bool Enabled);
 internal sealed record ObsRemotePreset(string Name, DateTimeOffset CreatedAt, string ProfileName, string SceneCollectionName, string CurrentScene, ObsPresetAudio[] AudioInputs, ObsPresetSceneItem[] SceneItems);
 internal sealed record ObsVolumeFadeRequest(string InputName, double TargetVolumeDb, int DurationMilliseconds);
-sealed record ObsOutputRequest(string Action);
-sealed record ObsTransitionRequest(string TransitionName, int DurationMilliseconds);
+internal sealed record ObsOutputRequest(string Action);
+internal sealed record ObsTransitionRequest(string TransitionName, int DurationMilliseconds);
 internal sealed record AgentPermissions(string[] AllowedCommands)
 {
     public static AgentPermissions Default { get; } = new(["obs.start", "obs.stop", "obs.control", "spotify.playpause", "streamerbot.start", "files.deploy", "updates.stage", "updates.apply"]);

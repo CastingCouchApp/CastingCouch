@@ -1,9 +1,9 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using CreatorControlSuite.Core.Music;
 
 namespace CreatorControlSuite.Core.Configuration;
 
-public sealed class JsonSettingsStore : ISettingsStore
+public sealed class JsonSettingsStore(string path) : ISettingsStore
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -11,13 +11,8 @@ public sealed class JsonSettingsStore : ISettingsStore
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly string _path;
+    private readonly string _path = path;
     private readonly SemaphoreSlim _saveLock = new(1, 1);
-
-    public JsonSettingsStore(string path)
-    {
-        _path = path;
-    }
 
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -28,7 +23,7 @@ public sealed class JsonSettingsStore : ISettingsStore
             return defaults;
         }
 
-        await using var stream = File.OpenRead(_path);
+        await using FileStream stream = File.OpenRead(_path);
 
         return EnsureDefaults(await JsonSerializer.DeserializeAsync<AppSettings>(
                    stream,
@@ -47,7 +42,7 @@ public sealed class JsonSettingsStore : ISettingsStore
 
         try
         {
-            var directory = Path.GetDirectoryName(_path);
+            string? directory = Path.GetDirectoryName(_path);
             if (!string.IsNullOrWhiteSpace(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -56,7 +51,7 @@ public sealed class JsonSettingsStore : ISettingsStore
             // Every save receives its own temporary file. Together with the
             // semaphore this prevents concurrent startup events from moving or
             // deleting another save operation's settings.json.tmp file.
-            var operationTempPath = $"{_path}.{Guid.NewGuid():N}.tmp";
+            string operationTempPath = $"{_path}.{Guid.NewGuid():N}.tmp";
             tempPath = operationTempPath;
 
             await using (var stream = new FileStream(
@@ -77,13 +72,13 @@ public sealed class JsonSettingsStore : ISettingsStore
 
             if (File.Exists(_path))
             {
-                var backupPath = _path + ".bak";
+                string backupPath = _path + ".bak";
                 File.Copy(_path, backupPath, overwrite: true);
             }
 
             const int maxAttempts = 5;
 
-            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 try
                 {
@@ -104,18 +99,16 @@ public sealed class JsonSettingsStore : ISettingsStore
             // Last-resort fallback if antivirus or another process repeatedly
             // blocks the atomic rename. The temporary file still belongs only
             // to this save operation.
-            await using (var source = File.OpenRead(operationTempPath))
-            await using (var destination = new FileStream(
+            await using FileStream source = File.OpenRead(operationTempPath);
+            await using var destination = new FileStream(
                              _path,
                              FileMode.Create,
                              FileAccess.Write,
                              FileShare.Read,
                              bufferSize: 4096,
-                             useAsync: true))
-            {
-                await source.CopyToAsync(destination, cancellationToken);
-                await destination.FlushAsync(cancellationToken);
-            }
+                             useAsync: true);
+            await source.CopyToAsync(destination, cancellationToken);
+            await destination.FlushAsync(cancellationToken);
         }
         finally
         {
@@ -157,14 +150,23 @@ public sealed class JsonSettingsStore : ISettingsStore
         settings.Updates ??= new UpdateSettings();
 
         if (string.IsNullOrWhiteSpace(settings.MusicPlayer.ProviderId))
+        {
             settings.MusicPlayer.ProviderId = MusicProviderIds.Spotify;
+        }
         else
+        {
             settings.MusicPlayer.ProviderId = MusicProviderIds.Normalize(settings.MusicPlayer.ProviderId);
+        }
 
         if (settings.YouTubeMusic.BridgePort is <= 0 or > 65535)
+        {
             settings.YouTubeMusic.BridgePort = 43831;
+        }
+
         if (settings.YouTubeMusic.StateTimeoutSeconds is <= 0)
+        {
             settings.YouTubeMusic.StateTimeoutSeconds = 12;
+        }
 
         return settings;
     }

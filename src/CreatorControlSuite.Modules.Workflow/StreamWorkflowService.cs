@@ -2,24 +2,30 @@ using System.Text.Json;
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Modules.Alerts;
 using CreatorControlSuite.Modules.OBS;
+using CreatorControlSuite.Modules.OBS.Models;
 using CreatorControlSuite.Modules.Overlay;
 using CreatorControlSuite.Modules.Spotify;
 using CreatorControlSuite.Modules.Workflow.Models;
 
 namespace CreatorControlSuite.Modules.Workflow;
 
-public sealed class StreamWorkflowService : IStreamWorkflowService
+public sealed class StreamWorkflowService(
+    ISettingsStore settingsStore,
+    IObsWebSocketClient obsClient,
+    SpotifyModule spotify,
+    AlertsModule alerts,
+    IOverlayDataService overlay) : IStreamWorkflowService
 {
-    private readonly ISettingsStore _settingsStore;
-    private readonly IObsWebSocketClient _obsClient;
-    private readonly SpotifyModule _spotify;
-    private readonly AlertsModule _alerts;
-    private readonly IOverlayDataService _overlay;
+    private readonly ISettingsStore _settingsStore = settingsStore;
+    private readonly IObsWebSocketClient _obsClient = obsClient;
+    private readonly SpotifyModule _spotify = spotify;
+    private readonly AlertsModule _alerts = alerts;
+    private readonly IOverlayDataService _overlay = overlay;
     private readonly SemaphoreSlim _transitionLock = new(1, 1);
 
     private CancellationTokenSource? _countdownCancellation;
-    private WorkflowState _state =
-        new(
+
+    public WorkflowState State { get; private set; } = new(
             StreamPhase.Idle,
             null,
             null,
@@ -27,22 +33,6 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
             0,
             "",
             "Bereit");
-
-    public StreamWorkflowService(
-        ISettingsStore settingsStore,
-        IObsWebSocketClient obsClient,
-        SpotifyModule spotify,
-        AlertsModule alerts,
-        IOverlayDataService overlay)
-    {
-        _settingsStore = settingsStore;
-        _obsClient = obsClient;
-        _spotify = spotify;
-        _alerts = alerts;
-        _overlay = overlay;
-    }
-
-    public WorkflowState State => _state;
     public StreamSessionStats SessionStats { get; } = new();
 
     public event EventHandler<WorkflowState>? StateChanged;
@@ -106,7 +96,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
         const int maximumAttempts = 15;
         Exception? lastException = null;
 
-        for (var attempt = 1; attempt <= maximumAttempts; attempt++)
+        for (int attempt = 1; attempt <= maximumAttempts; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -136,7 +126,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
 
     private static bool IsObsStartupNotReadyException(Exception exception)
     {
-        var message = exception.ToString();
+        string message = exception.ToString();
         return message.Contains("not ready to perform the request", StringComparison.OrdinalIgnoreCase)
             || message.Contains("fehlgeschlagen (207)", StringComparison.OrdinalIgnoreCase)
             || message.Contains("request code 207", StringComparison.OrdinalIgnoreCase);
@@ -145,7 +135,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
     public async Task StartCountdownAsync(
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
 
         _countdownCancellation?.Cancel();
         _countdownCancellation =
@@ -158,20 +148,20 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
             settings.Obs.StartScene,
             settings.Workflow.StartCountdownSeconds);
 
-        for (var remaining = settings.Workflow.StartCountdownSeconds;
+        for (int remaining = settings.Workflow.StartCountdownSeconds;
              remaining >= 0;
              remaining--)
         {
             _countdownCancellation.Token.ThrowIfCancellationRequested();
 
-            _state = _state with
+            State = State with
             {
                 Phase = StreamPhase.Countdown,
                 CountdownRemainingSeconds = remaining,
                 Detail = "Countdown läuft."
             };
 
-            StateChanged?.Invoke(this, _state);
+            StateChanged?.Invoke(this, State);
 
             await _overlay.UpdateAsync(
                 data =>
@@ -208,7 +198,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
                 if (settings.Workflow.AutoStartObsStream &&
                     _obsClient.IsConnected)
                 {
-                    var stream = await _obsClient.GetStreamStatusAsync(
+                    ObsStreamStatus stream = await _obsClient.GetStreamStatusAsync(
                         cancellationToken);
 
                     if (!stream.OutputActive)
@@ -243,8 +233,8 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
                     }
                 }
 
-                var liveStartedAt = DateTimeOffset.Now;
-                _state = _state with
+                DateTimeOffset liveStartedAt = DateTimeOffset.Now;
+                State = State with
                 {
                     Phase = StreamPhase.Live,
                     LiveStartedAt = liveStartedAt,
@@ -266,7 +256,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
                     },
                     cancellationToken);
 
-                StateChanged?.Invoke(this, _state);
+                StateChanged?.Invoke(this, State);
             },
             cancellationToken);
     }
@@ -338,7 +328,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
                     "Stream wird beendet.",
                     settings.Obs.EndScene);
 
-                var endedAt = DateTimeOffset.Now;
+                DateTimeOffset endedAt = DateTimeOffset.Now;
                 await FinalizeSessionStatsAsync(endedAt, cancellationToken);
 
                 if (settings.Workflow.AutoSwitchScenes &&
@@ -357,7 +347,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
                 if (settings.Workflow.AutoStopObsStream &&
                     _obsClient.IsConnected)
                 {
-                    var stream = await _obsClient.GetStreamStatusAsync(
+                    ObsStreamStatus stream = await _obsClient.GetStreamStatusAsync(
                         cancellationToken);
 
                     if (stream.OutputActive)
@@ -559,7 +549,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
 
         try
         {
-            var settings = await _settingsStore.LoadAsync(
+            AppSettings settings = await _settingsStore.LoadAsync(
                 cancellationToken);
 
             await transition(settings);
@@ -627,7 +617,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
     private async Task ExportSessionReportAsync(
         CancellationToken cancellationToken)
     {
-        var dataRoot = Path.Combine(
+        string dataRoot = Path.Combine(
             Environment.GetFolderPath(
                 Environment.SpecialFolder.LocalApplicationData),
             "CreatorControlSuite",
@@ -635,7 +625,7 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
 
         Directory.CreateDirectory(dataRoot);
 
-        var path = Path.Combine(
+        string path = Path.Combine(
             dataRoot,
             "session-" +
             DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss") +
@@ -658,17 +648,17 @@ public sealed class StreamWorkflowService : IStreamWorkflowService
         string currentScene = "",
         int countdown = 0)
     {
-        _state = _state with
+        State = State with
         {
             Phase = phase,
             Detail = detail,
             CurrentScene = currentScene,
             CountdownRemainingSeconds = countdown,
             SessionStartedAt =
-                _state.SessionStartedAt
+                State.SessionStartedAt
                 ?? SessionStats.StartedAt
         };
 
-        StateChanged?.Invoke(this, _state);
+        StateChanged?.Invoke(this, State);
     }
 }

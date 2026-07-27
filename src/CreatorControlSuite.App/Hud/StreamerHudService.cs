@@ -35,25 +35,35 @@ public sealed class StreamerHudService
         _window.UpdateLiveStatus(_liveStatus);
         _window.ApplySettings(_settings);
         if (!_window.IsVisible)
+        {
             _window.Show();
+        }
     }
 
     public void ShowPreview(StreamerHudSettings settings)
     {
-        var preview = Clone(settings);
+        StreamerHudSettings preview = Clone(settings);
         preview.Enabled = true;
         Apply(preview, forceShow: true);
     }
 
     public void Hide()
     {
-        if (_window is null) return;
+        if (_window is null)
+        {
+            return;
+        }
+
         _window.Hide();
     }
 
     public void Close()
     {
-        if (_window is null) return;
+        if (_window is null)
+        {
+            return;
+        }
+
         _window.Close();
         _window = null;
     }
@@ -66,12 +76,17 @@ public sealed class StreamerHudService
 
     private void EnsureWindow()
     {
-        if (_window is not null) return;
+        if (_window is not null)
+        {
+            return;
+        }
 
         _window = new StreamerHudWindow();
         _window.Closed += (_, _) => _window = null;
         if (_chatItems is not null && _eventItems is not null)
+        {
             _window.BindSources(_chatItems, _eventItems);
+        }
     }
 
     private static StreamerHudSettings Clone(StreamerHudSettings source) => new()

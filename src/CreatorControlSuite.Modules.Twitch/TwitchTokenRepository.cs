@@ -3,16 +3,11 @@ using CreatorControlSuite.Modules.Twitch.Models;
 
 namespace CreatorControlSuite.Modules.Twitch;
 
-public sealed class TwitchTokenRepository
+public sealed class TwitchTokenRepository(ISecretStore secretStore)
 {
-    private readonly SecretJsonStore<TwitchTokenSet> _store;
-
-    public TwitchTokenRepository(ISecretStore secretStore)
-    {
-        _store = new SecretJsonStore<TwitchTokenSet>(
+    private readonly SecretJsonStore<TwitchTokenSet> _store = new(
             secretStore,
             "twitch.tokenSet");
-    }
 
     public Task SaveAsync(
         TwitchTokenSet tokenSet,

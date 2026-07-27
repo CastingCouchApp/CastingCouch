@@ -58,7 +58,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
         await _socket.ConnectAsync(uri, timeout.Token);
 
-        var helloEnvelope = await ReceiveEnvelopeAsync(_socket, timeout.Token);
+        ObsReceivedEnvelope helloEnvelope = await ReceiveEnvelopeAsync(_socket, timeout.Token);
 
         if (helloEnvelope.Op != HelloOp)
         {
@@ -66,7 +66,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
                 $"OBS sendete beim Verbindungsaufbau Op {helloEnvelope.Op} statt Hello.");
         }
 
-        var hello = helloEnvelope.Data.Deserialize<ObsHello>(JsonOptions)
+        ObsHello hello = helloEnvelope.Data.Deserialize<ObsHello>(JsonOptions)
                     ?? throw new InvalidOperationException(
                         "OBS Hello konnte nicht gelesen werden.");
 
@@ -99,7 +99,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
         await SendJsonAsync(identifyEnvelope, timeout.Token);
 
-        var identifiedEnvelope = await ReceiveEnvelopeAsync(_socket, timeout.Token);
+        ObsReceivedEnvelope identifiedEnvelope = await ReceiveEnvelopeAsync(_socket, timeout.Token);
 
         if (identifiedEnvelope.Op != IdentifiedOp)
         {
@@ -150,7 +150,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
             }
         }
 
-        foreach (var pending in _pendingRequests.Values)
+        foreach (TaskCompletionSource<ObsRequestResponse> pending in _pendingRequests.Values)
         {
             pending.TrySetException(
                 new InvalidOperationException("OBS-Verbindung wurde getrennt."));
@@ -169,7 +169,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
     public async Task<ObsServerInfo> GetVersionAsync(
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetVersion",
             requestData: null,
             cancellationToken);
@@ -185,16 +185,16 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
     public async Task<IReadOnlyList<ObsSceneInfo>> GetSceneListAsync(
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetSceneList",
             requestData: null,
             cancellationToken);
 
         var scenes = new List<ObsSceneInfo>();
 
-        if (data.TryGetProperty("scenes", out var sceneArray))
+        if (data.TryGetProperty("scenes", out JsonElement sceneArray))
         {
-            foreach (var scene in sceneArray.EnumerateArray())
+            foreach (JsonElement scene in sceneArray.EnumerateArray())
             {
                 scenes.Add(new ObsSceneInfo(
                     GetString(scene, "sceneName"),
@@ -202,24 +202,22 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
             }
         }
 
-        return scenes
-            .OrderBy(scene => scene.Index)
-            .ToList();
+        return [.. scenes.OrderBy(scene => scene.Index)];
     }
 
     public async Task<IReadOnlyList<ObsInputInfo>> GetInputListAsync(
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetInputList",
             requestData: null,
             cancellationToken);
 
         var inputs = new List<ObsInputInfo>();
 
-        if (data.TryGetProperty("inputs", out var inputArray))
+        if (data.TryGetProperty("inputs", out JsonElement inputArray))
         {
-            foreach (var input in inputArray.EnumerateArray())
+            foreach (JsonElement input in inputArray.EnumerateArray())
             {
                 inputs.Add(new ObsInputInfo(
                     GetString(input, "inputName"),
@@ -228,23 +226,21 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
             }
         }
 
-        return inputs
-            .OrderBy(input => input.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return [.. inputs.OrderBy(input => input.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
     public async Task<IReadOnlyList<ObsTransitionInfo>> GetSceneTransitionListAsync(
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetSceneTransitionList",
             requestData: null,
             cancellationToken);
 
         var transitions = new List<ObsTransitionInfo>();
-        if (data.TryGetProperty("transitions", out var transitionArray))
+        if (data.TryGetProperty("transitions", out JsonElement transitionArray))
         {
-            foreach (var transition in transitionArray.EnumerateArray())
+            foreach (JsonElement transition in transitionArray.EnumerateArray())
             {
                 transitions.Add(new ObsTransitionInfo(
                     GetString(transition, "transitionName"),
@@ -253,10 +249,9 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
             }
         }
 
-        return transitions
+        return [.. transitions
             .Where(transition => !string.IsNullOrWhiteSpace(transition.Name))
-            .OrderBy(transition => transition.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .OrderBy(transition => transition.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
     public async Task<IReadOnlyList<ObsSceneItemInfo>> GetSceneItemListAsync(
@@ -264,11 +259,11 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
-        var data = await SendRequestAsync("GetSceneItemList", new { sceneName }, cancellationToken);
+        JsonElement data = await SendRequestAsync("GetSceneItemList", new { sceneName }, cancellationToken);
         var items = new List<ObsSceneItemInfo>();
-        if (data.TryGetProperty("sceneItems", out var itemArray))
+        if (data.TryGetProperty("sceneItems", out JsonElement itemArray))
         {
-            foreach (var item in itemArray.EnumerateArray())
+            foreach (JsonElement item in itemArray.EnumerateArray())
             {
                 items.Add(new ObsSceneItemInfo(
                     GetInt32(item, "sceneItemId"), GetInt32(item, "sceneItemIndex"),
@@ -277,19 +272,19 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
                     GetBoolean(item, "isGroup")));
             }
         }
-        return items.OrderByDescending(item => item.Index).ThenBy(item => item.SourceName, StringComparer.OrdinalIgnoreCase).ToList();
+        return [.. items.OrderByDescending(item => item.Index).ThenBy(item => item.SourceName, StringComparer.OrdinalIgnoreCase)];
     }
 
     public async Task<ObsInputAudioState> GetInputAudioStateAsync(
         string inputName,
         CancellationToken cancellationToken = default)
     {
-        var mute = await SendRequestAsync("GetInputMute", new { inputName }, cancellationToken);
-        var volume = await SendRequestAsync("GetInputVolume", new { inputName }, cancellationToken);
+        JsonElement mute = await SendRequestAsync("GetInputMute", new { inputName }, cancellationToken);
+        JsonElement volume = await SendRequestAsync("GetInputVolume", new { inputName }, cancellationToken);
         return new ObsInputAudioState(
             inputName,
             GetBoolean(mute, "inputMuted"),
-            volume.TryGetProperty("inputVolumeDb", out var db) ? db.GetDouble() : 0d);
+            volume.TryGetProperty("inputVolumeDb", out JsonElement db) ? db.GetDouble() : 0d);
     }
 
     public Task SetInputMuteAsync(string inputName, bool muted, CancellationToken cancellationToken = default)
@@ -302,8 +297,8 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         string inputName,
         CancellationToken cancellationToken = default)
     {
-        var monitor = await SendRequestAsync("GetInputAudioMonitorType", new { inputName }, cancellationToken);
-        var sync = await SendRequestAsync("GetInputAudioSyncOffset", new { inputName }, cancellationToken);
+        JsonElement monitor = await SendRequestAsync("GetInputAudioMonitorType", new { inputName }, cancellationToken);
+        JsonElement sync = await SendRequestAsync("GetInputAudioSyncOffset", new { inputName }, cancellationToken);
         return new ObsInputAdvancedAudioState(
             inputName,
             GetString(monitor, "monitorType"),
@@ -319,7 +314,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
     public async Task<string> GetCurrentProgramSceneAsync(
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetCurrentProgramScene",
             requestData: null,
             cancellationToken);
@@ -363,7 +358,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
     public async Task<ObsStreamStatus> GetStreamStatusAsync(
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetStreamStatus",
             requestData: null,
             cancellationToken);
@@ -381,7 +376,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
     public async Task<ObsStats> GetStatsAsync(
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetStats",
             requestData: null,
             cancellationToken);
@@ -418,7 +413,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
     public async Task<ObsOutputStatus> GetRecordStatusAsync(CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync("GetRecordStatus", null, cancellationToken);
+        JsonElement data = await SendRequestAsync("GetRecordStatus", null, cancellationToken);
         return new ObsOutputStatus(GetBoolean(data, "outputActive"), GetBoolean(data, "outputPaused"),
             GetString(data, "outputTimecode"), GetInt64(data, "outputDuration"), GetInt64(data, "outputBytes"));
     }
@@ -434,7 +429,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
     public async Task<ObsOutputStatus> GetReplayBufferStatusAsync(CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync("GetReplayBufferStatus", null, cancellationToken);
+        JsonElement data = await SendRequestAsync("GetReplayBufferStatus", null, cancellationToken);
         return new ObsOutputStatus(GetBoolean(data, "outputActive"), false, string.Empty, 0, 0);
     }
 
@@ -447,7 +442,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
     public async Task<bool> GetVirtualCamStatusAsync(CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync("GetVirtualCamStatus", null, cancellationToken);
+        JsonElement data = await SendRequestAsync("GetVirtualCamStatus", null, cancellationToken);
         return GetBoolean(data, "outputActive");
     }
 
@@ -480,14 +475,17 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         string inputName,
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetInputSettings",
             new { inputName },
             cancellationToken);
         var result = new Dictionary<string, System.Text.Json.JsonElement>(StringComparer.OrdinalIgnoreCase);
-        if (data.TryGetProperty("inputSettings", out var settings) && settings.ValueKind == System.Text.Json.JsonValueKind.Object)
+        if (data.TryGetProperty("inputSettings", out JsonElement settings) && settings.ValueKind == System.Text.Json.JsonValueKind.Object)
         {
-            foreach (var property in settings.EnumerateObject()) result[property.Name] = property.Value.Clone();
+            foreach (JsonProperty property in settings.EnumerateObject())
+            {
+                result[property.Name] = property.Value.Clone();
+            }
         }
         return result;
     }
@@ -520,7 +518,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         string sceneName,
         CancellationToken cancellationToken = default)
     {
-        var scenes = await GetSceneListAsync(cancellationToken);
+        IReadOnlyList<ObsSceneInfo> scenes = await GetSceneListAsync(cancellationToken);
 
         if (scenes.Any(scene =>
                 string.Equals(
@@ -757,7 +755,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         bool enabled,
         CancellationToken cancellationToken = default)
     {
-        var itemId = await GetSceneItemIdAsync(
+        int itemId = await GetSceneItemIdAsync(
             sceneName,
             sourceName,
             cancellationToken);
@@ -779,7 +777,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         bool locked,
         CancellationToken cancellationToken = default)
     {
-        var itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
+        int itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
         await SendRequestAsync(
             "SetSceneItemLocked",
             new { sceneName, sceneItemId = itemId, sceneItemLocked = locked },
@@ -793,9 +791,11 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         CancellationToken cancellationToken = default)
     {
         if (sceneItemIndex < 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(sceneItemIndex));
+        }
 
-        var itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
+        int itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
         await SendRequestAsync(
             "SetSceneItemIndex",
             new { sceneName, sceneItemId = itemId, sceneItemIndex },
@@ -811,7 +811,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         double height,
         CancellationToken cancellationToken = default)
     {
-        var itemId = await GetSceneItemIdAsync(
+        int itemId = await GetSceneItemIdAsync(
             sceneName,
             sourceName,
             cancellationToken);
@@ -840,25 +840,25 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         string sourceName,
         CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetSourceFilterList",
             new { sourceName },
             cancellationToken);
 
         var filters = new List<ObsSourceFilterInfo>();
-        if (data.TryGetProperty("filters", out var filterArray))
+        if (data.TryGetProperty("filters", out JsonElement filterArray))
         {
-            foreach (var filter in filterArray.EnumerateArray())
+            foreach (JsonElement filter in filterArray.EnumerateArray())
             {
                 filters.Add(new ObsSourceFilterInfo(
                     GetString(filter, "filterName"),
                     GetString(filter, "filterKind"),
-                    filter.TryGetProperty("filterEnabled", out var enabledElement) && enabledElement.GetBoolean(),
+                    filter.TryGetProperty("filterEnabled", out JsonElement enabledElement) && enabledElement.GetBoolean(),
                     GetInt32(filter, "filterIndex")));
             }
         }
 
-        return filters.OrderByDescending(filter => filter.Index).ToList();
+        return [.. filters.OrderByDescending(filter => filter.Index)];
     }
 
     public Task SetSourceFilterEnabledAsync(
@@ -878,26 +878,26 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         string sourceName,
         CancellationToken cancellationToken = default)
     {
-        var itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
-        var data = await SendRequestAsync(
+        int itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
+        JsonElement data = await SendRequestAsync(
             "GetSceneItemTransform",
             new { sceneName, sceneItemId = itemId },
             cancellationToken);
 
-        var transform = data.TryGetProperty("sceneItemTransform", out var value) ? value : data;
+        JsonElement transform = data.TryGetProperty("sceneItemTransform", out JsonElement value) ? value : data;
         static double ReadDouble(JsonElement element, string name, double fallback = 0)
-            => element.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.Number
+            => element.TryGetProperty(name, out JsonElement property) && property.ValueKind == JsonValueKind.Number
                 ? property.GetDouble()
                 : fallback;
         static int ReadInt(JsonElement element, string name)
-            => element.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.Number
+            => element.TryGetProperty(name, out JsonElement property) && property.ValueKind == JsonValueKind.Number
                 ? property.GetInt32()
                 : 0;
 
-        var sourceWidth = ReadDouble(transform, "sourceWidth", 1);
-        var sourceHeight = ReadDouble(transform, "sourceHeight", 1);
-        var width = ReadDouble(transform, "width", sourceWidth);
-        var height = ReadDouble(transform, "height", sourceHeight);
+        double sourceWidth = ReadDouble(transform, "sourceWidth", 1);
+        double sourceHeight = ReadDouble(transform, "sourceHeight", 1);
+        double width = ReadDouble(transform, "width", sourceWidth);
+        double height = ReadDouble(transform, "height", sourceHeight);
 
         return new ObsSceneItemTransformInfo(
             ReadDouble(transform, "positionX"),
@@ -916,7 +916,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         string sourceName,
         CancellationToken cancellationToken = default)
     {
-        var itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
+        int itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
         await SendRequestAsync(
             "ResetSceneItemTransform",
             new { sceneName, sceneItemId = itemId },
@@ -937,7 +937,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         int cropBottom,
         CancellationToken cancellationToken = default)
     {
-        var itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
+        int itemId = await GetSceneItemIdAsync(sceneName, sourceName, cancellationToken);
         await SendRequestAsync(
             "SetSceneItemTransform",
             new
@@ -968,7 +968,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         string sourceName,
         CancellationToken cancellationToken)
     {
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetSceneItemId",
             new
             {
@@ -982,27 +982,27 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
     private static int ParseObsColor(string htmlColor)
     {
-        var value = htmlColor.Trim().TrimStart('#');
+        string value = htmlColor.Trim().TrimStart('#');
 
         if (value.Length != 6)
         {
             return 0xFFFFFF;
         }
 
-        var red = Convert.ToInt32(value.Substring(0, 2), 16);
-        var green = Convert.ToInt32(value.Substring(2, 2), 16);
-        var blue = Convert.ToInt32(value.Substring(4, 2), 16);
+        int red = Convert.ToInt32(value[..2], 16);
+        int green = Convert.ToInt32(value.Substring(2, 2), 16);
+        int blue = Convert.ToInt32(value.Substring(4, 2), 16);
 
-        return blue << 16 | green << 8 | red;
+        return (blue << 16) | (green << 8) | red;
     }
 
     public async Task<(string CurrentProfile, IReadOnlyList<string> Profiles)> GetProfileListAsync(CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync("GetProfileList", null, cancellationToken);
-        var current = data.TryGetProperty("currentProfileName", out var currentElement) ? currentElement.GetString() ?? "" : "";
-        var profiles = data.TryGetProperty("profiles", out var listElement)
-            ? listElement.EnumerateArray().Select(x => x.TryGetProperty("profileName", out var n) ? n.GetString() ?? "" : "").Where(x => x.Length > 0).ToArray()
-            : Array.Empty<string>();
+        JsonElement data = await SendRequestAsync("GetProfileList", null, cancellationToken);
+        string current = data.TryGetProperty("currentProfileName", out JsonElement currentElement) ? currentElement.GetString() ?? "" : "";
+        string[] profiles = data.TryGetProperty("profiles", out JsonElement listElement)
+            ? [.. listElement.EnumerateArray().Select(x => x.TryGetProperty("profileName", out JsonElement n) ? n.GetString() ?? "" : "").Where(x => x.Length > 0)]
+            : [];
         return (current, profiles);
     }
 
@@ -1011,11 +1011,11 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
     public async Task<(string CurrentSceneCollection, IReadOnlyList<string> SceneCollections)> GetSceneCollectionListAsync(CancellationToken cancellationToken = default)
     {
-        var data = await SendRequestAsync("GetSceneCollectionList", null, cancellationToken);
-        var current = data.TryGetProperty("currentSceneCollectionName", out var currentElement) ? currentElement.GetString() ?? "" : "";
-        var collections = data.TryGetProperty("sceneCollections", out var listElement)
-            ? listElement.EnumerateArray().Select(x => x.TryGetProperty("sceneCollectionName", out var n) ? n.GetString() ?? "" : "").Where(x => x.Length > 0).ToArray()
-            : Array.Empty<string>();
+        JsonElement data = await SendRequestAsync("GetSceneCollectionList", null, cancellationToken);
+        string current = data.TryGetProperty("currentSceneCollectionName", out JsonElement currentElement) ? currentElement.GetString() ?? "" : "";
+        string[] collections = data.TryGetProperty("sceneCollections", out JsonElement listElement)
+            ? [.. listElement.EnumerateArray().Select(x => x.TryGetProperty("sceneCollectionName", out JsonElement n) ? n.GetString() ?? "" : "").Where(x => x.Length > 0)]
+            : [];
         return (current, collections);
     }
 
@@ -1045,35 +1045,35 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
                 imageCompressionQuality = -1
             };
 
-        var data = await SendRequestAsync(
+        JsonElement data = await SendRequestAsync(
             "GetSourceScreenshot",
             requestData,
             cancellationToken);
 
-        if (!data.TryGetProperty("imageData", out var imageDataElement))
+        if (!data.TryGetProperty("imageData", out JsonElement imageDataElement))
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
-        var imageData = imageDataElement.GetString();
+        string? imageData = imageDataElement.GetString();
         if (string.IsNullOrWhiteSpace(imageData))
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
-        var commaIndex = imageData.IndexOf(',');
-        var base64 = commaIndex >= 0 ? imageData[(commaIndex + 1)..] : imageData;
+        int commaIndex = imageData.IndexOf(',');
+        string base64 = commaIndex >= 0 ? imageData[(commaIndex + 1)..] : imageData;
         return Convert.FromBase64String(base64);
     }
 
     public async Task<ObsSnapshot> GetSnapshotAsync(
         CancellationToken cancellationToken = default)
     {
-        var versionTask = GetVersionAsync(cancellationToken);
-        var scenesTask = GetSceneListAsync(cancellationToken);
-        var inputsTask = GetInputListAsync(cancellationToken);
-        var currentSceneTask = GetCurrentProgramSceneAsync(cancellationToken);
-        var streamTask = GetStreamStatusAsync(cancellationToken);
+        Task<ObsServerInfo> versionTask = GetVersionAsync(cancellationToken);
+        Task<IReadOnlyList<ObsSceneInfo>> scenesTask = GetSceneListAsync(cancellationToken);
+        Task<IReadOnlyList<ObsInputInfo>> inputsTask = GetInputListAsync(cancellationToken);
+        Task<string> currentSceneTask = GetCurrentProgramSceneAsync(cancellationToken);
+        Task<ObsStreamStatus> streamTask = GetStreamStatusAsync(cancellationToken);
 
         await Task.WhenAll(
             versionTask,
@@ -1120,7 +1120,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
                 "OBS ist nicht verbunden.");
         }
 
-        var requestId = Guid.NewGuid().ToString("N");
+        string requestId = Guid.NewGuid().ToString("N");
         var completion = new TaskCompletionSource<ObsRequestResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -1150,7 +1150,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
             timeout.CancelAfter(_requestTimeout);
 
-            var response = await completion.Task.WaitAsync(timeout.Token);
+            ObsRequestResponse response = await completion.Task.WaitAsync(timeout.Token);
 
             if (!response.RequestStatus.Result)
             {
@@ -1172,12 +1172,12 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         object payload,
         CancellationToken cancellationToken)
     {
-        var socket = _socket
+        ClientWebSocket socket = _socket
                      ?? throw new InvalidOperationException(
                          "OBS WebSocket ist nicht initialisiert.");
 
-        var json = JsonSerializer.Serialize(payload, JsonOptions);
-        var bytes = Encoding.UTF8.GetBytes(json);
+        string json = JsonSerializer.Serialize(payload, JsonOptions);
+        byte[] bytes = Encoding.UTF8.GetBytes(json);
 
         await _sendLock.WaitAsync(cancellationToken);
 
@@ -1198,7 +1198,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
     private async Task ReceiveLoopAsync(
         CancellationToken cancellationToken)
     {
-        var socket = _socket
+        ClientWebSocket socket = _socket
                      ?? throw new InvalidOperationException(
                          "OBS WebSocket ist nicht initialisiert.");
 
@@ -1207,28 +1207,28 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
             while (!cancellationToken.IsCancellationRequested &&
                    socket.State == WebSocketState.Open)
             {
-                var envelope = await ReceiveEnvelopeAsync(
+                ObsReceivedEnvelope envelope = await ReceiveEnvelopeAsync(
                     socket,
                     cancellationToken);
 
                 switch (envelope.Op)
                 {
                     case RequestResponseOp:
-                    {
-                        var response =
-                            envelope.Data.Deserialize<ObsRequestResponse>(
-                                JsonOptions);
-
-                        if (response is not null &&
-                            _pendingRequests.TryGetValue(
-                                response.RequestId,
-                                out var completion))
                         {
-                            completion.TrySetResult(response);
-                        }
+                            ObsRequestResponse? response =
+                                envelope.Data.Deserialize<ObsRequestResponse>(
+                                    JsonOptions);
 
-                        break;
-                    }
+                            if (response is not null &&
+                                _pendingRequests.TryGetValue(
+                                    response.RequestId,
+                                    out TaskCompletionSource<ObsRequestResponse>? completion))
+                            {
+                                completion.TrySetResult(response);
+                            }
+
+                            break;
+                        }
 
                     case EventOp:
                         HandleEvent(envelope.Data);
@@ -1241,7 +1241,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         }
         catch (Exception exception)
         {
-            foreach (var pending in _pendingRequests.Values)
+            foreach (TaskCompletionSource<ObsRequestResponse> pending in _pendingRequests.Values)
             {
                 pending.TrySetException(exception);
             }
@@ -1254,13 +1254,13 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
     private void HandleEvent(JsonElement data)
     {
-        if (!data.TryGetProperty("eventType", out var eventTypeElement) ||
-            !data.TryGetProperty("eventData", out var eventData))
+        if (!data.TryGetProperty("eventType", out JsonElement eventTypeElement) ||
+            !data.TryGetProperty("eventData", out JsonElement eventData))
         {
             return;
         }
 
-        var eventType = eventTypeElement.GetString();
+        string? eventType = eventTypeElement.GetString();
 
         if (eventType is "SceneCreated" or "SceneRemoved" or "SceneNameChanged" or "SceneListChanged")
         {
@@ -1276,33 +1276,50 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         }
 
         if (string.Equals(eventType, "InputVolumeMeters", StringComparison.Ordinal) &&
-            eventData.TryGetProperty("inputs", out var meterInputs) &&
+            eventData.TryGetProperty("inputs", out JsonElement meterInputs) &&
             meterInputs.ValueKind == JsonValueKind.Array)
         {
             var meters = new List<ObsInputVolumeMeter>();
-            foreach (var meterInput in meterInputs.EnumerateArray())
+            foreach (JsonElement meterInput in meterInputs.EnumerateArray())
             {
-                var inputName = meterInput.TryGetProperty("inputName", out var nameElement) ? nameElement.GetString() ?? string.Empty : string.Empty;
-                if (string.IsNullOrWhiteSpace(inputName) || !meterInput.TryGetProperty("inputLevelsMul", out var levels) || levels.ValueKind != JsonValueKind.Array)
+                string inputName = meterInput.TryGetProperty("inputName", out JsonElement nameElement) ? nameElement.GetString() ?? string.Empty : string.Empty;
+                if (string.IsNullOrWhiteSpace(inputName) || !meterInput.TryGetProperty("inputLevelsMul", out JsonElement levels) || levels.ValueKind != JsonValueKind.Array)
+                {
                     continue;
+                }
 
                 double magnitude = 0, peak = 0, inputPeak = 0;
-                var channelCount = 0;
-                foreach (var channel in levels.EnumerateArray())
+                int channelCount = 0;
+                foreach (JsonElement channel in levels.EnumerateArray())
                 {
-                    if (channel.ValueKind != JsonValueKind.Array) continue;
-                    var values = channel.EnumerateArray().Select(value => value.GetDouble()).ToArray();
-                    if (values.Length < 3) continue;
+                    if (channel.ValueKind != JsonValueKind.Array)
+                    {
+                        continue;
+                    }
+
+                    double[] values = [.. channel.EnumerateArray().Select(value => value.GetDouble())];
+                    if (values.Length < 3)
+                    {
+                        continue;
+                    }
+
                     magnitude = Math.Max(magnitude, values[0]);
                     peak = Math.Max(peak, values[1]);
                     inputPeak = Math.Max(inputPeak, values[2]);
                     channelCount++;
                 }
-                if (channelCount == 0) continue;
+                if (channelCount == 0)
+                {
+                    continue;
+                }
+
                 static double MulToDb(double value) => value <= 0.000001 ? -60 : Math.Clamp(20 * Math.Log10(value), -60, 10);
                 meters.Add(new ObsInputVolumeMeter(inputName, MulToDb(magnitude), MulToDb(peak), MulToDb(inputPeak)));
             }
-            if (meters.Count > 0) InputVolumeMeters?.Invoke(this, meters);
+            if (meters.Count > 0)
+            {
+                InputVolumeMeters?.Invoke(this, meters);
+            }
         }
 
         if (string.Equals(
@@ -1311,9 +1328,9 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
                 StringComparison.Ordinal) &&
             eventData.TryGetProperty(
                 "sceneName",
-                out var sceneNameElement))
+                out JsonElement sceneNameElement))
         {
-            var sceneName = sceneNameElement.GetString();
+            string? sceneName = sceneNameElement.GetString();
 
             if (!string.IsNullOrWhiteSpace(sceneName))
             {
@@ -1329,11 +1346,11 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         CancellationToken cancellationToken)
     {
         using var stream = new MemoryStream();
-        var buffer = new byte[16 * 1024];
+        byte[] buffer = new byte[16 * 1024];
 
         while (true)
         {
-            var result = await socket.ReceiveAsync(
+            WebSocketReceiveResult result = await socket.ReceiveAsync(
                 buffer,
                 cancellationToken);
 
@@ -1359,14 +1376,14 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
 
         stream.Position = 0;
 
-        using var document = await JsonDocument.ParseAsync(
+        using JsonDocument document = await JsonDocument.ParseAsync(
             stream,
             cancellationToken: cancellationToken);
 
-        var root = document.RootElement;
+        JsonElement root = document.RootElement;
 
-        if (!root.TryGetProperty("op", out var opElement) ||
-            !root.TryGetProperty("d", out var dataElement))
+        if (!root.TryGetProperty("op", out JsonElement opElement) ||
+            !root.TryGetProperty("d", out JsonElement dataElement))
         {
             throw new InvalidOperationException(
                 "Ungültige OBS-WebSocket-Nachricht.");
@@ -1381,7 +1398,7 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         JsonElement element,
         string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var property)
+        return element.TryGetProperty(propertyName, out JsonElement property)
             ? property.GetString() ?? ""
             : "";
     }
@@ -1390,8 +1407,8 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         JsonElement element,
         string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var property) &&
-               property.TryGetInt32(out var value)
+        return element.TryGetProperty(propertyName, out JsonElement property) &&
+               property.TryGetInt32(out int value)
             ? value
             : 0;
     }
@@ -1400,8 +1417,8 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         JsonElement element,
         string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var property) &&
-               property.TryGetInt64(out var value)
+        return element.TryGetProperty(propertyName, out JsonElement property) &&
+               property.TryGetInt64(out long value)
             ? value
             : 0;
     }
@@ -1410,8 +1427,8 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         JsonElement element,
         string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var property) &&
-               property.TryGetDouble(out var value)
+        return element.TryGetProperty(propertyName, out JsonElement property) &&
+               property.TryGetDouble(out double value)
             ? value
             : 0d;
     }
@@ -1420,10 +1437,8 @@ public sealed class ObsWebSocketClient : IObsWebSocketClient
         JsonElement element,
         string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var property) &&
-               property.ValueKind is JsonValueKind.True or JsonValueKind.False
-            ? property.GetBoolean()
-            : false;
+        return element.TryGetProperty(propertyName, out JsonElement property) &&
+               property.ValueKind is JsonValueKind.True or JsonValueKind.False && property.GetBoolean();
     }
 
     private sealed record ObsReceivedEnvelope(

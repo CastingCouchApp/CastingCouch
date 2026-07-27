@@ -111,19 +111,19 @@ csharp_space_between_method_call_name_and_opening_parenthesis = false
 csharp_space_between_method_call_empty_parameter_list_parentheses = false
 
 # Naming — types / non-field members
-dotnet_naming_rule.interfaces_should_be_i_prefixed.severity = suggestion
+dotnet_naming_rule.interfaces_should_be_i_prefixed.severity = silent
 dotnet_naming_rule.interfaces_should_be_i_prefixed.symbols = interface_symbols
 dotnet_naming_rule.interfaces_should_be_i_prefixed.style = begins_with_i
 
-dotnet_naming_rule.types_should_be_pascal_case.severity = suggestion
+dotnet_naming_rule.types_should_be_pascal_case.severity = silent
 dotnet_naming_rule.types_should_be_pascal_case.symbols = type_symbols
 dotnet_naming_rule.types_should_be_pascal_case.style = pascal_case
 
-dotnet_naming_rule.non_field_members_should_be_pascal_case.severity = suggestion
+dotnet_naming_rule.non_field_members_should_be_pascal_case.severity = silent
 dotnet_naming_rule.non_field_members_should_be_pascal_case.symbols = non_field_symbols
 dotnet_naming_rule.non_field_members_should_be_pascal_case.style = pascal_case
 
-dotnet_naming_rule.private_fields_should_be_underscore_camel.severity = suggestion
+dotnet_naming_rule.private_fields_should_be_underscore_camel.severity = silent
 dotnet_naming_rule.private_fields_should_be_underscore_camel.symbols = private_field_symbols
 dotnet_naming_rule.private_fields_should_be_underscore_camel.style = underscore_camel
 

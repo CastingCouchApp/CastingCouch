@@ -10,28 +10,23 @@ namespace CreatorControlSuite.App.Services;
 /// Bridges domain service events onto the application <see cref="IEventBus"/>.
 /// Started once after host construction (App startup or MainWindow ctor).
 /// </summary>
-public sealed class AppEventBridge : IDisposable
+public sealed class AppEventBridge(
+    IEventBus eventBus,
+    IStreamWorkflowService workflow,
+    IMusicPlayerRouter musicRouter) : IDisposable
 {
-    private readonly IEventBus _eventBus;
-    private readonly IStreamWorkflowService _workflow;
-    private readonly IMusicPlayerRouter _musicRouter;
+    private readonly IEventBus _eventBus = eventBus;
+    private readonly IStreamWorkflowService _workflow = workflow;
+    private readonly IMusicPlayerRouter _musicRouter = musicRouter;
     private bool _started;
     private bool _disposed;
-
-    public AppEventBridge(
-        IEventBus eventBus,
-        IStreamWorkflowService workflow,
-        IMusicPlayerRouter musicRouter)
-    {
-        _eventBus = eventBus;
-        _workflow = workflow;
-        _musicRouter = musicRouter;
-    }
 
     public void Start()
     {
         if (_started || _disposed)
+        {
             return;
+        }
 
         _workflow.StateChanged += OnWorkflowStateChanged;
         _musicRouter.SnapshotChanged += OnMusicSnapshotChanged;
@@ -69,7 +64,9 @@ public sealed class AppEventBridge : IDisposable
     public void Dispose()
     {
         if (_disposed)
+        {
             return;
+        }
 
         if (_started)
         {

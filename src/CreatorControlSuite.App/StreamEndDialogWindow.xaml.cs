@@ -45,7 +45,7 @@ public partial class StreamEndDialogWindow : Window
         _suggestRaidTargets = suggestRaidTargets;
         _raidTargetChanged = raidTargetChanged;
 
-        var initial = !string.IsNullOrWhiteSpace(selectedRaidChannel)
+        string initial = !string.IsNullOrWhiteSpace(selectedRaidChannel)
             ? selectedRaidChannel.Trim().TrimStart('@')
             : raidChannels.FirstOrDefault() ?? "";
         RaidChannelSearchBox.Text = initial;
@@ -86,7 +86,7 @@ public partial class StreamEndDialogWindow : Window
         };
         OpenRaidChannelButton.Click += (_, _) =>
         {
-            var channel = GetRaidChannelText();
+            string channel = GetRaidChannelText();
             if (!string.IsNullOrWhiteSpace(channel))
             {
                 _openRaidChannel?.Invoke(channel);
@@ -203,7 +203,7 @@ public partial class StreamEndDialogWindow : Window
 
     private void UpdateModeDependentPanels()
     {
-        var needsDuration = EndSceneRadio.IsChecked == true || EndSceneRaidRadio.IsChecked == true;
+        bool needsDuration = EndSceneRadio.IsChecked == true || EndSceneRaidRadio.IsChecked == true;
         EndSceneDurationPanel.Visibility = needsDuration ? Visibility.Visible : Visibility.Collapsed;
         RaidTargetPanel.Visibility = EndSceneRaidRadio.IsChecked == true
             ? Visibility.Visible
@@ -293,12 +293,12 @@ public partial class StreamEndDialogWindow : Window
         _searchCts?.Cancel();
         _searchCts?.Dispose();
         _searchCts = new CancellationTokenSource();
-        var token = _searchCts.Token;
-        var query = GetRaidChannelText();
+        CancellationToken token = _searchCts.Token;
+        string query = GetRaidChannelText();
 
         try
         {
-            var suggestions = await _suggestRaidTargets(query, token);
+            IReadOnlyList<TwitchChannelSuggestion> suggestions = await _suggestRaidTargets(query, token);
             if (token.IsCancellationRequested)
             {
                 return;
@@ -347,13 +347,13 @@ public partial class StreamEndDialogWindow : Window
 
     private void MoveSuggestion(int delta)
     {
-        var count = RaidSuggestionsBox.Items.Count;
+        int count = RaidSuggestionsBox.Items.Count;
         if (count == 0)
         {
             return;
         }
 
-        var next = RaidSuggestionsBox.SelectedIndex + delta;
+        int next = RaidSuggestionsBox.SelectedIndex + delta;
         if (next < 0)
         {
             next = count - 1;
@@ -394,7 +394,7 @@ public partial class StreamEndDialogWindow : Window
                 return;
             }
 
-            if (!TryReadEndSceneSeconds(out var seconds))
+            if (!TryReadEndSceneSeconds(out int seconds))
             {
                 return;
             }
@@ -404,7 +404,7 @@ public partial class StreamEndDialogWindow : Window
         else
         {
             SelectedMode = StreamEndMode.EndSceneThenStop;
-            if (!TryReadEndSceneSeconds(out var seconds))
+            if (!TryReadEndSceneSeconds(out int seconds))
             {
                 return;
             }

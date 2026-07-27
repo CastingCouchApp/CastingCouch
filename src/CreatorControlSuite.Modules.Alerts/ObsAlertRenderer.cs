@@ -1,21 +1,16 @@
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Modules.Alerts.Models;
 using CreatorControlSuite.Modules.OBS;
+using CreatorControlSuite.Modules.OBS.Models;
 
 namespace CreatorControlSuite.Modules.Alerts;
 
-public sealed class ObsAlertRenderer : IAlertRenderer
+public sealed class ObsAlertRenderer(
+    ISettingsStore settingsStore,
+    IObsWebSocketClient obsClient) : IAlertRenderer
 {
-    private readonly ISettingsStore _settingsStore;
-    private readonly IObsWebSocketClient _obsClient;
-
-    public ObsAlertRenderer(
-        ISettingsStore settingsStore,
-        IObsWebSocketClient obsClient)
-    {
-        _settingsStore = settingsStore;
-        _obsClient = obsClient;
-    }
+    private readonly ISettingsStore _settingsStore = settingsStore;
+    private readonly IObsWebSocketClient _obsClient = obsClient;
 
     public Task InstallSourcesAsync(
         AlertDefinition definition,
@@ -34,10 +29,10 @@ public sealed class ObsAlertRenderer : IAlertRenderer
         string renderedText,
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
-        var alertSettings = settings.Alerts;
+        AlertSettings alertSettings = settings.Alerts;
 
         await PrepareSourcesAsync(
             definition,
@@ -100,10 +95,10 @@ public sealed class ObsAlertRenderer : IAlertRenderer
     public async Task HideAsync(
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
-        var alertSettings = settings.Alerts;
+        AlertSettings alertSettings = settings.Alerts;
 
         try
         {
@@ -146,7 +141,7 @@ public sealed class ObsAlertRenderer : IAlertRenderer
         bool createIfMissing,
         CancellationToken cancellationToken)
     {
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
         if (!_obsClient.IsConnected)
@@ -155,7 +150,7 @@ public sealed class ObsAlertRenderer : IAlertRenderer
                 "OBS ist für Alerts nicht verbunden.");
         }
 
-        var alertSettings = settings.Alerts;
+        AlertSettings alertSettings = settings.Alerts;
 
         if (createIfMissing)
         {
@@ -200,7 +195,7 @@ public sealed class ObsAlertRenderer : IAlertRenderer
         await _obsClient.SetSceneItemTransformAsync(
             alertSettings.ObsSceneName,
             alertSettings.ObsTextSourceName,
-            definition.X + definition.Width * 0.37,
+            definition.X + (definition.Width * 0.37),
             definition.Y,
             definition.Width * 0.63,
             definition.Height,
@@ -224,10 +219,10 @@ public sealed class ObsAlertRenderer : IAlertRenderer
         AlertSettings alertSettings,
         CancellationToken cancellationToken)
     {
-        var scenes = await _obsClient.GetSceneListAsync(
+        IReadOnlyList<ObsSceneInfo> scenes = await _obsClient.GetSceneListAsync(
             cancellationToken);
 
-        var sceneExists = scenes.Any(scene =>
+        bool sceneExists = scenes.Any(scene =>
             string.Equals(
                 scene.Name,
                 alertSettings.ObsSceneName,
@@ -269,17 +264,17 @@ public sealed class ObsAlertRenderer : IAlertRenderer
 
     private static int ParseObsColor(string htmlColor)
     {
-        var value = htmlColor.Trim().TrimStart('#');
+        string value = htmlColor.Trim().TrimStart('#');
 
         if (value.Length != 6)
         {
             return 0xFFFFFF;
         }
 
-        var red = Convert.ToInt32(value.Substring(0, 2), 16);
-        var green = Convert.ToInt32(value.Substring(2, 2), 16);
-        var blue = Convert.ToInt32(value.Substring(4, 2), 16);
+        int red = Convert.ToInt32(value[..2], 16);
+        int green = Convert.ToInt32(value.Substring(2, 2), 16);
+        int blue = Convert.ToInt32(value.Substring(4, 2), 16);
 
-        return blue << 16 | green << 8 | red;
+        return (blue << 16) | (green << 8) | red;
     }
 }

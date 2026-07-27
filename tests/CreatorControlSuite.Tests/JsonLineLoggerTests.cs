@@ -7,7 +7,7 @@ public sealed class JsonLineLoggerTests
     [Fact]
     public async Task CanWriteAndReadLog()
     {
-        var root = Path.Combine(
+        string root = Path.Combine(
             Path.GetTempPath(),
             "CreatorControlSuite.LoggerTests",
             Guid.NewGuid().ToString("N"));
@@ -23,7 +23,7 @@ public sealed class JsonLineLoggerTests
                 "Test",
                 "Hello");
 
-            var entries = await logger.ReadRecentAsync();
+            IReadOnlyList<AppLogEntry> entries = await logger.ReadRecentAsync();
 
             Assert.Contains(
                 entries,
@@ -40,7 +40,7 @@ public sealed class JsonLineLoggerTests
     [Fact]
     public void WriteDoesNotCrashWhenLogFileIsTemporarilyLocked()
     {
-        var root = Path.Combine(
+        string root = Path.Combine(
             Path.GetTempPath(),
             "CreatorControlSuite.LoggerTests",
             Guid.NewGuid().ToString("N"));
@@ -49,7 +49,7 @@ public sealed class JsonLineLoggerTests
 
         try
         {
-            var path = Path.Combine(
+            string path = Path.Combine(
                 root,
                 "suite-" + DateTime.Now.ToString("yyyyMMdd") + ".jsonl");
             using var exclusiveLock = new FileStream(
@@ -59,7 +59,7 @@ public sealed class JsonLineLoggerTests
                 FileShare.None);
             var logger = new JsonLineAppLogger(root);
 
-            var exception = Record.Exception(() =>
+            Exception exception = Record.Exception(() =>
                 logger.Write(
                     AppLogLevel.Information,
                     "Test",

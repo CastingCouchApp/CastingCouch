@@ -8,36 +8,34 @@ using CreatorControlSuite.Core.Music;
 
 namespace CreatorControlSuite.Modules.YouTubeMusic;
 
-public sealed class YouTubeMusicBridge : IAsyncDisposable
+public sealed class YouTubeMusicBridge(ISettingsStore settingsStore) : IAsyncDisposable
 {
-    private readonly ISettingsStore _settingsStore;
+    private readonly ISettingsStore _settingsStore = settingsStore;
     private readonly ConcurrentQueue<string> _commands = new();
-    private readonly object _stateLock = new();
+    private readonly Lock _stateLock = new();
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _loop;
     private YouTubeMusicBridgeState _state = YouTubeMusicBridgeState.Empty;
     private DateTimeOffset _lastStateAt = DateTimeOffset.MinValue;
-    private bool _running;
 
-    public YouTubeMusicBridge(ISettingsStore settingsStore)
-    {
-        _settingsStore = settingsStore;
-    }
-
-    public bool IsRunning => _running;
+    public bool IsRunning { get; private set; }
 
     public event EventHandler? StateChanged;
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        if (_running)
+        if (IsRunning)
+        {
             return;
+        }
 
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var port = settings.YouTubeMusic.BridgePort;
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        int port = settings.YouTubeMusic.BridgePort;
         if (port is <= 0 or > 65535)
+        {
             throw new InvalidOperationException("Ungültiger YouTube-Music-Bridge-Port.");
+        }
 
         var listener = new HttpListener();
         listener.Prefixes.Add($"http://127.0.0.1:{port}/");
@@ -45,16 +43,18 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
 
         _listener = listener;
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _running = true;
+        IsRunning = true;
         _loop = Task.Run(() => ListenLoopAsync(_cts.Token), CancellationToken.None);
     }
 
     public async Task StopAsync()
     {
-        if (!_running)
+        if (!IsRunning)
+        {
             return;
+        }
 
-        _running = false;
+        IsRunning = false;
         _cts?.Cancel();
 
         try
@@ -91,7 +91,9 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
     public void EnqueueCommand(string command)
     {
         if (string.IsNullOrWhiteSpace(command))
+        {
             return;
+        }
 
         _commands.Enqueue(command.Trim().ToLowerInvariant());
     }
@@ -107,15 +109,15 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
         }
 
         var timeout = TimeSpan.FromSeconds(Math.Clamp(stateTimeoutSeconds, 3, 120));
-        var fresh = lastStateAt != DateTimeOffset.MinValue &&
+        bool fresh = lastStateAt != DateTimeOffset.MinValue &&
                     DateTimeOffset.UtcNow - lastStateAt <= timeout;
-        var connected = _running && fresh;
+        bool connected = IsRunning && fresh;
 
         if (!connected)
         {
             return new NowPlayingSnapshot(
                 MusicProviderIds.YouTubeMusic,
-                Connected: _running,
+                Connected: IsRunning,
                 IsPlaying: false,
                 Title: "",
                 Artist: "",
@@ -124,7 +126,7 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
                 ProgressMs: 0,
                 DurationMs: 0,
                 VolumePercent: null,
-                StatusText: !_running
+                StatusText: !IsRunning
                     ? "Bridge gestoppt"
                     : "Bookmarklet inaktiv");
         }
@@ -150,7 +152,7 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
         // music.youtube.com erzwingt Trusted Types (require-trusted-types-for 'script').
         // Script-Tags mit .src/.text sind blockiert – daher Bridge-Code inline im Bookmarklet.
         // Newlines müssen erhalten bleiben (als %0A): sonst kommentiert das erste // den Rest der Zeile weg.
-        var script = GetBridgeScript(port).Trim();
+        string script = GetBridgeScript(port).Trim();
         return "javascript:" + Uri.EscapeDataString(script);
     }
 
@@ -162,10 +164,10 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
 
     public string GetBookmarkletInstallHtml(int port)
     {
-        var bookmarklet = GetBookmarklet(port);
-        var title = GetBookmarkletDisplayName();
-        var href = System.Net.WebUtility.HtmlEncode(bookmarklet);
-        var text = System.Net.WebUtility.HtmlEncode(title);
+        string bookmarklet = GetBookmarklet(port);
+        string title = GetBookmarkletDisplayName();
+        string href = System.Net.WebUtility.HtmlEncode(bookmarklet);
+        string text = System.Net.WebUtility.HtmlEncode(title);
         return $$"""
             <!DOCTYPE html>
             <html lang="de">
@@ -196,7 +198,7 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
 
     public string GetBridgeScript(int port)
     {
-        var raw = LoadEmbeddedBridgeScript();
+        string raw = LoadEmbeddedBridgeScript();
         return raw.Replace("__CCS_BRIDGE_PORT__", port.ToString(), StringComparison.Ordinal);
     }
 
@@ -238,13 +240,13 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
                 return;
             }
 
-            var path = context.Request.Url?.AbsolutePath.TrimEnd('/').ToLowerInvariant() ?? "";
+            string path = context.Request.Url?.AbsolutePath.TrimEnd('/').ToLowerInvariant() ?? "";
             if (path is "/ytmusic/state" &&
                 string.Equals(context.Request.HttpMethod, "POST", StringComparison.OrdinalIgnoreCase))
             {
                 using var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
-                var body = await reader.ReadToEndAsync();
-                var incoming = JsonSerializer.Deserialize<YouTubeMusicBridgeState>(body, JsonOptions())
+                string body = await reader.ReadToEndAsync();
+                YouTubeMusicBridgeState incoming = JsonSerializer.Deserialize<YouTubeMusicBridgeState>(body, JsonOptions())
                     ?? YouTubeMusicBridgeState.Empty;
                 lock (_stateLock)
                 {
@@ -261,8 +263,10 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
                 string.Equals(context.Request.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase))
             {
                 var commands = new List<string>();
-                while (_commands.TryDequeue(out var command))
+                while (_commands.TryDequeue(out string? command))
+                {
                     commands.Add(command);
+                }
 
                 await WriteJsonAsync(context.Response, 200, new { commands });
                 return;
@@ -271,9 +275,9 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
             if (path is "/ytmusic/bookmarklet.js" &&
                 string.Equals(context.Request.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase))
             {
-                var settings = await _settingsStore.LoadAsync();
-                var script = GetBridgeScript(settings.YouTubeMusic.BridgePort);
-                var bytes = Encoding.UTF8.GetBytes(script);
+                AppSettings settings = await _settingsStore.LoadAsync();
+                string script = GetBridgeScript(settings.YouTubeMusic.BridgePort);
+                byte[] bytes = Encoding.UTF8.GetBytes(script);
                 context.Response.StatusCode = 200;
                 context.Response.ContentType = "application/javascript; charset=utf-8";
                 context.Response.ContentLength64 = bytes.Length;
@@ -285,9 +289,9 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
             if (path is "/ytmusic/install" &&
                 string.Equals(context.Request.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase))
             {
-                var settings = await _settingsStore.LoadAsync();
-                var html = GetBookmarkletInstallHtml(settings.YouTubeMusic.BridgePort);
-                var bytes = Encoding.UTF8.GetBytes(html);
+                AppSettings settings = await _settingsStore.LoadAsync();
+                string html = GetBookmarkletInstallHtml(settings.YouTubeMusic.BridgePort);
+                byte[] bytes = Encoding.UTF8.GetBytes(html);
                 context.Response.StatusCode = 200;
                 context.Response.ContentType = "text/html; charset=utf-8";
                 context.Response.ContentLength64 = bytes.Length;
@@ -298,7 +302,7 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
 
             if (path is "/ytmusic/health")
             {
-                await WriteJsonAsync(context.Response, 200, new { ok = true, running = _running });
+                await WriteJsonAsync(context.Response, 200, new { ok = true, running = IsRunning });
                 return;
             }
 
@@ -328,7 +332,7 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
 
     private static async Task WriteJsonAsync(HttpListenerResponse response, int statusCode, object payload)
     {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions());
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions());
         response.StatusCode = statusCode;
         response.ContentType = "application/json; charset=utf-8";
         response.ContentLength64 = bytes.Length;
@@ -346,11 +350,11 @@ public sealed class YouTubeMusicBridge : IAsyncDisposable
     private static string LoadEmbeddedBridgeScript()
     {
         var assembly = Assembly.GetExecutingAssembly();
-        var name = assembly.GetManifestResourceNames()
+        string name = assembly.GetManifestResourceNames()
             .FirstOrDefault(n => n.EndsWith("ytmusic-bridge.js", StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("ytmusic-bridge.js fehlt als EmbeddedResource.");
 
-        using var stream = assembly.GetManifestResourceStream(name)
+        using Stream stream = assembly.GetManifestResourceStream(name)
             ?? throw new InvalidOperationException("ytmusic-bridge.js konnte nicht geladen werden.");
         using var reader = new StreamReader(stream, Encoding.UTF8);
         return reader.ReadToEnd();

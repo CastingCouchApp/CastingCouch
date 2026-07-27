@@ -8,7 +8,7 @@ public sealed class ProfileServiceTests
     [Fact]
     public async Task CanCreateAndApplyProfile()
     {
-        var root = Path.Combine(
+        string root = Path.Combine(
             Path.GetTempPath(),
             "CreatorControlSuite.ProfileTests",
             Guid.NewGuid().ToString("N"));
@@ -30,7 +30,7 @@ public sealed class ProfileServiceTests
             settings.Branding.DisplayName = "Denver John";
             await settingsStore.SaveAsync(settings);
 
-            var profile =
+            CreatorProfile profile =
                 await service.CreateFromCurrentSettingsAsync(
                     "RP",
                     "Roleplay");
@@ -40,7 +40,7 @@ public sealed class ProfileServiceTests
 
             await service.ApplyAsync(profile.Id);
 
-            var loaded = await settingsStore.LoadAsync();
+            AppSettings loaded = await settingsStore.LoadAsync();
 
             Assert.Equal(
                 "Denver John",

@@ -20,7 +20,7 @@ public sealed class WindowsDpapiSecretStore : ISecretStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
-        var protectedBytes = ProtectedData.Protect(
+        byte[] protectedBytes = ProtectedData.Protect(
             Encoding.UTF8.GetBytes(value),
             optionalEntropy: null,
             DataProtectionScope.CurrentUser);
@@ -35,15 +35,15 @@ public sealed class WindowsDpapiSecretStore : ISecretStore
         string key,
         CancellationToken cancellationToken = default)
     {
-        var path = GetPath(key);
+        string path = GetPath(key);
 
         if (!File.Exists(path))
         {
             return null;
         }
 
-        var encrypted = await File.ReadAllBytesAsync(path, cancellationToken);
-        var plain = ProtectedData.Unprotect(
+        byte[] encrypted = await File.ReadAllBytesAsync(path, cancellationToken);
+        byte[] plain = ProtectedData.Unprotect(
             encrypted,
             optionalEntropy: null,
             DataProtectionScope.CurrentUser);
@@ -55,7 +55,7 @@ public sealed class WindowsDpapiSecretStore : ISecretStore
         string key,
         CancellationToken cancellationToken = default)
     {
-        var path = GetPath(key);
+        string path = GetPath(key);
 
         if (File.Exists(path))
         {
@@ -67,7 +67,7 @@ public sealed class WindowsDpapiSecretStore : ISecretStore
 
     private string GetPath(string key)
     {
-        var safeName = string.Concat(
+        string safeName = string.Concat(
             key.Select(character =>
                 Path.GetInvalidFileNameChars().Contains(character)
                     ? '_'

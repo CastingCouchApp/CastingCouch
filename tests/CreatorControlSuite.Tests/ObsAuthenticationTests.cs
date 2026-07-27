@@ -7,12 +7,12 @@ public sealed class ObsAuthenticationTests
     [Fact]
     public void AuthenticationResponseIsDeterministic()
     {
-        var first = ObsAuthentication.CreateResponse(
+        string first = ObsAuthentication.CreateResponse(
             "password",
             "salt",
             "challenge");
 
-        var second = ObsAuthentication.CreateResponse(
+        string second = ObsAuthentication.CreateResponse(
             "password",
             "salt",
             "challenge");
@@ -24,12 +24,12 @@ public sealed class ObsAuthenticationTests
     [Fact]
     public void DifferentPasswordsProduceDifferentResponses()
     {
-        var first = ObsAuthentication.CreateResponse(
+        string first = ObsAuthentication.CreateResponse(
             "password-a",
             "salt",
             "challenge");
 
-        var second = ObsAuthentication.CreateResponse(
+        string second = ObsAuthentication.CreateResponse(
             "password-b",
             "salt",
             "challenge");

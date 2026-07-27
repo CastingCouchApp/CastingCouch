@@ -9,7 +9,7 @@ public sealed class AlertEngineTests
     [Fact]
     public async Task Start_Enqueue_PlaysAlert()
     {
-        await using var harness = CreateHarness();
+        await using Harness harness = CreateHarness();
         await harness.Engine.StartAsync();
 
         await harness.Engine.EnqueueAsync(
@@ -31,13 +31,13 @@ public sealed class AlertEngineTests
     [Fact]
     public async Task ClearQueue_Empties()
     {
-        await using var harness = CreateHarness(settings =>
+        await using Harness harness = CreateHarness(settings =>
         {
             settings.Alerts.Definitions["Follow"].DurationSeconds = 5;
         });
         await harness.Engine.StartAsync();
 
-        for (var i = 0; i < 2; i++)
+        for (int i = 0; i < 2; i++)
         {
             await harness.Engine.EnqueueAsync(
                 new AlertRequest(
@@ -57,9 +57,9 @@ public sealed class AlertEngineTests
     [Fact]
     public async Task BuildPreviewAsync_RendersTemplate()
     {
-        await using var harness = CreateHarness();
+        await using Harness harness = CreateHarness();
 
-        var preview = await harness.Engine.BuildPreviewAsync("Follow", "Alice");
+        AlertPreview preview = await harness.Engine.BuildPreviewAsync("Follow", "Alice");
 
         Assert.Equal("Follow", preview.Type);
         Assert.Equal("Alice folgt jetzt!", preview.Text);
@@ -69,10 +69,10 @@ public sealed class AlertEngineTests
     [Fact]
     public async Task DropOldest_WhenQueueFull()
     {
-        await using var harness = CreateHarness();
+        await using Harness harness = CreateHarness();
         await harness.Engine.StartAsync();
 
-        for (var i = 0; i < 3; i++)
+        for (int i = 0; i < 3; i++)
         {
             await harness.Engine.EnqueueAsync(
                 new AlertRequest(
@@ -92,7 +92,7 @@ public sealed class AlertEngineTests
     [Fact]
     public async Task StopAsync_HidesRenderer()
     {
-        await using var harness = CreateHarness();
+        await using Harness harness = CreateHarness();
         await harness.Engine.StartAsync();
 
         await harness.Engine.EnqueueAsync(
@@ -132,7 +132,7 @@ public sealed class AlertEngineTests
 
     private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
     {
-        var deadline = DateTime.UtcNow + timeout;
+        DateTime deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
             if (condition())
@@ -146,25 +146,17 @@ public sealed class AlertEngineTests
         Assert.True(condition(), "Bedingung innerhalb des Timeouts nicht erfüllt.");
     }
 
-    private sealed class Harness : IAsyncDisposable
+    private sealed class Harness(AlertEngine engine, AlertEngineTests.FakeAlertRenderer renderer) : IAsyncDisposable
     {
-        public Harness(AlertEngine engine, FakeAlertRenderer renderer)
-        {
-            Engine = engine;
-            Renderer = renderer;
-        }
-
-        public AlertEngine Engine { get; }
-        public FakeAlertRenderer Renderer { get; }
+        public AlertEngine Engine { get; } = engine;
+        public FakeAlertRenderer Renderer { get; } = renderer;
 
         public ValueTask DisposeAsync() => Engine.DisposeAsync();
     }
 
-    private sealed class InMemorySettingsStore : ISettingsStore
+    private sealed class InMemorySettingsStore(AppSettings settings) : ISettingsStore
     {
-        private AppSettings _settings;
-
-        public InMemorySettingsStore(AppSettings settings) => _settings = settings;
+        private AppSettings _settings = settings;
 
         public Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(_settings);

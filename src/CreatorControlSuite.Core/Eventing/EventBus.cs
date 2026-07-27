@@ -5,7 +5,7 @@ namespace CreatorControlSuite.Core.Eventing;
 public sealed class EventBus : IEventBus
 {
     private readonly ConcurrentDictionary<Type, List<Delegate>> _handlers = new();
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
 
     public IDisposable Subscribe<TEvent>(Action<TEvent> handler)
     {
@@ -13,7 +13,7 @@ public sealed class EventBus : IEventBus
 
         lock (_sync)
         {
-            var handlers = _handlers.GetOrAdd(typeof(TEvent), static _ => []);
+            List<Delegate> handlers = _handlers.GetOrAdd(typeof(TEvent), static _ => []);
             handlers.Add(handler);
         }
 
@@ -25,11 +25,15 @@ public sealed class EventBus : IEventBus
         Delegate[] snapshot;
         lock (_sync)
         {
-            if (!_handlers.TryGetValue(typeof(TEvent), out var handlers)) return;
+            if (!_handlers.TryGetValue(typeof(TEvent), out List<Delegate>? handlers))
+            {
+                return;
+            }
+
             snapshot = [.. handlers];
         }
 
-        foreach (var handler in snapshot.Cast<Action<TEvent>>())
+        foreach (Action<TEvent> handler in snapshot.Cast<Action<TEvent>>())
         {
             handler(eventData);
         }
@@ -39,9 +43,16 @@ public sealed class EventBus : IEventBus
     {
         lock (_sync)
         {
-            if (!_handlers.TryGetValue(typeof(TEvent), out var handlers)) return;
+            if (!_handlers.TryGetValue(typeof(TEvent), out List<Delegate>? handlers))
+            {
+                return;
+            }
+
             handlers.Remove(handler);
-            if (handlers.Count == 0) _handlers.TryRemove(typeof(TEvent), out _);
+            if (handlers.Count == 0)
+            {
+                _handlers.TryRemove(typeof(TEvent), out _);
+            }
         }
     }
 

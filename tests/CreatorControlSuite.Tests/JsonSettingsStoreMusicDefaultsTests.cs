@@ -10,7 +10,7 @@ public sealed class JsonSettingsStoreMusicDefaultsTests
     [Fact]
     public async Task LoadAsync_MissingMusicSections_UsesDefaults()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"ccs-settings-{Guid.NewGuid():N}.json");
+        string path = Path.Combine(Path.GetTempPath(), $"ccs-settings-{Guid.NewGuid():N}.json");
         try
         {
             // Legacy settings ohne MusicPlayer / YouTubeMusic.
@@ -22,7 +22,7 @@ public sealed class JsonSettingsStoreMusicDefaultsTests
                 """, Encoding.UTF8);
 
             var store = new JsonSettingsStore(path);
-            var settings = await store.LoadAsync();
+            AppSettings settings = await store.LoadAsync();
 
             Assert.NotNull(settings.MusicPlayer);
             Assert.Equal(MusicProviderIds.Spotify, settings.MusicPlayer.ProviderId);
@@ -32,16 +32,21 @@ public sealed class JsonSettingsStoreMusicDefaultsTests
         finally
         {
             if (File.Exists(path))
+            {
                 File.Delete(path);
+            }
+
             if (File.Exists(path + ".bak"))
+            {
                 File.Delete(path + ".bak");
+            }
         }
     }
 
     [Fact]
     public async Task LoadAsync_NullMusicPlayer_IsRepaired()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"ccs-settings-{Guid.NewGuid():N}.json");
+        string path = Path.Combine(Path.GetTempPath(), $"ccs-settings-{Guid.NewGuid():N}.json");
         try
         {
             await File.WriteAllTextAsync(path, """
@@ -52,7 +57,7 @@ public sealed class JsonSettingsStoreMusicDefaultsTests
                 """, Encoding.UTF8);
 
             var store = new JsonSettingsStore(path);
-            var settings = await store.LoadAsync();
+            AppSettings settings = await store.LoadAsync();
 
             Assert.NotNull(settings.MusicPlayer);
             Assert.Equal(MusicProviderIds.Spotify, settings.MusicPlayer.ProviderId);
@@ -61,9 +66,14 @@ public sealed class JsonSettingsStoreMusicDefaultsTests
         finally
         {
             if (File.Exists(path))
+            {
                 File.Delete(path);
+            }
+
             if (File.Exists(path + ".bak"))
+            {
                 File.Delete(path + ".bak");
+            }
         }
     }
 }

@@ -12,7 +12,7 @@ public sealed class SpotifyListeningStatisticsService
 
     public SpotifyListeningStatisticsService()
     {
-        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "Statistics");
+        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "Statistics");
         Directory.CreateDirectory(folder);
         _filePath = Path.Combine(folder, "spotify-listening-statistics.json");
         Load();
@@ -20,16 +20,16 @@ public sealed class SpotifyListeningStatisticsService
 
     public void Observe(SpotifyPlaybackState playback)
     {
-        var now = DateTimeOffset.Now;
-        var elapsed = Math.Clamp((now - _lastSampleAt).TotalSeconds, 0, 15);
+        DateTimeOffset now = DateTimeOffset.Now;
+        double elapsed = Math.Clamp((now - _lastSampleAt).TotalSeconds, 0, 15);
         _lastSampleAt = now;
 
-        if (_activeTrackId is not null && _tracks.TryGetValue(_activeTrackId, out var active) && playback.IsPlaying)
+        if (_activeTrackId is not null && _tracks.TryGetValue(_activeTrackId, out SpotifyTrackStatistic? active) && playback.IsPlaying)
         {
             active.ListeningSeconds += elapsed;
         }
 
-        var track = playback.Track;
+        SpotifyTrack? track = playback.Track;
         if (track is null)
         {
             _activeTrackId = null;
@@ -37,7 +37,7 @@ public sealed class SpotifyListeningStatisticsService
             return;
         }
 
-        if (!_tracks.TryGetValue(track.Id, out var statistic))
+        if (!_tracks.TryGetValue(track.Id, out SpotifyTrackStatistic? statistic))
         {
             statistic = new SpotifyTrackStatistic
             {
@@ -61,14 +61,14 @@ public sealed class SpotifyListeningStatisticsService
 
     public SpotifyListeningStatisticsSnapshot GetSnapshot()
     {
-        var totalSeconds = _tracks.Values.Sum(item => item.ListeningSeconds);
+        double totalSeconds = _tracks.Values.Sum(item => item.ListeningSeconds);
         return new SpotifyListeningStatisticsSnapshot(
             _tracks.Values.Sum(item => item.PlayCount),
             TimeSpan.FromSeconds(totalSeconds),
-            _tracks.Values.OrderByDescending(item => item.PlayCount).ThenByDescending(item => item.ListeningSeconds).Take(10).ToList(),
-            _tracks.Values.GroupBy(item => item.Artist, StringComparer.OrdinalIgnoreCase)
+            [.. _tracks.Values.OrderByDescending(item => item.PlayCount).ThenByDescending(item => item.ListeningSeconds).Take(10)],
+            [.. _tracks.Values.GroupBy(item => item.Artist, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new SpotifyArtistStatistic(group.Key, group.Sum(item => item.PlayCount), TimeSpan.FromSeconds(group.Sum(item => item.ListeningSeconds))))
-                .OrderByDescending(item => item.PlayCount).ThenByDescending(item => item.ListeningTime).Take(10).ToList());
+                .OrderByDescending(item => item.PlayCount).ThenByDescending(item => item.ListeningTime).Take(10)]);
     }
 
     public void Reset()
@@ -82,9 +82,16 @@ public sealed class SpotifyListeningStatisticsService
     {
         try
         {
-            if (!File.Exists(_filePath)) return;
-            var items = JsonSerializer.Deserialize<List<SpotifyTrackStatistic>>(File.ReadAllText(_filePath)) ?? [];
-            foreach (var item in items.Where(item => !string.IsNullOrWhiteSpace(item.TrackId))) _tracks[item.TrackId] = item;
+            if (!File.Exists(_filePath))
+            {
+                return;
+            }
+
+            List<SpotifyTrackStatistic> items = JsonSerializer.Deserialize<List<SpotifyTrackStatistic>>(File.ReadAllText(_filePath)) ?? [];
+            foreach (SpotifyTrackStatistic? item in items.Where(item => !string.IsNullOrWhiteSpace(item.TrackId)))
+            {
+                _tracks[item.TrackId] = item;
+            }
         }
         catch { }
     }

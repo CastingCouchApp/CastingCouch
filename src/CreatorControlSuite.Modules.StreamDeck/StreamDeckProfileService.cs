@@ -17,8 +17,8 @@ public sealed class StreamDeckProfileService
     public async Task<StreamDeckProfilePackage> BuildDefaultProfileAsync(
         CancellationToken cancellationToken = default)
     {
-        var actions = new[]
-        {
+        StreamDeckActionDefinition[] actions =
+        [
             new StreamDeckActionDefinition(
                 "prepare",
                 "Vorbereiten",
@@ -104,10 +104,10 @@ public sealed class StreamDeckProfileService
                 "Spotify 50%",
                 "spotify.volume50",
                 "Spotify Lautstärke auf 50 Prozent")
-        };
+        ];
 
-        var timestamp = DateTimeOffset.Now;
-        var directory = Path.Combine(
+        DateTimeOffset timestamp = DateTimeOffset.Now;
+        string directory = Path.Combine(
             _outputRoot,
             "CreatorControlSuite-Default");
 
@@ -143,7 +143,7 @@ public sealed class StreamDeckProfileService
                 }),
             cancellationToken);
 
-        var packagePath = Path.Combine(
+        string packagePath = Path.Combine(
             _outputRoot,
             "CreatorControlSuite-Default.streamDeckProfile");
 

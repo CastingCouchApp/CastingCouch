@@ -2,15 +2,10 @@ using CreatorControlSuite.Core.Modules;
 
 namespace CreatorControlSuite.Modules.StreamDeck;
 
-public sealed class StreamDeckModule : IConnectableModule
+public sealed class StreamDeckModule(
+    StreamDeckProfileService profileService) : IConnectableModule
 {
-    private readonly StreamDeckProfileService _profileService;
-
-    public StreamDeckModule(
-        StreamDeckProfileService profileService)
-    {
-        _profileService = profileService;
-    }
+    private readonly StreamDeckProfileService _profileService = profileService;
 
     public string Id => "streamdeck";
     public string DisplayName => "Stream Deck";

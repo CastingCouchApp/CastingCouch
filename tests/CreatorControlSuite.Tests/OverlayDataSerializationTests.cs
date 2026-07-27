@@ -12,7 +12,7 @@ public sealed class OverlayDataSerializationTests
         data.Stream.IsLive = true;
         data.Spotify.StatusText = "Pause";
 
-        var json = JsonSerializer.Serialize(
+        string json = JsonSerializer.Serialize(
             data,
             new JsonSerializerOptions
             {

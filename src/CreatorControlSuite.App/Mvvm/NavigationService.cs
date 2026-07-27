@@ -10,7 +10,9 @@ public sealed class NavigationService : INavigationService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(pageKey);
         if (string.Equals(CurrentPageKey, pageKey, StringComparison.OrdinalIgnoreCase))
+        {
             return;
+        }
 
         CurrentPageKey = pageKey;
         PageChanged?.Invoke(this, pageKey);

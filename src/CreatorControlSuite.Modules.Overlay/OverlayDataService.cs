@@ -5,7 +5,7 @@ using CreatorControlSuite.Modules.Overlay.Models;
 
 namespace CreatorControlSuite.Modules.Overlay;
 
-public sealed class OverlayDataService : IOverlayDataService
+public sealed class OverlayDataService(ISettingsStore settingsStore) : IOverlayDataService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -13,14 +13,9 @@ public sealed class OverlayDataService : IOverlayDataService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    private readonly ISettingsStore _settingsStore;
-    private readonly object _stateLock = new();
-    private OverlayData _current = new();
-
-    public OverlayDataService(ISettingsStore settingsStore)
-    {
-        _settingsStore = settingsStore;
-    }
+    private readonly ISettingsStore _settingsStore = settingsStore;
+    private readonly Lock _stateLock = new();
+    private readonly OverlayData _current = new();
 
     public OverlayData Current
     {
@@ -38,7 +33,7 @@ public sealed class OverlayDataService : IOverlayDataService
     public async Task InitializeAsync(
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
 
         lock (_stateLock)
         {
@@ -84,7 +79,7 @@ public sealed class OverlayDataService : IOverlayDataService
 
         try
         {
-            var primaryPath = await GetDataFilePathAsync(cancellationToken);
+            string primaryPath = await GetDataFilePathAsync(cancellationToken);
             OverlayData snapshot;
 
             lock (_stateLock)
@@ -119,24 +114,24 @@ public sealed class OverlayDataService : IOverlayDataService
         {
             try
             {
-                var existingText = await File.ReadAllTextAsync(path, cancellationToken);
-                output = JsonNode.Parse(existingText) as JsonObject ?? new JsonObject();
+                string existingText = await File.ReadAllTextAsync(path, cancellationToken);
+                output = JsonNode.Parse(existingText) as JsonObject ?? [];
             }
             catch (JsonException)
             {
                 // Eine defekte oder leere Datei wird durch eine gültige Datenstruktur ersetzt.
-                output = new JsonObject();
+                output = [];
             }
         }
         else
         {
-            output = new JsonObject();
+            output = [];
         }
 
         // Vorhandene unbekannte Felder (z. B. Layout-Konfiguration des Nutzers)
         // bleiben erhalten. Nur die von der Suite verwalteten Datenbereiche werden
         // mit dem aktuellen Zustand fortgeschrieben.
-        var managed = JsonSerializer.SerializeToNode(snapshot, JsonOptions) as JsonObject ?? new JsonObject();
+        JsonObject managed = JsonSerializer.SerializeToNode(snapshot, JsonOptions) as JsonObject ?? [];
 
         // Spotify-Laufzeitdaten haben genau einen Besitzer: den dedizierten
         // Spotify-Schreiber in MainWindow. Der allgemeine OverlayDataService
@@ -154,13 +149,13 @@ public sealed class OverlayDataService : IOverlayDataService
         // auf OFFLINE zurücksetzen.
         managed.Remove("stream");
 
-        foreach (var property in managed)
+        foreach (KeyValuePair<string, JsonNode?> property in managed)
         {
             output[property.Key] = property.Value?.DeepClone();
         }
 
-        var json = output.ToJsonString(JsonOptions);
-        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        string json = output.ToJsonString(JsonOptions);
+        string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
 
         try
         {
@@ -195,7 +190,10 @@ public sealed class OverlayDataService : IOverlayDataService
         {
             try
             {
-                if (File.Exists(temp)) File.Delete(temp);
+                if (File.Exists(temp))
+                {
+                    File.Delete(temp);
+                }
             }
             catch
             {
@@ -208,12 +206,12 @@ public sealed class OverlayDataService : IOverlayDataService
     public async Task<string> GetDataFilePathAsync(
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
-        var root = Path.GetFullPath(Environment.ExpandEnvironmentVariables(
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        string root = Path.GetFullPath(Environment.ExpandEnvironmentVariables(
             await GetOverlayRootAsync(cancellationToken)));
 
-        var denverUiPath = Path.Combine(root, "Overlay", "modules", "ui");
-        var denverDataPath = Path.Combine(root, "Overlay", "data", "overlay-data.json");
+        string denverUiPath = Path.Combine(root, "Overlay", "modules", "ui");
+        string denverDataPath = Path.Combine(root, "Overlay", "data", "overlay-data.json");
 
         // DenverJohn v18.x: Alle UI-Module liegen unter Overlay/modules/ui und
         // laden ../../data/overlay-data.json. Damit ist Overlay/data zwingend
@@ -232,8 +230,11 @@ public sealed class OverlayDataService : IOverlayDataService
                 settings.Overlay.DataFilePath.Trim()));
         }
 
-        var nestedPath = Path.Combine(root, "Overlay", "data", settings.Overlay.DataFileName);
-        if (File.Exists(nestedPath)) return nestedPath;
+        string nestedPath = Path.Combine(root, "Overlay", "data", settings.Overlay.DataFileName);
+        if (File.Exists(nestedPath))
+        {
+            return nestedPath;
+        }
 
         return Path.Combine(root, "data", settings.Overlay.DataFileName);
     }
@@ -241,7 +242,7 @@ public sealed class OverlayDataService : IOverlayDataService
     public async Task<string> GetOverlayRootAsync(
         CancellationToken cancellationToken = default)
     {
-        var settings = await _settingsStore.LoadAsync(cancellationToken);
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(settings.Overlay.RootPath))
         {
@@ -258,9 +259,9 @@ public sealed class OverlayDataService : IOverlayDataService
     public async Task InstallBundledOverlayAsync(
         CancellationToken cancellationToken = default)
     {
-        var root = await GetOverlayRootAsync(cancellationToken);
+        string root = await GetOverlayRootAsync(cancellationToken);
 
-        foreach (var directory in new[]
+        foreach (string? directory in new[]
         {
             root,
             Path.Combine(root, "data"),
@@ -272,7 +273,7 @@ public sealed class OverlayDataService : IOverlayDataService
             Directory.CreateDirectory(directory);
         }
 
-        var bundledRoot = Path.Combine(
+        string bundledRoot = Path.Combine(
             AppContext.BaseDirectory,
             "BundledOverlay");
 
@@ -290,7 +291,7 @@ public sealed class OverlayDataService : IOverlayDataService
     {
         Directory.CreateDirectory(target);
 
-        foreach (var file in Directory.GetFiles(source))
+        foreach (string file in Directory.GetFiles(source))
         {
             File.Copy(
                 file,
@@ -300,7 +301,7 @@ public sealed class OverlayDataService : IOverlayDataService
                 overwrite: true);
         }
 
-        foreach (var directory in Directory.GetDirectories(source))
+        foreach (string directory in Directory.GetDirectories(source))
         {
             CopyDirectory(
                 directory,
@@ -312,7 +313,7 @@ public sealed class OverlayDataService : IOverlayDataService
 
     private static OverlayData Clone(OverlayData value)
     {
-        var json = JsonSerializer.Serialize(value, JsonOptions);
+        string json = JsonSerializer.Serialize(value, JsonOptions);
 
         return JsonSerializer.Deserialize<OverlayData>(
                    json,

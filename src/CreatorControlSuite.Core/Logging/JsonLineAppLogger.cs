@@ -12,15 +12,15 @@ public sealed class JsonLineAppLogger : IAppLogger
     };
 
     private readonly string _logRoot;
-    private readonly object _writeLock = new();
+    private readonly Lock _writeLock = new();
     private readonly Mutex _crossProcessWriteMutex;
 
     public JsonLineAppLogger(string logRoot)
     {
         _logRoot = logRoot;
         Directory.CreateDirectory(_logRoot);
-        var normalizedRoot = Path.GetFullPath(_logRoot).ToUpperInvariant();
-        var rootHash = Convert.ToHexString(
+        string normalizedRoot = Path.GetFullPath(_logRoot).ToUpperInvariant();
+        string rootHash = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(normalizedRoot)));
         _crossProcessWriteMutex = new Mutex(
             initiallyOwned: false,
@@ -46,12 +46,12 @@ public sealed class JsonLineAppLogger : IAppLogger
                 new Dictionary<string, string>(
                     StringComparer.OrdinalIgnoreCase));
 
-        var line = JsonSerializer.Serialize(entry, JsonOptions);
-        var path = GetCurrentLogPath();
+        string line = JsonSerializer.Serialize(entry, JsonOptions);
+        string path = GetCurrentLogPath();
 
         lock (_writeLock)
         {
-            var mutexAcquired = false;
+            bool mutexAcquired = false;
             try
             {
                 try
@@ -106,7 +106,7 @@ public sealed class JsonLineAppLogger : IAppLogger
             .Take(5)
             .ToList();
 
-        foreach (var file in files)
+        foreach (string? file in files)
         {
             string[] lines;
             try
@@ -125,7 +125,7 @@ public sealed class JsonLineAppLogger : IAppLogger
                 continue;
             }
 
-            foreach (var line in lines.Reverse())
+            foreach (string? line in lines.Reverse())
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -136,7 +136,7 @@ public sealed class JsonLineAppLogger : IAppLogger
 
                 try
                 {
-                    var entry = JsonSerializer.Deserialize<AppLogEntry>(
+                    AppLogEntry? entry = JsonSerializer.Deserialize<AppLogEntry>(
                         line,
                         JsonOptions);
 
@@ -163,19 +163,18 @@ public sealed class JsonLineAppLogger : IAppLogger
         string targetPath,
         CancellationToken cancellationToken = default)
     {
-        var entries = await ReadRecentAsync(
+        IReadOnlyList<AppLogEntry> entries = await ReadRecentAsync(
             5000,
             cancellationToken);
 
-        var lines = entries
+        string[] lines = [.. entries
             .OrderBy(entry => entry.Timestamp)
             .Select(entry =>
                 $"{entry.Timestamp:yyyy-MM-dd HH:mm:ss.fff} " +
                 $"[{entry.Level}] {entry.Category}: {entry.Message}" +
                 (string.IsNullOrWhiteSpace(entry.Exception)
                     ? ""
-                    : Environment.NewLine + entry.Exception))
-            .ToArray();
+                    : Environment.NewLine + entry.Exception))];
 
         await File.WriteAllLinesAsync(
             targetPath,
@@ -206,7 +205,7 @@ public sealed class JsonLineAppLogger : IAppLogger
             return;
         }
 
-        var rotated = Path.Combine(
+        string rotated = Path.Combine(
             info.DirectoryName!,
             Path.GetFileNameWithoutExtension(path) +
             "-" +
@@ -220,7 +219,7 @@ public sealed class JsonLineAppLogger : IAppLogger
     {
         const int attempts = 4;
 
-        for (var attempt = 1; attempt <= attempts; attempt++)
+        for (int attempt = 1; attempt <= attempts; attempt++)
         {
             try
             {

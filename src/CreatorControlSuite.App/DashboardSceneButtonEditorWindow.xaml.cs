@@ -77,12 +77,12 @@ public partial class DashboardSceneButtonEditorWindow : Window
         BuildEmojiPicker();
         GlyphBox.ItemsSource = GlyphChoices.Select(item => item.Label).ToList();
 
-        var kind = NormalizeKind(Result.IconKind);
+        string kind = NormalizeKind(Result.IconKind);
         switch (kind)
         {
             case "Glyph":
                 GlyphKindRadio.IsChecked = true;
-                var glyphMatch = GlyphChoices.FirstOrDefault(item => item.Glyph == Result.IconValue);
+                (string Label, string Glyph) glyphMatch = GlyphChoices.FirstOrDefault(item => item.Glyph == Result.IconValue);
                 GlyphBox.SelectedItem = glyphMatch.Label ?? GlyphChoices[0].Label;
                 break;
             case "Image":
@@ -114,7 +114,7 @@ public partial class DashboardSceneButtonEditorWindow : Window
     private void BuildEmojiPicker()
     {
         EmojiPickerPanel.Children.Clear();
-        foreach (var emoji in EmojiChoices)
+        foreach (string emoji in EmojiChoices)
         {
             var button = new Button
             {
@@ -204,7 +204,7 @@ public partial class DashboardSceneButtonEditorWindow : Window
             return;
         }
 
-        var title = TitleBox.Text?.Trim();
+        string? title = TitleBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(title))
         {
             title = sceneName;
@@ -215,7 +215,7 @@ public partial class DashboardSceneButtonEditorWindow : Window
         if (GlyphKindRadio.IsChecked == true)
         {
             iconKind = "Glyph";
-            var label = GlyphBox.SelectedItem as string ?? GlyphChoices[0].Label;
+            string label = GlyphBox.SelectedItem as string ?? GlyphChoices[0].Label;
             iconValue = GlyphChoices.FirstOrDefault(item => item.Label == label).Glyph ?? GlyphChoices[0].Glyph;
         }
         else if (ImageKindRadio.IsChecked == true)

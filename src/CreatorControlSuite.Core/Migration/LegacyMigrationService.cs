@@ -3,22 +3,17 @@ using CreatorControlSuite.Core.Configuration;
 
 namespace CreatorControlSuite.Core.Migration;
 
-public sealed class LegacyMigrationService : ILegacyMigrationService
+public sealed class LegacyMigrationService(ISettingsStore settingsStore) : ILegacyMigrationService
 {
-    private readonly ISettingsStore _settingsStore;
-
-    public LegacyMigrationService(ISettingsStore settingsStore)
-    {
-        _settingsStore = settingsStore;
-    }
+    private readonly ISettingsStore _settingsStore = settingsStore;
 
     public Task<IReadOnlyList<MigrationCandidate>> DetectAsync(
         CancellationToken cancellationToken = default)
     {
         var candidates = new List<MigrationCandidate>();
 
-        var roots = new[]
-        {
+        string[] roots =
+        [
             Path.Combine(
                 Environment.GetFolderPath(
                     Environment.SpecialFolder.MyDocuments),
@@ -31,9 +26,9 @@ public sealed class LegacyMigrationService : ILegacyMigrationService
                 Environment.GetFolderPath(
                     Environment.SpecialFolder.ApplicationData),
                 "StreamingSuite")
-        };
+        ];
 
-        foreach (var root in roots.Distinct())
+        foreach (string? root in roots.Distinct())
         {
             if (!Directory.Exists(root))
             {
@@ -85,10 +80,10 @@ public sealed class LegacyMigrationService : ILegacyMigrationService
 
         var imported = new List<string>();
         var warnings = new List<string>();
-        var settings = await _settingsStore.LoadAsync(
+        AppSettings settings = await _settingsStore.LoadAsync(
             cancellationToken);
 
-        var legacySettingsPath = Path.Combine(
+        string legacySettingsPath = Path.Combine(
             sourcePath,
             "settings.json");
 
@@ -101,7 +96,7 @@ public sealed class LegacyMigrationService : ILegacyMigrationService
                         legacySettingsPath,
                         cancellationToken));
 
-                var root = document.RootElement;
+                JsonElement root = document.RootElement;
 
                 TryReadString(
                     root,
@@ -162,7 +157,7 @@ public sealed class LegacyMigrationService : ILegacyMigrationService
             }
         }
 
-        var legacyOverlayRoot = Path.Combine(
+        string legacyOverlayRoot = Path.Combine(
             sourcePath,
             "content");
 
@@ -175,7 +170,7 @@ public sealed class LegacyMigrationService : ILegacyMigrationService
             imported.Add("Overlay-Pfad");
         }
 
-        var alertsPath = Path.Combine(
+        string alertsPath = Path.Combine(
             sourcePath,
             "alerts");
 
@@ -206,10 +201,10 @@ public sealed class LegacyMigrationService : ILegacyMigrationService
         string propertyName,
         Action<string> setter)
     {
-        if (root.TryGetProperty(propertyName, out var value) &&
+        if (root.TryGetProperty(propertyName, out JsonElement value) &&
             value.ValueKind == JsonValueKind.String)
         {
-            var text = value.GetString();
+            string? text = value.GetString();
 
             if (!string.IsNullOrWhiteSpace(text))
             {
@@ -223,8 +218,8 @@ public sealed class LegacyMigrationService : ILegacyMigrationService
         string propertyName,
         Action<int> setter)
     {
-        if (root.TryGetProperty(propertyName, out var value) &&
-            value.TryGetInt32(out var number))
+        if (root.TryGetProperty(propertyName, out JsonElement value) &&
+            value.TryGetInt32(out int number))
         {
             setter(number);
         }

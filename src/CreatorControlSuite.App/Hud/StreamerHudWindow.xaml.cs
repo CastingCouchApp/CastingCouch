@@ -23,10 +23,9 @@ public partial class StreamerHudWindow : Window
 
     public void BindSources(ObservableCollection<string> chatItems, ObservableCollection<string> eventItems)
     {
-        if (_chatItems is not null)
-            _chatItems.CollectionChanged -= OnChatCollectionChanged;
-        if (_eventItems is not null)
-            _eventItems.CollectionChanged -= OnEventCollectionChanged;
+        _chatItems?.CollectionChanged -= OnChatCollectionChanged;
+
+        _eventItems?.CollectionChanged -= OnEventCollectionChanged;
 
         _chatItems = chatItems;
         _eventItems = eventItems;
@@ -66,17 +65,17 @@ public partial class StreamerHudWindow : Window
 
     private void PositionOnMonitor(StreamerHudSettings settings)
     {
-        var monitor = NativeWindowHelper.ResolveMonitor(settings.MonitorIndex);
-        var margin = Math.Max(0, settings.Margin);
+        NativeWindowHelper.MonitorInfo monitor = NativeWindowHelper.ResolveMonitor(settings.MonitorIndex);
+        int margin = Math.Max(0, settings.Margin);
         UpdateLayout();
-        var height = ActualHeight > 0 ? ActualHeight : 420;
+        double height = ActualHeight > 0 ? ActualHeight : 420;
 
-        var left = settings.Anchor switch
+        double left = settings.Anchor switch
         {
             "TopLeft" or "BottomLeft" => monitor.BoundsDip.Left + margin,
             _ => monitor.BoundsDip.Right - Width - margin
         };
-        var top = settings.Anchor switch
+        double top = settings.Anchor switch
         {
             "BottomLeft" or "BottomRight" => monitor.BoundsDip.Bottom - height - margin,
             _ => monitor.BoundsDip.Top + margin
@@ -106,22 +105,30 @@ public partial class StreamerHudWindow : Window
 
     private void ScrollChatToEnd()
     {
-        if (ChatList.Items.Count == 0) return;
+        if (ChatList.Items.Count == 0)
+        {
+            return;
+        }
+
         ChatList.ScrollIntoView(ChatList.Items[^1]);
     }
 
     private void ScrollEventsToEnd()
     {
-        if (EventsList.Items.Count == 0) return;
+        if (EventsList.Items.Count == 0)
+        {
+            return;
+        }
+
         EventsList.ScrollIntoView(EventsList.Items[^1]);
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        if (_chatItems is not null)
-            _chatItems.CollectionChanged -= OnChatCollectionChanged;
-        if (_eventItems is not null)
-            _eventItems.CollectionChanged -= OnEventCollectionChanged;
+        _chatItems?.CollectionChanged -= OnChatCollectionChanged;
+
+        _eventItems?.CollectionChanged -= OnEventCollectionChanged;
+
         base.OnClosed(e);
     }
 }

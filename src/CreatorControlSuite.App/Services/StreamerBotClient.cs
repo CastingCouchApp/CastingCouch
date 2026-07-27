@@ -12,7 +12,7 @@ namespace CreatorControlSuite.App.Services;
 public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
 {
     private readonly SemaphoreSlim _requestGate = new(1, 1);
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
     private ClientWebSocket? _socket;
     private StreamerBotConnectionInfo? _connection;
 
@@ -22,9 +22,9 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
         {
             lock (_sync)
             {
-                var connected = IsConnected;
-                var host = _connection?.Host ?? "";
-                var port = _connection?.Port ?? 0;
+                bool connected = IsConnected;
+                string host = _connection?.Host ?? "";
+                int port = _connection?.Port ?? 0;
                 return new StreamerBotConnectionStatus(
                     connected,
                     host,
@@ -41,7 +41,9 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
         get
         {
             lock (_sync)
+            {
                 return _socket is { State: WebSocketState.Open };
+            }
         }
     }
 
@@ -49,16 +51,18 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        var host = string.IsNullOrWhiteSpace(settings.Host) ? "127.0.0.1" : settings.Host.Trim();
-        var port = settings.Port is > 0 and <= 65535 ? settings.Port : 8080;
-        var endpoint = string.IsNullOrWhiteSpace(settings.Endpoint) ? "/" : settings.Endpoint.Trim();
+        string host = string.IsNullOrWhiteSpace(settings.Host) ? "127.0.0.1" : settings.Host.Trim();
+        int port = settings.Port is > 0 and <= 65535 ? settings.Port : 8080;
+        string endpoint = string.IsNullOrWhiteSpace(settings.Endpoint) ? "/" : settings.Endpoint.Trim();
         if (!endpoint.StartsWith('/'))
+        {
             endpoint = "/" + endpoint;
+        }
 
-        var password = settings.Password ?? "";
+        string password = settings.Password ?? "";
         if (!string.IsNullOrWhiteSpace(password))
         {
-            var separator = endpoint.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+            string separator = endpoint.Contains('?', StringComparison.Ordinal) ? "&" : "?";
             endpoint += separator + "password=" + Uri.EscapeDataString(password);
         }
 
@@ -72,10 +76,12 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
     {
         await DisconnectAsync(cancellationToken);
 
-        var connection = ResolveConnection(settings);
+        StreamerBotConnectionInfo connection = ResolveConnection(settings);
         var socket = new ClientWebSocket();
         if (!string.IsNullOrWhiteSpace(connection.Password))
+        {
             socket.Options.SetRequestHeader("Authorization", "Bearer " + connection.Password);
+        }
 
         await socket.ConnectAsync(connection.WebSocketUri, cancellationToken);
 
@@ -97,7 +103,9 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
         }
 
         if (socket is null)
+        {
             return;
+        }
 
         try
         {
@@ -128,22 +136,25 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
         lock (_sync)
         {
             if (_socket is null || _socket.State != WebSocketState.Open)
+            {
                 throw new InvalidOperationException("Streamer.bot ist nicht verbunden.");
+            }
+
             socket = _socket;
         }
 
         await _requestGate.WaitAsync(cancellationToken);
         try
         {
-            var id = "ccs-" + Guid.NewGuid().ToString("N");
-            var json = JsonSerializer.Serialize(requestBody);
+            string id = "ccs-" + Guid.NewGuid().ToString("N");
+            string json = JsonSerializer.Serialize(requestBody);
             using var bodyDocument = JsonDocument.Parse(json);
             var dictionary = bodyDocument.RootElement
                 .EnumerateObject()
                 .ToDictionary(p => p.Name, p => p.Value.Clone());
             dictionary["id"] = JsonDocument.Parse(JsonSerializer.Serialize(id)).RootElement.Clone();
-            var payload = JsonSerializer.Serialize(dictionary);
-            var bytes = Encoding.UTF8.GetBytes(payload);
+            string payload = JsonSerializer.Serialize(dictionary);
+            byte[] bytes = Encoding.UTF8.GetBytes(payload);
             await socket.SendAsync(
                 new ArraySegment<byte>(bytes),
                 WebSocketMessageType.Text,
@@ -152,20 +163,24 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(timeout ?? TimeSpan.FromSeconds(8));
-            var buffer = new byte[64 * 1024];
+            byte[] buffer = new byte[64 * 1024];
             using var stream = new MemoryStream();
             while (true)
             {
-                var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), timeoutCts.Token);
+                WebSocketReceiveResult result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), timeoutCts.Token);
                 if (result.MessageType == WebSocketMessageType.Close)
+                {
                     throw new InvalidOperationException("Streamer.bot hat die WebSocket-Verbindung geschlossen.");
+                }
 
                 stream.Write(buffer, 0, result.Count);
                 if (!result.EndOfMessage)
+                {
                     continue;
+                }
 
                 var response = JsonDocument.Parse(stream.ToArray());
-                if (!response.RootElement.TryGetProperty("id", out var responseId) ||
+                if (!response.RootElement.TryGetProperty("id", out JsonElement responseId) ||
                     !string.Equals(responseId.GetString(), id, StringComparison.Ordinal))
                 {
                     response.Dispose();
@@ -173,10 +188,10 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
                     continue;
                 }
 
-                if (response.RootElement.TryGetProperty("status", out var status) &&
+                if (response.RootElement.TryGetProperty("status", out JsonElement status) &&
                     string.Equals(status.GetString(), "error", StringComparison.OrdinalIgnoreCase))
                 {
-                    var message = response.RootElement.TryGetProperty("message", out var messageNode)
+                    string? message = response.RootElement.TryGetProperty("message", out JsonElement messageNode)
                         ? messageNode.GetString()
                         : "Unbekannter Streamer.bot-Fehler";
                     response.Dispose();
@@ -195,27 +210,29 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
     public async Task<IReadOnlyList<StreamerBotActionInfo>> GetActionsAsync(
         CancellationToken cancellationToken = default)
     {
-        using var response = await SendRequestAsync(
+        using JsonDocument response = await SendRequestAsync(
             new { request = "GetActions" },
             TimeSpan.FromSeconds(5),
             cancellationToken);
 
-        if (!response.RootElement.TryGetProperty("actions", out var actionsNode) ||
+        if (!response.RootElement.TryGetProperty("actions", out JsonElement actionsNode) ||
             actionsNode.ValueKind != JsonValueKind.Array)
         {
             return [];
         }
 
         var results = new List<StreamerBotActionInfo>();
-        foreach (var action in actionsNode.EnumerateArray())
+        foreach (JsonElement action in actionsNode.EnumerateArray())
         {
-            var id = action.TryGetProperty("id", out var idNode) ? idNode.GetString() ?? "" : "";
-            var name = action.TryGetProperty("name", out var nameNode) ? nameNode.GetString() ?? "" : "";
-            var group = action.TryGetProperty("group", out var groupNode) ? groupNode.GetString() ?? "" : "";
+            string id = action.TryGetProperty("id", out JsonElement idNode) ? idNode.GetString() ?? "" : "";
+            string name = action.TryGetProperty("name", out JsonElement nameNode) ? nameNode.GetString() ?? "" : "";
+            string group = action.TryGetProperty("group", out JsonElement groupNode) ? groupNode.GetString() ?? "" : "";
             if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(id))
+            {
                 continue;
+            }
 
-            var display = string.IsNullOrWhiteSpace(group)
+            string display = string.IsNullOrWhiteSpace(group)
                 ? name
                 : $"{group} · {name}";
             results.Add(new StreamerBotActionInfo(id, name, group, display));
@@ -231,13 +248,15 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(actionId) && string.IsNullOrWhiteSpace(actionName))
+        {
             throw new ArgumentException("actionId oder actionName erforderlich.");
+        }
 
         var action = !string.IsNullOrWhiteSpace(actionId)
             ? new { id = actionId, name = actionName ?? "" }
             : new { id = "", name = actionName ?? "" };
 
-        using var response = await SendRequestAsync(
+        using JsonDocument response = await SendRequestAsync(
             new
             {
                 request = "DoAction",
@@ -246,11 +265,13 @@ public sealed class StreamerBotClient : IStreamerBotClient, IAsyncDisposable
             },
             cancellationToken: cancellationToken);
 
-        var status = response.RootElement.TryGetProperty("status", out var statusNode)
+        string? status = response.RootElement.TryGetProperty("status", out JsonElement statusNode)
             ? statusNode.GetString()
             : null;
         if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
+        {
             throw new InvalidOperationException("Streamer.bot hat die Aktion nicht bestätigt.");
+        }
     }
 
     public async ValueTask DisposeAsync()
