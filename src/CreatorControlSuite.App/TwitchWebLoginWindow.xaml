@@ -1,0 +1,52 @@
+<Window x:Class="CreatorControlSuite.App.TwitchWebLoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Twitch Web-Login"
+        Width="980"
+        Height="720"
+        MinWidth="720"
+        MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="Twitch Web-Login" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock Text="Melde dich hier bei Twitch an. Die Session wird lokal im WebView2-Profil gespeichert und für den eingebetteten Chat wiederverwendet. Dies ist unabhängig von der Device-Code-API-Anmeldung."
+                       Foreground="{DynamicResource TextMutedBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,6,0,12"/>
+            <TextBlock x:Name="StatusText"
+                       Foreground="{DynamicResource AccentHoverBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,10"/>
+        </StackPanel>
+
+        <Border Grid.Row="1"
+                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                ClipToBounds="True">
+            <wv2:WebView2 x:Name="LoginWebView"
+                          DefaultBackgroundColor="Transparent"/>
+        </Border>
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0">
+            <Button x:Name="CloseButton"
+                    Content="SCHLIESSEN"
+                    Padding="18,7"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="{DynamicResource TextOnAccentBrush}"/>
+        </StackPanel>
+    </Grid>
+</Window>

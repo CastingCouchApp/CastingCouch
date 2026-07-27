@@ -110,6 +110,10 @@ public sealed class TwitchSettings
     public bool ConnectOnPrepare { get; set; } = true;
     public string CreatorDashboardUrl { get; set; } = "";
     public bool EnableChat { get; set; } = true;
+
+    /// <summary>Anzeige des Twitch-Chats in Dashboard/Dienste: Built-in (EventSub/Helix) oder eingebetteter Web-Popout.</summary>
+    public TwitchChatUiMode ChatUiMode { get; set; } = TwitchChatUiMode.BuiltIn;
+
     public bool EnableEventSub { get; set; } = true;
     public bool UseDeviceCodeFlow { get; set; } = true;
     public TwitchGoalSettings FollowerGoal { get; set; } = new() { Title = "Follower-Ziel", Target = 200 };

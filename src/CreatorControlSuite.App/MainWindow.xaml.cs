@@ -21,6 +21,7 @@ using CreatorControlSuite.App.Hud;
 using CreatorControlSuite.App.Mvvm;
 using CreatorControlSuite.App.Services;
 using CreatorControlSuite.App.Themes;
+using CreatorControlSuite.App.Twitch;
 using CreatorControlSuite.App.ViewModels;
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Core.Diagnostics;
@@ -49,6 +50,8 @@ using CreatorControlSuite.Modules.Twitch.Models;
 using CreatorControlSuite.Modules.Workflow;
 using CreatorControlSuite.Modules.Workflow.Models;
 using CreatorControlSuite.Modules.YouTubeMusic;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
 using Microsoft.Win32;
 
 namespace CreatorControlSuite.App;
@@ -114,6 +117,7 @@ public partial class MainWindow : Window
     private readonly System.Windows.Threading.DispatcherTimer _alertAudioPreviewTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private bool _updatingAlertAudioTrimUi;
     private readonly ObservableCollection<string> _twitchChatItems = [];
+    private string? _lastTwitchWebChatUrl;
     private readonly ObservableCollection<TwitchRewardRedemptionItem> _twitchRedemptionItems = [];
     private readonly ObservableCollection<string> _twitchModerationLogItems = [];
     private string? _activeTwitchPollId;
@@ -1497,6 +1501,10 @@ public partial class MainWindow : Window
 
         DisconnectTwitchButton.Click += async (_, _) =>
             await DisconnectTwitchAsync();
+
+        TwitchChatUiBuiltInRadio.Checked += async (_, _) => await OnTwitchChatUiModeChangedAsync();
+        TwitchChatUiEmbeddedWebRadio.Checked += async (_, _) => await OnTwitchChatUiModeChangedAsync();
+        TwitchWebLoginButton.Click += (_, _) => OpenTwitchWebLoginWindow();
 
         SearchTwitchCategoryButton.Click += async (_, _) =>
             await SearchTwitchCategoriesAsync();
@@ -3731,6 +3739,8 @@ public partial class MainWindow : Window
         TwitchConnectOnPrepareBox.IsChecked = _settings.Twitch.ConnectOnPrepare;
         TwitchCreatorDashboardUrlBox.Text = _settings.Twitch.CreatorDashboardUrl;
         TwitchChatEnabledBox.IsChecked = _settings.Twitch.EnableChat;
+        TwitchChatUiBuiltInRadio.IsChecked = _settings.Twitch.ChatUiMode != TwitchChatUiMode.EmbeddedWeb;
+        TwitchChatUiEmbeddedWebRadio.IsChecked = _settings.Twitch.ChatUiMode == TwitchChatUiMode.EmbeddedWeb;
         TwitchEventSubEnabledBox.IsChecked = _settings.Twitch.EnableEventSub;
 
         SpotifyClientIdBox.Text = _settings.Spotify.ClientId;
@@ -3960,6 +3970,7 @@ public partial class MainWindow : Window
             await ConnectStreamerBotAsync();
         }
 
+        await ApplyTwitchChatUiModeAsync();
         _loadingSettingsIntoUi = false;
     }
 
@@ -4033,6 +4044,9 @@ public partial class MainWindow : Window
             _settings.Twitch.ConnectOnPrepare = TwitchConnectOnPrepareBox.IsChecked == true;
             _settings.Twitch.CreatorDashboardUrl = TwitchCreatorDashboardUrlBox.Text.Trim();
             _settings.Twitch.EnableChat = TwitchChatEnabledBox.IsChecked == true;
+            _settings.Twitch.ChatUiMode = TwitchChatUiEmbeddedWebRadio.IsChecked == true
+                ? TwitchChatUiMode.EmbeddedWeb
+                : TwitchChatUiMode.BuiltIn;
             _settings.Twitch.EnableEventSub = TwitchEventSubEnabledBox.IsChecked == true;
 
             _settings.Spotify.ClientId = SpotifyClientIdBox.Text.Trim();
@@ -4188,6 +4202,8 @@ public partial class MainWindow : Window
             await RefreshMusicPlayerUiAsync();
 
             await _secretStore.SaveAsync("obs.password", ObsPasswordBox.Password);
+
+            await ApplyTwitchChatUiModeAsync();
 
             _appLogger.Write(
                 AppLogLevel.Information,
@@ -7724,6 +7740,22 @@ public partial class MainWindow : Window
 
     private void OpenDashboardTwitchChat()
     {
+        string? channel = ResolveTwitchChatChannel();
+        if (string.IsNullOrWhiteSpace(channel))
+        {
+            AddDashboardNotification(
+                "Kein Twitch-Kanal für den Chat konfiguriert.",
+                "Warnung");
+            return;
+        }
+
+        OpenConfiguredTarget(
+            TwitchWebViewProfile.BuildPopoutChatUrl(channel),
+            "Twitch Chat");
+    }
+
+    private string? ResolveTwitchChatChannel()
+    {
         TwitchConnectionSnapshot twitchSnapshot = _twitchModule.GetSnapshot();
         string channel = twitchSnapshot.ChannelLogin;
 
@@ -7734,17 +7766,124 @@ public partial class MainWindow : Window
                 : _settings.Twitch.ChannelName;
         }
 
-        if (string.IsNullOrWhiteSpace(channel))
+        return string.IsNullOrWhiteSpace(channel) ? null : channel.Trim();
+    }
+
+    private async Task OnTwitchChatUiModeChangedAsync()
+    {
+        if (_loadingSettingsIntoUi)
         {
-            AddDashboardNotification(
-                "Kein Twitch-Kanal für den Chat konfiguriert.",
-                "Warnung");
             return;
         }
 
-        OpenConfiguredTarget(
-            $"https://www.twitch.tv/popout/{channel}/chat?popout=",
-            "Twitch Chat");
+        _settings.Twitch.ChatUiMode = TwitchChatUiEmbeddedWebRadio.IsChecked == true
+            ? TwitchChatUiMode.EmbeddedWeb
+            : TwitchChatUiMode.BuiltIn;
+        await ApplyTwitchChatUiModeAsync();
+    }
+
+    private void OpenTwitchWebLoginWindow()
+    {
+        var window = new TwitchWebLoginWindow
+        {
+            Owner = this,
+        };
+        window.ShowDialog();
+        _ = RefreshTwitchWebChatViewsAsync(forceReload: true);
+    }
+
+    private async Task ApplyTwitchChatUiModeAsync()
+    {
+        bool web = _settings.Twitch.ChatUiMode == TwitchChatUiMode.EmbeddedWeb;
+
+        DashboardTwitchChatList.Visibility = web ? Visibility.Collapsed : Visibility.Visible;
+        DashboardTwitchWebChat.Visibility = web ? Visibility.Visible : Visibility.Collapsed;
+        DashboardTwitchChatHeader.Visibility = web ? Visibility.Collapsed : Visibility.Visible;
+        DashboardTwitchChatControls.Visibility = web ? Visibility.Collapsed : Visibility.Visible;
+        DashboardTwitchChatHeaderRow.Height = web ? new GridLength(0) : GridLength.Auto;
+        DashboardTwitchChatControlsRow.Height = web ? new GridLength(0) : GridLength.Auto;
+        DashboardTwitchChatContentHost.Margin = web ? new Thickness(0) : new Thickness(0, 8, 0, 8);
+        DashboardTwitchChatModule.Padding = web ? new Thickness(0) : new Thickness(10);
+
+        ServicesTwitchChatList.Visibility = web ? Visibility.Collapsed : Visibility.Visible;
+        ServicesTwitchWebChat.Visibility = web ? Visibility.Visible : Visibility.Collapsed;
+
+        TwitchBuiltInChatPanel.Visibility = web ? Visibility.Collapsed : Visibility.Visible;
+        TwitchWebChatSettingsHint.Visibility = web ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!web)
+        {
+            return;
+        }
+
+        await RefreshTwitchWebChatViewsAsync(forceReload: false);
+    }
+
+    private async Task RefreshTwitchWebChatViewsAsync(bool forceReload)
+    {
+        if (_settings.Twitch.ChatUiMode != TwitchChatUiMode.EmbeddedWeb)
+        {
+            return;
+        }
+
+        string? channel = ResolveTwitchChatChannel();
+        if (string.IsNullOrWhiteSpace(channel))
+        {
+            return;
+        }
+
+        string url = TwitchWebViewProfile.BuildPopoutChatUrl(channel);
+        if (!forceReload &&
+            string.Equals(_lastTwitchWebChatUrl, url, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            await EnsureAndNavigateTwitchWebChatAsync(DashboardTwitchWebChat, url, forceReload);
+            await EnsureAndNavigateTwitchWebChatAsync(ServicesTwitchWebChat, url, forceReload);
+            _lastTwitchWebChatUrl = url;
+        }
+        catch (WebView2RuntimeNotFoundException)
+        {
+            AddDashboardNotification(
+                "WebView2 Runtime fehlt. Bitte Evergreen Runtime installieren oder den Systembrowser nutzen.",
+                "Warnung");
+            MessageBoxResult result = MessageBox.Show(
+                this,
+                "Die Microsoft Edge WebView2 Runtime ist nicht installiert.\n\nInstaller jetzt im Browser öffnen?",
+                "WebView2 Runtime fehlt",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (result == MessageBoxResult.Yes)
+            {
+                OpenConfiguredTarget(TwitchWebViewProfile.RuntimeInstallerUrl, "WebView2 Runtime");
+            }
+        }
+        catch (Exception ex)
+        {
+            AddDashboardNotification("Web-Chat konnte nicht geladen werden: " + ex.Message, "Warnung");
+        }
+    }
+
+    private static async Task EnsureAndNavigateTwitchWebChatAsync(WebView2 webView, string url, bool forceReload = false)
+    {
+        await TwitchWebViewProfile.EnsureAsync(webView);
+        if (!forceReload &&
+            webView.Source?.AbsoluteUri is string current &&
+            string.Equals(current, url, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (forceReload && webView.CoreWebView2 is not null)
+        {
+            webView.CoreWebView2.Navigate(url);
+            return;
+        }
+
+        webView.Source = new Uri(url);
     }
 
 
@@ -13462,6 +13601,7 @@ public partial class MainWindow : Window
         ServicesTwitchTitleBox.Text = snapshot.ChannelTitle;
         ServicesTwitchCategorySearchBox.Text = snapshot.CategoryName;
         RefreshDashboardServiceActionButtons();
+        _ = RefreshTwitchWebChatViewsAsync(forceReload: false);
     }
 
     private static string GetTwitchRoleLabel(
