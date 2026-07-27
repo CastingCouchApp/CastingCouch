@@ -49,6 +49,8 @@ public static class StreamingModuleRegistrations
         {
             services.AddHttpClient<ITwitchOAuthClient, TwitchOAuthClient>();
             services.AddHttpClient<ITwitchApiClient, TwitchApiClient>();
+            services.AddHttpClient<IChatEmoteCatalog, ChatEmoteCatalog>();
+            services.AddSingleton<IChatBadgeCatalog, ChatBadgeCatalog>();
             services.AddSingleton<ITwitchEventSubClient, TwitchEventSubClient>();
             services.AddSingleton<TwitchTokenRepository>();
             services.AddSingleton<TwitchModule>();
@@ -107,7 +109,10 @@ public static class StreamingModuleRegistrations
 
         public void Register(IServiceCollection services)
         {
+            services.AddSingleton<OverlayRealtimeHub>();
+            services.AddSingleton<IOverlayRealtimeHub>(sp => sp.GetRequiredService<OverlayRealtimeHub>());
             services.AddSingleton<IOverlayDataService, OverlayDataService>();
+            services.AddSingleton<IOverlayWebServer, OverlayWebServer>();
             services.AddSingleton<OverlayModule>();
             services.AddStreamingModuleBinding<OverlayModule>();
         }

@@ -21,7 +21,7 @@
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}">
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="36"
+        <shell:WindowChrome CaptionHeight="140"
                             ResizeBorderThickness="6"
                             GlassFrameThickness="0"
                             CornerRadius="0"
@@ -41,7 +41,7 @@
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="36"/>
+            <RowDefinition Height="140"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -50,111 +50,311 @@
                 BorderBrush="{DynamicResource SidebarBorderBrush}"
                 BorderThickness="0,0,0,1">
             <Grid>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" IsHitTestVisible="False">
-                    <Image Source="Assets/Brand/app.png"
-                           Width="18"
-                           Height="18"
-                           Margin="0,0,10,0"
-                           Stretch="Uniform"
-                           RenderOptions.BitmapScalingMode="HighQuality"/>
-                    <TextBlock Text="NEXORA"
-                               Foreground="{DynamicResource TextPrimaryBrush}"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center"
-                               FontFamily="{DynamicResource AppHeadingFontFamily}"/>
-                    <TextBlock Text="· Creator Control Suite"
-                               Foreground="{DynamicResource TextMutedBrush}"
-                               FontSize="12"
-                               VerticalAlignment="Center"
-                               Margin="8,0,0,0"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="12,0,4,0"
+                            IsHitTestVisible="False">
+                    <Border Width="48" Height="48" CornerRadius="8" ClipToBounds="True" Margin="0,0,10,0">
+                        <Image Source="Assets/Brand/app.png"
+                               Stretch="UniformToFill"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="NEXORA"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   FontSize="22"
+                                   FontWeight="Light"
+                                   FontFamily="{DynamicResource AppHeadingFontFamily}"/>
+                        <TextBlock Text="STREAMING CONTROL SUITE"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Border x:Name="TitleBarMusicWidget"
-                            Margin="0,0,8,0"
-                            Padding="8,0"
-                            VerticalAlignment="Stretch"
-                            Cursor="Hand"
-                            Background="Transparent"
+                <Grid x:Name="DashboardTopStatusRow" Grid.Column="1" Margin="8,6,8,6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Border x:Name="DashboardServiceStatusSection" Background="Transparent" BorderThickness="0" Padding="0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <!-- Stream-Widget: Live-Status -->
+                            <Border Margin="5" Padding="12,10" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" MinWidth="180" VerticalAlignment="Stretch">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Width="38" Height="38" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,9,0">
+                                            <TextBlock Text="●" Foreground="{DynamicResource SuccessBrush}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Text="Stream" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
+                                        <Ellipse x:Name="StreamDashboardLamp" Width="7" Height="7" Fill="IndianRed" Margin="0,5,6,0"/>
+                                        <TextBlock x:Name="StreamDashboardStatus" Text="OFFLINE" Foreground="{DynamicResource SuccessBrush}" FontSize="12" TextWrapping="NoWrap"/>
+                                        <TextBlock Text="  "/>
+                                        <TextBlock x:Name="DashboardStreamDetailText" Text="00:00:00" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="NoWrap"/>
+                                    </StackPanel>
+                                    <Button x:Name="DashboardHeaderStreamActionButton" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Stream abhängig vom aktuellen Zustand starten oder beenden" Content="●  LIVE GEHEN" Background="{DynamicResource DangerBrush}" Foreground="{DynamicResource TextOnAccentBrush}" BorderBrush="{DynamicResource DangerBrush}" FontWeight="Bold" Height="30" Padding="12,2" Margin="0,10,0,0" HorizontalAlignment="Left"/>
+                                </StackPanel>
+                            </Border>
+                            <!-- Qualitäts-Widget neben Stream -->
+                            <Border Grid.Column="1" Margin="5" Padding="12,10" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" MinWidth="240" VerticalAlignment="Stretch" x:Name="DashboardStreamQualityModule">
+                                <StackPanel>
+                                    <DockPanel LastChildFill="True">
+                                        <Ellipse x:Name="DashboardStreamQualityLamp" Width="8" Height="8" Fill="{DynamicResource TextMutedBrush}" Margin="0,4,7,0" DockPanel.Dock="Left"/>
+                                        <TextBlock Text="Qualität" FontWeight="SemiBold" FontSize="15"/>
+                                        <TextBlock x:Name="DashboardStreamQualityStatusText" Text="OBS nicht verbunden" Foreground="{DynamicResource TextMutedBrush}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                    <UniformGrid Columns="2" Margin="0,10,0,0">
+                                        <StackPanel Margin="0,0,10,6">
+                                            <TextBlock Text="BITRATE" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
+                                            <TextBlock x:Name="DashboardStreamBitrateText" Text="0 kbps" FontSize="14" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,0,6">
+                                            <TextBlock Text="FPS" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
+                                            <TextBlock x:Name="DashboardStreamFpsText" Text="0 / 60" FontSize="14" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,10,0">
+                                            <TextBlock Text="DROPS" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
+                                            <TextBlock x:Name="DashboardDroppedFramesText" Text="0 (0 %)" FontSize="13" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="RENDER" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
+                                            <TextBlock x:Name="DashboardRenderLagText" Text="0 (0 %)" FontSize="13" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock x:Name="DashboardStreamQualityDetailText" Text="Stream ist offline" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,8,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <!-- Music Player in der Dashboard-Titelleiste -->
+                            <Border x:Name="DashboardTopMusicWidget"
+                                    Grid.Column="2"
+                                    shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                                    Margin="5"
+                                    Padding="12,10"
+                                    Background="{DynamicResource CardBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Width="380"
+                                    MaxWidth="380"
+                                    VerticalAlignment="Stretch"
+                                    Cursor="Hand"
+                                    ToolTip="Music Player öffnen">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="92"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="84" Height="84" CornerRadius="6" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Image x:Name="DashboardTopMusicCoverImage" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
+                                        <TextBlock x:Name="DashboardTopMusicProviderText" Text="MUSIC PLAYER" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
+                                        <Border x:Name="DashboardTopMusicTitleViewport"
+                                                ClipToBounds="True"
+                                                Margin="0,4,0,0"
+                                                Height="24">
+                                            <TextBlock x:Name="DashboardTopMusicTitleText"
+                                                       Text="Kein Titel"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="NoWrap"
+                                                       HorizontalAlignment="Left">
+                                                <TextBlock.RenderTransform>
+                                                    <TranslateTransform x:Name="DashboardTopMusicTitleTranslate"/>
+                                                </TextBlock.RenderTransform>
+                                            </TextBlock>
+                                        </Border>
+                                        <TextBlock x:Name="DashboardTopMusicArtistText" Text="-" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                        <TextBlock x:Name="DashboardTopMusicAlbumText" Text="Album: -" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                        <Grid Margin="0,5,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="112"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="DashboardTopMusicStatusText" Text="Nicht verbunden" Foreground="{DynamicResource AccentBrush}" FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            <Slider x:Name="DashboardTopMusicVolumeSlider" shell:WindowChrome.IsHitTestVisibleInChrome="True" Grid.Column="1" Minimum="0" Maximum="100" Value="100" Height="16" Margin="6,0,4,0" VerticalAlignment="Center" ToolTip="Spotify-Lautstärke"/>
+                                            <TextBlock x:Name="DashboardTopMusicVolumeText" Grid.Column="2" Text="100 %" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button x:Name="DashboardTopMusicPreviousButton" shell:WindowChrome.IsHitTestVisibleInChrome="True" Content="⏮" Width="28" Height="28" FontSize="12" Padding="0" Margin="0,0,4,0" MinWidth="28" MinHeight="28" ToolTip="Zurück"/>
+                                        <Button x:Name="DashboardTopMusicPlayPauseButton" shell:WindowChrome.IsHitTestVisibleInChrome="True" Content="▶" Width="32" Height="28" FontSize="12" FontWeight="Bold" Padding="0" Margin="0,0,4,0" MinWidth="32" MinHeight="28" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" ToolTip="Play/Pause"/>
+                                        <Button x:Name="DashboardTopMusicNextButton" shell:WindowChrome.IsHitTestVisibleInChrome="True" Content="⏭" Width="28" Height="28" FontSize="12" Padding="0" Margin="0" MinWidth="28" MinHeight="28" ToolTip="Weiter"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <!-- Community-Widgets in der Titelzeile -->
+                            <WrapPanel x:Name="DashboardCommunityModule" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Margin="5" Padding="12,10" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" MinWidth="280">
+                                    <StackPanel>
+                                        <TextBlock Text="COMMUNITY" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                        <UniformGrid Columns="4">
+                                            <StackPanel Margin="0,0,10,0">
+                                                <TextBlock x:Name="DashboardHeroViewerText" Text="0" FontSize="22" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Zuschauer" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,10,0">
+                                                <TextBlock x:Name="DashboardHeroFollowerText" Text="0" FontSize="22" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Follower" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,10,0">
+                                                <TextBlock x:Name="DashboardChatAlertsText" Text="0" FontSize="22" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Abos" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                            </StackPanel>
+                                            <StackPanel>
+                                                <TextBlock x:Name="DashboardCommunityChattersText" Text="0" FontSize="22" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Chatter" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                            </StackPanel>
+                                        </UniformGrid>
+                                        <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" BorderThickness="1" CornerRadius="5" Margin="0,10,0,0" Padding="6">
+                                            <Grid>
+                                                <Canvas Height="36" ClipToBounds="True">
+                                                    <Polyline x:Name="DashboardViewerTrendLine" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2"/>
+                                                </Canvas>
+                                                <TextBlock Text="-60 Min" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" VerticalAlignment="Bottom" HorizontalAlignment="Left"/>
+                                                <TextBlock Text="Jetzt" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                                <Border Margin="5" Padding="12,10" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" MinWidth="260">
+                                    <StackPanel>
+                                        <TextBlock Text="SESSION" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                        <UniformGrid Columns="4">
+                                            <StackPanel Margin="0,0,8,0">
+                                                <TextBlock x:Name="DashboardPeakViewersText" Text="0" FontSize="18" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Peak" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,8,0">
+                                                <TextBlock x:Name="DashboardAverageViewersText" Text="0" FontSize="18" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Ø Zusch." Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,8,0">
+                                                <TextBlock x:Name="DashboardFollowersGainedText" Text="0" FontSize="18" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Follower +" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                                <TextBlock x:Name="DashboardFollowerTotalText" Text="Gesamt: 0" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
+                                            </StackPanel>
+                                            <StackPanel>
+                                                <TextBlock x:Name="DashboardCommunityUniqueChattersText" Text="0" FontSize="18" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Unique" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                            </StackPanel>
+                                        </UniformGrid>
+                                        <TextBlock x:Name="DashboardTwitchSessionMetricsText" Text="Subs 0 · Gift-Subs 0 · Bits 0 · Raids 0" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="DashboardTwitchGoalsText" Text="Follower-Ziel: 0 / 0 · Sub-Ziel: 0 / 0" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+                            </WrapPanel>
+                            <!-- Kompatibilitäts-Host für Status/Connect-Controls -->
+                            <StackPanel Visibility="Collapsed">
+                                <Ellipse x:Name="ObsDashboardLamp"/>
+                                <TextBlock x:Name="ObsDashboardStatus"/>
+                                <Button x:Name="DashboardOpenObsServiceButton"/>
+                                <Button x:Name="DashboardTopConnectObsButton"/>
+                                <Ellipse x:Name="TwitchDashboardLamp"/>
+                                <TextBlock x:Name="TwitchDashboardStatus"/>
+                                <Button x:Name="DashboardOpenTwitchServiceButton"/>
+                                <Button x:Name="DashboardTopConnectTwitchButton"/>
+                                <Ellipse x:Name="SpotifyDashboardLamp"/>
+                                <TextBlock x:Name="SpotifyDashboardStatus"/>
+                                <Button x:Name="DashboardOpenSpotifyServiceButton"/>
+                                <Button x:Name="DashboardTopConnectSpotifyButton"/>
+                                <Ellipse x:Name="StreamerBotDashboardLamp"/>
+                                <TextBlock x:Name="StreamerBotDashboardStatus"/>
+                                <Button x:Name="DashboardOpenStreamerBotServiceButton"/>
+                                <Button x:Name="DashboardTopConnectStreamerBotButton"/>
+                                <Button x:Name="DashboardTopOpenStreamDeckButton"/>
+                                <Ellipse x:Name="AlertsDashboardLamp"/>
+                                <TextBlock x:Name="AlertsDashboardStatus"/>
+                                <Button x:Name="DashboardOpenAlertsServiceButton"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+                <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="TitleBarMinimizeButton"
+                                Style="{StaticResource TitleBarCaptionButtonStyle}"
+                                ToolTip="Minimieren"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                                Click="TitleBarMinimizeButton_Click">
+                            <Path Width="10" Height="10" Stretch="Uniform" StrokeThickness="1.4"
+                                  Data="M0,5 L10,5"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Button>
+                        <Button x:Name="TitleBarMaximizeButton"
+                                Style="{StaticResource TitleBarCaptionButtonStyle}"
+                                ToolTip="Maximieren"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                                Click="TitleBarMaximizeButton_Click">
+                            <Grid Width="10" Height="10">
+                                <Path x:Name="TitleBarMaximizeIcon"
+                                      Width="10" Height="10" Stretch="Uniform" StrokeThickness="1.4" Fill="Transparent"
+                                      Data="M0,0 H10 V10 H0 Z"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                <Path x:Name="TitleBarRestoreIcon"
+                                      Width="10" Height="10" Stretch="Uniform" StrokeThickness="1.4" Fill="Transparent"
+                                      Visibility="Collapsed"
+                                      Data="M2.5,0 H10 V7.5 H2.5 Z M0,2.5 H7.5 V10 H0 Z"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Grid>
+                        </Button>
+                        <Button x:Name="TitleBarCloseButton"
+                                Style="{StaticResource TitleBarCloseButtonStyle}"
+                                ToolTip="Schließen"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                                Click="TitleBarCloseButton_Click">
+                            <Path Width="10" Height="10" Stretch="Uniform" StrokeThickness="1.4"
+                                  Data="M0,0 L10,10 M10,0 L0,10"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Button>
+                    </StackPanel>
+                    <!-- Verbindungen unter den Window-Controls, rechtsbündig; Details im Mouseover -->
+                    <Border x:Name="DashboardConnectionSummaryChip"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            ToolTip="Music Player öffnen">
+                            Margin="0,6,8,0"
+                            Padding="12,8"
+                            Background="{DynamicResource CardBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="9"
+                            HorizontalAlignment="Right"
+                            Cursor="Hand"
+                            ToolTipService.InitialShowDelay="180"
+                            ToolTipService.BetweenShowDelay="0"
+                            ToolTipService.ShowDuration="20000">
+                        <Border.ToolTip>
+                            <ToolTip Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" Padding="12">
+                                <StackPanel MinWidth="220">
+                                    <TextBlock x:Name="DashboardConnectionTooltipTitle"
+                                               Text="Verbindungen"
+                                               FontWeight="SemiBold"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="0,0,0,8"/>
+                                    <StackPanel x:Name="DashboardConnectionTooltipListPanel"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Width="22" Height="22" CornerRadius="3" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" Margin="0,0,8,0">
-                                <Image x:Name="TitleBarMusicCoverImage" Stretch="UniformToFill"/>
-                            </Border>
-                            <Border x:Name="TitleBarMusicTrackViewport"
-                                    Width="160"
-                                    MaxWidth="160"
-                                    ClipToBounds="True"
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,8,0">
-                                <TextBlock x:Name="TitleBarMusicTrackText"
-                                           Text="Kein Titel"
-                                           TextWrapping="NoWrap"
-                                           VerticalAlignment="Center"
-                                           HorizontalAlignment="Left"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           FontSize="12">
-                                    <TextBlock.RenderTransform>
-                                        <TranslateTransform x:Name="TitleBarMusicTrackTranslate"/>
-                                    </TextBlock.RenderTransform>
-                                </TextBlock>
-                            </Border>
-                            <Button x:Name="TitleBarMusicPreviousButton"
-                                    Style="{StaticResource TitleBarCaptionButtonStyle}"
-                                    Width="28"
-                                    Content="⏮"
-                                    ToolTip="Zurück"
-                                    shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-                            <Button x:Name="TitleBarMusicPlayPauseButton"
-                                    Style="{StaticResource TitleBarCaptionButtonStyle}"
-                                    Width="28"
-                                    Content="▶"
-                                    ToolTip="Play/Pause"
-                                    shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-                            <Button x:Name="TitleBarMusicNextButton"
-                                    Style="{StaticResource TitleBarCaptionButtonStyle}"
-                                    Width="28"
-                                    Content="⏭"
-                                    ToolTip="Weiter"
-                                    shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                            <Ellipse x:Name="DashboardConnectionSummaryLamp" Width="9" Height="9" Fill="IndianRed" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="DashboardConnectionSummaryCount" Text="0/4" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="VERBINDUNGEN" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="DashboardConnectionSummaryDetail" Text="offline" Foreground="{DynamicResource WarningBrush}" FontSize="11"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
-                    <Button x:Name="TitleBarMinimizeButton"
-                            Style="{StaticResource TitleBarCaptionButtonStyle}"
-                            ToolTip="Minimieren"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            Click="TitleBarMinimizeButton_Click">
-                        <Path Width="10" Height="10" Stretch="Uniform" StrokeThickness="1.4"
-                              Data="M0,5 L10,5"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                    </Button>
-                    <Button x:Name="TitleBarMaximizeButton"
-                            Style="{StaticResource TitleBarCaptionButtonStyle}"
-                            ToolTip="Maximieren"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            Click="TitleBarMaximizeButton_Click">
-                        <Grid Width="10" Height="10">
-                            <Path x:Name="TitleBarMaximizeIcon"
-                                  Width="10" Height="10" Stretch="Uniform" StrokeThickness="1.4" Fill="Transparent"
-                                  Data="M0,0 H10 V10 H0 Z"
-                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                            <Path x:Name="TitleBarRestoreIcon"
-                                  Width="10" Height="10" Stretch="Uniform" StrokeThickness="1.4" Fill="Transparent"
-                                  Visibility="Collapsed"
-                                  Data="M2.5,0 H10 V7.5 H2.5 Z M0,2.5 H7.5 V10 H0 Z"
-                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                        </Grid>
-                    </Button>
-                    <Button x:Name="TitleBarCloseButton"
-                            Style="{StaticResource TitleBarCloseButtonStyle}"
-                            ToolTip="Schließen"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            Click="TitleBarCloseButton_Click">
-                        <Path Width="10" Height="10" Stretch="Uniform" StrokeThickness="1.4"
-                              Data="M0,0 L10,10 M10,0 L0,10"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
@@ -192,21 +392,6 @@
                         </Grid>
                     </StackPanel>
                     <StackPanel Margin="14,18,14,10">
-                        <Grid Margin="6,0,6,24">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="56"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" ClipToBounds="True">
-                                <Image Source="Assets/Brand/app.png"
-                                       Stretch="UniformToFill"
-                                       RenderOptions.BitmapScalingMode="HighQuality"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
-                                <TextBlock Text="NEXORA" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="28" FontWeight="Light" FontFamily="{DynamicResource AppHeadingFontFamily}"/>
-                                <TextBlock Text="STREAMING CONTROL SUITE" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
-                            </StackPanel>
-                        </Grid>
                         <Button x:Name="DashboardButton" Content="▦   Dashboard" Style="{StaticResource SidebarNavButtonStyle}"/>
                         <Button x:Name="PlayerButton" Content="♫   Player" Style="{StaticResource SidebarNavButtonStyle}"/>
                         <Button x:Name="ServicesButton" Content="⚙   Dienste" Style="{StaticResource SidebarNavButtonStyle}"/>
@@ -265,253 +450,11 @@
                              <Grid.RowDefinitions>
                                  <RowDefinition Height="Auto"/>
                                  <RowDefinition Height="Auto"/>
-                                 <RowDefinition Height="Auto"/>
                                  <RowDefinition Height="*"/>
                                  <RowDefinition Height="Auto"/>
                              </Grid.RowDefinitions>
-                            <Grid x:Name="DashboardTopStatusRow" Grid.Row="0" Margin="0,0,0,12" HorizontalAlignment="Stretch">
-                                <Border x:Name="DashboardServiceStatusSection" Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" BorderThickness="1" CornerRadius="10" Padding="8">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <!-- Stream-Widget: Live-Status -->
-                                        <Border Margin="5" Padding="12,10" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" MinWidth="180" VerticalAlignment="Stretch">
-                                            <StackPanel>
-                                                <StackPanel Orientation="Horizontal">
-                                                    <Border Width="38" Height="38" CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,9,0">
-                                                        <TextBlock Text="●" Foreground="{DynamicResource SuccessBrush}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <TextBlock Text="Stream" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
-                                                    <Ellipse x:Name="StreamDashboardLamp" Width="7" Height="7" Fill="IndianRed" Margin="0,5,6,0"/>
-                                                    <TextBlock x:Name="StreamDashboardStatus" Text="OFFLINE" Foreground="{DynamicResource SuccessBrush}" FontSize="12" TextWrapping="NoWrap"/>
-                                                    <TextBlock Text="  "/>
-                                                    <TextBlock x:Name="DashboardStreamDetailText" Text="00:00:00" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="NoWrap"/>
-                                                </StackPanel>
-                                                <Button x:Name="DashboardHeaderStreamActionButton" ToolTip="Stream abhängig vom aktuellen Zustand starten oder beenden" Content="●  LIVE GEHEN" Background="{DynamicResource DangerBrush}" Foreground="{DynamicResource TextOnAccentBrush}" BorderBrush="{DynamicResource DangerBrush}" FontWeight="Bold" Height="30" Padding="12,2" Margin="0,10,0,0" HorizontalAlignment="Left"/>
-                                            </StackPanel>
-                                        </Border>
-                                        <!-- Qualitäts-Widget neben Stream -->
-                                        <Border Grid.Column="1" Margin="5" Padding="12,10" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" MinWidth="240" VerticalAlignment="Stretch" x:Name="DashboardStreamQualityModule">
-                                            <StackPanel>
-                                                <DockPanel LastChildFill="True">
-                                                    <Ellipse x:Name="DashboardStreamQualityLamp" Width="8" Height="8" Fill="{DynamicResource TextMutedBrush}" Margin="0,4,7,0" DockPanel.Dock="Left"/>
-                                                    <TextBlock Text="Qualität" FontWeight="SemiBold" FontSize="15"/>
-                                                    <TextBlock x:Name="DashboardStreamQualityStatusText" Text="OBS nicht verbunden" Foreground="{DynamicResource TextMutedBrush}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                                                </DockPanel>
-                                                <UniformGrid Columns="2" Margin="0,10,0,0">
-                                                    <StackPanel Margin="0,0,10,6">
-                                                        <TextBlock Text="BITRATE" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
-                                                        <TextBlock x:Name="DashboardStreamBitrateText" Text="0 kbps" FontSize="14" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                    <StackPanel Margin="0,0,0,6">
-                                                        <TextBlock Text="FPS" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
-                                                        <TextBlock x:Name="DashboardStreamFpsText" Text="0 / 60" FontSize="14" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                    <StackPanel Margin="0,0,10,0">
-                                                        <TextBlock Text="DROPS" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
-                                                        <TextBlock x:Name="DashboardDroppedFramesText" Text="0 (0 %)" FontSize="13" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                    <StackPanel>
-                                                        <TextBlock Text="RENDER" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
-                                                        <TextBlock x:Name="DashboardRenderLagText" Text="0 (0 %)" FontSize="13" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                </UniformGrid>
-                                                <TextBlock x:Name="DashboardStreamQualityDetailText" Text="Stream ist offline" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,8,0,0"/>
-                                            </StackPanel>
-                                        </Border>
-                                        <!-- Music Player in der Dashboard-Titelleiste -->
-                                        <Border x:Name="DashboardTopMusicWidget"
-                                                Grid.Column="2"
-                                                Margin="5"
-                                                Padding="12,10"
-                                                Background="{DynamicResource CardBackgroundBrush}"
-                                                BorderBrush="{DynamicResource BorderBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="9"
-                                                Width="380"
-                                                MaxWidth="380"
-                                                VerticalAlignment="Stretch"
-                                                Cursor="Hand"
-                                                ToolTip="Music Player öffnen">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="92"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Border Width="84" Height="84" CornerRadius="6" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" ClipToBounds="True" VerticalAlignment="Center">
-                                                    <Image x:Name="DashboardTopMusicCoverImage" Stretch="UniformToFill"/>
-                                                </Border>
-                                                <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
-                                                    <TextBlock x:Name="DashboardTopMusicProviderText" Text="MUSIC PLAYER" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
-                                                    <Border x:Name="DashboardTopMusicTitleViewport"
-                                                            ClipToBounds="True"
-                                                            Margin="0,4,0,0"
-                                                            Height="24">
-                                                        <TextBlock x:Name="DashboardTopMusicTitleText"
-                                                                   Text="Kein Titel"
-                                                                   FontSize="18"
-                                                                   FontWeight="SemiBold"
-                                                                   TextWrapping="NoWrap"
-                                                                   HorizontalAlignment="Left">
-                                                            <TextBlock.RenderTransform>
-                                                                <TranslateTransform x:Name="DashboardTopMusicTitleTranslate"/>
-                                                            </TextBlock.RenderTransform>
-                                                        </TextBlock>
-                                                    </Border>
-                                                    <TextBlock x:Name="DashboardTopMusicArtistText" Text="-" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
-                                                    <TextBlock x:Name="DashboardTopMusicAlbumText" Text="Album: -" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
-                                                    <Grid Margin="0,5,0,0">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="112"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock x:Name="DashboardTopMusicStatusText" Text="Nicht verbunden" Foreground="{DynamicResource AccentBrush}" FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                        <Slider x:Name="DashboardTopMusicVolumeSlider" Grid.Column="1" Minimum="0" Maximum="100" Value="100" Height="16" Margin="6,0,4,0" VerticalAlignment="Center" ToolTip="Spotify-Lautstärke"/>
-                                                        <TextBlock x:Name="DashboardTopMusicVolumeText" Grid.Column="2" Text="100 %" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" VerticalAlignment="Center"/>
-                                                    </Grid>
-                                                </StackPanel>
-                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Button x:Name="DashboardTopMusicPreviousButton" Content="⏮" Width="28" Height="28" FontSize="12" Padding="0" Margin="0,0,4,0" MinWidth="28" MinHeight="28" ToolTip="Zurück"/>
-                                                    <Button x:Name="DashboardTopMusicPlayPauseButton" Content="▶" Width="32" Height="28" FontSize="12" FontWeight="Bold" Padding="0" Margin="0,0,4,0" MinWidth="32" MinHeight="28" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" ToolTip="Play/Pause"/>
-                                                    <Button x:Name="DashboardTopMusicNextButton" Content="⏭" Width="28" Height="28" FontSize="12" Padding="0" Margin="0" MinWidth="28" MinHeight="28" ToolTip="Weiter"/>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                        <!-- Community-Widgets in der Titelzeile -->
-                                        <WrapPanel x:Name="DashboardCommunityModule" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Border Margin="5" Padding="12,10" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" MinWidth="280">
-                                                <StackPanel>
-                                                    <TextBlock Text="COMMUNITY" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                                    <UniformGrid Columns="4">
-                                                        <StackPanel Margin="0,0,10,0">
-                                                            <TextBlock x:Name="DashboardHeroViewerText" Text="0" FontSize="22" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="Zuschauer" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
-                                                        </StackPanel>
-                                                        <StackPanel Margin="0,0,10,0">
-                                                            <TextBlock x:Name="DashboardHeroFollowerText" Text="0" FontSize="22" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="Follower" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
-                                                        </StackPanel>
-                                                        <StackPanel Margin="0,0,10,0">
-                                                            <TextBlock x:Name="DashboardChatAlertsText" Text="0" FontSize="22" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="Abos" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
-                                                        </StackPanel>
-                                                        <StackPanel>
-                                                            <TextBlock x:Name="DashboardCommunityChattersText" Text="0" FontSize="22" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="Chatter" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
-                                                        </StackPanel>
-                                                    </UniformGrid>
-                                                    <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" BorderThickness="1" CornerRadius="5" Margin="0,10,0,0" Padding="6">
-                                                        <Grid>
-                                                            <Canvas Height="36" ClipToBounds="True">
-                                                                <Polyline x:Name="DashboardViewerTrendLine" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2"/>
-                                                            </Canvas>
-                                                            <TextBlock Text="-60 Min" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" VerticalAlignment="Bottom" HorizontalAlignment="Left"/>
-                                                            <TextBlock Text="Jetzt" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
-                                                        </Grid>
-                                                    </Border>
-                                                </StackPanel>
-                                            </Border>
-                                            <Border Margin="5" Padding="12,10" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" MinWidth="260">
-                                                <StackPanel>
-                                                    <TextBlock Text="SESSION" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                                    <UniformGrid Columns="4">
-                                                        <StackPanel Margin="0,0,8,0">
-                                                            <TextBlock x:Name="DashboardPeakViewersText" Text="0" FontSize="18" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="Peak" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
-                                                        </StackPanel>
-                                                        <StackPanel Margin="0,0,8,0">
-                                                            <TextBlock x:Name="DashboardAverageViewersText" Text="0" FontSize="18" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="Ø Zusch." Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
-                                                        </StackPanel>
-                                                        <StackPanel Margin="0,0,8,0">
-                                                            <TextBlock x:Name="DashboardFollowersGainedText" Text="0" FontSize="18" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="Follower +" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
-                                                            <TextBlock x:Name="DashboardFollowerTotalText" Text="Gesamt: 0" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"/>
-                                                        </StackPanel>
-                                                        <StackPanel>
-                                                            <TextBlock x:Name="DashboardCommunityUniqueChattersText" Text="0" FontSize="18" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="Unique" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
-                                                        </StackPanel>
-                                                    </UniformGrid>
-                                                    <TextBlock x:Name="DashboardTwitchSessionMetricsText" Text="Subs 0 · Gift-Subs 0 · Bits 0 · Raids 0" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,10,0,0" TextWrapping="Wrap"/>
-                                                    <TextBlock x:Name="DashboardTwitchGoalsText" Text="Follower-Ziel: 0 / 0 · Sub-Ziel: 0 / 0" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                                </StackPanel>
-                                            </Border>
-                                        </WrapPanel>
-                                        <!-- Verbindungen als Zahl rechts; Details im Mouseover -->
-                                        <Border x:Name="DashboardConnectionSummaryChip"
-                                                Grid.Column="4"
-                                                Margin="5"
-                                                Padding="14,10"
-                                                Background="{DynamicResource CardBackgroundBrush}"
-                                                BorderBrush="{DynamicResource BorderBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="9"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Center"
-                                                Cursor="Hand"
-                                                ToolTipService.InitialShowDelay="180"
-                                                ToolTipService.BetweenShowDelay="0"
-                                                ToolTipService.ShowDuration="20000">
-                                            <Border.ToolTip>
-                                                <ToolTip Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" Padding="12">
-                                                    <StackPanel MinWidth="220">
-                                                        <TextBlock x:Name="DashboardConnectionTooltipTitle"
-                                                                   Text="Verbindungen"
-                                                                   FontWeight="SemiBold"
-                                                                   FontSize="13"
-                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                                   Margin="0,0,0,8"/>
-                                                        <StackPanel x:Name="DashboardConnectionTooltipListPanel"/>
-                                                    </StackPanel>
-                                                </ToolTip>
-                                            </Border.ToolTip>
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Ellipse x:Name="DashboardConnectionSummaryLamp" Width="9" Height="9" Fill="IndianRed" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                                <TextBlock x:Name="DashboardConnectionSummaryCount" Text="0/4" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock Text="VERBINDUNGEN" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
-                                                    <TextBlock x:Name="DashboardConnectionSummaryDetail" Text="offline" Foreground="{DynamicResource WarningBrush}" FontSize="11"/>
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </Border>
-                                        <!-- Kompatibilitäts-Host für Status/Connect-Controls -->
-                                        <StackPanel Visibility="Collapsed">
-                                            <Ellipse x:Name="ObsDashboardLamp"/>
-                                            <TextBlock x:Name="ObsDashboardStatus"/>
-                                            <Button x:Name="DashboardOpenObsServiceButton"/>
-                                            <Button x:Name="DashboardTopConnectObsButton"/>
-                                            <Ellipse x:Name="TwitchDashboardLamp"/>
-                                            <TextBlock x:Name="TwitchDashboardStatus"/>
-                                            <Button x:Name="DashboardOpenTwitchServiceButton"/>
-                                            <Button x:Name="DashboardTopConnectTwitchButton"/>
-                                            <Ellipse x:Name="SpotifyDashboardLamp"/>
-                                            <TextBlock x:Name="SpotifyDashboardStatus"/>
-                                            <Button x:Name="DashboardOpenSpotifyServiceButton"/>
-                                            <Button x:Name="DashboardTopConnectSpotifyButton"/>
-                                            <Ellipse x:Name="StreamerBotDashboardLamp"/>
-                                            <TextBlock x:Name="StreamerBotDashboardStatus"/>
-                                            <Button x:Name="DashboardOpenStreamerBotServiceButton"/>
-                                            <Button x:Name="DashboardTopConnectStreamerBotButton"/>
-                                            <Button x:Name="DashboardTopOpenStreamDeckButton"/>
-                                            <Ellipse x:Name="AlertsDashboardLamp"/>
-                                            <TextBlock x:Name="AlertsDashboardStatus"/>
-                                            <Button x:Name="DashboardOpenAlertsServiceButton"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </Grid>
                             <Border x:Name="DashboardTwitchChannelWidget"
-                                    Grid.Row="1"
+                                    Grid.Row="0"
                                     Margin="0,0,0,12"
                                     Padding="14,10"
                                     Background="{DynamicResource ElevatedBackgroundBrush}"
@@ -541,7 +484,7 @@
                                     <TextBlock Grid.Column="3" Text="BEARBEITEN  ›" Foreground="{DynamicResource AccentHoverBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 </Grid>
                             </Border>
-                            <Border Grid.Row="2" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardStreamControlModule" Margin="0,0,0,12" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+                            <Border Grid.Row="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardStreamControlModule" Margin="0,0,0,12" HorizontalAlignment="Stretch" VerticalAlignment="Top">
                                              <StackPanel>
                                                 <TextBlock Text="SCHNELLZUGRIFF" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
                                                 <UniformGrid Columns="6" Rows="1" Margin="0,12,0,8">
@@ -617,7 +560,7 @@
                                                 </StackPanel>
                                              </StackPanel>
                             </Border>
-                            <Grid x:Name="DashboardPrimaryRow" Grid.Row="3" Margin="0" VerticalAlignment="Stretch">
+                            <Grid x:Name="DashboardPrimaryRow" Grid.Row="2" Margin="0" VerticalAlignment="Stretch">
                                 <Grid.RowDefinitions>
                                     <!-- Normal: Content in Zeile 0 (*); Groß-Vorschau: Content in Zeile 1 (*), gesetzt per Code -->
                                     <RowDefinition Height="*"/>
@@ -760,7 +703,7 @@
                                     </Grid>
                             </Grid>
                             <!-- Entfernte Dashboard-Widgets (Kompatibilität für Code-Behind) -->
-                            <Grid Grid.Row="4" Visibility="Collapsed">
+                            <Grid Grid.Row="3" Visibility="Collapsed">
                                 <Grid x:Name="DashboardStreamingServicesRow"/>
                                 <Grid x:Name="DashboardRemainingWidgetsRow">
                                     <Border x:Name="DashboardNextAutomationModule">
@@ -2537,14 +2480,14 @@
                 </Grid.RowDefinitions>
                 <StackPanel>
                     <TextBlock Text="Overlays" FontSize="30" FontWeight="Bold"/>
-                    <TextBlock Text="Lokaler Webserver für Browserquellen in OBS. Overlay-HTML-Dateien und Live-Daten werden aus dem gewählten Ordner ausgeliefert." Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
+                    <TextBlock Text="Mehrere Overlay-Ordner anlegen. Alle Clients verbinden sich auf denselben WebSocket und empfangen getypte App- und Twitch-Events." Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
                 </StackPanel>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Grid.Row="1" Margin="0,18,0,18">
                     <StackPanel Margin="18">
                         <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,0,0,16">
                             <StackPanel>
                                 <TextBlock Text="Overlay-Webserver" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                <TextBlock Text="OBS-Browserquellen nutzen http://127.0.0.1:&lt;Port&gt;/… statt lokaler Dateien. Live-Daten werden über /ws gepusht." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,10"/>
+                                <TextBlock Text="OBS-Browserquellen nutzen http://127.0.0.1:&lt;Port&gt;/o/&lt;id&gt;/… Live-Events über ws://127.0.0.1:&lt;Port&gt;/ws." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,10"/>
                                 <CheckBox x:Name="OverlayWebServerEnabledBox" Content="Webserver aktivieren" Margin="0,0,0,8"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -2556,18 +2499,103 @@
                                     <TextBlock Text="Port" VerticalAlignment="Center"/>
                                     <TextBox x:Name="OverlayWebServerPortBox" Grid.Column="1"/>
                                     <TextBox x:Name="OverlayWebServerUrlBox" Grid.Column="2" IsReadOnly="True" Margin="12,0,0,0"/>
-                                    <Button x:Name="CopyOverlayWebServerUrlButton" Grid.Column="3" Content="URL KOPIEREN" Margin="8,0,0,0"/>
+                                    <Button x:Name="CopyOverlayWebServerUrlButton" Grid.Column="3" Content="WS-BASE KOPIEREN" Margin="8,0,0,0"/>
                                 </Grid>
                                 <TextBlock x:Name="OverlayWebServerStatusText" Text="Webserver: –" Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
-                        <TextBlock Text="Overlay-Ordner" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
-                        <TextBlock Text="Root-Ordner für statische Dateien und die Laufzeit-Daten (data\overlay-data.json)." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                        <DockPanel>
-                            <Button x:Name="BrowseOverlayFolderButton" Content="Durchsuchen…" DockPanel.Dock="Right" Margin="8,0,0,0"/>
-                            <TextBox x:Name="OverlayRootBox"/>
-                        </DockPanel>
-                        <TextBlock x:Name="OverlayStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+
+                        <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Chat-Overlay" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                <TextBlock Text="Eingebaute Seite unter /chat. Nachrichten inkl. Emotes kommen über denselben WebSocket (/ws)." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,10"/>
+                                <CheckBox x:Name="OverlayChatEnabledBox" Content="Chat-Overlay aktiv" Margin="0,0,0,8"/>
+                                <CheckBox x:Name="OverlayChatShowEventsBox" Content="Twitch-Events einblenden (Follow, Sub, Raid, …)" Margin="0,0,0,8"/>
+                                <CheckBox x:Name="OverlayChatBttvBox" Content="BTTV-Emotes" Margin="0,0,0,4"/>
+                                <CheckBox x:Name="OverlayChatFfzBox" Content="FrankerFaceZ-Emotes" Margin="0,0,0,4"/>
+                                <CheckBox x:Name="OverlayChatSevenTvBox" Content="7TV-Emotes" Margin="0,0,0,12"/>
+
+                                <TextBlock Text="Darstellung" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="Hintergrund" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="OverlayChatBackgroundTypeBox" Grid.Column="1" Margin="0,0,0,6">
+                                        <ComboBoxItem Content="Keiner (transparent)" Tag="None"/>
+                                        <ComboBoxItem Content="Farbe" Tag="Color"/>
+                                        <ComboBoxItem Content="Bild" Tag="Image"/>
+                                    </ComboBox>
+                                    <TextBlock Text="Farbe" Grid.Row="1" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="OverlayChatBackgroundColorBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,6" ToolTip="#RRGGBB"/>
+                                    <TextBlock Text="Bild" Grid.Row="2" VerticalAlignment="Center"/>
+                                    <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,6">
+                                        <Button x:Name="BrowseOverlayChatBackgroundButton" Content="Durchsuchen…" DockPanel.Dock="Right" Margin="8,0,0,0"/>
+                                        <TextBox x:Name="OverlayChatBackgroundImageBox"/>
+                                    </DockPanel>
+                                    <TextBlock Text="Transparenz %" Grid.Row="3" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="OverlayChatBackgroundOpacityBox" Grid.Row="3" Grid.Column="1" Margin="0,0,0,6" ToolTip="0–100, nur Hintergrund"/>
+                                    <TextBlock Text="Padding px" Grid.Row="4" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="OverlayChatPaddingBox" Grid.Row="4" Grid.Column="1" Margin="0,0,0,6"/>
+                                    <TextBlock Text="Eckenradius px" Grid.Row="5" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="OverlayChatRadiusBox" Grid.Row="5" Grid.Column="1" Margin="0,0,0,6"/>
+                                    <TextBlock Text="Abstand px" Grid.Row="6" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="OverlayChatGapBox" Grid.Row="6" Grid.Column="1"/>
+                                </Grid>
+
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="OverlayChatUrlBox" IsReadOnly="True"/>
+                                    <Button x:Name="CopyOverlayChatUrlButton" Grid.Column="1" Content="URL KOPIEREN" Margin="8,0,0,0"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="Overlay-Instanzen" Foreground="{DynamicResource AccentBrush}" Margin="0,6,0,6" FontWeight="Bold"/>
+                        <TextBlock Text="Jeder Eintrag hat einen eigenen Ordner unter /o/{id}/. Alle empfangen dieselben Events über /ws." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="240"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <ListBox x:Name="OverlayInstancesList" Height="220" DisplayMemberPath="Name"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button x:Name="AddOverlayInstanceButton" Content="HINZUFÜGEN"/>
+                                    <Button x:Name="RemoveOverlayInstanceButton" Content="ENTFERNEN" Margin="8,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                                <TextBlock Text="Name" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="OverlayInstanceNameBox" Margin="0,0,0,10"/>
+                                <TextBlock Text="Ordner" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
+                                <DockPanel Margin="0,0,0,10">
+                                    <Button x:Name="BrowseOverlayInstanceFolderButton" Content="Durchsuchen…" DockPanel.Dock="Right" Margin="8,0,0,0"/>
+                                    <TextBox x:Name="OverlayInstanceRootBox"/>
+                                </DockPanel>
+                                <CheckBox x:Name="OverlayInstanceEnabledBox" Content="Aktiv (vom Webserver ausliefern)" Margin="0,0,0,10"/>
+                                <TextBlock Text="OBS-URL" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
+                                <DockPanel>
+                                    <Button x:Name="CopyOverlayInstanceUrlButton" Content="URL KOPIEREN" DockPanel.Dock="Right" Margin="8,0,0,0"/>
+                                    <TextBox x:Name="OverlayInstanceUrlBox" IsReadOnly="True"/>
+                                </DockPanel>
+                                <TextBlock x:Name="OverlayInstanceIdText" Text="" Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0" FontSize="11"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="OverlayStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,14,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
                 <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
@@ -2968,7 +2996,7 @@
                                     <Button x:Name="DashboardApplyPresetButton" Content="PRESET ANWENDEN"/>
                                 </WrapPanel>
                                 <TextBlock Text="Lege fest, welche Bereiche im Command Center angezeigt werden. Die Auswahl wird dauerhaft gespeichert." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,6,0,16"/>
-                                <CheckBox x:Name="DashboardShowServiceStatusBox" Content="Statuskarten für Stream und Dienste anzeigen" Margin="0,5"/>
+                                <CheckBox x:Name="DashboardShowServiceStatusBox" Content="Statuskarten in der Titelleiste anzeigen" Margin="0,5"/>
                                 <CheckBox x:Name="DashboardShowStreamControlsBox" Content="Stream-, Szenen- und Raid-Steuerung anzeigen" Margin="0,5"/>
                                 <CheckBox x:Name="DashboardShowLivePanelsBox" Content="Twitch Chat, User, Events und Spotify anzeigen" Margin="0,5"/>
                                 <CheckBox x:Name="DashboardShowQuickServicesBox" Content="Dienste-Schnellzugriff und Übersichten anzeigen" Margin="0,5"/>

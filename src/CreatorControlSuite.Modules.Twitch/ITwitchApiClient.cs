@@ -126,6 +126,13 @@ public interface ITwitchApiClient
 
     Task UpdateRewardRedemptionStatusAsync(string broadcasterId, string rewardId, string redemptionId, string status, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ChatBadgeDefinition>> GetGlobalChatBadgesAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ChatBadgeDefinition>> GetChannelChatBadgesAsync(
+        string broadcasterId,
+        CancellationToken cancellationToken = default);
+
     Task CreateEventSubSubscriptionAsync(
         string type,
         string version,

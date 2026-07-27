@@ -566,6 +566,60 @@ public sealed class TwitchApiClient(HttpClient httpClient) : ITwitchApiClient
         prediction.Id, prediction.Title, prediction.Status, prediction.LocksAt,
         [.. prediction.Outcomes.Select(o => new TwitchPredictionOutcome(o.Id, o.Title, o.ChannelPoints))]);
 
+    public async Task<IReadOnlyList<ChatBadgeDefinition>> GetGlobalChatBadgesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        ChatBadgeListResponse response = await SendAsync<ChatBadgeListResponse>(
+            HttpMethod.Get,
+            "chat/badges/global",
+            body: null,
+            cancellationToken);
+        return ParseBadgeSets(response.Data);
+    }
+
+    public async Task<IReadOnlyList<ChatBadgeDefinition>> GetChannelChatBadgesAsync(
+        string broadcasterId,
+        CancellationToken cancellationToken = default)
+    {
+        ChatBadgeListResponse response = await SendAsync<ChatBadgeListResponse>(
+            HttpMethod.Get,
+            "chat/badges?broadcaster_id=" + Uri.EscapeDataString(broadcasterId),
+            body: null,
+            cancellationToken);
+        return ParseBadgeSets(response.Data);
+    }
+
+    private static IReadOnlyList<ChatBadgeDefinition> ParseBadgeSets(ChatBadgeSetData[] sets)
+    {
+        var badges = new List<ChatBadgeDefinition>();
+        foreach (ChatBadgeSetData set in sets)
+        {
+            if (string.IsNullOrWhiteSpace(set.SetId))
+            {
+                continue;
+            }
+
+            foreach (ChatBadgeVersionData version in set.Versions)
+            {
+                string url = !string.IsNullOrWhiteSpace(version.ImageUrl2x)
+                    ? version.ImageUrl2x
+                    : version.ImageUrl1x;
+                if (string.IsNullOrWhiteSpace(version.Id) || string.IsNullOrWhiteSpace(url))
+                {
+                    continue;
+                }
+
+                badges.Add(new ChatBadgeDefinition(
+                    set.SetId,
+                    version.Id,
+                    url,
+                    string.IsNullOrWhiteSpace(version.Title) ? set.SetId : version.Title));
+            }
+        }
+
+        return badges;
+    }
+
     public async Task CreateEventSubSubscriptionAsync(
         string type,
         string version,
@@ -914,5 +968,35 @@ public sealed class TwitchApiClient(HttpClient httpClient) : ITwitchApiClient
     {
         [JsonPropertyName("message")]
         public string Message { get; set; } = "";
+    }
+
+    private sealed class ChatBadgeListResponse
+    {
+        [JsonPropertyName("data")]
+        public ChatBadgeSetData[] Data { get; set; } = [];
+    }
+
+    private sealed class ChatBadgeSetData
+    {
+        [JsonPropertyName("set_id")]
+        public string SetId { get; set; } = "";
+
+        [JsonPropertyName("versions")]
+        public ChatBadgeVersionData[] Versions { get; set; } = [];
+    }
+
+    private sealed class ChatBadgeVersionData
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = "";
+
+        [JsonPropertyName("image_url_1x")]
+        public string ImageUrl1x { get; set; } = "";
+
+        [JsonPropertyName("image_url_2x")]
+        public string ImageUrl2x { get; set; } = "";
+
+        [JsonPropertyName("title")]
+        public string Title { get; set; } = "";
     }
 }

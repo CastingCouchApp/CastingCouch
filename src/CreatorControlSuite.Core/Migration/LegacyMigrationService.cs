@@ -166,7 +166,6 @@ public sealed class LegacyMigrationService(ISettingsStore settingsStore) : ILega
             settings.Overlay.RootPath =
                 legacyOverlayRoot;
 
-            settings.Overlay.UseBundledOverlay = false;
             imported.Add("Overlay-Pfad");
         }
 

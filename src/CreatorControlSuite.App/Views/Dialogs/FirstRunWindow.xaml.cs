@@ -226,6 +226,7 @@ public partial class FirstRunWindow : Window
 
         settings.Overlay.RootPath =
             OverlayRootBox.Text.Trim();
+        settings.Overlay.EnsureInstancesMigrated();
 
         await _settingsStore.SaveAsync(settings);
 

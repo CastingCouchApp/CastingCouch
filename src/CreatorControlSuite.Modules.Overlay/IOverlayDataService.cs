@@ -16,5 +16,4 @@ public interface IOverlayDataService
     Task WriteAsync(CancellationToken cancellationToken = default);
     Task<string> GetDataFilePathAsync(CancellationToken cancellationToken = default);
     Task<string> GetOverlayRootAsync(CancellationToken cancellationToken = default);
-    Task InstallBundledOverlayAsync(CancellationToken cancellationToken = default);
 }

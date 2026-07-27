@@ -1,0 +1,212 @@
+(() => {
+  const root = document.getElementById("chat");
+  const maxLines = 80;
+  const eventTypes = new Set([
+    "channel.follow",
+    "channel.subscribe",
+    "channel.subscription.message",
+    "channel.subscription.gift",
+    "channel.cheer",
+    "channel.raid",
+    "stream.online",
+    "stream.offline"
+  ]);
+
+  // Twitch-Badge-Icons als Event-Marker (kein Text-Label).
+  const eventIcons = {
+    "channel.follow": "https://static-cdn.jtvnw.net/badges/v1/5d9f2208-5dd8-11e7-8513-2ff4adfae661/2",
+    "channel.subscribe": "https://static-cdn.jtvnw.net/badges/v1/5d9f2208-5dd8-11e7-8513-2ff4adfae661/2",
+    "channel.subscription.message": "https://static-cdn.jtvnw.net/badges/v1/5d9f2208-5dd8-11e7-8513-2ff4adfae661/2",
+    "channel.subscription.gift": "https://static-cdn.jtvnw.net/badges/v1/5d9f2208-5dd8-11e7-8513-2ff4adfae661/2",
+    "channel.cheer": "https://static-cdn.jtvnw.net/badges/v1/73b5c3fb-7f24-432c-a4ae-c6c3d5e3d5c7/2",
+    "channel.raid": "https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85b62/2",
+    "stream.online": "https://static-cdn.jtvnw.net/badges/v1/d12a2e27-16f6-41d0-ab77-b780518f00a3/2",
+    "stream.offline": "https://static-cdn.jtvnw.net/badges/v1/d12a2e27-16f6-41d0-ab77-b780518f00a3/2"
+  };
+
+  let showTwitchEvents = true;
+  const panel = document.getElementById("panel");
+
+  function wsUrl() {
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${location.host}/ws`;
+  }
+
+  function applyAppearance(config) {
+    if (!panel) {
+      return;
+    }
+
+    const type = String(config.backgroundType || "None");
+    const opacity = Math.min(1, Math.max(0, Number(config.backgroundOpacity ?? 0.55)));
+    const padding = Math.max(0, Number(config.paddingPx ?? 12));
+    const radius = Math.max(0, Number(config.borderRadiusPx ?? 12));
+    const gap = Math.max(0, Number(config.gapPx ?? 6));
+    const color = String(config.backgroundColor || "#000000");
+
+    panel.style.setProperty("--chat-padding", `${padding}px`);
+    panel.style.setProperty("--chat-radius", `${radius}px`);
+    panel.style.setProperty("--chat-gap", `${gap}px`);
+    panel.style.setProperty("--chat-bg-opacity", String(opacity));
+    panel.style.setProperty("--chat-bg-color", color);
+
+    panel.classList.remove("has-bg", "bg-image");
+    if (type === "Color") {
+      panel.classList.add("has-bg");
+    } else if (type === "Image") {
+      panel.classList.add("has-bg", "bg-image");
+      const bust = encodeURIComponent(String(config.backgroundVersion || Date.now()));
+      panel.style.setProperty("--chat-bg-image", `url("/chat/background?v=${bust}")`);
+    } else {
+      panel.style.removeProperty("--chat-bg-image");
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
+  function renderParts(partsJson) {
+    let parts = [];
+    try {
+      parts = JSON.parse(partsJson || "[]");
+    } catch {
+      return "";
+    }
+
+    return parts.map((part) => {
+      if (part.type === "emote" && part.url) {
+        const alt = escapeHtml(part.text || "");
+        return `<img class="emote" src="${escapeHtml(part.url)}" alt="${alt}" title="${alt}" />`;
+      }
+      return escapeHtml(part.text || "");
+    }).join("");
+  }
+
+  function renderBadges(badgesJson) {
+    let badges = [];
+    try {
+      const parsed = JSON.parse(badgesJson || "[]");
+      badges = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return "";
+    }
+
+    return badges
+      .filter((badge) => badge && badge.url)
+      .map((badge) => {
+        const title = escapeHtml(badge.title || badge.setId || "");
+        return `<img class="badge-icon" src="${escapeHtml(badge.url)}" alt="" title="${title}" />`;
+      })
+      .join("");
+  }
+
+  function clearStatusIfNeeded() {
+    const status = root.querySelector(".status");
+    if (status) {
+      root.innerHTML = "";
+    }
+  }
+
+  function trimLines() {
+    while (root.children.length > maxLines) {
+      root.removeChild(root.firstChild);
+    }
+    root.scrollTop = root.scrollHeight;
+  }
+
+  function appendMessage(data) {
+    const line = document.createElement("div");
+    line.className = "line";
+    line.dataset.messageId = data.messageId || "";
+
+    const color = data.color && /^#[0-9a-fA-F]{6}$/.test(data.color)
+      ? data.color
+      : "#dedede";
+
+    line.innerHTML =
+      `${renderBadges(data.badges)}` +
+      `<span class="user" style="color:${color}">${escapeHtml(data.userName || data.userLogin || "user")}:</span>` +
+      `<span class="message">${renderParts(data.parts)}</span>`;
+
+    root.appendChild(line);
+    trimLines();
+  }
+
+  function appendEvent(payload) {
+    const line = document.createElement("div");
+    line.className = "line event";
+    line.dataset.eventType = payload.type || "";
+
+    const iconUrl = eventIcons[payload.type];
+    const icon = iconUrl
+      ? `<img class="event-icon" src="${escapeHtml(iconUrl)}" alt="" />`
+      : "";
+    const summary = escapeHtml(payload.summary || payload.type || "Event");
+    line.innerHTML = `${icon}<span class="event-summary">${summary}</span>`;
+
+    root.appendChild(line);
+    trimLines();
+  }
+
+  function setStatus(text) {
+    root.innerHTML = `<div class="line status">${escapeHtml(text)}</div>`;
+  }
+
+  function connect() {
+    const socket = new WebSocket(wsUrl());
+
+    socket.addEventListener("message", (event) => {
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      if (payload?.source === "twitch" && payload?.type === "channel.chat.message") {
+        clearStatusIfNeeded();
+        appendMessage(payload.data || {});
+        return;
+      }
+
+      if (
+        showTwitchEvents &&
+        payload?.source === "twitch" &&
+        eventTypes.has(payload?.type)
+      ) {
+        clearStatusIfNeeded();
+        appendEvent(payload);
+      }
+    });
+
+    socket.addEventListener("close", () => {
+      setTimeout(connect, 1500);
+    });
+
+    socket.addEventListener("error", () => {
+      try { socket.close(); } catch { /* ignore */ }
+    });
+  }
+
+  async function loadConfig() {
+    try {
+      const response = await fetch("/chat/config", { cache: "no-store" });
+      if (!response.ok) {
+        return;
+      }
+      const config = await response.json();
+      showTwitchEvents = config.showTwitchEvents !== false;
+      applyAppearance(config);
+    } catch {
+      // defaults
+    }
+  }
+
+  setStatus("Verbinde…");
+  loadConfig().finally(connect);
+})();

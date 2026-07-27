@@ -5,7 +5,8 @@ using CreatorControlSuite.Modules.Overlay.Models;
 
 namespace CreatorControlSuite.Modules.Overlay;
 
-public sealed class OverlayDataService(ISettingsStore settingsStore) : IOverlayDataService
+public sealed class OverlayDataService(
+    ISettingsStore settingsStore) : IOverlayDataService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -45,11 +46,6 @@ public sealed class OverlayDataService(ISettingsStore settingsStore) : IOverlayD
                 settings.Branding.AccentColor;
             _current.Branding.LogoPath =
                 settings.Branding.LogoPath;
-        }
-
-        if (settings.Overlay.UseBundledOverlay)
-        {
-            await InstallBundledOverlayAsync(cancellationToken);
         }
 
         await WriteAsync(cancellationToken);
@@ -102,7 +98,7 @@ public sealed class OverlayDataService(ISettingsStore settingsStore) : IOverlayD
     }
 
 
-    private static async Task WriteSnapshotAsync(
+    private static async Task<string> WriteSnapshotAsync(
         string path,
         OverlayData snapshot,
         CancellationToken cancellationToken)
@@ -201,6 +197,8 @@ public sealed class OverlayDataService(ISettingsStore settingsStore) : IOverlayD
                 // niemals beeinflussen.
             }
         }
+
+        return json;
     }
 
     public async Task<string> GetDataFilePathAsync(
@@ -254,61 +252,6 @@ public sealed class OverlayDataService(ISettingsStore settingsStore) : IOverlayD
                 Environment.SpecialFolder.LocalApplicationData),
             "CreatorControlSuite",
             "Overlay");
-    }
-
-    public async Task InstallBundledOverlayAsync(
-        CancellationToken cancellationToken = default)
-    {
-        string root = await GetOverlayRootAsync(cancellationToken);
-
-        foreach (string? directory in new[]
-        {
-            root,
-            Path.Combine(root, "data"),
-            Path.Combine(root, "assets"),
-            Path.Combine(root, "modules"),
-            Path.Combine(root, "scenes")
-        })
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        string bundledRoot = Path.Combine(
-            AppContext.BaseDirectory,
-            "BundledOverlay");
-
-        if (Directory.Exists(bundledRoot))
-        {
-            CopyDirectory(
-                bundledRoot,
-                root);
-        }
-    }
-
-    private static void CopyDirectory(
-        string source,
-        string target)
-    {
-        Directory.CreateDirectory(target);
-
-        foreach (string file in Directory.GetFiles(source))
-        {
-            File.Copy(
-                file,
-                Path.Combine(
-                    target,
-                    Path.GetFileName(file)),
-                overwrite: true);
-        }
-
-        foreach (string directory in Directory.GetDirectories(source))
-        {
-            CopyDirectory(
-                directory,
-                Path.Combine(
-                    target,
-                    Path.GetFileName(directory)));
-        }
     }
 
     private static OverlayData Clone(OverlayData value)

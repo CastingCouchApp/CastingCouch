@@ -2,7 +2,9 @@ using CreatorControlSuite.Core.Modules;
 
 namespace CreatorControlSuite.Modules.Overlay;
 
-public sealed class OverlayModule(IOverlayDataService service) : IConnectableModule
+public sealed class OverlayModule(
+    IOverlayDataService service,
+    IOverlayWebServer webServer) : IConnectableModule
 {
     private bool _initialized;
 
@@ -10,10 +12,20 @@ public sealed class OverlayModule(IOverlayDataService service) : IConnectableMod
     public string DisplayName => "Overlay";
 
     public IOverlayDataService Service { get; } = service;
+    public IOverlayWebServer WebServer { get; } = webServer;
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         await Service.InitializeAsync(cancellationToken);
+        try
+        {
+            await WebServer.StartAsync(cancellationToken);
+        }
+        catch
+        {
+            // Overlay-Daten sind auch ohne Webserver nutzbar; Status meldet den Fehler.
+        }
+
         _initialized = true;
     }
 
@@ -22,16 +34,29 @@ public sealed class OverlayModule(IOverlayDataService service) : IConnectableMod
         return InitializeAsync(cancellationToken);
     }
 
-    public Task DisconnectAsync(CancellationToken cancellationToken)
+    public async Task DisconnectAsync(CancellationToken cancellationToken)
     {
+        await WebServer.StopAsync(cancellationToken);
         _initialized = false;
-        return Task.CompletedTask;
     }
 
     public async Task<ModuleStatus> GetStatusAsync(
         CancellationToken cancellationToken)
     {
         string path = await Service.GetDataFilePathAsync(cancellationToken);
+        string detail;
+        if (WebServer.IsRunning && !string.IsNullOrWhiteSpace(WebServer.BaseUrl))
+        {
+            detail = $"Webserver {WebServer.BaseUrl} · {path}";
+        }
+        else if (File.Exists(path))
+        {
+            detail = path;
+        }
+        else
+        {
+            detail = "Overlay-Datendatei wird vorbereitet";
+        }
 
         return new ModuleStatus(
             Id,
@@ -39,9 +64,7 @@ public sealed class OverlayModule(IOverlayDataService service) : IConnectableMod
             _initialized
                 ? ModuleHealth.Connected
                 : ModuleHealth.Ready,
-            File.Exists(path)
-                ? path
-                : "Overlay-Datendatei wird vorbereitet",
+            detail,
             DateTimeOffset.Now);
     }
 }

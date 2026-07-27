@@ -76,6 +76,24 @@ public sealed record TwitchRaidTargetStatus(
     string ChannelUrl);
 
 
+public sealed record TwitchChatBadge(
+    string SetId,
+    string Id,
+    string Info = "");
+
+public enum TwitchChatFragmentType
+{
+    Text,
+    Emote,
+    Mention,
+    Cheermote
+}
+
+public sealed record TwitchChatFragment(
+    TwitchChatFragmentType Type,
+    string Text,
+    string? EmoteId = null);
+
 public sealed record TwitchChatMessage(
     string MessageId,
     string BroadcasterUserId,
@@ -85,7 +103,8 @@ public sealed record TwitchChatMessage(
     string MessageText,
     string Color,
     DateTimeOffset ReceivedAt,
-    IReadOnlyList<string> Badges);
+    IReadOnlyList<TwitchChatBadge> Badges,
+    IReadOnlyList<TwitchChatFragment> Fragments);
 
 public sealed record TwitchEvent(
     string Type,

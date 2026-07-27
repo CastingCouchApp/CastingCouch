@@ -37,6 +37,7 @@ Implementiert:
 - session_reconnect
 - revocation
 - Chatnachrichten
+- Chat-`message.fragments` (Text/Emotes/Mentions/Cheermotes) für das Overlay
 - Follow
 - Sub
 - ReSub
@@ -45,6 +46,14 @@ Implementiert:
 - Raid
 - Stream online
 - Stream offline
+
+## Emotes für Overlay-Chat
+
+- Twitch-Emotes kommen aus EventSub-Fragments (CDN `static-cdn.jtvnw.net`)
+- Badge-Icons über Helix `chat/badges` (global + channel)
+- Optional: BTTV / FFZ / 7TV über `Overlay.Chat`-Flags (Katalog-Refresh nach Twitch-Connect)
+- Ausgabe als `channel.chat.message` über den Overlay-WebSocket `/ws`
+- Optional: EventSub-Events (Follow/Sub/…) im Chat-Overlay (`ShowTwitchEvents`)
 
 ## WPF-Oberfläche
 
@@ -68,7 +77,7 @@ Unter Einstellungen → Twitch:
 
 Der Web-Login ist eine eigene Browser-Session und unabhängig von der Device-Code-API-Anmeldung. API-Tokens können nicht als Web-Cookies übernommen werden.
 
-`EnableChat` steuert weiterhin die EventSub-Chat-Subscription (HUD, Stats, Workflow). Der Streamer-HUD zeigt weiterhin den Built-in-Feed.
+`EnableChat` steuert weiterhin die EventSub-Chat-Subscription (Stats, Workflow, Dashboard-Chat).
 
 ## Nächste Erweiterungen
 

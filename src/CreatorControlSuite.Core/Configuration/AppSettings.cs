@@ -1,4 +1,4 @@
-﻿namespace CreatorControlSuite.Core.Configuration;
+namespace CreatorControlSuite.Core.Configuration;
 
 public sealed class AppSettings
 {
@@ -17,7 +17,6 @@ public sealed class AppSettings
     public StreamerBotSettings StreamerBot { get; set; } = new();
     public AlertSettings Alerts { get; set; } = new();
     public OverlaySettings Overlay { get; set; } = new();
-    public StreamerHudSettings StreamerHud { get; set; } = new();
     public WorkflowSettings Workflow { get; set; } = new();
     public StreamDeckSettings StreamDeck { get; set; } = new();
     public DashboardSettings Dashboard { get; set; } = new();
@@ -116,6 +115,16 @@ public sealed class TwitchSettings
 
     public bool EnableEventSub { get; set; } = true;
     public bool UseDeviceCodeFlow { get; set; } = true;
+
+    /// <summary>Chatter-Listen-Intervall in Sekunden, wenn Zuschauer unter der Schwelle liegen.</summary>
+    public int ChattersRefreshSecondsLow { get; set; } = 10;
+
+    /// <summary>Chatter-Listen-Intervall in Sekunden, wenn Zuschauer die Schwelle erreichen oder überschreiten.</summary>
+    public int ChattersRefreshSecondsHigh { get; set; } = 60;
+
+    /// <summary>Zuschauerzahl, ab der die langsamere Chatter-Listen-Aktualisierung gilt.</summary>
+    public int ChattersRefreshViewerThreshold { get; set; } = 50;
+
     public TwitchGoalSettings FollowerGoal { get; set; } = new() { Title = "Follower-Ziel", Target = 200 };
     public TwitchGoalSettings SubGoal { get; set; } = new() { Title = "Sub-Ziel", Target = 25 };
     public TwitchGoalSettings DonationGoal { get; set; } = new() { Title = "Donation-Ziel", Target = 100, Currency = "EUR" };
@@ -226,8 +235,6 @@ public sealed class SpotifySettings
     public int AlertFadeInMilliseconds { get; set; } = 500;
     public int FadeTargetVolumePercent { get; set; } = 35;
     public bool OverlayEnabled { get; set; } = true;
-    public string OverlayProjectId { get; set; } = "";
-    public string OverlayItemId { get; set; } = "";
     public string OverlayObsScene { get; set; } = "";
     public string OverlayObsSource { get; set; } = "ccs_spotify";
     public string[] Scopes { get; set; } =
@@ -361,53 +368,110 @@ public sealed class AlertDefinitionSettings
     }
 }
 
+public sealed class OverlayChatSettings
+{
+    public bool Enabled { get; set; } = true;
+    public bool EnableBttv { get; set; } = true;
+    public bool EnableFfz { get; set; } = true;
+    public bool EnableSevenTv { get; set; } = true;
+    public bool ShowTwitchEvents { get; set; } = true;
+    public int MaxBufferedMessages { get; set; } = 100;
+
+    /// <summary>None | Color | Image</summary>
+    public string BackgroundType { get; set; } = "None";
+    public string BackgroundColor { get; set; } = "#000000";
+    public string BackgroundImagePath { get; set; } = "";
+    /// <summary>0..1 – nur Hintergrundschicht, Text bleibt deckend.</summary>
+    public double BackgroundOpacity { get; set; } = 0.55;
+    public int PaddingPx { get; set; } = 12;
+    public int BorderRadiusPx { get; set; } = 12;
+    public int GapPx { get; set; } = 6;
+
+    public void NormalizeAppearance()
+    {
+        string type = (BackgroundType ?? "None").Trim();
+        BackgroundType = type.Equals("Color", StringComparison.OrdinalIgnoreCase) ? "Color"
+            : type.Equals("Image", StringComparison.OrdinalIgnoreCase) ? "Image"
+            : "None";
+
+        BackgroundColor = string.IsNullOrWhiteSpace(BackgroundColor)
+            ? "#000000"
+            : BackgroundColor.Trim();
+        BackgroundImagePath = (BackgroundImagePath ?? "").Trim();
+        BackgroundOpacity = Math.Clamp(BackgroundOpacity, 0, 1);
+        PaddingPx = Math.Clamp(PaddingPx, 0, 120);
+        BorderRadiusPx = Math.Clamp(BorderRadiusPx, 0, 64);
+        GapPx = Math.Clamp(GapPx, 0, 48);
+        MaxBufferedMessages = Math.Clamp(MaxBufferedMessages, 0, 1000);
+    }
+}
+
+public sealed class OverlayInstanceSettings
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "";
+    public string RootPath { get; set; } = "";
+    public bool Enabled { get; set; } = true;
+}
+
 public sealed class OverlaySettings
 {
     public string RootPath { get; set; } = "";
-    public bool UseBundledOverlay { get; set; } = true;
-    public int Width { get; set; } = 1920;
-    public int Height { get; set; } = 1080;
-    public int RefreshMilliseconds { get; set; } = 500;
     public string DataFileName { get; set; } = "overlay-data.json";
     // Optionaler vollständiger Pfad zu der JSON-Datei, die vorhandene Overlays bereits lesen.
     // Leer bedeutet: automatische Standarddatei unter %LocalAppData%\CreatorControlSuite\Overlay\data.
     public string DataFilePath { get; set; } = "";
-    // Nur noch für die rückwärtskompatible Deserialisierung älterer
-    // Einstellungen vorhanden. Neue Versionen spiegeln keine Datendateien
-    // mehr, sondern verknüpfen Overlay-Projekte mit der zentralen Datei.
+    // Rückwärtskompatibel für ältere Einstellungsdateien; wird nicht mehr geschrieben.
     public List<string> AdditionalDataRoots { get; set; } = [];
-    public bool AutoInstallBrowserSources { get; set; } = true;
-    public bool EnableFollowerGoal { get; set; } = true;
-    public bool EnableSpotifyWidget { get; set; } = true;
-    public bool EnableLiveStatusWidget { get; set; } = true;
-    public bool EnableEndStatsWidget { get; set; } = true;
-    public string StartText { get; set; } = "Der Stream startet gleich";
-    public string PauseText { get; set; } = "Kurze Pause – gleich geht es weiter";
-    public string EndText { get; set; } = "Danke fürs Zuschauen";
-    public string SharedSceneText { get; set; } = "";
-    public string FontFamily { get; set; } = "Segoe UI";
-    public int FontSize { get; set; } = 54;
-    public string FontColor { get; set; } = "#FFFFFF";
-    public int StartTimerSeconds { get; set; } = 600;
-    public int TimerX { get; set; } = 760;
-    public int TimerY { get; set; } = 700;
-    public string FrameStyle { get; set; } = "Solid";
-    public string FrameColor { get; set; } = "#FF6A00";
-    public string FrameEffect { get; set; } = "Glow";
-}
+    public List<OverlayInstanceSettings> Instances { get; set; } = [];
+    public bool WebServerEnabled { get; set; } = true;
+    public int WebServerPort { get; set; } = 8765;
+    public OverlayChatSettings Chat { get; set; } = new();
 
-public sealed class StreamerHudSettings
-{
-    public bool Enabled { get; set; }
-    public int MonitorIndex { get; set; }
-    public double Opacity { get; set; } = 0.85;
-    public bool ClickThrough { get; set; } = true;
-    public bool ShowChat { get; set; } = true;
-    public bool ShowEvents { get; set; } = true;
-    public bool ShowLiveStatus { get; set; } = true;
-    public string Anchor { get; set; } = "TopRight";
-    public int Margin { get; set; } = 24;
-    public int PanelWidth { get; set; } = 420;
+    public string GetBaseUrl() => $"http://127.0.0.1:{Math.Clamp(WebServerPort, 1, 65535)}";
+
+    public string GetInstanceUrl(string instanceId)
+    {
+        string id = (instanceId ?? "").Trim().Trim('/');
+        return string.IsNullOrWhiteSpace(id)
+            ? GetBaseUrl()
+            : $"{GetBaseUrl()}/o/{id}/";
+    }
+
+    public string GetOverlayUrl(string relativePath)
+    {
+        string rel = (relativePath ?? "")
+            .Replace('\\', '/')
+            .TrimStart('/');
+        return string.IsNullOrWhiteSpace(rel)
+            ? GetBaseUrl()
+            : $"{GetBaseUrl()}/{rel}";
+    }
+
+    /// <summary>
+    /// Seeds a Default instance from legacy <see cref="RootPath"/> when no instances exist.
+    /// </summary>
+    public void EnsureInstancesMigrated()
+    {
+        Instances ??= [];
+        if (Instances.Count > 0)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(RootPath))
+        {
+            return;
+        }
+
+        Instances.Add(new OverlayInstanceSettings
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = "Default",
+            RootPath = RootPath.Trim(),
+            Enabled = true
+        });
+    }
 }
 
 public sealed class WorkflowSettings

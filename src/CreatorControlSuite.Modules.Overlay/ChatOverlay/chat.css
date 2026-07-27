@@ -1,0 +1,117 @@
+:root {
+  --chat-font: "Segoe UI", system-ui, sans-serif;
+  --chat-text: #f5f5f5;
+  --chat-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  --chat-emote-size: 28px;
+  --chat-badge-size: 18px;
+  --chat-event: #7dd3fc;
+  --chat-padding: 12px;
+  --chat-radius: 12px;
+  --chat-gap: 6px;
+  --chat-bg-opacity: 0.55;
+  --chat-bg-color: #000000;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--chat-font);
+  color: var(--chat-text);
+}
+
+#panel {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: var(--chat-padding);
+  border-radius: var(--chat-radius);
+  overflow: hidden;
+}
+
+#panel-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-color: var(--chat-bg-color);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+#panel.has-bg #panel-bg {
+  opacity: var(--chat-bg-opacity);
+}
+
+#panel.bg-image #panel-bg {
+  background-image: var(--chat-bg-image);
+}
+
+#chat {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--chat-gap);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.line {
+  display: block;
+  line-height: 1.35;
+  font-size: 18px;
+  font-weight: 600;
+  text-shadow: var(--chat-shadow);
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.user {
+  margin-right: 0.35rem;
+}
+
+.badge-icon {
+  height: var(--chat-badge-size);
+  width: var(--chat-badge-size);
+  vertical-align: middle;
+  margin-right: 0.2rem;
+}
+
+.emote {
+  height: var(--chat-emote-size);
+  width: auto;
+  vertical-align: middle;
+  margin: 0 0.05rem;
+}
+
+.event {
+  color: var(--chat-event);
+}
+
+.event-icon {
+  height: var(--chat-badge-size);
+  width: var(--chat-badge-size);
+  vertical-align: middle;
+  margin-right: 0.35rem;
+}
+
+.event-summary {
+  font-weight: 600;
+}
+
+.status {
+  opacity: 0.7;
+  font-weight: 500;
+  font-size: 14px;
+}

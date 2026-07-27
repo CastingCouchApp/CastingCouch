@@ -229,9 +229,6 @@ public sealed class StreamWorkflowServiceTests
 
         public Task<string> GetOverlayRootAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(".");
-
-        public Task InstallBundledOverlayAsync(CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
     }
 
     private sealed class FakeAlertEngine : IAlertEngine

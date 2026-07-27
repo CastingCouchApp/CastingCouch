@@ -6,7 +6,6 @@ Der Assistent erscheint beim ersten Start und erfasst:
 - Twitch-Kanalname
 - OBS Host und Port
 - Start-, Live-, Pause- und Endszene
-- Overlay-Ordner
-- Installation des Standard-Overlays
+- Overlay-Ordner (Webserver-Root; leer = LocalAppData-Standard)
 
 Twitch- und Spotify-Tokens werden nicht während der Installation abgefragt.

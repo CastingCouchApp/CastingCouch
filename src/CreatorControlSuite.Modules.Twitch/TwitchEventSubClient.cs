@@ -394,38 +394,9 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
                 "channel.chat.message",
                 StringComparison.Ordinal))
         {
-            string message = eventData
-                .GetProperty("message")
-                .GetProperty("text")
-                .GetString()
-                ?? "";
-
-            string[] badges =
-                eventData.TryGetProperty("badges", out JsonElement badgesElement) &&
-                badgesElement.ValueKind == JsonValueKind.Array
-                    ? [.. badgesElement
-                        .EnumerateArray()
-                        .Select(
-                            badge =>
-                                GetString(
-                                    badge,
-                                    "set_id"))
-                        .Where(
-                            badge =>
-                                !string.IsNullOrWhiteSpace(
-                                    badge))]
-                    : [];
-
-            var chatMessage = new TwitchChatMessage(
-                GetString(eventData, "message_id"),
-                GetString(eventData, "broadcaster_user_id"),
-                GetString(eventData, "chatter_user_id"),
-                GetString(eventData, "chatter_user_login"),
-                GetString(eventData, "chatter_user_name"),
-                message,
-                GetString(eventData, "color"),
-                DateTimeOffset.Now,
-                badges);
+            TwitchChatMessage chatMessage = TwitchChatMessageParser.Parse(
+                eventData,
+                DateTimeOffset.Now);
 
             ChatMessageReceived?.Invoke(
                 this,

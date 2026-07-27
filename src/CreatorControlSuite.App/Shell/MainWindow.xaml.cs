@@ -100,6 +100,9 @@ public partial class MainWindow : Window
     private readonly AlertsModule _alertsModule;
     private readonly OverlayModule _overlayModule;
     private readonly IOverlayRealtimeHub _overlayRealtimeHub;
+    private readonly IChatEmoteCatalog _chatEmoteCatalog;
+    private readonly IChatBadgeCatalog _chatBadgeCatalog;
+    private readonly ITwitchApiClient _twitchApiClient;
     private readonly WorkflowModule _workflowModule;
     private readonly IProfileService _profileService;
     private readonly IUpdateService _updateService;
@@ -288,6 +291,10 @@ public partial class MainWindow : Window
     private readonly ExternalAlertActivityService _externalAlertActivity;
     private bool _suiteAlertRunning;
     private int _suiteAlertQueueLength;
+    private string? _lastOverlayPublishedPhase;
+    private bool? _lastOverlayPublishedLive;
+    private string? _lastOverlayPublishedScene;
+    private string? _lastOverlayPublishedSpotifyTrack;
     private int? _spotifyVolumeBeforeAlert;
     private bool _spotifyWasPlayingBeforeAlert;
     private bool _spotifyAlertMuteActive;
@@ -369,6 +376,9 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<string> _multiPcDeviceItems = [];
     private readonly ObservableCollection<string> _multiPcHistoryItems = [];
     private readonly ObservableCollection<string> _multiPcRolloutItems = [];
+    private readonly ObservableCollection<OverlayInstanceSettings> _overlayInstances = [];
+    private bool _loadingOverlayInstanceEditor;
+    private bool _suppressOverlayInstanceSelection;
     private CancellationTokenSource? _multiPcRolloutCts;
     private CancellationTokenSource? _scheduledMultiPcRolloutCts;
     private readonly Dictionary<string, string> _multiPcRolloutGroups = new(StringComparer.OrdinalIgnoreCase);
@@ -393,6 +403,9 @@ public partial class MainWindow : Window
         AlertsModule alertsModule,
         OverlayModule overlayModule,
         IOverlayRealtimeHub overlayRealtimeHub,
+        IChatEmoteCatalog chatEmoteCatalog,
+        IChatBadgeCatalog chatBadgeCatalog,
+        ITwitchApiClient twitchApiClient,
         WorkflowModule workflowModule,
         IProfileService profileService,
         IUpdateService updateService,
@@ -467,6 +480,9 @@ public partial class MainWindow : Window
         _alertsModule = alertsModule;
         _overlayModule = overlayModule;
         _overlayRealtimeHub = overlayRealtimeHub;
+        _chatEmoteCatalog = chatEmoteCatalog;
+        _chatBadgeCatalog = chatBadgeCatalog;
+        _twitchApiClient = twitchApiClient;
         _workflowModule = workflowModule;
         _profileService = profileService;
         _updateService = updateService;
@@ -699,18 +715,6 @@ public partial class MainWindow : Window
             ShowPage(MusicPlayerPage);
             _ = RefreshMusicPlayerUiAsync();
         };
-        TitleBarMusicWidget.MouseLeftButtonUp += (_, _) =>
-        {
-            ServicesNavigationPanel.Visibility = Visibility.Collapsed;
-            ShowPage(MusicPlayerPage);
-            _ = RefreshMusicPlayerUiAsync();
-        };
-        TitleBarMusicPreviousButton.Click += async (_, _) =>
-            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PreviousAsync());
-        TitleBarMusicPlayPauseButton.Click += async (_, _) =>
-            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PlayPauseAsync());
-        TitleBarMusicNextButton.Click += async (_, _) =>
-            await ExecuteMusicCommandAsync(() => _musicPlayerRouter.NextAsync());
         DashboardTopMusicPreviousButton.Click += async (_, _) =>
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PreviousAsync());
         DashboardTopMusicPlayPauseButton.Click += async (_, _) =>
@@ -746,7 +750,6 @@ public partial class MainWindow : Window
             _ = RefreshMusicPlayerUiAsync();
         };
         DashboardTopMusicTitleViewport.SizeChanged += (_, _) => UpdateMusicTitleMarquees();
-        TitleBarMusicTrackViewport.SizeChanged += (_, _) => UpdateMusicTitleMarquees();
         MusicPlayerPreviousButton.Click += async (_, _) =>
             await ExecuteMusicCommandAsync(() => _musicPlayerRouter.PreviousAsync());
         MusicPlayerPlayPauseButton.Click += async (_, _) =>
@@ -1490,6 +1493,7 @@ public partial class MainWindow : Window
                 CancelPendingSceneAutomationExecutions();
             });
             _ = _creatorIntelligence.RecordAsync("obs.scene.changed", new { scene = sceneName, viewers = _currentLiveViewerCount });
+            _ = PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppObsScene(sceneName));
             _ = Dispatcher.InvokeAsync(async () =>
             {
                 await ExecuteSpotifySceneAutomationAsync(sceneName);
@@ -1571,6 +1575,7 @@ public partial class MainWindow : Window
             });
 
             await _workflowModule.Service.RegisterChatMessageAsync();
+            await PublishOverlayChatMessageAsync(message);
         };
 
         _twitchModule.EventReceived += async (_, twitchEvent) =>
@@ -1603,6 +1608,12 @@ public partial class MainWindow : Window
                             : Visibility.Collapsed;
                 }
             });
+
+            await PublishOverlayRealtimeEventAsync(OverlayEventBridge.FromTwitch(
+                twitchEvent.Type,
+                twitchEvent.Summary,
+                twitchEvent.ReceivedAt,
+                twitchEvent.Data));
 
             if (twitchEvent.Type == "channel.follow")
             {
@@ -2326,10 +2337,21 @@ public partial class MainWindow : Window
             if (alertJustStarted)
             {
                 await _workflowModule.Service.RegisterAlertPlayedAsync();
+                string alertType = state.Current?.Type ?? "";
+                string user = state.Current?.User ?? "";
+                await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppAlert(alertType, user));
             }
         };
 
-        BrowseOverlayFolderButton.Click += (_, _) => BrowseOverlayFolder();
+        AddOverlayInstanceButton.Click += (_, _) => AddOverlayInstance();
+        RemoveOverlayInstanceButton.Click += (_, _) => RemoveSelectedOverlayInstance();
+        BrowseOverlayInstanceFolderButton.Click += (_, _) => BrowseOverlayInstanceFolder();
+        CopyOverlayInstanceUrlButton.Click += (_, _) => CopySelectedOverlayInstanceUrl();
+        OverlayInstancesList.SelectionChanged += (_, _) => OnOverlayInstanceSelectionChanged();
+        OverlayInstanceNameBox.TextChanged += (_, _) => ApplyOverlayInstanceEditorToSelection();
+        OverlayInstanceRootBox.TextChanged += (_, _) => ApplyOverlayInstanceEditorToSelection();
+        OverlayInstanceEnabledBox.Checked += (_, _) => ApplyOverlayInstanceEditorToSelection();
+        OverlayInstanceEnabledBox.Unchecked += (_, _) => ApplyOverlayInstanceEditorToSelection();
         CopyOverlayWebServerUrlButton.Click += (_, _) =>
         {
             string url = string.IsNullOrWhiteSpace(OverlayWebServerUrlBox.Text)
@@ -2338,13 +2360,29 @@ public partial class MainWindow : Window
             try
             {
                 Clipboard.SetText(url);
-                OverlayWebServerStatusText.Text = "URL kopiert: " + url;
+                OverlayWebServerStatusText.Text = "Base-URL kopiert: " + url + " · WS: " + url.Replace("http://", "ws://", StringComparison.OrdinalIgnoreCase) + "/ws";
             }
             catch (Exception exception)
             {
                 OverlayWebServerStatusText.Text = "URL konnte nicht kopiert werden: " + exception.Message;
             }
         };
+        CopyOverlayChatUrlButton.Click += (_, _) =>
+        {
+            string url = string.IsNullOrWhiteSpace(OverlayChatUrlBox.Text)
+                ? _settings.Overlay.GetOverlayUrl("chat")
+                : OverlayChatUrlBox.Text.Trim();
+            try
+            {
+                Clipboard.SetText(url);
+                OverlayWebServerStatusText.Text = "Chat-URL kopiert: " + url;
+            }
+            catch (Exception exception)
+            {
+                OverlayWebServerStatusText.Text = "Chat-URL konnte nicht kopiert werden: " + exception.Message;
+            }
+        };
+        BrowseOverlayChatBackgroundButton.Click += (_, _) => BrowseOverlayChatBackgroundImage();
 
         DashboardPrepareStreamButton.Click += async (_, _) =>
             await ExecuteDashboardActionAsync(
@@ -2525,6 +2563,7 @@ public partial class MainWindow : Window
         _workflowModule.Service.StateChanged += (_, state) =>
         {
             Dispatcher.Invoke(() => RefreshWorkflowUi(state));
+            _ = PublishOverlayWorkflowStateAsync(state);
         };
 
         CreateStreamDeckActionButton.Click += async (_, _) => await CreateStreamDeckActionAsync();
@@ -3843,10 +3882,24 @@ public partial class MainWindow : Window
 
         await LoadSelectedAlertDefinitionAsync();
 
-        OverlayRootBox.Text = _settings.Overlay.RootPath;
         OverlayWebServerEnabledBox.IsChecked = _settings.Overlay.WebServerEnabled;
         OverlayWebServerPortBox.Text = _settings.Overlay.WebServerPort.ToString();
         OverlayWebServerUrlBox.Text = _settings.Overlay.GetBaseUrl();
+        OverlayChatEnabledBox.IsChecked = _settings.Overlay.Chat.Enabled;
+        OverlayChatShowEventsBox.IsChecked = _settings.Overlay.Chat.ShowTwitchEvents;
+        OverlayChatBttvBox.IsChecked = _settings.Overlay.Chat.EnableBttv;
+        OverlayChatFfzBox.IsChecked = _settings.Overlay.Chat.EnableFfz;
+        OverlayChatSevenTvBox.IsChecked = _settings.Overlay.Chat.EnableSevenTv;
+        _settings.Overlay.Chat.NormalizeAppearance();
+        SelectOverlayChatBackgroundType(_settings.Overlay.Chat.BackgroundType);
+        OverlayChatBackgroundColorBox.Text = _settings.Overlay.Chat.BackgroundColor;
+        OverlayChatBackgroundImageBox.Text = _settings.Overlay.Chat.BackgroundImagePath;
+        OverlayChatBackgroundOpacityBox.Text = ((int)Math.Round(_settings.Overlay.Chat.BackgroundOpacity * 100)).ToString();
+        OverlayChatPaddingBox.Text = _settings.Overlay.Chat.PaddingPx.ToString();
+        OverlayChatRadiusBox.Text = _settings.Overlay.Chat.BorderRadiusPx.ToString();
+        OverlayChatGapBox.Text = _settings.Overlay.Chat.GapPx.ToString();
+        OverlayChatUrlBox.Text = _settings.Overlay.GetOverlayUrl("chat");
+        LoadOverlayInstancesUi();
         RefreshOverlayWebServerStatusUi();
 
         StartSceneBox.Text = _settings.Obs.StartScene;
@@ -4104,7 +4157,7 @@ public partial class MainWindow : Window
 
             SaveAlertDefinitionToSettings();
 
-            _settings.Overlay.RootPath = OverlayRootBox.Text.Trim();
+            CommitOverlayInstancesFromUi();
             _settings.Overlay.WebServerEnabled = OverlayWebServerEnabledBox.IsChecked == true;
             if (!int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int overlayPort) || overlayPort is <= 0 or > 65535)
             {
@@ -4112,7 +4165,47 @@ public partial class MainWindow : Window
             }
 
             _settings.Overlay.WebServerPort = overlayPort;
+            _settings.Overlay.Chat ??= new OverlayChatSettings();
+            _settings.Overlay.Chat.Enabled = OverlayChatEnabledBox.IsChecked == true;
+            _settings.Overlay.Chat.ShowTwitchEvents = OverlayChatShowEventsBox.IsChecked == true;
+            _settings.Overlay.Chat.EnableBttv = OverlayChatBttvBox.IsChecked == true;
+            _settings.Overlay.Chat.EnableFfz = OverlayChatFfzBox.IsChecked == true;
+            _settings.Overlay.Chat.EnableSevenTv = OverlayChatSevenTvBox.IsChecked == true;
+            _settings.Overlay.Chat.BackgroundType = GetOverlayChatBackgroundType();
+            _settings.Overlay.Chat.BackgroundColor = OverlayChatBackgroundColorBox.Text.Trim();
+            _settings.Overlay.Chat.BackgroundImagePath = OverlayChatBackgroundImageBox.Text.Trim();
+            if (int.TryParse(OverlayChatBackgroundOpacityBox.Text.Trim(), out int opacityPercent))
+            {
+                _settings.Overlay.Chat.BackgroundOpacity = opacityPercent / 100.0;
+            }
+
+            if (int.TryParse(OverlayChatPaddingBox.Text.Trim(), out int paddingPx))
+            {
+                _settings.Overlay.Chat.PaddingPx = paddingPx;
+            }
+
+            if (int.TryParse(OverlayChatRadiusBox.Text.Trim(), out int radiusPx))
+            {
+                _settings.Overlay.Chat.BorderRadiusPx = radiusPx;
+            }
+
+            if (int.TryParse(OverlayChatGapBox.Text.Trim(), out int gapPx))
+            {
+                _settings.Overlay.Chat.GapPx = gapPx;
+            }
+
+            _settings.Overlay.Chat.NormalizeAppearance();
+            SelectOverlayChatBackgroundType(_settings.Overlay.Chat.BackgroundType);
+            OverlayChatBackgroundColorBox.Text = _settings.Overlay.Chat.BackgroundColor;
+            OverlayChatBackgroundOpacityBox.Text = ((int)Math.Round(_settings.Overlay.Chat.BackgroundOpacity * 100)).ToString();
+            OverlayChatPaddingBox.Text = _settings.Overlay.Chat.PaddingPx.ToString();
+            OverlayChatRadiusBox.Text = _settings.Overlay.Chat.BorderRadiusPx.ToString();
+            OverlayChatGapBox.Text = _settings.Overlay.Chat.GapPx.ToString();
             OverlayWebServerUrlBox.Text = _settings.Overlay.GetBaseUrl();
+            OverlayChatUrlBox.Text = _settings.Overlay.GetOverlayUrl("chat");
+            RefreshSelectedOverlayInstanceUrl();
+            _overlayRealtimeHub.ConfigureChatBuffer(_settings.Overlay.Chat.MaxBufferedMessages);
+            await RefreshChatEmoteCatalogFromSettingsAsync();
 
             _settings.Workflow.EndSceneSeconds = int.Parse(EndSceneSecondsBox.Text.Trim());
             _settings.Twitch.EndSceneDurationSeconds = _settings.Workflow.EndSceneSeconds;
@@ -8752,7 +8845,7 @@ public partial class MainWindow : Window
         {
             string baseUrl = _overlayModule.WebServer.BaseUrl ?? _settings.Overlay.GetBaseUrl();
             OverlayWebServerStatusText.Text =
-                $"Läuft auf {baseUrl} · Beispiel: {baseUrl}/modules/spotify-info.html · WS: {baseUrl.Replace("http://", "ws://", StringComparison.Ordinal)}/ws";
+                $"Läuft auf {baseUrl} · Chat: {baseUrl}/chat · WS: {baseUrl.Replace("http://", "ws://", StringComparison.Ordinal)}/ws";
             OverlayWebServerStatusText.Foreground = Brushes.LightGreen;
             return;
         }
@@ -10289,7 +10382,184 @@ public partial class MainWindow : Window
         }
     }
 
-    private void BrowseOverlayFolder()
+    private void LoadOverlayInstancesUi()
+    {
+        _settings.Overlay.EnsureInstancesMigrated();
+        _suppressOverlayInstanceSelection = true;
+        try
+        {
+            _overlayInstances.Clear();
+            foreach (OverlayInstanceSettings instance in _settings.Overlay.Instances)
+            {
+                _overlayInstances.Add(new OverlayInstanceSettings
+                {
+                    Id = string.IsNullOrWhiteSpace(instance.Id) ? Guid.NewGuid().ToString("N") : instance.Id,
+                    Name = instance.Name,
+                    RootPath = instance.RootPath,
+                    Enabled = instance.Enabled
+                });
+            }
+
+            OverlayInstancesList.ItemsSource = _overlayInstances;
+            if (_overlayInstances.Count > 0)
+            {
+                OverlayInstancesList.SelectedIndex = 0;
+            }
+            else
+            {
+                ClearOverlayInstanceEditor();
+            }
+        }
+        finally
+        {
+            _suppressOverlayInstanceSelection = false;
+        }
+
+        OnOverlayInstanceSelectionChanged();
+    }
+
+    private void CommitOverlayInstancesFromUi()
+    {
+        ApplyOverlayInstanceEditorToSelection();
+        _settings.Overlay.Instances = _overlayInstances
+            .Select(item => new OverlayInstanceSettings
+            {
+                Id = string.IsNullOrWhiteSpace(item.Id) ? Guid.NewGuid().ToString("N") : item.Id.Trim(),
+                Name = item.Name?.Trim() ?? "",
+                RootPath = item.RootPath?.Trim() ?? "",
+                Enabled = item.Enabled
+            })
+            .ToList();
+
+        // Legacy-Feld: erster Root bleibt für Datenpfad-Fallback synchron.
+        _settings.Overlay.RootPath = _settings.Overlay.Instances
+            .Select(i => i.RootPath)
+            .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path))
+            ?? _settings.Overlay.RootPath;
+    }
+
+    private void AddOverlayInstance()
+    {
+        var instance = new OverlayInstanceSettings
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = $"Overlay {_overlayInstances.Count + 1}",
+            RootPath = "",
+            Enabled = true
+        };
+        _overlayInstances.Add(instance);
+        OverlayInstancesList.SelectedItem = instance;
+        OverlayStatusText.Text = "Neue Overlay-Instanz angelegt.";
+    }
+
+    private void RemoveSelectedOverlayInstance()
+    {
+        if (OverlayInstancesList.SelectedItem is not OverlayInstanceSettings selected)
+        {
+            return;
+        }
+
+        int index = OverlayInstancesList.SelectedIndex;
+        _overlayInstances.Remove(selected);
+        if (_overlayInstances.Count == 0)
+        {
+            ClearOverlayInstanceEditor();
+            return;
+        }
+
+        OverlayInstancesList.SelectedIndex = Math.Clamp(index, 0, _overlayInstances.Count - 1);
+    }
+
+    private void OnOverlayInstanceSelectionChanged()
+    {
+        if (_suppressOverlayInstanceSelection)
+        {
+            return;
+        }
+
+        _loadingOverlayInstanceEditor = true;
+        try
+        {
+            if (OverlayInstancesList.SelectedItem is not OverlayInstanceSettings selected)
+            {
+                ClearOverlayInstanceEditor();
+                return;
+            }
+
+            OverlayInstanceNameBox.Text = selected.Name ?? "";
+            OverlayInstanceRootBox.Text = selected.RootPath ?? "";
+            OverlayInstanceEnabledBox.IsChecked = selected.Enabled;
+            OverlayInstanceIdText.Text = "Id: " + selected.Id;
+            RefreshSelectedOverlayInstanceUrl();
+        }
+        finally
+        {
+            _loadingOverlayInstanceEditor = false;
+        }
+    }
+
+    private void ClearOverlayInstanceEditor()
+    {
+        _loadingOverlayInstanceEditor = true;
+        try
+        {
+            OverlayInstanceNameBox.Text = "";
+            OverlayInstanceRootBox.Text = "";
+            OverlayInstanceEnabledBox.IsChecked = true;
+            OverlayInstanceUrlBox.Text = "";
+            OverlayInstanceIdText.Text = "";
+        }
+        finally
+        {
+            _loadingOverlayInstanceEditor = false;
+        }
+    }
+
+    private void ApplyOverlayInstanceEditorToSelection()
+    {
+        if (_loadingOverlayInstanceEditor ||
+            OverlayInstancesList.SelectedItem is not OverlayInstanceSettings selected)
+        {
+            return;
+        }
+
+        selected.Name = OverlayInstanceNameBox.Text;
+        selected.RootPath = OverlayInstanceRootBox.Text;
+        selected.Enabled = OverlayInstanceEnabledBox.IsChecked == true;
+        RefreshSelectedOverlayInstanceUrl();
+
+        // DisplayMemberPath aktualisieren
+        int index = OverlayInstancesList.SelectedIndex;
+        _suppressOverlayInstanceSelection = true;
+        try
+        {
+            OverlayInstancesList.Items.Refresh();
+            OverlayInstancesList.SelectedIndex = index;
+        }
+        finally
+        {
+            _suppressOverlayInstanceSelection = false;
+        }
+    }
+
+    private void RefreshSelectedOverlayInstanceUrl()
+    {
+        if (OverlayInstancesList.SelectedItem is not OverlayInstanceSettings selected ||
+            string.IsNullOrWhiteSpace(selected.Id))
+        {
+            OverlayInstanceUrlBox.Text = "";
+            return;
+        }
+
+        if (int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int port) && port is > 0 and <= 65535)
+        {
+            _settings.Overlay.WebServerPort = port;
+        }
+
+        OverlayInstanceUrlBox.Text = _settings.Overlay.GetInstanceUrl(selected.Id);
+    }
+
+    private void BrowseOverlayInstanceFolder()
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
@@ -10297,7 +10567,7 @@ public partial class MainWindow : Window
             Multiselect = false
         };
 
-        string currentPath = OverlayRootBox.Text.Trim();
+        string currentPath = OverlayInstanceRootBox.Text.Trim();
         if (!string.IsNullOrWhiteSpace(currentPath) && Directory.Exists(currentPath))
         {
             dialog.InitialDirectory = currentPath;
@@ -10305,8 +10575,111 @@ public partial class MainWindow : Window
 
         if (dialog.ShowDialog(this) == true)
         {
-            OverlayRootBox.Text = dialog.FolderName;
+            OverlayInstanceRootBox.Text = dialog.FolderName;
+            ApplyOverlayInstanceEditorToSelection();
         }
+    }
+
+    private void BrowseOverlayChatBackgroundImage()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Chat-Hintergrundbild wählen",
+            Filter = "Bilder|*.png;*.jpg;*.jpeg;*.gif;*.webp;*.bmp|Alle Dateien|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        string currentPath = OverlayChatBackgroundImageBox.Text.Trim();
+        if (!string.IsNullOrWhiteSpace(currentPath))
+        {
+            try
+            {
+                string? directory = Path.GetDirectoryName(Path.GetFullPath(Environment.ExpandEnvironmentVariables(currentPath)));
+                if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                {
+                    dialog.InitialDirectory = directory;
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            OverlayChatBackgroundImageBox.Text = dialog.FileName;
+            SelectOverlayChatBackgroundType("Image");
+        }
+    }
+
+    private void SelectOverlayChatBackgroundType(string type)
+    {
+        string normalized = string.IsNullOrWhiteSpace(type) ? "None" : type.Trim();
+        foreach (object item in OverlayChatBackgroundTypeBox.Items)
+        {
+            if (item is System.Windows.Controls.ComboBoxItem combo &&
+                string.Equals(Convert.ToString(combo.Tag), normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                OverlayChatBackgroundTypeBox.SelectedItem = combo;
+                return;
+            }
+        }
+
+        OverlayChatBackgroundTypeBox.SelectedIndex = 0;
+    }
+
+    private string GetOverlayChatBackgroundType()
+    {
+        if (OverlayChatBackgroundTypeBox.SelectedItem is System.Windows.Controls.ComboBoxItem combo &&
+            combo.Tag is string tag &&
+            !string.IsNullOrWhiteSpace(tag))
+        {
+            return tag;
+        }
+
+        return "None";
+    }
+
+    private void CopySelectedOverlayInstanceUrl()
+    {
+        RefreshSelectedOverlayInstanceUrl();
+        string url = OverlayInstanceUrlBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            OverlayStatusText.Text = "Keine Overlay-URL – Instanz wählen.";
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(url);
+            OverlayStatusText.Text = "Overlay-URL kopiert: " + url;
+        }
+        catch (Exception exception)
+        {
+            OverlayStatusText.Text = "URL konnte nicht kopiert werden: " + exception.Message;
+        }
+    }
+
+    private string ResolveConfiguredOverlayRoot()
+    {
+        string fromSettings = _settings.Overlay.RootPath?.Trim() ?? "";
+        if (!string.IsNullOrWhiteSpace(fromSettings))
+        {
+            return fromSettings;
+        }
+
+        return _settings.Overlay.Instances
+            .Select(i => i.RootPath?.Trim() ?? "")
+            .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path))
+            ?? "";
+    }
+
+    private void BrowseOverlayFolder()
+    {
+        BrowseOverlayInstanceFolder();
     }
 
     private void OpenConfiguredTarget(string? target, string displayName, bool showMissingMessage = true)
@@ -11092,10 +11465,6 @@ public partial class MainWindow : Window
             DashboardTopMusicTitleText,
             DashboardTopMusicTitleViewport,
             DashboardTopMusicTitleTranslate);
-        UpdateTextMarquee(
-            TitleBarMusicTrackText,
-            TitleBarMusicTrackViewport,
-            TitleBarMusicTrackTranslate);
     }
 
     private static void UpdateTextMarquee(
@@ -11271,8 +11640,6 @@ public partial class MainWindow : Window
         _updatingMusicPlayerUi = true;
         try
         {
-            TitleBarMusicTrackText.Text = trackLabel;
-            TitleBarMusicPlayPauseButton.Content = uiState.IsPlaying ? "Ⅱ" : "▶";
             DashboardTopMusicTitleText.Text = string.IsNullOrWhiteSpace(uiState.Title) ? "Kein Titel" : uiState.Title;
             DashboardTopMusicArtistText.Text = string.IsNullOrWhiteSpace(uiState.Artist) ? "-" : uiState.Artist;
             bool showAlbum = !IsYouTubeMusicProvider();
@@ -11348,7 +11715,6 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(coverUrl))
         {
-            TitleBarMusicCoverImage.Source = null;
             DashboardTopMusicCoverImage.Source = null;
             MusicPlayerCoverImage.Source = null;
             return;
@@ -11365,7 +11731,6 @@ public partial class MainWindow : Window
             image.StreamSource = stream;
             image.EndInit();
             image.Freeze();
-            TitleBarMusicCoverImage.Source = image;
             DashboardTopMusicCoverImage.Source = image;
             MusicPlayerCoverImage.Source = image;
         }
@@ -11450,7 +11815,6 @@ public partial class MainWindow : Window
 
             string json = rootObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(targetPath, json);
-            await _overlayRealtimeHub.PublishJsonAsync(json);
         }
         catch (Exception exception)
         {
@@ -11806,7 +12170,7 @@ public partial class MainWindow : Window
             // schreiben wir hier bewusst direkt in diese Datei und umgehen den
             // allgemeinen OverlayDataService, dessen gespeicherter Pfad bei älteren
             // Installationen noch auf die zweite JSON im Root zeigen kann.
-            string overlayRoot = OverlayRootBox.Text.Trim();
+            string overlayRoot = ResolveConfiguredOverlayRoot();
             if (string.IsNullOrWhiteSpace(overlayRoot))
             {
                 overlayRoot = _settings.Overlay.RootPath?.Trim() ?? "";
@@ -11904,7 +12268,16 @@ public partial class MainWindow : Window
             // eine temporäre Datei erzeugte bei einigen OBS-Browserquellen ein
             // Dateiwechsel-Ereignis, das wie kurzes Aus-/Einblenden wirkte.
             await File.WriteAllTextAsync(targetPath, json);
-            await _overlayRealtimeHub.PublishJsonAsync(json);
+
+            string trackKey = $"{playback.Track?.Artist}|{playback.Track?.Name}|{playback.Track?.AlbumImageUrl}";
+            if (!string.Equals(_lastOverlayPublishedSpotifyTrack, trackKey, StringComparison.Ordinal))
+            {
+                _lastOverlayPublishedSpotifyTrack = trackKey;
+                await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppSpotifyTrack(
+                    playback.Track?.Name ?? "",
+                    playback.Track?.Artist ?? "",
+                    playback.Track?.AlbumImageUrl ?? ""));
+            }
 
             ServicesSpotifyDataJsonPathBox.Text = targetPath;
             ServicesSpotifyOverlayPathText.Text = $"Aktive JSON: {targetPath}";
@@ -12013,7 +12386,7 @@ public partial class MainWindow : Window
 
     private string ResolveActiveOverlayDataPath()
     {
-        string overlayRoot = OverlayRootBox.Text.Trim();
+        string overlayRoot = ResolveConfiguredOverlayRoot();
         if (string.IsNullOrWhiteSpace(overlayRoot))
         {
             overlayRoot = _settings.Overlay.RootPath?.Trim() ?? "";
@@ -12087,9 +12460,143 @@ public partial class MainWindow : Window
             await writer.WriteAsync(json);
             await writer.FlushAsync();
             await stream.FlushAsync();
-            await _overlayRealtimeHub.PublishJsonAsync(json);
         }
         finally { OverlayDataWriteCoordinator.Lock.Release(); }
+    }
+
+    private Task PublishOverlayRealtimeEventAsync(OverlayRealtimeEvent evt) =>
+        _overlayRealtimeHub.PublishEventAsync(evt);
+
+    private string? _chatEmoteCatalogBroadcasterId;
+    private string? _chatBadgeCatalogBroadcasterId;
+
+    private async Task PublishOverlayChatMessageAsync(TwitchChatMessage message)
+    {
+        if (!_settings.Overlay.Chat.Enabled)
+        {
+            return;
+        }
+
+        try
+        {
+            await EnsureChatEmoteCatalogAsync(message.BroadcasterUserId);
+            await EnsureChatBadgeCatalogAsync(message.BroadcasterUserId);
+
+            IReadOnlyDictionary<string, ChatEmoteDefinition> catalog =
+                _chatEmoteCatalog.GetActiveMap(_settings.Overlay.Chat);
+            IReadOnlyList<OverlayChatPart> enriched = ChatEmoteEnricher.Enrich(
+                message.Fragments,
+                catalog);
+            IReadOnlyList<OverlayChatMessagePart> parts =
+            [
+                .. enriched.Select(part => new OverlayChatMessagePart(
+                    part.Type,
+                    part.Text,
+                    part.Url,
+                    part.Provider))
+            ];
+            IReadOnlyList<OverlayChatBadgePart> badges =
+            [
+                .. _chatBadgeCatalog.ResolveBadges(message.Badges)
+                    .Select(badge => new OverlayChatBadgePart(
+                        badge.SetId,
+                        badge.Id,
+                        badge.Url,
+                        badge.Title))
+            ];
+
+            await PublishOverlayRealtimeEventAsync(OverlayEventBridge.FromChatMessage(
+                message.MessageId,
+                message.ChatterName,
+                message.ChatterLogin,
+                message.Color,
+                badges,
+                $"{message.ChatterName}: {message.MessageText}",
+                message.ReceivedAt,
+                parts));
+        }
+        catch
+        {
+            // Chat overlay is best-effort and must not break the in-app chat UI.
+        }
+    }
+
+    private async Task EnsureChatEmoteCatalogAsync(string broadcasterUserId)
+    {
+        if (string.IsNullOrWhiteSpace(broadcasterUserId))
+        {
+            return;
+        }
+
+        OverlayChatSettings chat = _settings.Overlay.Chat;
+        if (!chat.EnableBttv && !chat.EnableFfz && !chat.EnableSevenTv)
+        {
+            return;
+        }
+
+        if (string.Equals(_chatEmoteCatalogBroadcasterId, broadcasterUserId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await _chatEmoteCatalog.RefreshAsync(broadcasterUserId, chat);
+        _chatEmoteCatalogBroadcasterId = broadcasterUserId;
+    }
+
+    private async Task EnsureChatBadgeCatalogAsync(string broadcasterUserId)
+    {
+        if (string.IsNullOrWhiteSpace(broadcasterUserId))
+        {
+            return;
+        }
+
+        if (string.Equals(_chatBadgeCatalogBroadcasterId, broadcasterUserId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await _chatBadgeCatalog.RefreshAsync(_twitchApiClient, broadcasterUserId);
+        _chatBadgeCatalogBroadcasterId = broadcasterUserId;
+    }
+
+    private async Task RefreshChatEmoteCatalogFromSettingsAsync()
+    {
+        _chatEmoteCatalogBroadcasterId = null;
+        _chatBadgeCatalogBroadcasterId = null;
+        string broadcasterId = _twitchModule.GetSnapshot().UserId;
+        if (string.IsNullOrWhiteSpace(broadcasterId))
+        {
+            return;
+        }
+
+        await EnsureChatEmoteCatalogAsync(broadcasterId);
+        await EnsureChatBadgeCatalogAsync(broadcasterId);
+    }
+
+    private async Task PublishOverlayWorkflowStateAsync(WorkflowState state)
+    {
+        string phase = state.Phase.ToString();
+        if (!string.Equals(_lastOverlayPublishedPhase, phase, StringComparison.Ordinal))
+        {
+            _lastOverlayPublishedPhase = phase;
+            await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppStreamPhase(phase));
+        }
+
+        bool isLive = state.Phase == StreamPhase.Live
+            || _lastObsStreamActive
+            || _twitchStreamStartedAt.HasValue;
+        if (_lastOverlayPublishedLive != isLive)
+        {
+            _lastOverlayPublishedLive = isLive;
+            await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppStreamLive(isLive));
+        }
+
+        if (!string.IsNullOrWhiteSpace(state.CurrentScene) &&
+            !string.Equals(_lastOverlayPublishedScene, state.CurrentScene, StringComparison.Ordinal))
+        {
+            _lastOverlayPublishedScene = state.CurrentScene;
+            await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppObsScene(state.CurrentScene));
+        }
     }
 
     private async Task StartLegacyStreamAutomationAsync()
@@ -12364,6 +12871,7 @@ public partial class MainWindow : Window
             await RefreshTwitchUsersAsync(force: true);
             await RefreshLiveViewerSampleAsync();
             await RefreshTwitchFollowerCountAsync();
+            await RefreshChatEmoteCatalogFromSettingsAsync();
         }
         catch (Exception exception)
         {
@@ -12938,7 +13446,7 @@ public partial class MainWindow : Window
         if (message.Badges.Any(
                 badge =>
                     string.Equals(
-                        badge,
+                        badge.SetId,
                         "moderator",
                         StringComparison.OrdinalIgnoreCase)))
         {
@@ -12948,7 +13456,7 @@ public partial class MainWindow : Window
         if (message.Badges.Any(
                 badge =>
                     string.Equals(
-                        badge,
+                        badge.SetId,
                         "vip",
                         StringComparison.OrdinalIgnoreCase)))
         {
@@ -12958,11 +13466,11 @@ public partial class MainWindow : Window
         if (message.Badges.Any(
                 badge =>
                     string.Equals(
-                        badge,
+                        badge.SetId,
                         "subscriber",
                         StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(
-                        badge,
+                        badge.SetId,
                         "founder",
                         StringComparison.OrdinalIgnoreCase)))
         {
@@ -13910,6 +14418,11 @@ public partial class MainWindow : Window
             // live-status.html trotz isLive=true weiterhin OFFLINE an.
             _streamSessionStartedAt ??= ResolveObservedObsStreamStartedAt(snapshot.Stream?.OutputTimecode);
             _ = HandleObservedStreamStartAsync();
+            if (_lastOverlayPublishedLive != true)
+            {
+                _lastOverlayPublishedLive = true;
+                _ = PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppStreamLive(true));
+            }
         }
         else if (!streamActiveNow && _lastObsStreamActive)
         {
@@ -13918,6 +14431,11 @@ public partial class MainWindow : Window
             _twitchStreamStartedAt = null;
             _spotifyStartPlaylistTriggeredForCurrentStream = false;
             _consecutiveObsStreamInactivePolls = 0;
+            if (_lastOverlayPublishedLive != false)
+            {
+                _lastOverlayPublishedLive = false;
+                _ = PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppStreamLive(false));
+            }
         }
         _lastObsStreamActive = streamActiveNow;
         RefreshWorkflowUi(_workflowModule.Service.State);

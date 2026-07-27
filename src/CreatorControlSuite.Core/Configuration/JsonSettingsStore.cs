@@ -144,10 +144,13 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
         settings.StreamerBot ??= new StreamerBotSettings();
         settings.Alerts ??= new AlertSettings();
         settings.Overlay ??= new OverlaySettings();
+        settings.Overlay.Chat ??= new OverlayChatSettings();
         settings.Workflow ??= new WorkflowSettings();
         settings.StreamDeck ??= new StreamDeckSettings();
         settings.Dashboard ??= new DashboardSettings();
         settings.Updates ??= new UpdateSettings();
+
+        settings.Overlay.EnsureInstancesMigrated();
 
         if (string.IsNullOrWhiteSpace(settings.MusicPlayer.ProviderId))
         {
