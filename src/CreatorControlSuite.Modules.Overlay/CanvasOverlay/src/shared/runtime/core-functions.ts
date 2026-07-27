@@ -1,4 +1,4 @@
-import type { LayoutItem } from '../types';
+﻿import type { LayoutItem } from '../types';
 import { prop } from '../utils/prop';
 import { escapeHtml } from '../utils/html';
 import { formatClock, formatUptime } from '../utils/format';
@@ -20,6 +20,13 @@ import {
   MUSIC_VARIANTS,
   MUSIC_SIZE_PRESETS
 } from '../widgets/music';
+import {
+  createPartnerRouletteEl,
+  updatePartnerRoulette,
+  resolvePartnerRouletteImages,
+  PARTNER_ROULETTE_TRANSITIONS
+} from '../widgets/partner-roulette';
+
 export {
   createSpotifyEl,
   updateSpotify,
@@ -32,6 +39,13 @@ export {
   providerHeading,
   MUSIC_VARIANTS,
   MUSIC_SIZE_PRESETS
+};
+
+export {
+  createPartnerRouletteEl,
+  updatePartnerRoulette,
+  resolvePartnerRouletteImages,
+  PARTNER_ROULETTE_TRANSITIONS
 };
 
 export function createOnlineEl(item) {
@@ -1061,6 +1075,7 @@ export function createItemContent(item) {
     if (item.type === "image") return createImageEl(item);
     if (item.type === "countdown") return createCountdownEl(item);
     if (item.type === "socials") return createSocialsEl(item);
+    if (item.type === "partner-roulette") return createPartnerRouletteEl(item);
     const unknown = document.createElement("div");
     unknown.textContent = item.type || "unknown";
     unknown.style.padding = "12px";

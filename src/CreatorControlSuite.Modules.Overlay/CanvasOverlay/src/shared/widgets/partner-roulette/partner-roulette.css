@@ -1,0 +1,75 @@
+.ccs-partner-roulette {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--ccs-roulette-radius, 0);
+  --ccs-roulette-transition-ms: 500ms;
+}
+
+.ccs-partner-roulette-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.ccs-partner-roulette-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: var(--ccs-roulette-fit, contain);
+  object-position: var(--ccs-roulette-position, center);
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.ccs-partner-roulette-slide.is-active {
+  opacity: 1;
+  z-index: 1;
+}
+
+.ccs-partner-roulette-t-fade .ccs-partner-roulette-slide,
+.ccs-partner-roulette-t-crossfade .ccs-partner-roulette-slide {
+  transition: opacity var(--ccs-roulette-transition-ms) ease;
+}
+
+.ccs-partner-roulette-t-slide .ccs-partner-roulette-slide {
+  opacity: 1;
+  transform: translateX(100%);
+  transition:
+    transform var(--ccs-roulette-transition-ms) ease,
+    opacity var(--ccs-roulette-transition-ms) ease;
+}
+
+.ccs-partner-roulette-t-slide .ccs-partner-roulette-slide.is-active {
+  transform: translateX(0);
+}
+
+.ccs-partner-roulette-t-slide .ccs-partner-roulette-slide.is-exit {
+  transform: translateX(-100%);
+  opacity: 1;
+}
+
+.ccs-partner-roulette-t-none .ccs-partner-roulette-slide {
+  transition: none;
+}
+
+.ccs-partner-roulette-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(0, 0, 0, 0.35);
+  font: 600 14px/1.35 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  z-index: 2;
+}
+
+.ccs-partner-roulette.has-images .ccs-partner-roulette-placeholder {
+  display: none;
+}

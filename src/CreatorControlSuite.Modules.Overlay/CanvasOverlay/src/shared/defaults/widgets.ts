@@ -99,6 +99,19 @@ export const WIDGET_DEFAULTS: Record<string, WidgetDefaults> = {
       iconColor: "#ffffff"
     }
   },
+  "partner-roulette": {
+    w: 320,
+    h: 320,
+    props: {
+      images: [],
+      intervalMs: 4000,
+      transition: "fade",
+      transitionMs: 500,
+      fit: "contain",
+      borderRadiusPx: 12,
+      objectPosition: "center"
+    }
+  },
   spotify: {
     w: 950,
     h: 188,

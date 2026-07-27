@@ -125,6 +125,8 @@ export function syncProps(
     ], "center"));
   } else if (item.type === "socials") {
     appendSocialsProps(item, ctx, propExtra);
+  } else if (item.type === "partner-roulette") {
+    appendPartnerRouletteProps(item, ctx, propExtra);
   } else if (item.type === "frame.card") {
     appendFrameCardProps(item, ctx, propExtra);
   } else if (item.type === "frame" || (item.type || "").startsWith("frame.")) {
@@ -207,6 +209,123 @@ function appendSocialsProps(item: LayoutItem, ctx: EditorContext, propExtra: HTM
   propExtra.appendChild(numProp("iconSize", "Icon-Größe px", item, ctx, 36));
   propExtra.appendChild(numProp("gap", "Abstand px", item, ctx, 12));
   propExtra.appendChild(colorProp("iconColor", "Mono-Farbe", item, ctx, "#ffffff"));
+}
+
+function readRouletteImages(item: LayoutItem): string[] {
+  const live = item.props?.images;
+  if (!Array.isArray(live)) return [];
+  return live.map((entry) => {
+    if (typeof entry === "string") return entry;
+    if (entry && typeof entry === "object") return String((entry as { src?: unknown }).src || "");
+    return "";
+  });
+}
+
+function appendPartnerRouletteProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
+  const timing = propSection("partner-roulette-timing", "Timing & Übergang");
+  timing.body.appendChild(numProp("intervalMs", "Anzeige (ms)", item, ctx, 4000, {
+    min: 500,
+    max: 60000,
+    step: 100
+  }));
+  timing.body.appendChild(selectProp("transition", "Übergang", item, ctx, [
+    { value: "fade", label: "Fade" },
+    { value: "crossfade", label: "Crossfade" },
+    { value: "slide", label: "Slide" },
+    { value: "none", label: "Keiner" }
+  ], "fade"));
+  timing.body.appendChild(numProp("transitionMs", "Übergang (ms)", item, ctx, 500, {
+    min: 0,
+    max: 3000,
+    step: 50
+  }));
+  propExtra.appendChild(timing.root);
+
+  const look = propSection("partner-roulette-look", "Darstellung");
+  look.body.appendChild(selectProp("fit", "Einpassung", item, ctx, [
+    { value: "contain", label: "Contain" },
+    { value: "cover", label: "Cover" },
+    { value: "fill", label: "Fill" },
+    { value: "none", label: "None" },
+    { value: "scale-down", label: "Scale-down" }
+  ], "contain"));
+  look.body.appendChild(numProp("borderRadiusPx", "Eckenradius px", item, ctx, 12));
+  look.body.appendChild(textProp("objectPosition", "Position", item, ctx, "center"));
+  propExtra.appendChild(look.root);
+
+  const imagesSection = propSection("partner-roulette-images", "Bilder");
+  const list = document.createElement("div");
+  list.className = "ccs-effects-list";
+
+  function renderList(): void {
+    list.innerHTML = "";
+    const live = ctx.liveItem(item) || item;
+    const images = readRouletteImages(live);
+    images.forEach((src, i) => {
+      const card = document.createElement("div");
+      card.className = "ccs-effect-instance";
+
+      const row = document.createElement("div");
+      row.className = "ccs-effect-row";
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = src;
+      input.placeholder = "https://… /media/…";
+      input.style.flex = "1";
+      input.addEventListener("change", () => {
+        ctx.commitProp(item, (next) => {
+          const nextImages = readRouletteImages(next);
+          nextImages[i] = input.value;
+          next.props.images = nextImages;
+        });
+      });
+      input.addEventListener("input", () => {
+        if (!ctx.previewProp) return;
+        ctx.previewProp(item, (next) => {
+          const nextImages = readRouletteImages(next);
+          nextImages[i] = input.value;
+          next.props.images = nextImages;
+        });
+      });
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.title = "Entfernen";
+      remove.addEventListener("click", () => {
+        ctx.commitProp(item, (next) => {
+          const nextImages = readRouletteImages(next);
+          nextImages.splice(i, 1);
+          next.props.images = nextImages;
+        });
+        renderList();
+      });
+
+      row.appendChild(input);
+      row.appendChild(remove);
+      card.appendChild(row);
+      list.appendChild(card);
+    });
+  }
+
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.textContent = "Bild hinzufügen";
+  addBtn.className = "ccs-palette-item";
+  addBtn.addEventListener("click", () => {
+    ctx.commitProp(item, (live) => {
+      const nextImages = readRouletteImages(live);
+      nextImages.push("");
+      live.props.images = nextImages;
+    });
+    renderList();
+  });
+
+  renderList();
+  imagesSection.body.appendChild(list);
+  imagesSection.body.appendChild(addBtn);
+  propExtra.appendChild(imagesSection.root);
 }
 
 function appendFrameProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {

@@ -127,6 +127,7 @@ export interface CcsCanvasApi {
   MUSIC_VARIANTS: readonly string[];
   MUSIC_VARIANT_LABELS: Record<string, string>;
   MUSIC_SIZE_PRESETS: Record<string, { w: number; h: number; label: string; scale?: number }>;
+  PARTNER_ROULETTE_TRANSITIONS: readonly string[];
   DEFAULT_LAYOUT: Layout;
   uid: () => string;
   registerWidget: (type: string, handlers: WidgetHandlers) => void;

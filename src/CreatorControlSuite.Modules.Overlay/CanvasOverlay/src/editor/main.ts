@@ -118,7 +118,8 @@ function bootEditor(): void {
     { type: "text", label: "Text" },
     { type: "image", label: "Image" },
     { type: "countdown", label: "Countdown" },
-    { type: "socials", label: "Socials" }
+    { type: "socials", label: "Socials" },
+    { type: "partner-roulette", label: "Partner Roulette" }
   ];
   const shapes: PaletteEntry[] = [
     { type: "frame", label: "Frame" },

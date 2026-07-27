@@ -5,6 +5,7 @@ import { WIDGET_DEFAULTS } from "./defaults/widgets";
 import { SHAPE_DEFAULTS, CARD_FRAME_SIZE_PRESETS, CARD_FRAME_VARIANTS, FRAME_MODES, FRAME_MODE_LABELS } from "./defaults/shapes";
 import { SCENE_BG_PRESETS } from "./defaults/scene-bg";
 import { MUSIC_VARIANTS, MUSIC_VARIANT_LABELS, MUSIC_SIZE_PRESETS } from "./widgets/music";
+import { PARTNER_ROULETTE_TRANSITIONS } from "./widgets/partner-roulette";
 import { uid } from "./utils/format";
 import { fetchJson } from "./net/fetch-json";
 import { connectWs } from "./net/connect-ws";
@@ -28,6 +29,7 @@ const CcsCanvas = {
   MUSIC_VARIANTS,
   MUSIC_VARIANT_LABELS,
   MUSIC_SIZE_PRESETS,
+  PARTNER_ROULETTE_TRANSITIONS,
   DEFAULT_LAYOUT,
   uid,
   registerWidget,

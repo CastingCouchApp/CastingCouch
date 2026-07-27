@@ -8,7 +8,7 @@ import { createItemContent, applyItemBox } from './item-content';
 import { applyItemEffects } from '../effects/apply';
 import {
   updateOnline, updateSpotify, updateChat, updateEndingStats, updateText, updateImage,
-  updateCountdown, updateSocials, paintSpotifyProgress, paintEndingStats, paintCountdown,
+  updateCountdown, updateSocials, updatePartnerRoulette, paintSpotifyProgress, paintEndingStats, paintCountdown,
   enqueueAlert, appendChatMessage, appendChatEvent, CHAT_EVENT_TYPES
 } from './core-functions';
 
@@ -176,6 +176,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
       if (item.type === "image") updateImage(node.content, item);
       if (item.type === "countdown") updateCountdown(node.content, item, data);
       if (item.type === "socials") updateSocials(node.content, item);
+      if (item.type === "partner-roulette") updatePartnerRoulette(node.content, item);
     }
 
     function refreshAllData() {

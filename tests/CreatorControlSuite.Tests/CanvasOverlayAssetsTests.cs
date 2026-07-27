@@ -19,7 +19,7 @@ public sealed class CanvasOverlayAssetsTests
     }
 
     [Fact]
-    public void ListWidgetTypes_ContainsOnlineAlertMusicChatEndingStatsTextImageCountdownSocials()
+    public void ListWidgetTypes_ContainsOnlineAlertMusicChatEndingStatsTextImageCountdownSocialsPartnerRoulette()
     {
         IReadOnlyList<string> types = CanvasOverlayAssets.ListWidgetTypes();
         Assert.Contains("online", types);
@@ -31,6 +31,7 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("image", types);
         Assert.Contains("countdown", types);
         Assert.Contains("socials", types);
+        Assert.Contains("partner-roulette", types);
         Assert.DoesNotContain("spotify", types);
     }
 
@@ -263,6 +264,35 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("container-type", styles);
     }
 
+    [Fact]
+    public void CanvasRuntime_RegistersPartnerRouletteWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"partner-roulette\":", runtime);
+        Assert.Contains("createPartnerRouletteEl", runtime);
+        Assert.Contains("updatePartnerRoulette", runtime);
+        Assert.Contains("PARTNER_ROULETTE_TRANSITIONS", runtime);
+        Assert.Contains("intervalMs", runtime);
+        Assert.Contains("transitionMs", runtime);
+        Assert.Contains("resolvePartnerRouletteImages", runtime);
+        Assert.Contains("ccs-partner-roulette", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"partner-roulette\"", editor);
+        Assert.Contains("selectProp(\"transition\"", editor);
+        Assert.Contains("intervalMs", editor);
+        Assert.Contains("transitionMs", editor);
+        Assert.Contains("Bild hinzuf\\xFCgen", editor);
+        Assert.Contains("Partner Roulette", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-partner-roulette", styles);
+        Assert.Contains(".ccs-partner-roulette-slide", styles);
+        Assert.Contains("ccs-partner-roulette-t-fade", styles);
+        Assert.Contains("ccs-partner-roulette-t-slide", styles);
+        Assert.Contains("ccs-partner-roulette-t-crossfade", styles);
+        Assert.Contains("--ccs-roulette-transition-ms", styles);
+    }
 
     [Fact]
     public void ListShapeTypes_ContainsFrames()

@@ -66,7 +66,8 @@ public static class CanvasOverlayAssets
         "text",
         "image",
         "countdown",
-        "socials"
+        "socials",
+        "partner-roulette"
     ];
 
     public static IReadOnlyList<string> ListShapeTypes() =>

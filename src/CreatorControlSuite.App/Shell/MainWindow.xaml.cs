@@ -10933,6 +10933,7 @@ public partial class MainWindow : Window
             ("Widget: Image", "image"),
             ("Widget: Countdown", "countdown"),
             ("Widget: Socials", "socials"),
+            ("Widget: Partner Roulette", "partner-roulette"),
             ("Shape: Frame", "shape/frame"),
             ("Shape: Card Frame", "shape/frame.card"),
             ("Shape: Vignette", "shape/shape.vignette"),
