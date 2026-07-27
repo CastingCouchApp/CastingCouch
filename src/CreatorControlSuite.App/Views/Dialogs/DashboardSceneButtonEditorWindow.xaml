@@ -1,4 +1,4 @@
-<Window x:Class="CreatorControlSuite.App.DashboardSceneButtonEditorWindow"
+<Window x:Class="CreatorControlSuite.App.Views.Dialogs.DashboardSceneButtonEditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Szenen-Button"

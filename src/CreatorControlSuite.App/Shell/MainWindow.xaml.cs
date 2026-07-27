@@ -17,12 +17,18 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using CreatorControlSuite.App.Hud;
+using CreatorControlSuite.App.Core.Eventing;
+using CreatorControlSuite.App.Helpers;
 using CreatorControlSuite.App.Mvvm;
 using CreatorControlSuite.App.Services;
+using CreatorControlSuite.App.Services.CreatorIntelligence;
 using CreatorControlSuite.App.Themes;
 using CreatorControlSuite.App.Twitch;
 using CreatorControlSuite.App.ViewModels;
+using CreatorControlSuite.App.ViewModels.Pages;
+using CreatorControlSuite.App.Views.Dialogs;
+using CreatorControlSuite.Core.Automation;
+using CreatorControlSuite.Core.Eventing;
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Core.Diagnostics;
 using CreatorControlSuite.Core.Ipc;
@@ -54,7 +60,7 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Microsoft.Win32;
 
-namespace CreatorControlSuite.App;
+namespace CreatorControlSuite.App.Shell;
 
 public partial class MainWindow : Window
 {
@@ -84,9 +90,16 @@ public partial class MainWindow : Window
     private readonly IMultiPcAgentClient _multiPcAgentClient;
     private readonly IStreamerBotClient _streamerBotClient;
     private readonly INavigationService _navigationService;
+    private readonly IEventBus _eventBus;
+    private IDisposable? _timedAutomationTickSubscription;
     private readonly DiagnosticsPageViewModel _diagnosticsPageViewModel;
+    private readonly ProfilesPageViewModel _profilesPageViewModel;
+    private readonly AboutPageViewModel _aboutPageViewModel;
+    private readonly MusicPlayerPageViewModel _musicPlayerPageViewModel;
+    private readonly CreatorIntelligenceService _creatorIntelligence;
     private readonly AlertsModule _alertsModule;
     private readonly OverlayModule _overlayModule;
+    private readonly IOverlayRealtimeHub _overlayRealtimeHub;
     private readonly WorkflowModule _workflowModule;
     private readonly IProfileService _profileService;
     private readonly IUpdateService _updateService;
@@ -96,11 +109,6 @@ public partial class MainWindow : Window
     private readonly ISettingsValidator _settingsValidator;
     private readonly RuntimeHealthService _runtimeHealthService;
     private readonly ICrashReporter _crashReporter;
-    private readonly ObsBrowserSourceInstaller _obsBrowserSourceInstaller;
-    private readonly OverlayProjectService _overlayProjectService;
-    private readonly StreamerHudService _streamerHudService = new();
-    private readonly ObservableCollection<OverlayProjectDefinition> _overlayProjects = [];
-    private readonly ObservableCollection<OverlayProjectItem> _overlayProjectItems = [];
     private readonly ILocalIpcServer _ipcServer;
     private readonly ILicenseService _licenseService;
     private readonly ILegalConsentService _legalConsentService;
@@ -130,8 +138,8 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<string> _streamHistoryItems = [];
     private readonly ObservableCollection<string> _twitchProfessionalHistoryItems = [];
     private readonly ObservableCollection<string> _creatorIntelligenceRecommendations = [];
-    private readonly CreatorIntelligenceService _creatorIntelligence = new();
     private DateTimeOffset? _streamSessionStartedAt;
+    private DateTimeOffset? _twitchStreamStartedAt;
     private int _consecutiveObsStreamInactivePolls;
     private const int ConfirmedObsOfflinePollsRequired = 15;
     private bool _spotifyStartPlaylistTriggeredForCurrentStream;
@@ -146,7 +154,6 @@ public partial class MainWindow : Window
     private int _runOfShowCurrentIndex = -1;
     private CancellationTokenSource? _runOfShowAutoCts;
     private readonly HashSet<string> _executedTimedAutomationRuleIds = new(StringComparer.OrdinalIgnoreCase);
-    private readonly System.Windows.Threading.DispatcherTimer _timedAutomationTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly System.Windows.Threading.DispatcherTimer _spotifySavedStateCleanupTimer = new() { Interval = TimeSpan.FromMinutes(15) };
     private DateTimeOffset? _automationSceneActivatedAt;
     private string _automationCurrentScene = "";
@@ -179,19 +186,7 @@ public partial class MainWindow : Window
     private int _activeSpotifyAutomationPriority = int.MinValue;
     private string _activeSpotifyAutomationGroup = "";
     private bool _activeSpotifyAutomationExclusive;
-    private readonly Dictionary<string, SpotifyAutomationSavedState> _spotifyAutomationSavedStates = new(StringComparer.OrdinalIgnoreCase);
-
-    private sealed record SpotifyAutomationSavedState(
-        string ContextUri,
-        CreatorControlSuite.Modules.Spotify.Models.SpotifyTrack? Track,
-        int ProgressMs,
-        int VolumePercent,
-        bool ShuffleEnabled,
-        string RepeatMode,
-        bool WasPlaying,
-        DateTimeOffset SavedAtUtc);
-
-    private sealed record SpotifySavedStateOverviewItem(string Group, string Summary, bool IsExpired);
+    private readonly SpotifySavedStateStore _spotifySavedStateStore = new();
     private sealed record SpotifySavedStateHistoryBackupItem(string FullPath, string DisplayName, DateTime LastWriteTime, long SizeBytes);
     private sealed record SpotifyHistoryRestoreProfile(string Name, bool Entries, bool Favorites, bool Notes, bool Counters, bool Filters, bool MergeEntries, bool IsBuiltIn = false);
     private sealed class SpotifyHistoryRestoreProfileImportItem
@@ -325,9 +320,11 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<StreamerBotLiveEventItem> _streamerBotLiveEvents = [];
     private CancellationTokenSource? _streamerBotScheduledActionCts;
     private readonly HashSet<string> _streamerBotFavoriteActionIds = new(StringComparer.OrdinalIgnoreCase);
-    private readonly System.Windows.Threading.DispatcherTimer _twitchUsersRefreshTimer = new() { Interval = TimeSpan.FromSeconds(30) };
+    private readonly System.Windows.Threading.DispatcherTimer _twitchUsersRefreshTimer = new() { Interval = TimeSpan.FromSeconds(10) };
     private readonly System.Windows.Threading.DispatcherTimer _liveViewerSampleTimer = new() { Interval = TimeSpan.FromSeconds(15) };
     private bool _liveViewerSampleRunning;
+    private bool _twitchUsersRefreshRunning;
+    private DateTimeOffset _lastTwitchUsersRefreshUtc = DateTimeOffset.MinValue;
     private int _currentLiveViewerCount;
     private readonly Queue<int> _dashboardViewerTrendSamples = new();
     private int _currentFollowerCount;
@@ -395,6 +392,7 @@ public partial class MainWindow : Window
         IMusicPlayerRouter musicPlayerRouter,
         AlertsModule alertsModule,
         OverlayModule overlayModule,
+        IOverlayRealtimeHub overlayRealtimeHub,
         WorkflowModule workflowModule,
         IProfileService profileService,
         IUpdateService updateService,
@@ -404,7 +402,6 @@ public partial class MainWindow : Window
         ISettingsValidator settingsValidator,
         RuntimeHealthService runtimeHealthService,
         ICrashReporter crashReporter,
-        ObsBrowserSourceInstaller obsBrowserSourceInstaller,
         ILocalIpcServer ipcServer,
         ILicenseService licenseService,
         ILegalConsentService legalConsentService,
@@ -421,9 +418,15 @@ public partial class MainWindow : Window
         IStreamerBotClient streamerBotClient,
         INavigationService navigationService,
         DiagnosticsPageViewModel diagnosticsPageViewModel,
+        ProfilesPageViewModel profilesPageViewModel,
+        AboutPageViewModel aboutPageViewModel,
+        MusicPlayerPageViewModel musicPlayerPageViewModel,
+        CreatorIntelligenceService creatorIntelligence,
+        IEventBus eventBus,
         AppEventBridge appEventBridge)
     {
         InitializeComponent();
+        NativeWindowHelper.RestrictMaximizeToWorkArea(this);
         WindowState = WindowState.Maximized;
         StateChanged += (_, _) => UpdateTitleBarMaximizeButton();
         UpdateTitleBarMaximizeButton();
@@ -436,6 +439,23 @@ public partial class MainWindow : Window
         _streamerBotClient = streamerBotClient;
         _navigationService = navigationService;
         _diagnosticsPageViewModel = diagnosticsPageViewModel;
+        _profilesPageViewModel = profilesPageViewModel;
+        _aboutPageViewModel = aboutPageViewModel;
+        _musicPlayerPageViewModel = musicPlayerPageViewModel;
+        _creatorIntelligence = creatorIntelligence;
+        _eventBus = eventBus;
+        DiagnosticsModuleView.DataContext = _diagnosticsPageViewModel;
+        ProfilesPageViewHost.DataContext = _profilesPageViewModel;
+        AboutPageViewHost.DataContext = _aboutPageViewModel;
+        _profilesPageViewModel.AfterProfileAppliedAsync = async () => await LoadSettingsAsync();
+        _profilesPageViewModel.ProfilesChanged += (_, _) =>
+        {
+            DashboardProfileBox.ItemsSource = _profilesPageViewModel.Profiles;
+            if (DashboardProfileBox.SelectedItem is null && _profilesPageViewModel.Profiles.Count > 0)
+            {
+                DashboardProfileBox.SelectedIndex = 0;
+            }
+        };
         appEventBridge.Start();
         _externalAlertActivity.ActiveCountChanged += async (_, _) => await ApplyCombinedAlertDuckingAsync();
         _secretStore = secretStore;
@@ -446,6 +466,7 @@ public partial class MainWindow : Window
         _musicPlayerRouter = musicPlayerRouter;
         _alertsModule = alertsModule;
         _overlayModule = overlayModule;
+        _overlayRealtimeHub = overlayRealtimeHub;
         _workflowModule = workflowModule;
         _profileService = profileService;
         _updateService = updateService;
@@ -455,9 +476,6 @@ public partial class MainWindow : Window
         _settingsValidator = settingsValidator;
         _runtimeHealthService = runtimeHealthService;
         _crashReporter = crashReporter;
-        _obsBrowserSourceInstaller = obsBrowserSourceInstaller;
-        _overlayProjectService = new OverlayProjectService(_obsClient, _appLogger, _overlayModule.Service);
-        _streamerHudService.BindSources(_twitchChatItems, _twitchEventItems);
         _ipcServer = ipcServer;
         _licenseService = licenseService;
         _legalConsentService = legalConsentService;
@@ -588,6 +606,7 @@ public partial class MainWindow : Window
         DashboardNotificationList.ItemsSource = _dashboardNotificationItems;
         DashboardStreamHistoryList.ItemsSource = _streamHistoryItems;
         _twitchUsersRefreshTimer.Tick += async (_, _) => await RefreshTwitchUsersAsync();
+        ApplyTwitchUsersRefreshInterval();
         _twitchUsersRefreshTimer.Start();
         _liveViewerSampleTimer.Tick += async (_, _) => await RefreshLiveViewerSampleAsync();
         _liveViewerSampleTimer.Start();
@@ -597,14 +616,12 @@ public partial class MainWindow : Window
             try
             {
                 await RunStartupStepSafelyAsync("Einstellungen laden", LoadSettingsAsync);
-                await RunStartupStepSafelyAsync("Overlay-Projekte laden", LoadOverlayProjectsAsync);
                 await RunStartupStepSafelyAsync("Dashboard initialisieren", () =>
                 {
                     RefreshDashboardAutomationSummary();
                     RefreshDashboardResourceUsage();
                     return Task.CompletedTask;
                 });
-                ApplyStreamerHudFromSettings();
             }
             finally
             {
@@ -615,7 +632,6 @@ public partial class MainWindow : Window
             }
         };
 
-        Closed += (_, _) => _streamerHudService.Close();
         Closing += OnMainWindowClosing;
 
         ObsDashboardStatus.MouseLeftButtonUp += (_, _) =>
@@ -925,7 +941,6 @@ public partial class MainWindow : Window
         MultiPcObsApplyPresetButton.Click += async (_, _) => await ApplyRemoteObsPresetAsync();
         MultiPcObsDeletePresetButton.Click += async (_, _) => await DeleteRemoteObsPresetAsync();
         MultiPcLoadAgentLogsButton.Click += async (_, _) => await LoadRemoteAgentLogsAsync();
-        MultiPcDeployOverlayButton.Click += async (_, _) => await DeployRemotePackageAsync("overlay/deploy", "Overlay-ZIP auswählen", "Overlay-Paket wurde verteilt");
         MultiPcStageUpdateButton.Click += async (_, _) => await DeployRemotePackageAsync("update/stage", "Update-ZIP auswählen", "Update-Paket wurde bereitgestellt");
         MultiPcLoadUpdateStatusButton.Click += async (_, _) => await LoadRemoteUpdateStatusAsync();
         MultiPcLoadUpdateHistoryButton.Click += async (_, _) => await LoadRemoteUpdateHistoryAsync();
@@ -1337,18 +1352,7 @@ public partial class MainWindow : Window
             ApplyDashboardLayout();
         };
 
-        BrowseOverlayManifestButton.Click += (_, _) => BrowseOverlayManifest();
-        CreateOverlayManifestButton.Click += async (_, _) => await CreateOverlayManifestAsync();
-        OpenOverlayManifestButton.Click += (_, _) => OpenOverlayManifestFolder();
         SaveOverlayPageButton.Click += async (_, _) => await SaveSettingsAsync();
-        StreamerHudPreviewButton.Click += (_, _) => PreviewStreamerHud();
-        StreamerHudHideButton.Click += (_, _) =>
-        {
-            _streamerHudService.Hide();
-            StreamerHudStatusText.Text = "HUD ausgeblendet.";
-        };
-        StreamerHudOpacitySlider.ValueChanged += (_, _) =>
-            StreamerHudOpacityValueText.Text = $"{StreamerHudOpacitySlider.Value:0%}";
         SaveSettingsButton.Click += async (_, _) => await SaveSettingsAsync();
         SaveAlertsPageButton.Click += async (_, _) => await SaveSettingsAsync();
         RunDiagnosticsButton.Click += async (_, _) => await RunDiagnosticsAsync();
@@ -2140,9 +2144,7 @@ public partial class MainWindow : Window
         ServicesSpotifyHidePausedBox.Unchecked += async (_, _) => await SaveSpotifyDisplayOptionsImmediatelyAsync();
         ServicesSpotifyObsAudioSourceBox.LostFocus += async (_, _) => await SaveSpotifyDisplayOptionsImmediatelyAsync();
         ServicesSpotifyBrowseDataJsonButton.Click += (_, _) => BrowseSpotifyDataJsonPath();
-        ServicesSpotifyOverlayProjectBox.SelectionChanged += (_, _) => RefreshSpotifyOverlayProjectItems();
         ServicesSpotifyOverlaySceneBox.SelectionChanged += async (_, _) => await RefreshSpotifyOverlayBrowserSourcesAsync();
-        ServicesSpotifyOverlayItemBox.SelectionChanged += (_, _) => RefreshSpotifyOverlaySelectionDetails();
         ServicesSpotifySyncOverlayButton.Click += async (_, _) => await WriteSpotifyDataJsonNowAsync();
         ServicesSpotifyReloadOverlayButton.Click += (_, _) => OpenSpotifyDataJsonFolder();
         ServicesSpotifyPreviewOverlayButton.Click += (_, _) => OpenSpotifyDataJsonFile();
@@ -2175,10 +2177,6 @@ public partial class MainWindow : Window
         };
         ServicesTwitchSaveEndSettingsButton.Click += async (_, _) => await SaveTwitchEndSettingsAsync();
         SaveTwitchGoalsButton.Click += async (_, _) => await SaveTwitchGoalsAsync();
-        AddFollowerGoalToObsButton.Click += async (_, _) => await InstallGoalInObsAsync("follower");
-        InstallAllGoalsSceneButton.Click += async (_, _) => await InstallAllGoalsSceneInObsAsync();
-        AddSubGoalToObsButton.Click += async (_, _) => await InstallGoalInObsAsync("sub");
-        AddDonationGoalToObsButton.Click += async (_, _) => await InstallGoalInObsAsync("donation");
         ServicesStreamerBotLaunchButton.Click += (_, _) => LaunchConfiguredExecutable(_settings.StreamerBot.ExecutablePath, "Streamer.bot");
         ServicesStreamerBotConnectButton.Click += async (_, _) => await ConnectStreamerBotAsync();
         ServicesStreamerBotDisconnectButton.Click += async (_, _) => await DisconnectStreamerBotAsync();
@@ -2331,44 +2329,22 @@ public partial class MainWindow : Window
             }
         };
 
-        InstallOverlayButton.Click += async (_, _) =>
-            await InstallOverlayAsync();
-
         BrowseOverlayFolderButton.Click += (_, _) => BrowseOverlayFolder();
-
-        OverlayFrameColorPaletteBox.SelectionChanged += (_, _) =>
+        CopyOverlayWebServerUrlButton.Click += (_, _) =>
         {
-            if (OverlayFrameColorPaletteBox.SelectedItem is ComboBoxItem selected && selected.Tag is string color)
+            string url = string.IsNullOrWhiteSpace(OverlayWebServerUrlBox.Text)
+                ? _settings.Overlay.GetBaseUrl()
+                : OverlayWebServerUrlBox.Text.Trim();
+            try
             {
-                OverlayFrameColorBox.Text = color;
-                UpdateOverlayFrameColorPreview(color);
+                Clipboard.SetText(url);
+                OverlayWebServerStatusText.Text = "URL kopiert: " + url;
+            }
+            catch (Exception exception)
+            {
+                OverlayWebServerStatusText.Text = "URL konnte nicht kopiert werden: " + exception.Message;
             }
         };
-        OverlayFrameColorBox.TextChanged += (_, _) => UpdateOverlayFrameColorPreview(OverlayFrameColorBox.Text);
-
-        OpenOverlayFolderButton.Click += async (_, _) =>
-            await OpenOverlayFolderAsync();
-
-        ValidateOverlayButton.Click += async (_, _) =>
-            await ValidateOverlayAsync();
-
-        InstallObsBrowserSourcesButton.Click += async (_, _) =>
-            await InstallObsBrowserSourcesAsync();
-        InstallSelectedOverlayContentButton.Click += async (_, _) =>
-            await InstallSelectedOverlayContentAsync();
-
-        OverlayProjectList.ItemsSource = _overlayProjects;
-        OverlayProjectItemsList.ItemsSource = _overlayProjectItems;
-        OverlayProjectList.SelectionChanged += (_, _) => RefreshSelectedOverlayProject();
-        OverlayProjectItemsList.SelectionChanged += (_, _) => RefreshSelectedOverlayProjectItem();
-        ImportOverlayProjectButton.Click += async (_, _) => await ImportOverlayProjectAsync();
-        ImportManagedOverlayButton.Click += async (_, _) => await ImportManagedOverlayAsync();
-        ImportOverlayFromObsButton.Click += async (_, _) => await ImportOverlayFromObsAsync();
-        AddOverlaySceneButton.Click += async (_, _) => await AddOverlaySceneAsync();
-        DeleteOverlayProjectButton.Click += async (_, _) => await DeleteOverlayProjectAsync();
-        SaveOverlayMappingButton.Click += async (_, _) => await SaveOverlayProjectMappingAsync();
-        SyncOverlayProjectButton.Click += async (_, _) => await SynchronizeOverlayProjectAsync();
-        OpenOverlayProjectFolderButton.Click += (_, _) => OpenSelectedOverlayProjectFolder();
 
         DashboardPrepareStreamButton.Click += async (_, _) =>
             await ExecuteDashboardActionAsync(
@@ -2540,8 +2516,11 @@ public partial class MainWindow : Window
         TimedAutomationTransitionBox.DropDownOpened += async (_, _) => await RefreshTimedAutomationObsListsAsync(false);
         StartShortStreamTestButton.Click += async (_, _) => await RunShortStreamTestAsync();
         CancelShortStreamTestButton.Click += (_, _) => _timedAutomationTestCts?.Cancel();
-        _timedAutomationTimer.Tick += async (_, _) => await EvaluateTimedAutomationRulesAsync();
-        _timedAutomationTimer.Start();
+        _timedAutomationTickSubscription = _eventBus.Subscribe<TimedAutomationTick>(tick =>
+        {
+            _ = Dispatcher.InvokeAsync(async () => await EvaluateTimedAutomationRulesAsync());
+        });
+        // Timer replaced by TimedAutomationTickPublisher -> IEventBus.
 
         _workflowModule.Service.StateChanged += (_, state) =>
         {
@@ -2610,23 +2589,6 @@ public partial class MainWindow : Window
         OpenStreamDeckFolderButton.Click += (_, _) =>
             OpenLocalDataFolder("StreamDeck");
 
-        CreateProfileButton.Click += async (_, _) =>
-            await CreateProfileAsync();
-
-        ApplyProfileButton.Click += async (_, _) =>
-            await ApplySelectedProfileAsync();
-
-        ExportProfileButton.Click += async (_, _) =>
-            await ExportSelectedProfileAsync();
-
-        ImportProfileButton.Click += async (_, _) =>
-            await ImportProfileAsync();
-
-        DeleteProfileButton.Click += async (_, _) =>
-            await DeleteSelectedProfileAsync();
-
-        ProfilesList.SelectionChanged += async (_, _) =>
-            await ShowSelectedProfileAsync();
 
         CheckUpdatesButton.Click += async (_, _) =>
             await CheckUpdatesAsync();
@@ -2790,6 +2752,7 @@ public partial class MainWindow : Window
             ReferenceEquals(page, AboutPage) ? "about" :
             "unknown";
         _navigationService.Navigate(pageKey);
+        _eventBus.Publish(new NavigationRequested(pageKey));
 
         if (ReferenceEquals(page, DashboardPage))
         {
@@ -3697,8 +3660,6 @@ public partial class MainWindow : Window
         StartWithWindowsBox.IsChecked = _settings.General.StartWithWindows;
         MinimizeToTrayBox.IsChecked = _settings.General.MinimizeToTray;
         await RefreshThemePickerAsync();
-        OverlayManifestPathBox.Text = _settings.General.OverlayManifestPath;
-        UpdateOverlayManifestStatus();
         ConnectionWatchdogEnabledBox.IsChecked = _settings.General.ConnectionWatchdogEnabled;
         ConnectionWatchdogSecondsBox.Text = _settings.General.ConnectionWatchdogSeconds.ToString();
         ReconnectObsBox.IsChecked = _settings.General.ReconnectObs;
@@ -3742,6 +3703,11 @@ public partial class MainWindow : Window
         TwitchChatUiBuiltInRadio.IsChecked = _settings.Twitch.ChatUiMode != TwitchChatUiMode.EmbeddedWeb;
         TwitchChatUiEmbeddedWebRadio.IsChecked = _settings.Twitch.ChatUiMode == TwitchChatUiMode.EmbeddedWeb;
         TwitchEventSubEnabledBox.IsChecked = _settings.Twitch.EnableEventSub;
+        NormalizeTwitchChattersRefreshSettings();
+        TwitchChattersRefreshLowBox.Text = _settings.Twitch.ChattersRefreshSecondsLow.ToString();
+        TwitchChattersRefreshHighBox.Text = _settings.Twitch.ChattersRefreshSecondsHigh.ToString();
+        TwitchChattersRefreshThresholdBox.Text = _settings.Twitch.ChattersRefreshViewerThreshold.ToString();
+        ApplyTwitchUsersRefreshInterval();
 
         SpotifyClientIdBox.Text = _settings.Spotify.ClientId;
         SpotifyRedirectUriBox.Text = _settings.Spotify.RedirectUri;
@@ -3877,31 +3843,11 @@ public partial class MainWindow : Window
 
         await LoadSelectedAlertDefinitionAsync();
 
-        UseBundledOverlayBox.IsChecked = _settings.Overlay.UseBundledOverlay;
         OverlayRootBox.Text = _settings.Overlay.RootPath;
-        OverlayWidthBox.Text = _settings.Overlay.Width.ToString();
-        OverlayHeightBox.Text = _settings.Overlay.Height.ToString();
-        EnableLiveStatusWidgetBox.IsChecked = _settings.Overlay.EnableLiveStatusWidget;
-        EnableFollowerGoalWidgetBox.IsChecked = _settings.Overlay.EnableFollowerGoal;
-        EnableSpotifyWidgetBox.IsChecked = _settings.Overlay.EnableSpotifyWidget;
-        EnableEndStatsWidgetBox.IsChecked = _settings.Overlay.EnableEndStatsWidget;
-        OverlayStartTextBox.Text = _settings.Overlay.StartText;
-        OverlayPauseTextBox.Text = _settings.Overlay.PauseText;
-        OverlayEndTextBox.Text = _settings.Overlay.EndText;
-        OverlaySharedTextBox.Text = _settings.Overlay.SharedSceneText;
-        OverlayFontFamilyBox.Text = _settings.Overlay.FontFamily;
-        OverlayFontSizeBox.Text = _settings.Overlay.FontSize.ToString();
-        OverlayFontColorBox.Text = _settings.Overlay.FontColor;
-        OverlayTimerSecondsBox.Text = _settings.Overlay.StartTimerSeconds.ToString();
-        OverlayTimerXBox.Text = _settings.Overlay.TimerX.ToString();
-        OverlayTimerYBox.Text = _settings.Overlay.TimerY.ToString();
-        SelectComboBoxTag(OverlayFrameStyleBox, _settings.Overlay.FrameStyle);
-        OverlayFrameColorBox.Text = _settings.Overlay.FrameColor;
-        SelectComboBoxTag(OverlayFrameEffectBox, _settings.Overlay.FrameEffect);
-        LoadStreamerHudSettingsIntoUi();
-        OverlayObsSceneTargetBox.ItemsSource = new[] { _settings.Obs.StartScene, _settings.Obs.LiveScene, _settings.Obs.PauseScene, "Metaschutz", _settings.Obs.EndScene }.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
-        OverlayObsSceneTargetBox.SelectedIndex = 0;
-        OverlayContentTypeBox.SelectedIndex = 0;
+        OverlayWebServerEnabledBox.IsChecked = _settings.Overlay.WebServerEnabled;
+        OverlayWebServerPortBox.Text = _settings.Overlay.WebServerPort.ToString();
+        OverlayWebServerUrlBox.Text = _settings.Overlay.GetBaseUrl();
+        RefreshOverlayWebServerStatusUi();
 
         StartSceneBox.Text = _settings.Obs.StartScene;
         LiveSceneBox.Text = _settings.Obs.LiveScene;
@@ -4015,7 +3961,6 @@ public partial class MainWindow : Window
             _settings.General.StartWithWindows = StartWithWindowsBox.IsChecked == true;
             _settings.General.MinimizeToTray = MinimizeToTrayBox.IsChecked == true;
             _settings.General.ThemeId = ResolveSelectedThemeId();
-            _settings.General.OverlayManifestPath = OverlayManifestPathBox.Text.Trim();
             _settings.General.ConnectionWatchdogEnabled = ConnectionWatchdogEnabledBox.IsChecked == true;
             if (int.TryParse(ConnectionWatchdogSecondsBox.Text.Trim(), out int watchdogSeconds))
             {
@@ -4048,6 +3993,26 @@ public partial class MainWindow : Window
                 ? TwitchChatUiMode.EmbeddedWeb
                 : TwitchChatUiMode.BuiltIn;
             _settings.Twitch.EnableEventSub = TwitchEventSubEnabledBox.IsChecked == true;
+            _settings.Twitch.ChattersRefreshSecondsLow = int.TryParse(
+                    TwitchChattersRefreshLowBox.Text.Trim(),
+                    out int chattersLow)
+                ? chattersLow
+                : _settings.Twitch.ChattersRefreshSecondsLow;
+            _settings.Twitch.ChattersRefreshSecondsHigh = int.TryParse(
+                    TwitchChattersRefreshHighBox.Text.Trim(),
+                    out int chattersHigh)
+                ? chattersHigh
+                : _settings.Twitch.ChattersRefreshSecondsHigh;
+            _settings.Twitch.ChattersRefreshViewerThreshold = int.TryParse(
+                    TwitchChattersRefreshThresholdBox.Text.Trim(),
+                    out int chattersThreshold)
+                ? chattersThreshold
+                : _settings.Twitch.ChattersRefreshViewerThreshold;
+            NormalizeTwitchChattersRefreshSettings();
+            TwitchChattersRefreshLowBox.Text = _settings.Twitch.ChattersRefreshSecondsLow.ToString();
+            TwitchChattersRefreshHighBox.Text = _settings.Twitch.ChattersRefreshSecondsHigh.ToString();
+            TwitchChattersRefreshThresholdBox.Text = _settings.Twitch.ChattersRefreshViewerThreshold.ToString();
+            ApplyTwitchUsersRefreshInterval();
 
             _settings.Spotify.ClientId = SpotifyClientIdBox.Text.Trim();
             _settings.Spotify.RedirectUri = SpotifyRedirectUriBox.Text.Trim();
@@ -4139,30 +4104,15 @@ public partial class MainWindow : Window
 
             SaveAlertDefinitionToSettings();
 
-            _settings.Overlay.UseBundledOverlay = UseBundledOverlayBox.IsChecked == true;
             _settings.Overlay.RootPath = OverlayRootBox.Text.Trim();
-            _settings.Overlay.Width = int.Parse(OverlayWidthBox.Text.Trim());
-            _settings.Overlay.Height = int.Parse(OverlayHeightBox.Text.Trim());
-            _settings.Overlay.EnableLiveStatusWidget = EnableLiveStatusWidgetBox.IsChecked == true;
-            _settings.Overlay.EnableFollowerGoal = EnableFollowerGoalWidgetBox.IsChecked == true;
-            _settings.Overlay.EnableSpotifyWidget = EnableSpotifyWidgetBox.IsChecked == true;
-            _settings.Overlay.EnableEndStatsWidget = EnableEndStatsWidgetBox.IsChecked == true;
-            _settings.Overlay.StartText = OverlayStartTextBox.Text.Trim();
-            _settings.Overlay.PauseText = OverlayPauseTextBox.Text.Trim();
-            _settings.Overlay.EndText = OverlayEndTextBox.Text.Trim();
-            _settings.Overlay.SharedSceneText = OverlaySharedTextBox.Text.Trim();
-            _settings.Overlay.FontFamily = OverlayFontFamilyBox.Text.Trim();
-            _settings.Overlay.FontSize = int.Parse(OverlayFontSizeBox.Text.Trim());
-            _settings.Overlay.FontColor = OverlayFontColorBox.Text.Trim();
-            _settings.Overlay.StartTimerSeconds = int.Parse(OverlayTimerSecondsBox.Text.Trim());
-            _settings.Overlay.TimerX = int.Parse(OverlayTimerXBox.Text.Trim());
-            _settings.Overlay.TimerY = int.Parse(OverlayTimerYBox.Text.Trim());
-            _settings.Overlay.FrameStyle = (OverlayFrameStyleBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Solid";
-            _settings.Overlay.FrameColor = OverlayFrameColorBox.Text.Trim();
-            _settings.Overlay.FrameEffect = (OverlayFrameEffectBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Glow";
-            ReadStreamerHudSettingsFromUi();
-            await WriteOverlayConfigurationAsync();
-            ApplyStreamerHudFromSettings();
+            _settings.Overlay.WebServerEnabled = OverlayWebServerEnabledBox.IsChecked == true;
+            if (!int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int overlayPort) || overlayPort is <= 0 or > 65535)
+            {
+                throw new InvalidOperationException("Ungültiger Overlay-Webserver-Port.");
+            }
+
+            _settings.Overlay.WebServerPort = overlayPort;
+            OverlayWebServerUrlBox.Text = _settings.Overlay.GetBaseUrl();
 
             _settings.Workflow.EndSceneSeconds = int.Parse(EndSceneSecondsBox.Text.Trim());
             _settings.Twitch.EndSceneDurationSeconds = _settings.Workflow.EndSceneSeconds;
@@ -4197,6 +4147,7 @@ public partial class MainWindow : Window
             RefreshRaidChannelSelectors();
 
             await _settingsStore.SaveAsync(_settings);
+            await RestartOverlayWebServerFromSettingsAsync();
             await _musicPlayerRouter.ApplyProviderAsync(_settings.MusicPlayer.ProviderId);
             ApplyMusicProviderUiState();
             await RefreshMusicPlayerUiAsync();
@@ -5567,161 +5518,14 @@ public partial class MainWindow : Window
 
     private async Task RefreshProfilesAsync()
     {
-        IReadOnlyList<ProfileSummary> profiles = await _profileService.ListAsync();
-        ProfilesList.ItemsSource = profiles;
-        DashboardProfileBox.ItemsSource = profiles;
-
-        if (DashboardProfileBox.SelectedItem is null && profiles.Count > 0)
+        await _profilesPageViewModel.RefreshAsync();
+        DashboardProfileBox.ItemsSource = _profilesPageViewModel.Profiles;
+        if (DashboardProfileBox.SelectedItem is null && _profilesPageViewModel.Profiles.Count > 0)
         {
             DashboardProfileBox.SelectedIndex = 0;
         }
     }
 
-    private async Task ShowSelectedProfileAsync()
-    {
-        if (ProfilesList.SelectedItem is not ProfileSummary summary)
-        {
-            return;
-        }
-
-        CreatorProfile profile = await _profileService.LoadAsync(summary.Id);
-        ProfileNameBox.Text = profile.Name;
-        ProfileDescriptionBox.Text = profile.Description;
-        ProfileStatusText.Text =
-            $"Zuletzt geändert: {profile.UpdatedAt:dd.MM.yyyy HH:mm}";
-    }
-
-    private async Task CreateProfileAsync()
-    {
-        try
-        {
-            string name = ProfileNameBox.Text.Trim();
-
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                name = "Profil " + DateTime.Now.ToString("dd.MM.yyyy HH:mm");
-            }
-
-            CreatorProfile profile =
-                await _profileService.CreateFromCurrentSettingsAsync(
-                    name,
-                    ProfileDescriptionBox.Text.Trim());
-
-            await RefreshProfilesAsync();
-
-            ProfilesList.SelectedItem =
-                (ProfilesList.ItemsSource as IEnumerable<ProfileSummary>)
-                ?.FirstOrDefault(item => item.Id == profile.Id);
-
-            ProfileStatusText.Text = "Profil gespeichert.";
-            ProfileStatusText.Foreground =
-                System.Windows.Media.Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            ProfileStatusText.Text = exception.Message;
-            ProfileStatusText.Foreground =
-                System.Windows.Media.Brushes.IndianRed;
-        }
-    }
-
-    private async Task ApplySelectedProfileAsync()
-    {
-        if (ProfilesList.SelectedItem is not ProfileSummary summary)
-        {
-            return;
-        }
-
-        MessageBoxResult result = MessageBox.Show(
-            $"Profil „{summary.Name}“ anwenden?\n\n" +
-            "Die aktuellen Einstellungen werden ersetzt.",
-            "Profil anwenden",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (result != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        await _profileService.ApplyAsync(summary.Id);
-        await LoadSettingsAsync();
-
-        ProfileStatusText.Text =
-            "Profil wurde angewendet.";
-        ProfileStatusText.Foreground =
-            System.Windows.Media.Brushes.LightGreen;
-    }
-
-    private async Task ExportSelectedProfileAsync()
-    {
-        if (ProfilesList.SelectedItem is not ProfileSummary summary)
-        {
-            return;
-        }
-
-        var dialog = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "Creator Control Suite Profil (*.ccsprofile)|*.ccsprofile",
-            FileName = summary.Name + ".ccsprofile"
-        };
-
-        if (dialog.ShowDialog() != true)
-        {
-            return;
-        }
-
-        await _profileService.ExportAsync(
-            summary.Id,
-            dialog.FileName);
-
-        ProfileStatusText.Text =
-            "Profil exportiert: " + dialog.FileName;
-    }
-
-    private async Task ImportProfileAsync()
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Filter = "Creator Control Suite Profil (*.ccsprofile;*.json)|*.ccsprofile;*.json"
-        };
-
-        if (dialog.ShowDialog() != true)
-        {
-            return;
-        }
-
-        await _profileService.ImportAsync(dialog.FileName);
-        await RefreshProfilesAsync();
-
-        ProfileStatusText.Text = "Profil importiert.";
-        ProfileStatusText.Foreground =
-            System.Windows.Media.Brushes.LightGreen;
-    }
-
-    private async Task DeleteSelectedProfileAsync()
-    {
-        if (ProfilesList.SelectedItem is not ProfileSummary summary)
-        {
-            return;
-        }
-
-        MessageBoxResult result = MessageBox.Show(
-            $"Profil „{summary.Name}“ löschen?",
-            "Profil löschen",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (result != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        await _profileService.DeleteAsync(summary.Id);
-        await RefreshProfilesAsync();
-
-        ProfileStatusText.Text = "Profil gelöscht.";
-    }
 
 
     private string StreamDeckActionsDirectory => Path.Combine(
@@ -8044,10 +7848,12 @@ public partial class MainWindow : Window
         TwitchConnectionSnapshot twitchSnapshot = _twitchModule.GetSnapshot();
         if (!twitchSnapshot.Authenticated)
         {
+            _twitchStreamStartedAt = null;
             _currentLiveViewerCount = 0;
             DashboardHeroViewerText.Text = "0";
             AddDashboardViewerTrendSample(0);
             RefreshTwitchProfessionalUi();
+            ApplyTwitchUsersRefreshInterval();
             return;
         }
 
@@ -8071,13 +7877,22 @@ public partial class MainWindow : Window
 
             if (status is null || !status.IsOnline)
             {
+                _twitchStreamStartedAt = null;
                 _currentLiveViewerCount = 0;
                 DashboardHeroViewerText.Text = "0";
                 AddDashboardViewerTrendSample(0);
+                RefreshTwitchProfessionalUi();
+                RefreshWorkflowUi(_workflowModule.Service.State);
+                ApplyTwitchUsersRefreshInterval();
                 return;
             }
 
+            // Helix streams.started_at ist die Zuschauer-sichtbare Live-Dauer auf Twitch.
+            // Lokale OBS-/Workflow-Zeiten dienen nur als Fallback, bis Twitch den Stream meldet.
+            ApplyTwitchLiveStreamStartedAt(status.StartedAt);
+
             _currentLiveViewerCount = Math.Max(0, status.ViewerCount);
+            ApplyTwitchUsersRefreshInterval();
             await _creatorIntelligence.RecordAsync("twitch.viewer.sample", new { viewers = _currentLiveViewerCount, scene = _servicesObsCurrentScene, category = status.GameName, title = status.StreamTitle });
             RefreshTwitchProfessionalUi(status);
 
@@ -8090,14 +7905,15 @@ public partial class MainWindow : Window
             {
                 data.Stream.ViewerCount = _currentLiveViewerCount;
             });
+            DateTimeOffset? liveStartedAt = ResolveLiveStreamStartedAt();
             await UpdateActiveOverlayJsonAsync(root =>
             {
                 JsonObject stream = root["stream"] as JsonObject ?? [];
                 stream["viewerCount"] = _currentLiveViewerCount;
                 stream["isLive"] = true;
-                stream["startedAt"] = _streamSessionStartedAt;
-                stream["elapsedSeconds"] = _streamSessionStartedAt.HasValue
-                    ? Math.Max(0, (long)(DateTimeOffset.Now - _streamSessionStartedAt.Value).TotalSeconds)
+                stream["startedAt"] = liveStartedAt;
+                stream["elapsedSeconds"] = liveStartedAt.HasValue
+                    ? Math.Max(0, (long)(DateTimeOffset.Now - liveStartedAt.Value).TotalSeconds)
                     : 0;
                 root["stream"] = stream;
             });
@@ -8894,478 +8710,55 @@ public partial class MainWindow : Window
                 : System.Windows.Media.Brushes.IndianRed;
     }
 
-    private async Task LoadOverlayProjectsAsync()
-    {
-        string? selectedId = (OverlayProjectList.SelectedItem as OverlayProjectDefinition)?.Id;
-        _overlayProjects.Clear();
-        foreach (OverlayProjectDefinition project in await _overlayProjectService.LoadAsync())
-        {
-            _overlayProjects.Add(project);
-        }
-
-        OverlayProjectList.SelectedItem = _overlayProjects.FirstOrDefault(x => x.Id == selectedId) ?? _overlayProjects.FirstOrDefault();
-        if (_obsClient.IsConnected)
-        {
-            OverlayProjectObsSceneBox.ItemsSource = (await _obsClient.GetSceneListAsync()).Select(x => x.Name).ToList();
-        }
-        RefreshSelectedOverlayProject();
-        RefreshSpotifyOverlayProjectSelector();
-    }
-
-    private void RefreshSelectedOverlayProject()
-    {
-        _overlayProjectItems.Clear();
-        if (OverlayProjectList.SelectedItem is not OverlayProjectDefinition project)
-        {
-            OverlayProjectTitleText.Text = "Kein Projekt ausgewählt";
-            OverlayProjectPathText.Text = "";
-            return;
-        }
-        OverlayProjectTitleText.Text = $"{project.Name} · Version {project.Version}";
-        OverlayProjectPathText.Text = string.IsNullOrWhiteSpace(project.RootPath) ? "Quelle: OBS" : project.RootPath;
-        foreach (OverlayProjectItem item in project.Items)
-        {
-            _overlayProjectItems.Add(item);
-        }
-
-        OverlayProjectStatusText.Text = project.Status;
-        OverlayProjectItemsList.SelectedIndex = project.Items.Count > 0 ? 0 : -1;
-    }
-
-    private void RefreshSelectedOverlayProjectItem()
-    {
-        if (OverlayProjectItemsList.SelectedItem is not OverlayProjectItem item)
-        {
-            return;
-        }
-
-        OverlayProjectObsSceneBox.SelectedItem = item.ObsScene;
-        OverlayProjectObsSourceBox.Text = item.ObsSource;
-    }
-
-    private void BrowseOverlayManifest()
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Eigene overlay.json auswählen",
-            Filter = "Overlay-Projektdatei (overlay.json)|overlay.json|JSON-Dateien (*.json)|*.json|Alle Dateien (*.*)|*.*",
-            CheckFileExists = true
-        };
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        OverlayManifestPathBox.Text = dialog.FileName;
-        _settings.General.OverlayManifestPath = dialog.FileName;
-        UpdateOverlayManifestStatus();
-    }
-
-    private async Task CreateOverlayManifestAsync()
+    private async Task RestartOverlayWebServerFromSettingsAsync()
     {
         try
         {
-            var dialog = new Microsoft.Win32.SaveFileDialog
+            if (_settings.Overlay.WebServerEnabled)
             {
-                Title = "Neue overlay.json anlegen",
-                FileName = "overlay.json",
-                DefaultExt = ".json",
-                Filter = "Overlay-Projektdatei (overlay.json)|overlay.json|JSON-Dateien (*.json)|*.json"
-            };
-            if (dialog.ShowDialog(this) != true)
-            {
-                return;
+                await _overlayModule.WebServer.RestartAsync();
             }
-
-            string path = await _overlayProjectService.CreateManifestAsync(dialog.FileName);
-            OverlayManifestPathBox.Text = path;
-            _settings.General.OverlayManifestPath = path;
-            await _settingsStore.SaveAsync(_settings);
-            UpdateOverlayManifestStatus("Neue overlay.json wurde angelegt und gespeichert.", Brushes.LightGreen);
-        }
-        catch (Exception ex)
-        {
-            UpdateOverlayManifestStatus(ex.Message, Brushes.IndianRed);
-        }
-    }
-
-    private void OpenOverlayManifestFolder()
-    {
-        string path = OverlayManifestPathBox.Text.Trim();
-        string? folder = string.IsNullOrWhiteSpace(path) ? "" : Path.GetDirectoryName(Path.GetFullPath(path));
-        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
-        {
-            UpdateOverlayManifestStatus("Der Ordner der overlay.json wurde nicht gefunden.", Brushes.IndianRed);
-            return;
-        }
-        Process.Start(new ProcessStartInfo("explorer.exe", folder) { UseShellExecute = true });
-    }
-
-    private void UpdateOverlayManifestStatus(string? message = null, Brush? brush = null)
-    {
-        if (OverlayManifestStatusText is null || OverlayManifestPathBox is null)
-        {
-            return;
-        }
-
-        string path = OverlayManifestPathBox.Text.Trim();
-        OverlayManifestStatusText.Text = message ?? (string.IsNullOrWhiteSpace(path)
-            ? "Noch keine overlay.json ausgewählt. Beim nächsten Overlay-Import wird sie automatisch im Projektordner angelegt."
-            : File.Exists(path) ? $"Aktive Datei: {path}" : $"Die Datei wird beim Erstellen/Importieren angelegt: {path}");
-        OverlayManifestStatusText.Foreground = brush ?? (File.Exists(path) ? Brushes.LightGreen : Brushes.LightGray);
-    }
-
-    private async Task ImportManagedOverlayAsync()
-    {
-        var dialog = new Microsoft.Win32.OpenFolderDialog
-        {
-            Title = "Vorhandenen Overlay-Hauptordner auswählen"
-        };
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        try
-        {
-            string overlayRoot = Path.GetFullPath(dialog.FolderName);
-            string manifestPath = Path.Combine(overlayRoot, "overlay.json");
-            string rootDataPath = Path.Combine(overlayRoot, "data", "overlay-data.json");
-            string nestedDataPath = Path.Combine(overlayRoot, "Overlay", "data", "overlay-data.json");
-            // Ältere DenverJohn-Overlays enthalten die tatsächlich von den HTML-Szenen
-            // geladene Laufzeitdatei im Unterordner Overlay\data. Diese Datei hat
-            // Vorrang vor einer zusätzlich vorhandenen, veralteten Kopie in data.
-            string dataPath = File.Exists(nestedDataPath) ? nestedDataPath : rootDataPath;
-
-            if (!File.Exists(manifestPath))
+            else
             {
-                throw new InvalidOperationException("Im ausgewählten Ordner wurde keine overlay.json gefunden.");
+                await _overlayModule.WebServer.StopAsync();
             }
-
-            if (!File.Exists(dataPath))
-            {
-                throw new InvalidOperationException(@"Im ausgewählten Ordner wurde weder Overlay\data\overlay-data.json noch data\overlay-data.json gefunden.");
-            }
-
-            await DisableLegacyOverlayWriterAsync(overlayRoot);
-
-            _settings.Overlay.RootPath = overlayRoot;
-            _settings.Overlay.DataFilePath = dataPath;
-            _settings.Overlay.DataFileName = "overlay-data.json";
-            _settings.General.OverlayManifestPath = manifestPath;
-            await _settingsStore.SaveAsync(_settings);
-
-            OverlayRootBox.Text = overlayRoot;
-            OverlayManifestPathBox.Text = manifestPath;
-            ServicesSpotifyDataJsonPathBox.Text = dataPath;
-
-            await _overlayModule.Service.UpdateAsync(data =>
-            {
-                data.Spotify.ShowInOverlay = true;
-                data.Spotify.ShowTitle = true;
-                data.Spotify.ShowArtist = true;
-                data.Spotify.ShowAlbumCover = true;
-                data.Spotify.ShowProgress = true;
-                data.Spotify.HideWhenPaused = false;
-                data.Spotify.HideWhenMuted = _settings.Spotify.OverlayHideWhenMuted;
-                data.Spotify.Cover = data.Spotify.CoverUrl;
-            });
-
-            OverlayProjectDefinition project = await _overlayProjectService.ImportFolderAsync(overlayRoot);
-            OverlayProjectDefinition? existing = _overlayProjects.FirstOrDefault(x => string.Equals(x.RootPath, overlayRoot, StringComparison.OrdinalIgnoreCase));
-            if (existing is not null)
-            {
-                _overlayProjects.Remove(existing);
-            }
-
-            if (_overlayProjects.Any(x => string.Equals(x.Id, project.Id, StringComparison.OrdinalIgnoreCase)))
-            {
-                project.Id = Guid.NewGuid().ToString("N");
-            }
-
-            _overlayProjects.Add(project);
-            await _overlayProjectService.SaveAsync(_overlayProjects);
-
-            OverlayProjectList.SelectedItem = project;
-            UpdateOverlayManifestStatus();
-            RefreshSpotifyOverlayProjectSelector();
-
-            OverlayProjectStatusText.Text = $"Vorhandenes Overlay aktiviert: {project.Items.Count} HTML-Dateien. OBS-Pfade bleiben unverändert.";
-            OverlayProjectStatusText.Foreground = Brushes.LightGreen;
-            ServicesSpotifyOverlayPathText.Text = $"Aktive JSON: {dataPath}";
-            ServicesSpotifyOverlayStatusText.Text = @"Die Suite schreibt direkt in die vorhandene data\overlay-data.json. Es wird keine zweite Overlay-Kopie angelegt.";
-            ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGreen;
-
-            await SynchronizeSpotifyOverlayVisibilityAsync(_spotifyModule.GetSnapshot().Playback);
         }
         catch (Exception exception)
         {
-            OverlayProjectStatusText.Text = "Overlay-Verzeichnis konnte nicht aktiviert werden: " + exception.Message;
-            OverlayProjectStatusText.Foreground = Brushes.IndianRed;
+            _appLogger.Write(
+                AppLogLevel.Warning,
+                "Overlay",
+                "Overlay-Webserver konnte nicht neu gestartet werden: " + exception.Message,
+                exception);
+            OverlayWebServerStatusText.Text = "Webserver-Fehler: " + exception.Message;
+            OverlayWebServerStatusText.Foreground = Brushes.IndianRed;
+            return;
         }
+
+        RefreshOverlayWebServerStatusUi();
     }
 
-    private static void CopyOverlayDirectory(string sourceRoot, string targetRoot)
+    private void RefreshOverlayWebServerStatusUi()
     {
-        Directory.CreateDirectory(targetRoot);
-        foreach (string directory in Directory.GetDirectories(sourceRoot, "*", SearchOption.AllDirectories))
+        OverlayWebServerUrlBox.Text = _settings.Overlay.GetBaseUrl();
+        if (!_settings.Overlay.WebServerEnabled)
         {
-            string relative = Path.GetRelativePath(sourceRoot, directory);
-            Directory.CreateDirectory(Path.Combine(targetRoot, relative));
-        }
-        foreach (string file in Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories))
-        {
-            string relative = Path.GetRelativePath(sourceRoot, file);
-            string target = Path.Combine(targetRoot, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target, true);
-        }
-    }
-
-    private async Task ImportOverlayProjectAsync()
-    {
-        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Ordner des HTML-Overlay-Projekts auswählen" };
-        if (dialog.ShowDialog(this) != true)
-        {
+            OverlayWebServerStatusText.Text = "Webserver deaktiviert – OBS nutzt lokale Dateien.";
+            OverlayWebServerStatusText.Foreground = Brushes.Gray;
             return;
         }
 
-        try
+        if (_overlayModule.WebServer.IsRunning)
         {
-            OverlayProjectDefinition project = await _overlayProjectService.ImportFolderAsync(dialog.FolderName);
-            OverlayProjectDefinition? existing = _overlayProjects.FirstOrDefault(x => string.Equals(x.RootPath, project.RootPath, StringComparison.OrdinalIgnoreCase));
-            if (existing is not null)
-            {
-                _overlayProjects.Remove(existing);
-            }
-
-            // Ein aus einem anderen Ordner kopiertes overlay.json darf nicht dazu führen,
-            // dass zwei unterschiedliche Overlay-Projekte dieselbe interne ID besitzen.
-            if (_overlayProjects.Any(x => string.Equals(x.Id, project.Id, StringComparison.OrdinalIgnoreCase)))
-            {
-                project.Id = Guid.NewGuid().ToString("N");
-                project.Name = new DirectoryInfo(project.RootPath).Name;
-                await _overlayProjectService.WriteManifestAsync(project, project.ManifestPath);
-            }
-
-            _overlayProjects.Add(project);
-            await _overlayProjectService.SaveAsync(_overlayProjects);
-            OverlayProjectList.SelectedItem = project;
-            OverlayManifestPathBox.Text = project.ManifestPath;
-            _settings.General.OverlayManifestPath = project.ManifestPath;
-            await _settingsStore.SaveAsync(_settings);
-            UpdateOverlayManifestStatus();
-            OverlayProjectStatusText.Text = $"Projekt importiert: {project.Items.Count} HTML-Dateien erkannt. overlay.json wurde angelegt/aktualisiert.";
-            OverlayProjectStatusText.Foreground = Brushes.LightGreen;
-        }
-        catch (Exception ex)
-        {
-            OverlayProjectStatusText.Text = ex.Message;
-            OverlayProjectStatusText.Foreground = Brushes.IndianRed;
-        }
-    }
-
-    private async Task ImportOverlayFromObsAsync()
-    {
-        try
-        {
-            OverlayProjectDefinition project = await _overlayProjectService.ImportFromObsAsync("OBS Szenensammlung " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
-            _overlayProjects.Add(project);
-            await _overlayProjectService.SaveAsync(_overlayProjects);
-            OverlayProjectList.SelectedItem = project;
-            OverlayManifestPathBox.Text = project.ManifestPath;
-            _settings.General.OverlayManifestPath = project.ManifestPath;
-            await _settingsStore.SaveAsync(_settings);
-            UpdateOverlayManifestStatus();
-            OverlayProjectStatusText.Text = project.Status + " · overlay.json wurde angelegt.";
-            OverlayProjectStatusText.Foreground = Brushes.LightGreen;
-        }
-        catch (Exception ex)
-        {
-            OverlayProjectStatusText.Text = ex.Message;
-            OverlayProjectStatusText.Foreground = Brushes.IndianRed;
-        }
-    }
-
-
-    private async Task AddOverlaySceneAsync()
-    {
-        if (OverlayProjectList.SelectedItem is not OverlayProjectDefinition project)
-        {
-            MessageBox.Show("Bitte wähle zuerst ein Overlay-Projekt aus.", "Overlay-Szene", MessageBoxButton.OK, MessageBoxImage.Information);
+            string baseUrl = _overlayModule.WebServer.BaseUrl ?? _settings.Overlay.GetBaseUrl();
+            OverlayWebServerStatusText.Text =
+                $"Läuft auf {baseUrl} · Beispiel: {baseUrl}/modules/spotify-info.html · WS: {baseUrl.Replace("http://", "ws://", StringComparison.Ordinal)}/ws";
+            OverlayWebServerStatusText.Foreground = Brushes.LightGreen;
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(project.RootPath) || !Directory.Exists(project.RootPath))
-        {
-            MessageBox.Show("Das ausgewählte Projekt besitzt keinen gültigen lokalen Projektordner.", "Overlay-Szene", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        var sceneNameBox = new TextBox { Margin = new Thickness(0, 8, 0, 12), MinWidth = 320 };
-        var createButton = new Button { Content = "DATEIEN AUSWÄHLEN UND SZENE ANLEGEN", IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
-        var cancelButton = new Button { Content = "ABBRECHEN", IsCancel = true };
-        var dialog = new Window
-        {
-            Title = "Neue Overlay-Szene",
-            Owner = this,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            SizeToContent = SizeToContent.WidthAndHeight,
-            ResizeMode = ResizeMode.NoResize,
-            Background = new SolidColorBrush(Color.FromRgb(17, 24, 29)),
-            Foreground = Brushes.White,
-            Content = new StackPanel
-            {
-                Margin = new Thickness(18),
-                Children =
-                {
-                    new TextBlock { Text = "Name der neuen Szene", FontWeight = FontWeights.Bold },
-                    sceneNameBox,
-                    new TextBlock { Text = "Danach kannst du HTML-, Bild-, Video-, Audio- und weitere Web-Assets auswählen. Die Dateien werden in das Overlay-Projekt kopiert und geeignete Quellen direkt in OBS angelegt.", Foreground = Brushes.LightGray, TextWrapping = TextWrapping.Wrap, MaxWidth = 440, Margin = new Thickness(0,0,0,12) },
-                    new WrapPanel { Children = { createButton, cancelButton } }
-                }
-            }
-        };
-        createButton.Click += (_, _) =>
-        {
-            if (string.IsNullOrWhiteSpace(sceneNameBox.Text))
-            {
-                MessageBox.Show(dialog, "Bitte gib einen Namen für die Szene ein.", "Overlay-Szene", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-            dialog.DialogResult = true;
-        };
-        if (dialog.ShowDialog() != true)
-        {
-            return;
-        }
-
-        var filesDialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Dateien für die neue Overlay-Szene auswählen",
-            Multiselect = true,
-            CheckFileExists = true,
-            Filter = "Geeignete Overlay-Dateien|*.html;*.htm;*.css;*.js;*.json;*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg;*.bmp;*.mp4;*.webm;*.mov;*.mkv;*.mp3;*.wav;*.ogg;*.m4a;*.woff;*.woff2;*.ttf;*.otf|HTML-Dateien|*.html;*.htm|Bilder|*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg;*.bmp|Video und Audio|*.mp4;*.webm;*.mov;*.mkv;*.mp3;*.wav;*.ogg;*.m4a|Web-Assets|*.css;*.js;*.json;*.woff;*.woff2;*.ttf;*.otf|Alle Dateien|*.*"
-        };
-        if (filesDialog.ShowDialog(this) != true || filesDialog.FileNames.Length == 0)
-        {
-            return;
-        }
-
-        try
-        {
-            List<OverlayProjectItem> added = await _overlayProjectService.AddSceneAsync(project, sceneNameBox.Text.Trim(), filesDialog.FileNames);
-            await _overlayProjectService.SaveAsync(_overlayProjects);
-            _overlayProjectItems.Clear();
-            foreach (OverlayProjectItem item in project.Items)
-            {
-                _overlayProjectItems.Add(item);
-            }
-
-            OverlayProjectItemsList.Items.Refresh();
-            OverlayProjectList.Items.Refresh();
-            OverlayProjectItemsList.SelectedItem = added.FirstOrDefault();
-            OverlayManifestPathBox.Text = project.ManifestPath;
-            _settings.General.OverlayManifestPath = project.ManifestPath;
-            await _settingsStore.SaveAsync(_settings);
-            OverlayProjectStatusText.Text = $"Szene '{sceneNameBox.Text.Trim()}' wurde mit {added.Count} geeigneten Quellen gespeichert und in OBS übernommen.";
-            OverlayProjectStatusText.Foreground = Brushes.LightGreen;
-        }
-        catch (Exception ex)
-        {
-            OverlayProjectStatusText.Text = ex.Message;
-            OverlayProjectStatusText.Foreground = Brushes.IndianRed;
-        }
-    }
-
-    private async Task DeleteOverlayProjectAsync()
-    {
-        if (OverlayProjectList.SelectedItem is not OverlayProjectDefinition project)
-        {
-            return;
-        }
-
-        if (MessageBox.Show($"Overlay-Projekt '{project.Name}' aus der Suite entfernen? Die Originaldateien werden nicht gelöscht.", "Overlay-Projekt", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        _overlayProjects.Remove(project);
-        await _overlayProjectService.SaveAsync(_overlayProjects);
-        RefreshSelectedOverlayProject();
-    }
-
-    private async Task SaveOverlayProjectMappingAsync()
-    {
-        if (OverlayProjectItemsList.SelectedItem is not OverlayProjectItem item)
-        {
-            return;
-        }
-
-        item.ObsScene = OverlayProjectObsSceneBox.SelectedItem?.ToString() ?? "";
-        item.ObsSource = OverlayProjectObsSourceBox.Text.Trim();
-        await _overlayProjectService.SaveAsync(_overlayProjects);
-        if (OverlayProjectList.SelectedItem is OverlayProjectDefinition project)
-        {
-            await _overlayProjectService.WriteManifestAsync(project);
-        }
-
-        OverlayProjectItemsList.Items.Refresh();
-        OverlayProjectStatusText.Text = "OBS-Zuordnung und overlay.json gespeichert.";
-        OverlayProjectStatusText.Foreground = Brushes.LightGreen;
-    }
-
-    private async Task SynchronizeOverlayProjectAsync()
-    {
-        if (OverlayProjectList.SelectedItem is not OverlayProjectDefinition project)
-        {
-            return;
-        }
-
-        try
-        {
-            await SaveOverlayProjectMappingAsync();
-            await _overlayProjectService.SynchronizeWithObsAsync(project);
-            await _overlayProjectService.SaveAsync(_overlayProjects);
-            OverlayProjectItemsList.Items.Refresh();
-            OverlayProjectList.Items.Refresh();
-            OverlayProjectStatusText.Text = project.Status;
-            OverlayProjectStatusText.Foreground = Brushes.LightGreen;
-        }
-        catch (Exception ex)
-        {
-            OverlayProjectStatusText.Text = ex.Message;
-            OverlayProjectStatusText.Foreground = Brushes.IndianRed;
-        }
-    }
-
-    private void OpenSelectedOverlayProjectFolder()
-    {
-        if (OverlayProjectList.SelectedItem is not OverlayProjectDefinition project || string.IsNullOrWhiteSpace(project.RootPath) || !Directory.Exists(project.RootPath))
-        {
-            OverlayProjectStatusText.Text = "Dieses Projekt besitzt keinen lokalen Projektordner.";
-            return;
-        }
-        Process.Start(new ProcessStartInfo { FileName = project.RootPath, UseShellExecute = true });
-    }
-
-    private async Task InstallOverlayAsync()
-    {
-        try
-        {
-            await SaveSettingsAsync();
-            await _overlayModule.Service.InstallBundledOverlayAsync();
-            await WriteOverlayConfigurationAsync();
-            await _overlayModule.Service.InitializeAsync();
-
-            OverlayStatusText.Text = "Standard-Overlay wurde installiert.";
-            OverlayStatusText.Foreground = System.Windows.Media.Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = exception.Message;
-            OverlayStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
-        }
+        OverlayWebServerStatusText.Text = "Webserver aktiviert, aber nicht erreichbar.";
+        OverlayWebServerStatusText.Foreground = Brushes.Orange;
     }
 
     private async Task OpenOverlayFolderAsync()
@@ -9379,83 +8772,6 @@ public partial class MainWindow : Window
                 FileName = root,
                 UseShellExecute = true
             });
-    }
-
-    private async Task ValidateOverlayAsync()
-    {
-        try
-        {
-            string root = await _overlayModule.Service.GetOverlayRootAsync();
-            string data = await _overlayModule.Service.GetDataFilePathAsync();
-
-            string[] required =
-            [
-                Path.Combine(root, "assets", "base.css"),
-                Path.Combine(root, "assets", "data-client.js"),
-                Path.Combine(root, "modules", "content-name.html"),
-                Path.Combine(root, "modules", "scene-text.html"),
-                Path.Combine(root, "modules", "start-timer.html"),
-                Path.Combine(root, "modules", "spotify-info.html"),
-                Path.Combine(root, "modules", "live-info.html"),
-                Path.Combine(root, "modules", "meta-status.html"),
-                Path.Combine(root, "modules", "pause-text.html"),
-                Path.Combine(root, "modules", "stream-stats.html"),
-                Path.Combine(root, "modules", "reaction-title.html"),
-                Path.Combine(root, "modules", "reaction-frame.html"),
-                Path.Combine(root, "modules", "reaction-text.html"),
-                Path.Combine(root, "modules", "frame.html"),
-                Path.Combine(root, "scenes", "start.html"),
-                Path.Combine(root, "scenes", "game.html"),
-                Path.Combine(root, "scenes", "pause.html"),
-                Path.Combine(root, "scenes", "metaschutz.html"),
-                Path.Combine(root, "scenes", "reactions.html"),
-                Path.Combine(root, "scenes", "ende.html"),
-                data
-            ];
-
-            var missing = required.Where(path => !File.Exists(path)).ToList();
-
-            OverlayStatusText.Text = missing.Count == 0
-                ? "Overlay vollständig. Daten: " + data
-                : "Fehlende Dateien: " +
-                  string.Join(", ", missing.Select(Path.GetFileName));
-
-            OverlayStatusText.Foreground = missing.Count == 0
-                ? System.Windows.Media.Brushes.LightGreen
-                : System.Windows.Media.Brushes.IndianRed;
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = exception.Message;
-            OverlayStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
-        }
-    }
-
-    private async Task InstallObsBrowserSourcesAsync()
-    {
-        try
-        {
-            IReadOnlyList<string> installed = await _obsBrowserSourceInstaller.InstallAsync();
-
-            OverlayStatusText.Text =
-                "Eigene Overlay-Szenen aus dem ausgewählten Pfad wurden in OBS eingerichtet:\n" +
-                string.Join("\n", installed.Select(item => "• " + item));
-
-            OverlayStatusText.Foreground =
-                System.Windows.Media.Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            _appLogger.Write(
-                AppLogLevel.Error,
-                "OBS",
-                "Browserquellen konnten nicht eingerichtet werden.",
-                exception);
-
-            OverlayStatusText.Text = exception.Message;
-            OverlayStatusText.Foreground =
-                System.Windows.Media.Brushes.IndianRed;
-        }
     }
 
     private async Task ExecuteWorkflowAsync(Func<Task> action)
@@ -9516,9 +8832,12 @@ public partial class MainWindow : Window
         // The dashboard must reflect the actual OBS output as well as streams
         // started through the suite workflow. Otherwise a stream started
         // directly in OBS (or through another controller) remains "OFFLINE".
-        bool isLive = state.Phase == StreamPhase.Live || _lastObsStreamActive;
-        string liveDetail = _lastObsStreamActive && _streamSessionStartedAt.HasValue
-            ? (DateTimeOffset.Now - _streamSessionStartedAt.Value).ToString(@"hh\:mm\:ss")
+        bool isLive = state.Phase == StreamPhase.Live
+            || _lastObsStreamActive
+            || _twitchStreamStartedAt.HasValue;
+        DateTimeOffset? liveStartedAt = ResolveLiveStreamStartedAt();
+        string liveDetail = isLive && liveStartedAt.HasValue
+            ? (DateTimeOffset.Now - liveStartedAt.Value).ToString(@"hh\:mm\:ss")
             : state.Detail;
 
         StreamDashboardStatus.Text = isLive ? "LIVE" : "OFFLINE";
@@ -9533,7 +8852,6 @@ public partial class MainWindow : Window
         RefreshCommunityUi();
         RefreshTwitchProfessionalUi();
         UpdateDashboardSelectedStatistic();
-        UpdateStreamerHudLiveStatus(isLive, liveDetail);
     }
 
     private void RefreshCommunityUi()
@@ -9560,9 +8878,6 @@ public partial class MainWindow : Window
         DashboardTwitchGoalsText.Text =
             $"Follower-Ziel: {_currentFollowerCount:0} / {_settings.Twitch.FollowerGoal.Target:0} · " +
             $"Sub-Ziel: {_currentActiveSubscriptionCount:0} / {_settings.Twitch.SubGoal.Target:0}";
-        UpdateStreamerHudLiveStatus(
-            StreamDashboardStatus.Text.Equals("LIVE", StringComparison.OrdinalIgnoreCase),
-            DashboardStreamDetailText.Text);
     }
 
     private async Task RefreshObsPreviewTickAsync()
@@ -9625,8 +8940,7 @@ public partial class MainWindow : Window
                     await Task.WhenAll(
                         RefreshLiveViewerSampleAsync(),
                         RefreshTwitchFollowerCountAsync(),
-                        RefreshTwitchGoalsAsync(),
-                        RefreshTwitchUsersAsync());
+                        RefreshTwitchGoalsAsync());
                     RefreshTwitchUi();
                     RefreshCommunityUi();
                 }
@@ -12136,6 +11450,7 @@ public partial class MainWindow : Window
 
             string json = rootObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(targetPath, json);
+            await _overlayRealtimeHub.PublishJsonAsync(json);
         }
         catch (Exception exception)
         {
@@ -12589,6 +11904,7 @@ public partial class MainWindow : Window
             // eine temporäre Datei erzeugte bei einigen OBS-Browserquellen ein
             // Dateiwechsel-Ereignis, das wie kurzes Aus-/Einblenden wirkte.
             await File.WriteAllTextAsync(targetPath, json);
+            await _overlayRealtimeHub.PublishJsonAsync(json);
 
             ServicesSpotifyDataJsonPathBox.Text = targetPath;
             ServicesSpotifyOverlayPathText.Text = $"Aktive JSON: {targetPath}";
@@ -12771,6 +12087,7 @@ public partial class MainWindow : Window
             await writer.WriteAsync(json);
             await writer.FlushAsync();
             await stream.FlushAsync();
+            await _overlayRealtimeHub.PublishJsonAsync(json);
         }
         finally { OverlayDataWriteCoordinator.Lock.Release(); }
     }
@@ -13044,7 +12361,7 @@ public partial class MainWindow : Window
             await _twitchModule.ConnectAsync(CancellationToken.None);
 
             RefreshTwitchUi();
-            await RefreshTwitchUsersAsync();
+            await RefreshTwitchUsersAsync(force: true);
             await RefreshLiveViewerSampleAsync();
             await RefreshTwitchFollowerCountAsync();
         }
@@ -13537,8 +12854,11 @@ public partial class MainWindow : Window
 
         TwitchConnectionSnapshot snapshot = _twitchModule.GetSnapshot();
         StreamSessionStats stats = _workflowModule.Service.SessionStats;
-        bool live = liveStatus?.IsOnline ?? _lastObsStreamActive;
-        DateTimeOffset? startedAt = liveStatus?.StartedAt ?? _streamSessionStartedAt ?? _twitchSessionObservedAt;
+        bool live = liveStatus is not null
+            ? liveStatus.IsOnline
+            : _twitchStreamStartedAt.HasValue || _lastObsStreamActive;
+        DateTimeOffset? startedAt = liveStatus?.StartedAt
+            ?? ResolveLiveStreamStartedAt();
         TimeSpan duration = startedAt.HasValue
             ? DateTimeOffset.Now - startedAt.Value
             : TimeSpan.Zero;
@@ -14175,7 +13495,6 @@ public partial class MainWindow : Window
         ServicesObsTransitionBox.ItemsSource = null;
         ServicesSpotifyOverlaySceneBox.ItemsSource = null;
         ServicesSpotifyOverlaySourceBox.ItemsSource = null;
-        OverlayProjectObsSceneBox.ItemsSource = null;
         ServicesObsTransitionStateText.Text = "OBS ist nicht verbunden.";
         DashboardObsAudioInputBox.ItemsSource = null;
         DashboardObsAudioStateText.Text = "OBS ist nicht verbunden.";
@@ -14523,11 +13842,7 @@ public partial class MainWindow : Window
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // Keep every OBS-scene selector on the same live scene list. Previously the
-        // Spotify selector copied OverlayProjectObsSceneBox.ItemsSource only while
-        // overlay projects were loaded. If OBS connected afterwards, it stayed empty.
         string? requestedSpotifyOverlayScene = ServicesSpotifyOverlaySceneBox.Text?.Trim();
-        string? requestedOverlayProjectScene = OverlayProjectObsSceneBox.Text?.Trim();
         string? requestedStartScene = StartSceneBox.Text?.Trim();
         string? requestedLiveScene = LiveSceneBox.Text?.Trim();
         string? requestedPauseScene = PauseSceneBox.Text?.Trim();
@@ -14541,7 +13856,6 @@ public partial class MainWindow : Window
         PauseSceneBox.Text = requestedPauseScene ?? _settings.Obs.PauseScene;
         EndSceneBox.Text = requestedEndScene ?? _settings.Obs.EndScene;
         ServicesSpotifyOverlaySceneBox.ItemsSource = dashboardScenes;
-        OverlayProjectObsSceneBox.ItemsSource = dashboardScenes;
 
         if (!string.IsNullOrWhiteSpace(requestedSpotifyOverlayScene))
         {
@@ -14550,11 +13864,6 @@ public partial class MainWindow : Window
         else if (!string.IsNullOrWhiteSpace(_settings.Spotify.OverlayObsScene))
         {
             ServicesSpotifyOverlaySceneBox.Text = _settings.Spotify.OverlayObsScene;
-        }
-
-        if (!string.IsNullOrWhiteSpace(requestedOverlayProjectScene))
-        {
-            OverlayProjectObsSceneBox.Text = requestedOverlayProjectScene;
         }
 
         await RefreshSpotifyOverlayBrowserSourcesAsync();
@@ -14606,6 +13915,7 @@ public partial class MainWindow : Window
         {
             _streamStartAutomationCts?.Cancel();
             _streamSessionStartedAt = null;
+            _twitchStreamStartedAt = null;
             _spotifyStartPlaylistTriggeredForCurrentStream = false;
             _consecutiveObsStreamInactivePolls = 0;
         }
@@ -14646,9 +13956,10 @@ public partial class MainWindow : Window
             JsonObject stream = root["stream"] as JsonObject ?? [];
             stream["isLive"] = streamActiveNow;
             stream["currentScene"] = snapshot.CurrentProgramScene;
-            stream["startedAt"] = _streamSessionStartedAt;
-            stream["elapsedSeconds"] = _streamSessionStartedAt.HasValue
-                ? Math.Max(0, (long)(DateTimeOffset.Now - _streamSessionStartedAt.Value).TotalSeconds)
+            DateTimeOffset? liveStartedAt = ResolveLiveStreamStartedAt();
+            stream["startedAt"] = liveStartedAt;
+            stream["elapsedSeconds"] = liveStartedAt.HasValue
+                ? Math.Max(0, (long)(DateTimeOffset.Now - liveStartedAt.Value).TotalSeconds)
                 : 0;
             stream["viewerCount"] = _currentLiveViewerCount;
             root["stream"] = stream;
@@ -14683,6 +13994,29 @@ public partial class MainWindow : Window
         }
 
         return DateTimeOffset.Now;
+    }
+
+    private DateTimeOffset? ResolveLiveStreamStartedAt() =>
+        _twitchStreamStartedAt ?? _streamSessionStartedAt ?? _twitchSessionObservedAt;
+
+    private void ApplyTwitchLiveStreamStartedAt(DateTimeOffset? startedAt)
+    {
+        if (startedAt is null)
+        {
+            return;
+        }
+
+        _twitchStreamStartedAt = startedAt;
+
+        // Helix started_at ist maßgeblich für die Live-Dauer. Lokale Startzeiten
+        // (OBS-Timecode / Workflow) werden damit auf den Twitch-Start korrigiert.
+        _streamSessionStartedAt = startedAt;
+
+        StreamSessionStats stats = _workflowModule.Service.SessionStats;
+        if (stats.EndedAt is null)
+        {
+            stats.StartedAt = startedAt;
+        }
     }
 
     private async Task HandleObservedStreamStartAsync()
@@ -15046,7 +14380,7 @@ public partial class MainWindow : Window
             JsonObject stream = root["stream"] as JsonObject ?? [];
             stream["isLive"] = true;
             stream["phase"] = "Ending";
-            stream["startedAt"] = _streamSessionStartedAt ?? sessionStats.StartedAt;
+            stream["startedAt"] = ResolveLiveStreamStartedAt() ?? sessionStats.StartedAt;
             stream["endedAt"] = endedAt;
             stream["elapsedSeconds"] = sessionStats.StreamTimeSeconds;
             stream["viewerCount"] = _currentLiveViewerCount;
@@ -16083,7 +15417,6 @@ public partial class MainWindow : Window
         try
         {
             await _diagnosticsPageViewModel.LoadStatusesAsync();
-            DiagnosticsGrid.ItemsSource = _diagnosticsPageViewModel.ModuleStatuses;
 
             _appLogger.Write(
                 AppLogLevel.Information,
@@ -17727,80 +17060,6 @@ public partial class MainWindow : Window
             ? "JSON-Pfad gespeichert. Die Suite schreibt aktuelle Spotify-Daten direkt in diese Datei; HTML und OBS bleiben unverändert."
             : "JSON-Pfad gespeichert. Die Datei wird beim nächsten Spotify-Datenupdate automatisch angelegt.";
         ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGreen;
-
-        int patchedFiles = await PatchSpotifyOverlayHtmlAsync(requestedPath);
-        if (patchedFiles > 0)
-        {
-            ServicesSpotifyOverlayStatusText.Text += $" Anzeigeoptionen wurden in {patchedFiles} Spotify-HTML-Datei(en) aktiviert.";
-        }
-    }
-
-    private async Task<int> PatchSpotifyOverlayHtmlAsync(string dataJsonPath)
-    {
-        try
-        {
-            string? dataDirectory = Path.GetDirectoryName(dataJsonPath);
-            string? overlayDirectory = dataDirectory is null ? null : Directory.GetParent(dataDirectory)?.FullName;
-            if (string.IsNullOrWhiteSpace(overlayDirectory) || !Directory.Exists(overlayDirectory))
-            {
-                return 0;
-            }
-
-            const string marker = "CCS-SPOTIFY-DISPLAY-OPTIONS-V2";
-            const string compatibilityScript = @"
-<script>
-// CCS-SPOTIFY-DISPLAY-OPTIONS-V2
-(() => {
-  if (!window.CreatorOverlayData || typeof window.CreatorOverlayData.subscribe !== 'function') return;
-  window.CreatorOverlayData.subscribe(data => {
-    const spotify = (data && data.spotify) || {};
-    const byId = id => document.getElementById(id);
-    const setVisible = (element, visible) => { if (element) element.style.display = visible ? '' : 'none'; };
-    setVisible(byId('title'), spotify.showTitle !== false);
-    setVisible(byId('artist'), spotify.showArtist !== false);
-    setVisible(byId('album'), spotify.showArtist !== false);
-    setVisible(byId('cover'), spotify.showAlbumCover !== false);
-    const progress = byId('prog') || byId('progress') || document.querySelector('.spotify-progress-row,.progress-row,.spotify-progress');
-    setVisible(progress, spotify.showProgress !== false);
-    const container = byId('box') || document.querySelector('.spotify-card,.spotify-container,.spotify-widget') || document.body;
-    const shouldHide = spotify.showInOverlay === false || (spotify.hideWhenPaused === true && spotify.isPlaying !== true);
-    if (container) container.style.display = shouldHide ? 'none' : '';
-  });
-})();
-</script>";
-
-            int patched = 0;
-            var candidates = Directory.EnumerateFiles(overlayDirectory, "*.html", SearchOption.AllDirectories)
-                .Where(path => Path.GetFileName(path).Contains("spotify", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            foreach (string? htmlPath in candidates)
-            {
-                string html = await File.ReadAllTextAsync(htmlPath);
-                if (html.Contains(marker, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                if (!html.Contains("CreatorOverlayData", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                int bodyIndex = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
-                html = bodyIndex >= 0
-                    ? html.Insert(bodyIndex, compatibilityScript)
-                    : html + compatibilityScript;
-                await File.WriteAllTextAsync(htmlPath, html);
-                patched++;
-            }
-            return patched;
-        }
-        catch (Exception exception)
-        {
-            _appLogger.Write(AppLogLevel.Warning, "Spotify", "Spotify-HTML konnte nicht für die Anzeigeoptionen aktualisiert werden.", exception);
-            return 0;
-        }
     }
 
     private void BrowseSpotifyDataJsonPath()
@@ -17959,125 +17218,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RefreshSpotifyOverlayProjectSelector()
-    {
-        if (ServicesSpotifyOverlayProjectBox is null)
-        {
-            return;
-        }
-
-        ServicesSpotifyOverlayProjectBox.ItemsSource = _overlayProjects;
-        // The live OBS refresh supplies this selector directly. As a fallback, reuse
-        // the overlay-project scene list when it is already available.
-        ServicesSpotifyOverlaySceneBox.ItemsSource ??= OverlayProjectObsSceneBox.ItemsSource;
-
-        ServicesSpotifyOverlayProjectBox.SelectedItem = _overlayProjects.FirstOrDefault(x => x.Id == _settings.Spotify.OverlayProjectId)
-            ?? _overlayProjects.FirstOrDefault(x => x.Items.Any(i => i.Name.Contains("spotify", StringComparison.OrdinalIgnoreCase) || i.RelativePath.Contains("spotify", StringComparison.OrdinalIgnoreCase)))
-            ?? _overlayProjects.FirstOrDefault();
-        RefreshSpotifyOverlayProjectItems();
-    }
-
-    private void RefreshSpotifyOverlayProjectItems()
-    {
-        if (ServicesSpotifyOverlayItemBox is null)
-        {
-            return;
-        }
-
-        var project = ServicesSpotifyOverlayProjectBox.SelectedItem as OverlayProjectDefinition;
-        List<OverlayProjectItem> candidates = project?.Items.Where(x => x.RelativePath.EndsWith(".html", StringComparison.OrdinalIgnoreCase)).ToList() ?? [];
-        ServicesSpotifyOverlayItemBox.ItemsSource = candidates;
-        ServicesSpotifyOverlayItemBox.SelectedItem = candidates.FirstOrDefault(x => x.Id == _settings.Spotify.OverlayItemId)
-            ?? candidates.FirstOrDefault(x => x.Name.Contains("spotify", StringComparison.OrdinalIgnoreCase) || x.RelativePath.Contains("spotify", StringComparison.OrdinalIgnoreCase))
-            ?? candidates.FirstOrDefault();
-        RefreshSpotifyOverlaySelectionDetails();
-    }
-
-    private void RefreshSpotifyOverlaySelectionDetails()
-    {
-        if (ServicesSpotifyOverlayPathText is null || ServicesSpotifyOverlayStatusText is null)
-        {
-            return;
-        }
-
-        if (ServicesSpotifyOverlayProjectBox.SelectedItem is not OverlayProjectDefinition project || ServicesSpotifyOverlayItemBox.SelectedItem is not OverlayProjectItem item)
-        {
-            string? jsonPath = ServicesSpotifyDataJsonPathBox?.Text?.Trim();
-            ServicesSpotifyOverlayPathText.Text = string.IsNullOrWhiteSpace(jsonPath) ? "Noch keine JSON-Datei ausgewählt." : $"JSON: {jsonPath}";
-            ServicesSpotifyOverlayStatusText.Text = "Die HTML- und OBS-Konfiguration wird nicht verändert. Die Suite schreibt nur in die ausgewählte JSON-Datei.";
-            ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGray;
-            return;
-        }
-        string path = item.IsLocalFile && !Path.IsPathRooted(item.RelativePath) ? Path.Combine(project.RootPath, item.RelativePath) : item.RelativePath;
-        ServicesSpotifyOverlayPathText.Text = $"HTML: {path}";
-        if (!string.IsNullOrWhiteSpace(item.ObsScene))
-        {
-            ServicesSpotifyOverlaySceneBox.Text = item.ObsScene;
-        }
-
-        if (!string.IsNullOrWhiteSpace(item.ObsSource))
-        {
-            ServicesSpotifyOverlaySourceBox.Text = item.ObsSource;
-        }
-
-        bool fileOk = !item.IsLocalFile || File.Exists(path);
-        ServicesSpotifyOverlayStatusText.Text = $"{(fileOk ? "HTML-Datei gefunden" : "HTML-Datei fehlt")} · {(string.IsNullOrWhiteSpace(item.ObsSource) ? "Browserquelle noch nicht festgelegt" : "Browserquelle: " + item.ObsSource)} · {project.DataReferenceStatus} · {(_obsClient.IsConnected ? "OBS verbunden" : "OBS nicht verbunden")}";
-        ServicesSpotifyOverlayStatusText.Foreground = fileOk ? Brushes.LightGray : Brushes.IndianRed;
-    }
-
-    private async Task SynchronizeSpotifyOverlayAsync()
-    {
-        try
-        {
-            await SaveSpotifyOverlaySettingsAsync();
-            if (ServicesSpotifyOverlayProjectBox.SelectedItem is not OverlayProjectDefinition project || ServicesSpotifyOverlayItemBox.SelectedItem is not OverlayProjectItem)
-            {
-                throw new InvalidOperationException("Bitte ein Overlay-Projekt und ein HTML-Modul auswählen.");
-            }
-
-            if (!_obsClient.IsConnected)
-            {
-                throw new InvalidOperationException("OBS ist nicht verbunden.");
-            }
-
-            await _overlayProjectService.SynchronizeWithObsAsync(project);
-            await _overlayProjectService.SaveAsync(_overlayProjects);
-            ServicesSpotifyOverlayStatusText.Text = "Spotify-Browserquelle wurde in OBS erstellt bzw. aktualisiert.";
-            ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            ServicesSpotifyOverlayStatusText.Text = exception.Message;
-            ServicesSpotifyOverlayStatusText.Foreground = Brushes.IndianRed;
-        }
-    }
-
-    private void PreviewSpotifyOverlay()
-    {
-        try
-        {
-            if (ServicesSpotifyOverlayProjectBox.SelectedItem is not OverlayProjectDefinition project || ServicesSpotifyOverlayItemBox.SelectedItem is not OverlayProjectItem item)
-            {
-                throw new InvalidOperationException("Bitte ein Overlay-Projekt und ein HTML-Modul auswählen.");
-            }
-
-            string path = item.IsLocalFile && !Path.IsPathRooted(item.RelativePath) ? Path.Combine(project.RootPath, item.RelativePath) : item.RelativePath;
-            if (item.IsLocalFile && !File.Exists(path))
-            {
-                throw new FileNotFoundException("Die ausgewählte HTML-Datei wurde nicht gefunden.", path);
-            }
-
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-            ServicesSpotifyOverlayStatusText.Text = "Overlay-Vorschau wurde im Standardbrowser geöffnet.";
-            ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            ServicesSpotifyOverlayStatusText.Text = exception.Message;
-            ServicesSpotifyOverlayStatusText.Foreground = Brushes.IndianRed;
-        }
-    }
-
     private void ApplyTwitchGoalFieldsToSettings()
     {
         static double D(string text, double fallback) => double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value) ? value : fallback;
@@ -18145,22 +17285,62 @@ public partial class MainWindow : Window
         Currency = goal.Currency
     };
 
-    private async Task InstallGoalInObsAsync(string goalType)
+    private void NormalizeTwitchChattersRefreshSettings()
     {
-        await SaveTwitchGoalsAsync();
-        string result = await _obsBrowserSourceInstaller.InstallGoalAsync(goalType);
-        MessageBox.Show(result, "OBS-Zielquelle", MessageBoxButton.OK, MessageBoxImage.Information);
+        _settings.Twitch ??= new TwitchSettings();
+        _settings.Twitch.ChattersRefreshSecondsLow = Math.Clamp(
+            _settings.Twitch.ChattersRefreshSecondsLow <= 0 ? 10 : _settings.Twitch.ChattersRefreshSecondsLow,
+            5,
+            120);
+        _settings.Twitch.ChattersRefreshSecondsHigh = Math.Clamp(
+            _settings.Twitch.ChattersRefreshSecondsHigh <= 0 ? 60 : _settings.Twitch.ChattersRefreshSecondsHigh,
+            15,
+            600);
+        _settings.Twitch.ChattersRefreshViewerThreshold = Math.Clamp(
+            _settings.Twitch.ChattersRefreshViewerThreshold <= 0 ? 50 : _settings.Twitch.ChattersRefreshViewerThreshold,
+            1,
+            10000);
+
+        if (_settings.Twitch.ChattersRefreshSecondsHigh < _settings.Twitch.ChattersRefreshSecondsLow)
+        {
+            _settings.Twitch.ChattersRefreshSecondsHigh = _settings.Twitch.ChattersRefreshSecondsLow;
+        }
     }
 
-    private async Task InstallAllGoalsSceneInObsAsync()
+    private void ApplyTwitchUsersRefreshInterval()
     {
-        await SaveTwitchGoalsAsync();
-        string result = await _obsBrowserSourceInstaller.InstallAllGoalsAsync();
-        MessageBox.Show(result, "OBS-Zielszene", MessageBoxButton.OK, MessageBoxImage.Information);
+        NormalizeTwitchChattersRefreshSettings();
+        int seconds = _currentLiveViewerCount >= _settings.Twitch.ChattersRefreshViewerThreshold
+            ? _settings.Twitch.ChattersRefreshSecondsHigh
+            : _settings.Twitch.ChattersRefreshSecondsLow;
+        TimeSpan interval = TimeSpan.FromSeconds(seconds);
+        if (_twitchUsersRefreshTimer.Interval != interval)
+        {
+            _twitchUsersRefreshTimer.Interval = interval;
+        }
     }
 
-    private async Task RefreshTwitchUsersAsync()
+    private async Task RefreshTwitchUsersAsync(bool force = false)
     {
+        if (_twitchUsersRefreshRunning)
+        {
+            return;
+        }
+
+        NormalizeTwitchChattersRefreshSettings();
+        int requiredSeconds = _currentLiveViewerCount >= _settings.Twitch.ChattersRefreshViewerThreshold
+            ? _settings.Twitch.ChattersRefreshSecondsHigh
+            : _settings.Twitch.ChattersRefreshSecondsLow;
+
+        if (!force &&
+            _lastTwitchUsersRefreshUtc != DateTimeOffset.MinValue &&
+            DateTimeOffset.UtcNow - _lastTwitchUsersRefreshUtc < TimeSpan.FromSeconds(requiredSeconds))
+        {
+            return;
+        }
+
+        _twitchUsersRefreshRunning = true;
+
         try
         {
             IReadOnlyList<string> users = await _twitchModule.GetChattersAsync();
@@ -18192,6 +17372,7 @@ public partial class MainWindow : Window
                     $"User ({_twitchUserItems.Count})";
                 RefreshCommunityUi();
             });
+            _lastTwitchUsersRefreshUtc = DateTimeOffset.UtcNow;
         }
         catch (Exception exception)
         {
@@ -18206,6 +17387,10 @@ public partial class MainWindow : Window
 
             // Die User-Liste ist optional. Chat und EventSub laufen bei einem
             // vorübergehenden API- oder Berechtigungsfehler weiter.
+        }
+        finally
+        {
+            _twitchUsersRefreshRunning = false;
         }
     }
 
@@ -19660,7 +18845,7 @@ public partial class MainWindow : Window
     {
         StreamSessionStats stats = _workflowModule.Service.SessionStats;
         DateTimeOffset endedAt = DateTimeOffset.Now;
-        DateTimeOffset startedAt = _streamSessionStartedAt ?? endedAt;
+        DateTimeOffset startedAt = ResolveLiveStreamStartedAt() ?? endedAt;
         var item = new
         {
             StartedAt = startedAt,
@@ -19687,6 +18872,7 @@ public partial class MainWindow : Window
         await _creatorIntelligence.CompleteSessionAsync(endedAt);
         await RefreshCreatorIntelligenceAsync();
         _streamSessionStartedAt = null;
+        _twitchStreamStartedAt = null;
     }
 
     private async Task LoadStreamHistoryAsync()
@@ -19841,184 +19027,6 @@ public partial class MainWindow : Window
     {
         string folder = GetStreamHistoryDirectory();
         Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
-    }
-
-
-    private void UpdateOverlayFrameColorPreview(string color)
-    {
-        try
-        {
-            object converted = System.Windows.Media.ColorConverter.ConvertFromString(color);
-            if (converted is System.Windows.Media.Color parsed)
-            {
-                OverlayFrameColorPreview.Background = new System.Windows.Media.SolidColorBrush(parsed);
-            }
-        }
-        catch
-        {
-            // Ungültige Eingaben bleiben im Textfeld sichtbar; die letzte Vorschau bleibt erhalten.
-        }
-    }
-
-    private static void SelectComboBoxTag(ComboBox box, string value)
-    {
-        foreach (ComboBoxItem entry in box.Items.OfType<ComboBoxItem>())
-        {
-            if (string.Equals(entry.Tag?.ToString(), value, StringComparison.OrdinalIgnoreCase))
-            {
-                box.SelectedItem = entry;
-                return;
-            }
-        }
-        if (box.Items.Count > 0)
-        {
-            box.SelectedIndex = 0;
-        }
-    }
-
-    private void LoadStreamerHudSettingsIntoUi()
-    {
-        StreamerHudSettings hud = _settings.StreamerHud;
-        StreamerHudEnabledBox.IsChecked = hud.Enabled;
-        StreamerHudShowChatBox.IsChecked = hud.ShowChat;
-        StreamerHudShowEventsBox.IsChecked = hud.ShowEvents;
-        StreamerHudShowLiveStatusBox.IsChecked = hud.ShowLiveStatus;
-        StreamerHudClickThroughBox.IsChecked = hud.ClickThrough;
-        StreamerHudOpacitySlider.Value = Math.Clamp(hud.Opacity, 0.3, 1.0);
-        StreamerHudOpacityValueText.Text = $"{StreamerHudOpacitySlider.Value:0%}";
-        StreamerHudPanelWidthBox.Text = hud.PanelWidth.ToString();
-        StreamerHudMarginBox.Text = hud.Margin.ToString();
-        SelectComboBoxTag(StreamerHudAnchorBox, string.IsNullOrWhiteSpace(hud.Anchor) ? "TopRight" : hud.Anchor);
-        PopulateStreamerHudMonitorBox(hud.MonitorIndex);
-        StreamerHudStatusText.Text = hud.Enabled ? "HUD wird nach dem Start angezeigt." : "HUD deaktiviert.";
-    }
-
-    private void PopulateStreamerHudMonitorBox(int selectedIndex)
-    {
-        StreamerHudMonitorBox.Items.Clear();
-        IReadOnlyList<NativeWindowHelper.MonitorInfo> monitors = NativeWindowHelper.GetMonitors();
-        foreach (NativeWindowHelper.MonitorInfo monitor in monitors)
-        {
-            string label = monitor.IsPrimary
-                ? $"{monitor.Index}: Primär ({(int)monitor.BoundsDip.Width}×{(int)monitor.BoundsDip.Height})"
-                : $"{monitor.Index}: {monitor.Name} ({(int)monitor.BoundsDip.Width}×{(int)monitor.BoundsDip.Height})";
-            StreamerHudMonitorBox.Items.Add(new ComboBoxItem { Content = label, Tag = monitor.Index });
-        }
-
-        if (StreamerHudMonitorBox.Items.Count == 0)
-        {
-            StreamerHudMonitorBox.Items.Add(new ComboBoxItem { Content = "0: Primär", Tag = 0 });
-        }
-
-        SelectComboBoxTag(StreamerHudMonitorBox, selectedIndex.ToString());
-        if (StreamerHudMonitorBox.SelectedIndex < 0)
-        {
-            StreamerHudMonitorBox.SelectedIndex = 0;
-        }
-    }
-
-    private void ReadStreamerHudSettingsFromUi()
-    {
-        _settings.StreamerHud.Enabled = StreamerHudEnabledBox.IsChecked == true;
-        _settings.StreamerHud.ShowChat = StreamerHudShowChatBox.IsChecked == true;
-        _settings.StreamerHud.ShowEvents = StreamerHudShowEventsBox.IsChecked == true;
-        _settings.StreamerHud.ShowLiveStatus = StreamerHudShowLiveStatusBox.IsChecked == true;
-        _settings.StreamerHud.ClickThrough = StreamerHudClickThroughBox.IsChecked == true;
-        _settings.StreamerHud.Opacity = Math.Clamp(StreamerHudOpacitySlider.Value, 0.3, 1.0);
-        _settings.StreamerHud.Anchor = (StreamerHudAnchorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "TopRight";
-        _settings.StreamerHud.MonitorIndex = int.TryParse((StreamerHudMonitorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out int monitor)
-            ? monitor
-            : 0;
-        _settings.StreamerHud.PanelWidth = int.TryParse(StreamerHudPanelWidthBox.Text.Trim(), out int width)
-            ? Math.Clamp(width, 280, 800)
-            : 420;
-        _settings.StreamerHud.Margin = int.TryParse(StreamerHudMarginBox.Text.Trim(), out int margin)
-            ? Math.Max(0, margin)
-            : 24;
-    }
-
-    private void ApplyStreamerHudFromSettings()
-    {
-        try
-        {
-            _streamerHudService.Apply(_settings.StreamerHud);
-            StreamerHudStatusText.Text = _settings.StreamerHud.Enabled
-                ? "HUD aktiv (vom Capture ausgeschlossen)."
-                : "HUD deaktiviert.";
-        }
-        catch (Exception ex)
-        {
-            StreamerHudStatusText.Text = "HUD konnte nicht geöffnet werden: " + ex.Message;
-            _appLogger.Write(AppLogLevel.Warning, "StreamerHud", StreamerHudStatusText.Text, ex);
-        }
-    }
-
-    private void PreviewStreamerHud()
-    {
-        try
-        {
-            ReadStreamerHudSettingsFromUi();
-            _streamerHudService.ShowPreview(_settings.StreamerHud);
-            StreamerHudStatusText.Text = "Vorschau aktiv (vom Capture ausgeschlossen).";
-        }
-        catch (Exception ex)
-        {
-            StreamerHudStatusText.Text = "Vorschau fehlgeschlagen: " + ex.Message;
-            _appLogger.Write(AppLogLevel.Warning, "StreamerHud", StreamerHudStatusText.Text, ex);
-        }
-    }
-
-    private void UpdateStreamerHudLiveStatus(bool isLive, string detail)
-    {
-        string text = isLive
-            ? $"LIVE · {_currentLiveViewerCount} Zuschauer · {detail}"
-            : "OFFLINE";
-        _streamerHudService.UpdateLiveStatus(text);
-    }
-
-    private async Task WriteOverlayConfigurationAsync()
-    {
-        string root = await _overlayModule.Service.GetOverlayRootAsync();
-        string dataFolder = Path.Combine(root, "data");
-        Directory.CreateDirectory(dataFolder);
-        var config = new
-        {
-            contentName = _settings.Branding.DisplayName,
-            startText = _settings.Overlay.StartText,
-            pauseText = _settings.Overlay.PauseText,
-            endText = _settings.Overlay.EndText,
-            sharedSceneText = _settings.Overlay.SharedSceneText,
-            fontFamily = _settings.Overlay.FontFamily,
-            fontSize = _settings.Overlay.FontSize,
-            fontColor = _settings.Overlay.FontColor,
-            startTimerSeconds = _settings.Overlay.StartTimerSeconds,
-            timerX = _settings.Overlay.TimerX,
-            timerY = _settings.Overlay.TimerY,
-            frameStyle = _settings.Overlay.FrameStyle,
-            frameColor = _settings.Overlay.FrameColor,
-            frameEffect = _settings.Overlay.FrameEffect
-        };
-        string json = System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
-        await File.WriteAllTextAsync(Path.Combine(dataFolder, "overlay-config.json"), json);
-    }
-
-    private async Task InstallSelectedOverlayContentAsync()
-    {
-        try
-        {
-            await SaveSettingsAsync();
-            string scene = OverlayObsSceneTargetBox.SelectedItem?.ToString() ?? OverlayObsSceneTargetBox.Text;
-            var item = OverlayContentTypeBox.SelectedItem as ComboBoxItem;
-            string type = item?.Tag?.ToString() ?? "content-name";
-            string result = await _obsBrowserSourceInstaller.InstallContentAsync(scene, type);
-            OverlayStatusText.Text = result;
-            OverlayStatusText.Foreground = System.Windows.Media.Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = exception.Message;
-            OverlayStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
-        }
     }
 
 
@@ -21460,10 +20468,10 @@ public partial class MainWindow : Window
             {
                 await AddResultAsync("Overlay", () =>
                 {
-                    string path = _settings.General.OverlayManifestPath;
+                    string path = ResolveActiveOverlayDataPath();
                     if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
                     {
-                        throw new InvalidOperationException("overlay.json wurde nicht gefunden.");
+                        throw new InvalidOperationException("overlay-data.json wurde nicht gefunden.");
                     }
 
                     return Task.CompletedTask;
@@ -21519,23 +20527,7 @@ public partial class MainWindow : Window
                     continue;
                 }
 
-                bool due = false;
-                if (string.Equals(rule.TriggerType, "StreamElapsed", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(rule.TriggerType, "StreamStarted", StringComparison.OrdinalIgnoreCase))
-                {
-                    due = _streamSessionStartedAt.HasValue && now - _streamSessionStartedAt.Value >= TimeSpan.FromSeconds(string.Equals(rule.TriggerType, "StreamStarted", StringComparison.OrdinalIgnoreCase) ? 0 : rule.DelaySeconds);
-                }
-                else if (string.Equals(rule.TriggerType, "SceneElapsed", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(rule.TriggerType, "SceneActivated", StringComparison.OrdinalIgnoreCase))
-                {
-                    due = _automationSceneActivatedAt.HasValue && string.Equals(_automationCurrentScene, rule.TriggerScene, StringComparison.OrdinalIgnoreCase) && now - _automationSceneActivatedAt.Value >= TimeSpan.FromSeconds(string.Equals(rule.TriggerType, "SceneActivated", StringComparison.OrdinalIgnoreCase) ? 0 : rule.DelaySeconds);
-                }
-                else if (rule.TriggerType is "DailySchedule" or "WeeklySchedule" or "OneTimeSchedule")
-                {
-                    DateTime localNow = DateTime.Now;
-                    due = IsScheduledAutomationDue(rule, localNow);
-                }
-                if (!due)
+                if (!TimedAutomationSchedule.IsTriggerDue(rule, now, _streamSessionStartedAt, _automationSceneActivatedAt, _automationCurrentScene))
                 {
                     continue;
                 }
@@ -21552,91 +20544,7 @@ public partial class MainWindow : Window
 
 
     private static bool IsScheduledAutomationDue(TimedAutomationRuleSettings rule, DateTime localNow)
-    {
-        if (!TimeOnly.TryParse(rule.ScheduleTime, out TimeOnly scheduledTime))
-        {
-            return false;
-        }
-
-        var today = DateOnly.FromDateTime(localNow);
-        if (DateOnly.TryParse(rule.ActiveFromDate, out DateOnly activeFrom) && today < activeFrom)
-        {
-            return false;
-        }
-
-        if (DateOnly.TryParse(rule.ActiveUntilDate, out DateOnly activeUntil) && today > activeUntil)
-        {
-            return false;
-        }
-
-        if (IsAutomationDateExcluded(rule, today) || IsAutomationDateInBlackout(rule, today))
-        {
-            return false;
-        }
-
-        var scheduledDateTime = today.ToDateTime(scheduledTime);
-        if (localNow < scheduledDateTime)
-        {
-            return false;
-        }
-
-        TimeSpan missedBy = localNow - scheduledDateTime;
-        if (string.Equals(rule.MissedRunBehavior, "Skip", StringComparison.OrdinalIgnoreCase) && missedBy > TimeSpan.FromMinutes(1))
-        {
-            return false;
-        }
-
-        if (string.Equals(rule.MissedRunBehavior, "WithinGrace", StringComparison.OrdinalIgnoreCase) && missedBy > TimeSpan.FromMinutes(Math.Clamp(rule.CatchUpGraceMinutes, 0, 1440)))
-        {
-            return false;
-        }
-
-        if (string.Equals(rule.LastScheduledRunDate, localNow.ToString("yyyy-MM-dd"), StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (string.Equals(rule.TriggerType, "WeeklySchedule", StringComparison.OrdinalIgnoreCase))
-        {
-            string[] days = (rule.ScheduleDays ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (!days.Any(x => string.Equals(x, localNow.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase)))
-            {
-                return false;
-            }
-        }
-        if (string.Equals(rule.TriggerType, "OneTimeSchedule", StringComparison.OrdinalIgnoreCase))
-        {
-            return DateOnly.TryParse(rule.ScheduleDate, out DateOnly scheduledDate) && today == scheduledDate;
-        }
-
-        return true;
-    }
-
-
-    private static bool IsAutomationDateExcluded(TimedAutomationRuleSettings rule, DateOnly day)
-    {
-        return (rule.ExcludedDates ?? "")
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(value => DateOnly.TryParse(value, out DateOnly excluded) && excluded == day);
-    }
-
-    private static bool IsAutomationDateInBlackout(TimedAutomationRuleSettings rule, DateOnly day)
-    {
-        foreach (string entry in (rule.BlackoutRanges ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            string[] bounds = entry.Split("..", StringSplitOptions.TrimEntries);
-            if (bounds.Length != 2 || !DateOnly.TryParse(bounds[0], out DateOnly start) || !DateOnly.TryParse(bounds[1], out DateOnly end))
-            {
-                continue;
-            }
-
-            if (start <= day && day <= end)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
+        => TimedAutomationSchedule.IsDue(rule, localNow);
 
     private static string DescribeNextScheduledRun(TimedAutomationRuleSettings rule)
     {
@@ -21645,52 +20553,13 @@ public partial class MainWindow : Window
             return "nicht zeitplanbasiert";
         }
 
-        if (!TimeOnly.TryParse(rule.ScheduleTime, out TimeOnly time))
+        string next = TimedAutomationSchedule.DescribeNextRun(rule, DateTime.Now);
+        return next switch
         {
-            return "ungültige Uhrzeit";
-        }
-
-        DateTime now = DateTime.Now;
-        for (int offset = 0; offset <= 370; offset++)
-        {
-            var day = DateOnly.FromDateTime(now.Date.AddDays(offset));
-            if (DateOnly.TryParse(rule.ActiveFromDate, out DateOnly from) && day < from)
-            {
-                continue;
-            }
-
-            if (DateOnly.TryParse(rule.ActiveUntilDate, out DateOnly until) && day > until)
-            {
-                break;
-            }
-
-            if (IsAutomationDateExcluded(rule, day) || IsAutomationDateInBlackout(rule, day))
-            {
-                continue;
-            }
-
-            if (rule.TriggerType == "WeeklySchedule")
-            {
-                string[] names = (rule.ScheduleDays ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                if (!names.Any(x => string.Equals(x, day.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
-            }
-            if (rule.TriggerType == "OneTimeSchedule" && (!DateOnly.TryParse(rule.ScheduleDate, out DateOnly once) || day != once))
-            {
-                continue;
-            }
-
-            var candidate = day.ToDateTime(time);
-            if (candidate <= now)
-            {
-                continue;
-            }
-
-            return candidate.ToString("dd.MM.yyyy HH:mm");
-        }
-        return "kein Termin im gültigen Zeitraum";
+            "Ungültige Uhrzeit" => "ungültige Uhrzeit",
+            "Kein nächster Lauf" => "kein Termin im gültigen Zeitraum",
+            _ => next
+        };
     }
 
     private async Task StartTimedAutomationRuleAsync(TimedAutomationRuleSettings rule, bool simulate)
@@ -22183,11 +21052,8 @@ public partial class MainWindow : Window
                 if (rule.SpotifyAutoRestorePreviousState &&
                     !string.Equals(rule.SpotifyAction, "RestorePrevious", StringComparison.OrdinalIgnoreCase))
                 {
-                    bool hasSavedState;
-                    lock (_spotifyAutomationSync)
-                    {
-                        hasSavedState = _spotifyAutomationSavedStates.ContainsKey(spotifyGroup);
-                    }
+                    _spotifySavedStateStore.TtlMinutes = GetSpotifySavedStateMaxAgeMinutes();
+                    bool hasSavedState = _spotifySavedStateStore.ContainsKey(spotifyGroup);
 
                     if (!hasSavedState)
                     {
@@ -22265,11 +21131,9 @@ public partial class MainWindow : Window
     private void RefreshSpotifySavedStateStatus()
     {
         string group = GetSpotifyAutomationEditorGroup();
+        _spotifySavedStateStore.TtlMinutes = GetSpotifySavedStateMaxAgeMinutes();
         SpotifyAutomationSavedState? state;
-        lock (_spotifyAutomationSync)
-        {
-            _spotifyAutomationSavedStates.TryGetValue(group, out state);
-        }
+        _spotifySavedStateStore.TryGet(group, out state);
 
         if (state is null)
         {
@@ -22282,34 +21146,31 @@ public partial class MainWindow : Window
         var position = TimeSpan.FromMilliseconds(Math.Max(0, state.ProgressMs));
         string playbackState = state.WasPlaying ? "lief" : "war pausiert";
         TimeSpan age = DateTimeOffset.UtcNow - state.SavedAtUtc;
-        string expiry = IsSpotifySavedStateExpired(state) ? " · ABGELAUFEN" : "";
+        string expiry = _spotifySavedStateStore.IsExpired(state) ? " · ABGELAUFEN" : "";
         TimedAutomationSpotifySavedStateText.Text =
             $"Gruppe '{group}': {title} – {artist} bei {position:mm\\:ss}, Lautstärke {state.VolumePercent} %, " +
             $"Shuffle {(state.ShuffleEnabled ? "an" : "aus")}, Wiederholung {state.RepeatMode}, {playbackState}. " +
-            $"Gesichert vor {FormatSpotifySavedStateAge(age)}{expiry}.";
+            $"Gesichert vor {SpotifySavedStateStore.FormatAge(age)}{expiry}.";
     }
 
     private void RefreshSpotifySavedStatesOverview()
     {
-        List<SpotifySavedStateOverviewItem> items;
-        lock (_spotifyAutomationSync)
-        {
-            items = [.. _spotifyAutomationSavedStates
-                .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(entry =>
-                {
-                    SpotifyAutomationSavedState state = entry.Value;
-                    string title = state.Track?.Name ?? "Unbekannter Titel";
-                    string artist = state.Track?.Artist ?? "Unbekannter Interpret";
-                    var position = TimeSpan.FromMilliseconds(Math.Max(0, state.ProgressMs));
-                    string playbackState = state.WasPlaying ? "lief" : "pausiert";
-                    TimeSpan age = DateTimeOffset.UtcNow - state.SavedAtUtc;
-                    bool expired = IsSpotifySavedStateExpired(state);
-                    string prefix = expired ? "[ABGELAUFEN] " : "";
-                    string summary = $"{prefix}{entry.Key} · {title} – {artist} · {position:mm\\:ss} · {state.VolumePercent} % · {playbackState} · vor {FormatSpotifySavedStateAge(age)}";
-                    return new SpotifySavedStateOverviewItem(entry.Key, summary, expired);
-                })];
-        }
+        _spotifySavedStateStore.TtlMinutes = GetSpotifySavedStateMaxAgeMinutes();
+        List<SpotifySavedStateOverviewItem> items = [.. _spotifySavedStateStore.Snapshot()
+            .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(entry =>
+            {
+                SpotifyAutomationSavedState state = entry.Value;
+                string title = state.Track?.Name ?? "Unbekannter Titel";
+                string artist = state.Track?.Artist ?? "Unbekannter Interpret";
+                var position = TimeSpan.FromMilliseconds(Math.Max(0, state.ProgressMs));
+                string playbackState = state.WasPlaying ? "lief" : "pausiert";
+                TimeSpan age = DateTimeOffset.UtcNow - state.SavedAtUtc;
+                bool expired = _spotifySavedStateStore.IsExpired(state);
+                string prefix = expired ? "[ABGELAUFEN] " : "";
+                string summary = $"{prefix}{entry.Key} · {title} – {artist} · {position:mm\\:ss} · {state.VolumePercent} % · {playbackState} · vor {SpotifySavedStateStore.FormatAge(age)}";
+                return new SpotifySavedStateOverviewItem(entry.Key, summary, expired);
+            })];
 
         SpotifySavedStatesOverviewList.ItemsSource = items;
         int expiredCount = items.Count(item => item.IsExpired);
@@ -22353,11 +21214,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        bool removed;
-        lock (_spotifyAutomationSync)
-        {
-            removed = _spotifyAutomationSavedStates.Remove(item.Group);
-        }
+        bool removed = _spotifySavedStateStore.Remove(item.Group);
 
         AddTimedAutomationDiagnostic(removed
             ? $"Spotify-Gruppe '{item.Group}': Gespeicherter Zustand wurde über die Übersicht verworfen."
@@ -22373,12 +21230,8 @@ public partial class MainWindow : Window
 
     private void DiscardAllSpotifySavedStates()
     {
-        int count;
-        lock (_spotifyAutomationSync)
-        {
-            count = _spotifyAutomationSavedStates.Count;
-            _spotifyAutomationSavedStates.Clear();
-        }
+        int count = _spotifySavedStateStore.Count;
+        _spotifySavedStateStore.Clear();
 
         AddTimedAutomationDiagnostic(count == 0
             ? "Spotify: Es waren keine gespeicherten Zustände vorhanden."
@@ -23779,7 +22632,7 @@ public partial class MainWindow : Window
         SpotifySavedStateStatisticsText.Text =
             $"Gespeichert: {_spotifySavedStateSaveCount} · Wiederhergestellt: {_spotifySavedStateRestoreCount} · " +
             $"Verworfen: {_spotifySavedStateDiscardCount} · Automatisch bereinigt: {_spotifySavedStateCleanupCount} · " +
-            $"Aktuell vorhanden: {_spotifyAutomationSavedStates.Count}";
+            $"Aktuell vorhanden: {_spotifySavedStateStore.Count}";
         int visibleCount = _spotifySavedStateHistoryView?.Cast<object>().Count() ?? _spotifySavedStateHistory.Count;
         SpotifySavedStateHistoryStatusText.Text = _spotifySavedStateHistory.Count == 0
             ? "Noch keine Zustandsaktionen in dieser Programmsitzung."
@@ -23795,35 +22648,6 @@ public partial class MainWindow : Window
             : 180;
     }
 
-    private bool IsSpotifySavedStateExpired(SpotifyAutomationSavedState state)
-    {
-        return DateTimeOffset.UtcNow - state.SavedAtUtc > TimeSpan.FromMinutes(GetSpotifySavedStateMaxAgeMinutes());
-    }
-
-    private static string FormatSpotifySavedStateAge(TimeSpan age)
-    {
-        if (age < TimeSpan.Zero)
-        {
-            age = TimeSpan.Zero;
-        }
-
-        if (age.TotalMinutes < 1)
-        {
-            return "weniger als 1 Minute";
-        }
-
-        if (age.TotalHours < 1)
-        {
-            return $"{Math.Max(1, (int)age.TotalMinutes)} Min.";
-        }
-
-        if (age.TotalDays < 1)
-        {
-            return $"{(int)age.TotalHours} Std. {age.Minutes} Min.";
-        }
-
-        return $"{(int)age.TotalDays} T. {age.Hours} Std.";
-    }
 
     private int GetSpotifySavedStateCleanupIntervalMinutes()
     {
@@ -23852,17 +22676,8 @@ public partial class MainWindow : Window
 
     private void DiscardExpiredSpotifySavedStates(string reason, bool onlyLogWhenRemoved = false)
     {
-        List<string> expiredGroups;
-        lock (_spotifyAutomationSync)
-        {
-            expiredGroups = [.. _spotifyAutomationSavedStates
-                .Where(entry => IsSpotifySavedStateExpired(entry.Value))
-                .Select(entry => entry.Key)];
-            foreach (string group in expiredGroups)
-            {
-                _spotifyAutomationSavedStates.Remove(group);
-            }
-        }
+        _spotifySavedStateStore.TtlMinutes = GetSpotifySavedStateMaxAgeMinutes();
+        _spotifySavedStateStore.DiscardExpired(out IReadOnlyList<string> expiredGroups);
 
         if (expiredGroups.Count > 0)
         {
@@ -23935,7 +22750,7 @@ public partial class MainWindow : Window
         bool removed;
         lock (_spotifyAutomationSync)
         {
-            removed = _spotifyAutomationSavedStates.Remove(group);
+            removed = _spotifySavedStateStore.Remove(group);
         }
 
         AddTimedAutomationDiagnostic(removed
@@ -23976,7 +22791,7 @@ public partial class MainWindow : Window
             DateTimeOffset.UtcNow);
         lock (_spotifyAutomationSync)
         {
-            _spotifyAutomationSavedStates[group] = state;
+            _spotifySavedStateStore.Set(group, state);
         }
 
         _spotifySavedStateSaveCount++;
@@ -23992,10 +22807,7 @@ public partial class MainWindow : Window
     private async Task RestoreSpotifyAutomationStateAsync(string group, TimedAutomationRuleSettings rule, CancellationToken cancellationToken)
     {
         SpotifyAutomationSavedState? state;
-        lock (_spotifyAutomationSync)
-        {
-            _spotifyAutomationSavedStates.TryGetValue(group, out state);
-        }
+        _spotifySavedStateStore.TryGet(group, out state);
 
         if (state is null)
         {
@@ -24044,7 +22856,7 @@ public partial class MainWindow : Window
 
         lock (_spotifyAutomationSync)
         {
-            _spotifyAutomationSavedStates.Remove(group);
+            _spotifySavedStateStore.Remove(group);
         }
 
         _spotifySavedStateRestoreCount++;

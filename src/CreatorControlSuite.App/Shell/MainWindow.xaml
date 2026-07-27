@@ -4,8 +4,11 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:local="clr-namespace:CreatorControlSuite.App"
         xmlns:controls="clr-namespace:CreatorControlSuite.App.Controls"
+        xmlns:diag="clr-namespace:CreatorControlSuite.App.Views.Pages.Diagnostics"
+        xmlns:profiles="clr-namespace:CreatorControlSuite.App.Views.Pages.Profiles"
+        xmlns:about="clr-namespace:CreatorControlSuite.App.Views.Pages.About"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
-        x:Class="CreatorControlSuite.App.MainWindow"
+        x:Class="CreatorControlSuite.App.Shell.MainWindow"
         Title="Creator Control Suite"
         Icon="pack://application:,,,/Assets/Brand/app.ico"
         Width="1600"
@@ -1425,17 +1428,6 @@
                                             <Button x:Name="ServicesSpotifyBrowseDataJsonButton" Grid.Column="2" Content="AUSWÄHLEN" Margin="8,0,0,0"/>
                                         </Grid>
                                         <TextBlock Text="Wähle genau die JSON-Datei, die deine Spotify-HTML bereits lädt. Ist noch keine vorhanden, wird beim Speichern eine neue overlay-data.json angelegt." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,7,0,0"/>
-                                        <Grid Visibility="Collapsed" Margin="0,12,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <TextBlock Text="Overlay-Projekt" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                                            <ComboBox x:Name="ServicesSpotifyOverlayProjectBox" Grid.Column="1" DisplayMemberPath="Name" Background="{DynamicResource ElevatedBackgroundBrush}" Foreground="#FFFFFF"/>
-                                            <TextBlock Grid.Row="1" Text="HTML-Modul" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,10,0,0"/>
-                                        </Grid>
-                                        <Grid Visibility="Collapsed" Margin="0,10,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <TextBlock Text="HTML-Modul" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                                            <ComboBox x:Name="ServicesSpotifyOverlayItemBox" Grid.Column="1" DisplayMemberPath="Name" Background="{DynamicResource ElevatedBackgroundBrush}" Foreground="#FFFFFF"/>
-                                        </Grid>
                                         <Grid Visibility="Collapsed" Margin="0,10,0,0">
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                             <TextBlock Text="OBS-Szene" Foreground="#FFFFFF" VerticalAlignment="Center"/>
@@ -1852,13 +1844,10 @@
                                         <TextBlock Text="Stream-Ziele &amp; Overlay-Content" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
                                         <TextBlock Text="Hier legst du die Ziele fest. Die aktuellen Follower- und Sub-Zahlen werden nach der Twitch-Verbindung automatisch aktualisiert. Die Ziel-Overlays werden in einer eigenen OBS-Szene angelegt. Diese Szene kannst du anschließend in beliebigen OBS-Szenen als Szenenquelle verwenden." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,12"/>
 
-                                        <WrapPanel Margin="0,0,0,12">
-                                            <StackPanel Margin="0,0,8,0">
-                                                <TextBlock Text="OBS-Szene für Ziele &amp; Overlay-Daten" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                <TextBox x:Name="GoalOverlaySceneBox" Width="280"/>
-                                            </StackPanel>
-                                            <Button x:Name="InstallAllGoalsSceneButton" Content="KOMPLETTE ZIEL-SZENE IN OBS ANLEGEN" VerticalAlignment="Bottom"/>
-                                        </WrapPanel>
+                                        <StackPanel Margin="0,0,0,12">
+                                            <TextBlock Text="OBS-Szene für Ziele &amp; Overlay-Daten" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBox x:Name="GoalOverlaySceneBox" Width="280"/>
+                                        </StackPanel>
 
                                         <TextBlock Text="Follower-Ziel" FontWeight="SemiBold" Margin="0,4,0,5"/>
                                         <WrapPanel>
@@ -1867,7 +1856,6 @@
                                             <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="FollowerGoalTargetBox" Width="80"/></StackPanel>
                                             <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="FollowerGoalFontBox" Width="150"/></StackPanel>
                                             <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="FollowerGoalFontSizeBox" Width="70"/></StackPanel>
-                                            <Button x:Name="AddFollowerGoalToObsButton" Content="FOLLOWER-OVERLAY IN OBS ANLEGEN" VerticalAlignment="Bottom" Margin="0,0,0,8"/>
                                         </WrapPanel>
 
                                         <TextBlock Text="Sub-Ziel" FontWeight="SemiBold" Margin="0,8,0,5"/>
@@ -1877,7 +1865,6 @@
                                             <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="SubGoalTargetBox" Width="80"/></StackPanel>
                                             <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="SubGoalFontBox" Width="150"/></StackPanel>
                                             <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="SubGoalFontSizeBox" Width="70"/></StackPanel>
-                                            <Button x:Name="AddSubGoalToObsButton" Content="SUB-OVERLAY IN OBS ANLEGEN" VerticalAlignment="Bottom" Margin="0,0,0,8"/>
                                         </WrapPanel>
 
                                         <TextBlock Text="Donation-Ziel" FontWeight="SemiBold" Margin="0,8,0,5"/>
@@ -1888,7 +1875,6 @@
                                             <StackPanel Margin="0,0,8,8"><TextBlock Text="Währung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="DonationGoalCurrencyBox" Width="70"/></StackPanel>
                                             <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="DonationGoalFontBox" Width="150"/></StackPanel>
                                             <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="DonationGoalFontSizeBox" Width="70"/></StackPanel>
-                                            <Button x:Name="AddDonationGoalToObsButton" Content="DONATION-OVERLAY IN OBS ANLEGEN" VerticalAlignment="Bottom" Margin="0,0,0,8"/>
                                         </WrapPanel>
                                         <Button x:Name="SaveTwitchGoalsButton" Content="ZIELE SPEICHERN &amp; OVERLAY-DATEN AKTUALISIEREN" HorizontalAlignment="Left" Margin="0,10,0,0"/>
                                     </StackPanel>
@@ -2551,273 +2537,37 @@
                 </Grid.RowDefinitions>
                 <StackPanel>
                     <TextBlock Text="Overlays" FontSize="30" FontWeight="Bold"/>
-                    <TextBlock Text="Standardszenen und frei platzierbare HTML-Content-Module erstellen und direkt in OBS einfügen" Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
+                    <TextBlock Text="Lokaler Webserver für Browserquellen in OBS. Overlay-HTML-Dateien und Live-Daten werden aus dem gewählten Ordner ausgeliefert." Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
                 </StackPanel>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Grid.Row="1" Margin="0,18,0,18">
                     <StackPanel Margin="18">
-                        <TextBlock Text="OVERLAY-PROJEKTE" Foreground="{DynamicResource AccentBrush}" FontSize="17" FontWeight="Bold"/>
-                        <TextBlock Text="Wähle den vorhandenen Overlay-Hauptordner aus. Die Suite verwendet dessen overlay.json und schreibt direkt in data\overlay-data.json. Es wird keine Kopie angelegt und die OBS-Browserquellen bleiben unverändert." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,12"/>
                         <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,0,0,16">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="340"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="Projektbibliothek" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold"/>
-                                    <ListBox x:Name="OverlayProjectList" Height="190" Margin="0,8,0,8" Background="{DynamicResource ListBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource StrongBorderBrush}"/>
-                                    <WrapPanel>
-                                        <Button x:Name="ImportOverlayProjectButton" Content="ORDNER IMPORTIEREN"/>
-                                        <Button x:Name="ImportManagedOverlayButton" Content="VORHANDENES OVERLAY AKTIVIEREN" Background="#416B3C"/>
-                                        <Button x:Name="ImportOverlayFromObsButton" Content="AUS OBS ÜBERNEHMEN"/>
-                                        <Button x:Name="AddOverlaySceneButton" Content="+ SZENE HINZUFÜGEN" Background="#A85F18"/>
-                                        <Button x:Name="DeleteOverlayProjectButton" Content="LÖSCHEN"/>
-                                    </WrapPanel>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock x:Name="OverlayProjectTitleText" Text="Kein Projekt ausgewählt" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="18" FontWeight="Bold"/>
-                                    <TextBlock x:Name="OverlayProjectPathText" Text="" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,8"/>
-                                    <ListBox x:Name="OverlayProjectItemsList" Height="150" Background="{DynamicResource ListBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource StrongBorderBrush}"/>
-                                    <Grid Margin="0,8,0,0">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <TextBlock Text="OBS-Szene" VerticalAlignment="Center"/>
-                                        <ComboBox x:Name="OverlayProjectObsSceneBox" Grid.Column="1"/>
-                                        <TextBlock Text="OBS-Quelle" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                        <TextBox x:Name="OverlayProjectObsSourceBox" Grid.Column="3"/>
-                                    </Grid>
-                                    <WrapPanel Margin="0,10,0,0">
-                                        <Button x:Name="SaveOverlayMappingButton" Content="ZUORDNUNG SPEICHERN"/>
-                                        <Button x:Name="SyncOverlayProjectButton" Content="MIT OBS SYNCHRONISIEREN" Background="#416B3C"/>
-                                        <Button x:Name="OpenOverlayProjectFolderButton" Content="PROJEKTORDNER ÖFFNEN"/>
-                                    </WrapPanel>
-                                    <TextBlock x:Name="OverlayProjectStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                                </StackPanel>
-                            </Grid>
+                            <StackPanel>
+                                <TextBlock Text="Overlay-Webserver" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                <TextBlock Text="OBS-Browserquellen nutzen http://127.0.0.1:&lt;Port&gt;/… statt lokaler Dateien. Live-Daten werden über /ws gepusht." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,10"/>
+                                <CheckBox x:Name="OverlayWebServerEnabledBox" Content="Webserver aktivieren" Margin="0,0,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Port" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="OverlayWebServerPortBox" Grid.Column="1"/>
+                                    <TextBox x:Name="OverlayWebServerUrlBox" Grid.Column="2" IsReadOnly="True" Margin="12,0,0,0"/>
+                                    <Button x:Name="CopyOverlayWebServerUrlButton" Grid.Column="3" Content="URL KOPIEREN" Margin="8,0,0,0"/>
+                                </Grid>
+                                <TextBlock x:Name="OverlayWebServerStatusText" Text="Webserver: –" Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
                         </Border>
-                        <TextBlock Text="STANDARD-OVERLAYS" Foreground="{DynamicResource AccentBrush}" FontSize="17" FontWeight="Bold"/>
-                        <TextBlock Text="Enthalten: Start, Game, Pause, Metaschutz, Reactions und Ende. Die mitgelieferten Beispiel-Overlays werden als lokale HTML-Dateien installiert." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,12"/>
-                        <CheckBox x:Name="UseBundledOverlayBox" Content="Mitgelieferte Standard-Overlays verwenden"/>
                         <TextBlock Text="Overlay-Ordner" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                        <TextBlock Text="Root-Ordner für statische Dateien und die Laufzeit-Daten (data\overlay-data.json)." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                         <DockPanel>
                             <Button x:Name="BrowseOverlayFolderButton" Content="Durchsuchen…" DockPanel.Dock="Right" Margin="8,0,0,0"/>
                             <TextBox x:Name="OverlayRootBox"/>
                         </DockPanel>
-                        <Grid Margin="0,14,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="150"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="150"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Breite" VerticalAlignment="Center"/>
-                            <TextBox x:Name="OverlayWidthBox" Grid.Column="1"/>
-                            <TextBlock Text="Höhe" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                            <TextBox x:Name="OverlayHeightBox" Grid.Column="3"/>
-                        </Grid>
-                        <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,16,0,0">
-                            <StackPanel>
-                                <TextBlock Text="Texte und Schrift" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                <TextBlock Text="Content Name wird automatisch aus dem Streamernamen der Suite übernommen." Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,10"/>
-                                <TextBlock Text="Text Startszene"/>
-                                <TextBox x:Name="OverlayStartTextBox" Margin="0,4,0,8"/>
-                                <TextBlock Text="Text Pauseszene"/>
-                                <TextBox x:Name="OverlayPauseTextBox" Margin="0,4,0,8"/>
-                                <TextBlock Text="Text Endszene"/>
-                                <TextBox x:Name="OverlayEndTextBox" Margin="0,4,0,8"/>
-                                <TextBlock Text="Freier Szenentext (auf jeder Szene nutzbar)"/>
-                                <TextBox x:Name="OverlaySharedTextBox" Margin="0,4,0,10"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="130"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Schriftart" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayFontFamilyBox" Grid.Column="1"/>
-                                    <TextBlock Text="Größe" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    <TextBox x:Name="OverlayFontSizeBox" Grid.Column="3"/>
-                                    <TextBlock Text="Farbe" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    <TextBox x:Name="OverlayFontColorBox" Grid.Column="5"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                        <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,12,0,0">
-                            <StackPanel>
-                                <TextBlock Text="Starttimer" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="160"/>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="80"/>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="80"/>
-                                        <ColumnDefinition Width="100"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Countdown-Zeit (Sekunden)" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayTimerSecondsBox" Grid.Column="1"/>
-                                    <TextBlock Text="Position X" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    <TextBox x:Name="OverlayTimerXBox" Grid.Column="3"/>
-                                    <TextBlock Text="Position Y" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    <TextBox x:Name="OverlayTimerYBox" Grid.Column="5"/>
-                                </Grid>
-                                <TextBlock Text="Der Timer kann in OBS zusätzlich über die Browserquelle frei skaliert und positioniert werden." Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0"/>
-                            </StackPanel>
-                        </Border>
-                        <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,12,0,0">
-                            <StackPanel>
-                                <TextBlock Text="Rahmen" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Rahmenart" VerticalAlignment="Center"/>
-                                    <ComboBox x:Name="OverlayFrameStyleBox" Grid.Column="1">
-                                        <ComboBoxItem Content="Durchgezogen" Tag="Solid"/>
-                                        <ComboBoxItem Content="Gestrichelt" Tag="Dashed"/>
-                                        <ComboBoxItem Content="Doppelt" Tag="Double"/>
-                                        <ComboBoxItem Content="Abgerundet" Tag="Rounded"/>
-                                        <ComboBoxItem Content="Gepunktet" Tag="Dotted"/>
-                                        <ComboBoxItem Content="Neon" Tag="Neon"/>
-                                        <ComboBoxItem Content="Glas" Tag="Glass"/>
-                                        <ComboBoxItem Content="3D" Tag="ThreeD"/>
-                                    </ComboBox>
-                                    <TextBlock Text="Farbe" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    <StackPanel Grid.Column="3" Orientation="Horizontal">
-                                        <Border x:Name="OverlayFrameColorPreview" Width="34" Height="28" CornerRadius="4" BorderBrush="#66737B" BorderThickness="1" Margin="0,0,6,0"/>
-                                        <ComboBox x:Name="OverlayFrameColorPaletteBox" Width="140">
-                                            <ComboBoxItem Content="Orange" Tag="#FF8C00"/>
-                                            <ComboBoxItem Content="Rot" Tag="#FF3B30"/>
-                                            <ComboBoxItem Content="Blau" Tag="#2D9CDB"/>
-                                            <ComboBoxItem Content="Cyan" Tag="#00E5FF"/>
-                                            <ComboBoxItem Content="Lila" Tag="#A855F7"/>
-                                            <ComboBoxItem Content="Grün" Tag="#32D74B"/>
-                                            <ComboBoxItem Content="Weiß" Tag="#FFFFFF"/>
-                                            <ComboBoxItem Content="Schwarz" Tag="#000000"/>
-                                        </ComboBox>
-                                        <TextBox x:Name="OverlayFrameColorBox" Width="105" Margin="6,0,0,0" ToolTip="Eigener HEX-Farbcode"/>
-                                    </StackPanel>
-                                    <TextBlock Text="Effekt" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    <ComboBox x:Name="OverlayFrameEffectBox" Grid.Column="5">
-                                        <ComboBoxItem Content="Kein Effekt" Tag="None"/>
-                                        <ComboBoxItem Content="Leuchten" Tag="Glow"/>
-                                        <ComboBoxItem Content="Pulsieren" Tag="Pulse"/>
-                                        <ComboBoxItem Content="Farbverlauf" Tag="Gradient"/>
-                                        <ComboBoxItem Content="Atemeffekt" Tag="Breathing"/>
-                                        <ComboBoxItem Content="Farbwechsel" Tag="ColorShift"/>
-                                        <ComboBoxItem Content="Regenbogen" Tag="Rainbow"/>
-                                        <ComboBoxItem Content="Lauflicht" Tag="Chase"/>
-                                        <ComboBoxItem Content="Blinken" Tag="Blink"/>
-                                        <ComboBoxItem Content="Zoom-Puls" Tag="ZoomPulse"/>
-                                        <ComboBoxItem Content="Schatten" Tag="Shadow"/>
-                                    </ComboBox>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                        <WrapPanel Margin="0,14,0,0">
-                            <CheckBox x:Name="EnableLiveStatusWidgetBox" Content="Live + Uhrzeit"/>
-                            <CheckBox x:Name="EnableFollowerGoalWidgetBox" Content="Content Name" Margin="18,0,0,0"/>
-                            <CheckBox x:Name="EnableSpotifyWidgetBox" Content="Spotify-Info" Margin="18,0,0,0"/>
-                            <CheckBox x:Name="EnableEndStatsWidgetBox" Content="Metaschutz-Status" Margin="18,0,0,0"/>
-                            <CheckBox x:Name="EnableReactionWidgetBox" Content="Reactions-Content" Margin="18,0,0,0"/>
-                        </WrapPanel>
-                        <TextBlock Text="Der grüne Button übernimmt ausschließlich vollständige Szenen-HTML-Dateien aus dem ausgewählten Overlay-Pfad. Texte, Timer, Spotify, Streamstats und Rahmen werden nur über „Einzelnes Element in OBS einfügen“ hinzugefügt." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,14,0,0"/>
-                        <WrapPanel Margin="0,16,0,0">
-                            <Button x:Name="InstallOverlayButton" Content="BEISPIEL-STANDARD-OVERLAYS INSTALLIEREN" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
-                            <Button x:Name="OpenOverlayFolderButton" Content="Overlay-Ordner öffnen"/>
-                            <Button x:Name="ValidateOverlayButton" Content="Overlay prüfen"/>
-                            <Button x:Name="InstallObsBrowserSourcesButton" Content="EIGENE OVERLAY-SZENEN AUS PFAD IN OBS EINFÜGEN" Background="#416B3C"/>
-                        </WrapPanel>
-                        <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,14,0,0">
-                            <StackPanel>
-                                <TextBlock Text="Einzelnes Element in OBS einfügen" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                <WrapPanel Margin="0,8,0,0">
-                                    <ComboBox x:Name="OverlayObsSceneTargetBox" Width="220"/>
-                                    <ComboBox x:Name="OverlayContentTypeBox" Width="260" Margin="8,0,0,0">
-                                        <ComboBoxItem Content="Content Name" Tag="content-name"/>
-                                        <ComboBoxItem Content="Freier Szenentext" Tag="scene-text"/>
-                                        <ComboBoxItem Content="Starttimer" Tag="start-timer"/>
-                                        <ComboBoxItem Content="Spotify-Info" Tag="spotify-info"/>
-                                        <ComboBoxItem Content="Live + Uhrzeit" Tag="live-info"/>
-                                        <ComboBoxItem Content="Metaschutz-Status" Tag="meta-status"/>
-                                        <ComboBoxItem Content="Pausentext" Tag="pause-text"/>
-                                        <ComboBoxItem Content="Streamstats · aktuelle Session" Tag="stream-stats"/>
-                                        <ComboBoxItem Content="Reactions · Titel" Tag="reaction-title"/>
-                                        <ComboBoxItem Content="Reactions · Webcam-Rahmen" Tag="reaction-frame"/>
-                                        <ComboBoxItem Content="Reactions · Hinweistext" Tag="reaction-text"/>
-                                        <ComboBoxItem Content="Rahmen" Tag="frame"/>
-                                    </ComboBox>
-                                    <Button x:Name="InstallSelectedOverlayContentButton" Content="IN OBS EINFÜGEN" Margin="8,0,0,0"/>
-                                </WrapPanel>
-                            </StackPanel>
-                        </Border>
                         <TextBlock x:Name="OverlayStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-
-                        <TextBlock Text="STREAMER-HUD (NUR LOKAL)" Foreground="{DynamicResource AccentBrush}" FontSize="17" FontWeight="Bold" Margin="0,24,0,0"/>
-                        <TextBlock Text="Persönliches HUD über dem Spielmonitor (Chat, Events, Live-Status). Erscheint nicht im Stream (Capture-Exclude). Keine Game-Injection. Empfohlen: Borderless Windowed." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,12"/>
-                        <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,0,0,0">
-                            <StackPanel>
-                                <CheckBox x:Name="StreamerHudEnabledBox" Content="HUD aktiv"/>
-                                <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Monitor" VerticalAlignment="Center"/>
-                                    <ComboBox x:Name="StreamerHudMonitorBox" Grid.Column="1"/>
-                                    <TextBlock Text="Position" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    <ComboBox x:Name="StreamerHudAnchorBox" Grid.Column="3">
-                                        <ComboBoxItem Content="Oben links" Tag="TopLeft"/>
-                                        <ComboBoxItem Content="Oben rechts" Tag="TopRight"/>
-                                        <ComboBoxItem Content="Unten links" Tag="BottomLeft"/>
-                                        <ComboBoxItem Content="Unten rechts" Tag="BottomRight"/>
-                                    </ComboBox>
-                                </Grid>
-                                <WrapPanel Margin="0,12,0,0">
-                                    <CheckBox x:Name="StreamerHudShowChatBox" Content="Chat"/>
-                                    <CheckBox x:Name="StreamerHudShowEventsBox" Content="Events" Margin="18,0,0,0"/>
-                                    <CheckBox x:Name="StreamerHudShowLiveStatusBox" Content="Live-Status" Margin="18,0,0,0"/>
-                                    <CheckBox x:Name="StreamerHudClickThroughBox" Content="Click-through" Margin="18,0,0,0"/>
-                                </WrapPanel>
-                                <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="70"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Deckkraft" VerticalAlignment="Center"/>
-                                    <Slider x:Name="StreamerHudOpacitySlider" Grid.Column="1" Minimum="0.3" Maximum="1.0" TickFrequency="0.05" IsSnapToTickEnabled="True" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="StreamerHudOpacityValueText" Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{DynamicResource MutedBrush}"/>
-                                </Grid>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="120"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Breite" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="StreamerHudPanelWidthBox" Grid.Column="1"/>
-                                    <TextBlock Text="Rand (px)" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    <TextBox x:Name="StreamerHudMarginBox" Grid.Column="3"/>
-                                </Grid>
-                                <WrapPanel Margin="0,14,0,0">
-                                    <Button x:Name="StreamerHudPreviewButton" Content="VORSCHAU ANZEIGEN" Background="#416B3C"/>
-                                    <Button x:Name="StreamerHudHideButton" Content="AUSBLENDEN" Margin="8,0,0,0"/>
-                                </WrapPanel>
-                                <TextBlock x:Name="StreamerHudStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                            </StackPanel>
-                        </Border>
                     </StackPanel>
                 </ScrollViewer>
                 <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
@@ -3184,22 +2934,6 @@
                                 <TextBlock x:Name="ThemeDescriptionText" Text="" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                 <TextBlock x:Name="ThemeLicenseHintText" Text="" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
                                 <Separator Margin="0,18,0,14"/>
-                                <TextBlock Text="Overlay-Projektdatei (overlay.json)" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
-                                <TextBlock Text="Beim Erstellen oder Importieren eines Overlay-Projekts legt die Suite automatisch eine overlay.json an. Hier kannst du die aktive JSON-Datei sehen, den Pfad ändern oder eine eigene overlay.json auswählen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,6,0,8"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="OverlayManifestPathBox" Foreground="{DynamicResource TextPrimaryBrush}" Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource StrongBorderBrush}"/>
-                                    <Button x:Name="BrowseOverlayManifestButton" Grid.Column="1" Content="JSON AUSWÄHLEN" Margin="8,0,0,0"/>
-                                </Grid>
-                                <WrapPanel Margin="0,8,0,0">
-                                    <Button x:Name="CreateOverlayManifestButton" Content="NEUE OVERLAY.JSON ANLEGEN" Margin="0,0,8,0"/>
-                                    <Button x:Name="OpenOverlayManifestButton" Content="DATEIÖRTNER ÖFFNEN"/>
-                                </WrapPanel>
-                                <TextBlock x:Name="OverlayManifestStatusText" Text="Noch keine overlay.json ausgewählt." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                                <Separator Margin="0,18,0,14"/>
                                 <TextBlock Text="Verbindungsüberwachung" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
                                 <CheckBox x:Name="ConnectionWatchdogEnabledBox" Content="Verbindungen automatisch überwachen und bei Abbruch wiederherstellen" Margin="0,10,0,0"/>
                                 <TextBlock Text="Prüfintervall in Sekunden" Foreground="{DynamicResource AccentBrush}" Margin="0,12,0,6"/>
@@ -3361,6 +3095,32 @@
                                         Margin="0,10,0,0"
                                         Padding="14,6"/>
                                 <CheckBox x:Name="TwitchEventSubEnabledBox" Content="Follower, Subs, Raids und Cheers empfangen" Margin="0,8,0,0"/>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Userliste &amp; Live-Daten" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Die Zuschauerzahl kommt von der Streams-API und bleibt unabhängig aktuell. Die Userliste sind Chat-Verbundene und wird adaptiv aktualisiert."
+                                                   Foreground="{DynamicResource MutedBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,8,0,0"/>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="Userliste-Aktualisierung unter Schwelle (Sekunden)" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="TwitchChattersRefreshLowBox" Grid.Column="1" Width="70" Margin="12,0,0,0" ToolTip="5–120 Sekunden"/>
+                                            <TextBlock Grid.Row="1" Text="Userliste-Aktualisierung ab Schwelle (Sekunden)" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                            <TextBox x:Name="TwitchChattersRefreshHighBox" Grid.Row="1" Grid.Column="1" Width="70" Margin="12,10,0,0" ToolTip="15–600 Sekunden"/>
+                                            <TextBlock Grid.Row="2" Text="Zuschauer-Schwelle für langsamere Userliste" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                            <TextBox x:Name="TwitchChattersRefreshThresholdBox" Grid.Row="2" Grid.Column="1" Width="70" Margin="12,10,0,0" ToolTip="Ab dieser Zuschauerzahl gilt das langsamere Intervall"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
                                 <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
                                     <StackPanel>
                                         <TextBlock Text="Twitch-Autorisierung" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
@@ -4154,7 +3914,7 @@
                 </WrapPanel>
                 <TabControl Grid.Row="2" Background="{DynamicResource SettingsTabBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}">
                     <TabItem Header="Module">
-                        <DataGrid x:Name="DiagnosticsGrid" AutoGenerateColumns="True" IsReadOnly="True" Background="{DynamicResource InputAltBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <diag:DiagnosticsPageView x:Name="DiagnosticsModuleView"/>
                     </TabItem>
                     <TabItem Header="Konfiguration">
                         <DataGrid x:Name="ValidationGrid" AutoGenerateColumns="True" IsReadOnly="True" Background="{DynamicResource InputAltBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -4390,44 +4150,7 @@
                 </Grid>
             </Grid>
             <Grid x:Name="ProfilesPage" Visibility="Collapsed">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <StackPanel>
-                    <TextBlock Text="Profile" FontSize="30" FontWeight="Bold"/>
-                    <TextBlock Text="Komplette Konfigurationen für RP, Just Chatting, Reactions und weitere Stream-Arten." Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
-                </StackPanel>
-                <Grid Grid.Row="1" Margin="0,18,0,18">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="360"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12">
-                        <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Gespeicherte Profile" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" Margin="0,0,0,10"/>
-                            <ListBox x:Name="ProfilesList" Background="{DynamicResource WindowBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="Name"/>
-                        </DockPanel>
-                    </Border>
-                    <Border Grid.Column="1" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="16,0,0,0">
-                        <StackPanel>
-                            <TextBlock Text="Profil bearbeiten" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                            <TextBlock Text="Name" Margin="0,14,0,6"/>
-                            <TextBox x:Name="ProfileNameBox"/>
-                            <TextBlock Text="Beschreibung" Margin="0,14,0,6"/>
-                            <TextBox x:Name="ProfileDescriptionBox" Height="90" AcceptsReturn="True" TextWrapping="Wrap"/>
-                            <TextBlock x:Name="ProfileStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,14,0,0"/>
-                        </StackPanel>
-                    </Border>
-                </Grid>
-                <WrapPanel Grid.Row="2">
-                    <Button x:Name="CreateProfileButton" Content="Aktuelle Einstellungen als Profil speichern" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
-                    <Button x:Name="ApplyProfileButton" Content="Profil anwenden"/>
-                    <Button x:Name="ExportProfileButton" Content="Exportieren"/>
-                    <Button x:Name="ImportProfileButton" Content="Importieren"/>
-                    <Button x:Name="DeleteProfileButton" Content="Löschen" Background="#7A3838"/>
-                </WrapPanel>
+                <profiles:ProfilesPageView x:Name="ProfilesPageViewHost"/>
             </Grid>
             <Grid x:Name="MultiPcPage" Visibility="Collapsed">
                 <Grid.RowDefinitions>
@@ -4510,7 +4233,7 @@
                             <TextBox x:Name="MultiPcRemoteObsPortBox" Text="4455" Margin="0,5,0,0"/><PasswordBox x:Name="MultiPcRemoteObsPasswordBox" Margin="0,5,0,0"/>
                             <Button x:Name="MultiPcSaveAgentSettingsButton" Content="AGENT-EINSTELLUNGEN SPEICHERN" Margin="0,6,0,0"/>
                             <TextBlock Text="REMOTE-DATEIEN UND DIAGNOSE" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="13" Margin="0,12,0,5"/>
-                            <WrapPanel><Button x:Name="MultiPcLoadAgentLogsButton" Content="AGENT-LOGS LADEN" Margin="0,0,6,6"/><Button x:Name="MultiPcDeployOverlayButton" Content="OVERLAY-ZIP VERTEILEN" Margin="0,0,6,6"/><Button x:Name="MultiPcStageUpdateButton" Content="UPDATE-ZIP BEREITSTELLEN" Margin="0,0,6,6" Background="#6B4A1F"/></WrapPanel>
+                            <WrapPanel><Button x:Name="MultiPcLoadAgentLogsButton" Content="AGENT-LOGS LADEN" Margin="0,0,6,6"/><Button x:Name="MultiPcStageUpdateButton" Content="UPDATE-ZIP BEREITSTELLEN" Margin="0,0,6,6" Background="#6B4A1F"/></WrapPanel>
                             <TextBlock Text="REMOTE-UPDATE" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="13" Margin="0,8,0,5"/>
                             <TextBlock x:Name="MultiPcUpdateStatusText" Text="Kein Update-Status geladen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
                             <CheckBox x:Name="MultiPcRestartSuiteAfterUpdateCheckBox" Content="Suite nach Update neu starten" IsChecked="True" Margin="0,6,0,0"/>
@@ -4539,11 +4262,7 @@
                 </Grid>
             </Grid>
             <Grid x:Name="AboutPage" Visibility="Collapsed">
-                <StackPanel>
-                    <TextBlock Text="Über das Programm" FontSize="30" FontWeight="Bold"/>
-                    <TextBlock Text="Creator Control Suite 2.0.83" Foreground="{DynamicResource AccentBrush}" Margin="0,12,0,0"/>
-                    <TextBlock Text="Professionelle Streaming-Steuerzentrale für OBS, Twitch, Spotify, Alerts, Overlays und Stream Deck." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                </StackPanel>
+                <about:AboutPageView x:Name="AboutPageViewHost"/>
             </Grid>
         </Grid>
         </Grid>

@@ -5,7 +5,7 @@ using System.Windows.Threading;
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Modules.Twitch.Models;
 
-namespace CreatorControlSuite.App;
+namespace CreatorControlSuite.App.Views.Dialogs;
 
 public partial class StreamEndDialogWindow : Window
 {

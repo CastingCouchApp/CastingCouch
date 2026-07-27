@@ -12,8 +12,12 @@ using CreatorControlSuite.App.Core.Eventing;
 using CreatorControlSuite.App.Modules;
 using CreatorControlSuite.App.Mvvm;
 using CreatorControlSuite.App.Services;
+using CreatorControlSuite.App.Services.CreatorIntelligence;
 using CreatorControlSuite.App.Themes;
 using CreatorControlSuite.App.ViewModels;
+using CreatorControlSuite.App.ViewModels.Pages;
+using CreatorControlSuite.App.Views.Dialogs;
+using CreatorControlSuite.App.Shell;
 using CreatorControlSuite.Core.Automation;
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Core.Diagnostics;
@@ -126,7 +130,6 @@ public partial class App : Application
                     services.AddSingleton<ExternalAlertActivityService>();
                     services.AddSingleton<IIpcCommandRouter, AppIpcCommandRouter>();
                     services.AddSingleton<ILocalIpcServer, NamedPipeIpcServer>();
-                    services.AddSingleton<ObsBrowserSourceInstaller>();
 
                     services.AddSingleton<ILegalConsentService>(new LegalConsentService(Path.Combine(localAppData, "legal-consent.json"), Path.Combine(AppContext.BaseDirectory, "Legal")));
 
@@ -197,7 +200,18 @@ public partial class App : Application
                     services.AddSingleton<IStreamerBotClient, StreamerBotClient>();
                     services.AddSingleton<IMusicPlayerUiPresenter, MusicPlayerUiPresenter>();
                     services.AddSingleton<INavigationService, NavigationService>();
+                    services.AddSingleton<CreatorIntelligenceService>();
                     services.AddSingleton<DiagnosticsPageViewModel>();
+                    services.AddSingleton<IPageViewModel>(sp => sp.GetRequiredService<DiagnosticsPageViewModel>());
+                    services.AddSingleton<ProfilesPageViewModel>();
+                    services.AddSingleton<IPageViewModel>(sp => sp.GetRequiredService<ProfilesPageViewModel>());
+                    services.AddSingleton<AboutPageViewModel>();
+                    services.AddSingleton<IPageViewModel>(sp => sp.GetRequiredService<AboutPageViewModel>());
+                    services.AddSingleton<MusicPlayerPageViewModel>();
+                    services.AddSingleton<IPageViewModel>(sp => sp.GetRequiredService<MusicPlayerPageViewModel>());
+                    services.AddSingleton<CreatorIntelligenceSectionViewModel>();
+                    services.AddSingleton<PageNavigationCoordinator>();
+                    services.AddSingleton<TimedAutomationTickPublisher>();
                     services.AddSingleton<AppEventBridge>();
 
                     services.AddSingleton<IThemeService, ThemeService>();
@@ -207,6 +221,8 @@ public partial class App : Application
                 .Build();
 
             await _host.StartAsync();
+            _ = _host.Services.GetRequiredService<PageNavigationCoordinator>();
+            _host.Services.GetRequiredService<TimedAutomationTickPublisher>().Start();
             _host.Services.GetRequiredService<AppEventBridge>().Start();
 
             try
@@ -312,7 +328,7 @@ public partial class App : Application
                 var wizard = new FirstRunWindow(
                     _host.Services.GetRequiredService<ISettingsStore>(),
                     firstRunService,
-                    _host.Services.GetRequiredService<OverlayModule>());
+                    _host.Services.GetRequiredService<CreatorControlSuite.Modules.Overlay.OverlayModule>());
 
                 bool? result = wizard.ShowDialog();
 
@@ -325,7 +341,7 @@ public partial class App : Application
                 MainWindow.Show();
 
                 if (wizard.OpenSettingsAfterCompletion &&
-                    MainWindow is CreatorControlSuite.App.MainWindow mainWindow)
+                    MainWindow is MainWindow mainWindow)
                 {
                     mainWindow.OpenSettingsPage();
                 }

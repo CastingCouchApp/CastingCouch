@@ -3,7 +3,7 @@ using CreatorControlSuite.App.Mvvm;
 using CreatorControlSuite.Core.Diagnostics;
 using CreatorControlSuite.Core.Modules;
 
-namespace CreatorControlSuite.App.ViewModels;
+namespace CreatorControlSuite.App.ViewModels.Pages;
 
 public sealed class DiagnosticsPageViewModel : ViewModelBase, IPageViewModel
 {

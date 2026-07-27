@@ -4,7 +4,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using CreatorControlSuite.Modules.Twitch.Models;
 
-namespace CreatorControlSuite.App;
+namespace CreatorControlSuite.App.Views.Dialogs;
 
 public partial class TwitchChannelEditorWindow : Window
 {

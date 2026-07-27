@@ -1,0 +1,9 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.About.AboutPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <TextBlock Text="{Binding Title}" FontSize="30" FontWeight="Bold"/>
+        <TextBlock Text="{Binding VersionText}" Foreground="{DynamicResource AccentBrush}" Margin="0,12,0,0"/>
+        <TextBlock Text="{Binding Description}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+    </StackPanel>
+</UserControl>

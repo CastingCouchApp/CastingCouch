@@ -1,6 +1,6 @@
 using System.Windows;
 using CreatorControlSuite.Core.Legal;
-namespace CreatorControlSuite.App;
+namespace CreatorControlSuite.App.Views.Dialogs;
 
 public partial class LegalConsentWindow : Window
 {

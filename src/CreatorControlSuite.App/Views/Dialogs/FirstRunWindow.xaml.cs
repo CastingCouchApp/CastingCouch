@@ -3,7 +3,7 @@ using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Core.Setup;
 using CreatorControlSuite.Modules.Overlay;
 
-namespace CreatorControlSuite.App;
+namespace CreatorControlSuite.App.Views.Dialogs;
 
 public partial class FirstRunWindow : Window
 {
@@ -59,8 +59,7 @@ public partial class FirstRunWindow : Window
         PauseSceneBox.Text = settings.Obs.PauseScene;
         EndSceneBox.Text = settings.Obs.EndScene;
         OverlayRootBox.Text = settings.Overlay.RootPath;
-        InstallBundledOverlayBox.IsChecked =
-            settings.Overlay.UseBundledOverlay;
+        InstallBundledOverlayBox.IsChecked = false;
     }
 
     private async Task MoveNextAsync()
@@ -228,14 +227,10 @@ public partial class FirstRunWindow : Window
         settings.Overlay.RootPath =
             OverlayRootBox.Text.Trim();
 
-        settings.Overlay.UseBundledOverlay =
-            InstallBundledOverlayBox.IsChecked == true;
-
         await _settingsStore.SaveAsync(settings);
 
-        if (settings.Overlay.UseBundledOverlay)
+        if (InstallBundledOverlayBox.IsChecked == true)
         {
-            await _overlayModule.Service.InstallBundledOverlayAsync();
             await _overlayModule.Service.InitializeAsync();
         }
 

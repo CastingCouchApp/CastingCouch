@@ -2,47 +2,60 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
-namespace CreatorControlSuite.App.Hud;
+namespace CreatorControlSuite.App.Helpers;
 
 internal static class NativeWindowHelper
 {
-    private const uint WdaExcludeFromCapture = 0x11;
-    private const int GwlExstyle = -20;
-    private const int WsExTransparent = 0x00000020;
-    private const int WsExLayered = 0x00080000;
-    private const int WsExToolwindow = 0x00000080;
-    private const int WsExNoactivate = 0x08000000;
+    private const int WmGetMinMaxInfo = 0x0024;
+    private const int MonitorDefaultToNearest = 2;
 
     public readonly record struct MonitorInfo(int Index, string Name, Rect BoundsDip, bool IsPrimary);
 
-    public static void ExcludeFromCapture(Window window)
+    /// <summary>
+    /// Verhindert, dass ein Window mit WindowStyle="None" beim Maximieren die Taskleiste überdeckt,
+    /// indem WM_GETMINMAXINFO auf den Arbeitsbereich des aktuellen Monitors begrenzt wird.
+    /// </summary>
+    public static void RestrictMaximizeToWorkArea(Window window)
     {
-        nint hwnd = new WindowInteropHelper(window).EnsureHandle();
-        SetWindowDisplayAffinity(hwnd, WdaExcludeFromCapture);
+        window.SourceInitialized += (_, _) =>
+        {
+            nint handle = new WindowInteropHelper(window).Handle;
+            HwndSource.FromHwnd(handle)?.AddHook(WindowProc);
+        };
     }
 
-    public static void ApplyToolWindowStyles(Window window)
+    private static IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        nint hwnd = new WindowInteropHelper(window).EnsureHandle();
-        long style = GetWindowLongPtr(hwnd, GwlExstyle).ToInt64();
-        style |= WsExToolwindow | WsExNoactivate | WsExLayered;
-        SetWindowLongPtr(hwnd, GwlExstyle, new IntPtr(style));
+        if (msg == WmGetMinMaxInfo)
+        {
+            ApplyWorkAreaToMinMaxInfo(hwnd, lParam);
+            handled = true;
+        }
+
+        return IntPtr.Zero;
     }
 
-    public static void SetClickThrough(Window window, bool enabled)
+    private static void ApplyWorkAreaToMinMaxInfo(IntPtr hwnd, IntPtr lParam)
     {
-        nint hwnd = new WindowInteropHelper(window).EnsureHandle();
-        long style = GetWindowLongPtr(hwnd, GwlExstyle).ToInt64();
-        if (enabled)
+        var minMaxInfo = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+
+        IntPtr monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitor != IntPtr.Zero)
         {
-            style |= WsExTransparent | WsExLayered;
-        }
-        else
-        {
-            style &= ~WsExTransparent;
+            var monitorInfo = new MonitorInfoNative { Size = Marshal.SizeOf<MonitorInfoNative>() };
+            if (GetMonitorInfo(monitor, ref monitorInfo))
+            {
+                RectNative workArea = monitorInfo.Work;
+                RectNative monitorArea = monitorInfo.Monitor;
+
+                minMaxInfo.MaxPosition.X = workArea.Left - monitorArea.Left;
+                minMaxInfo.MaxPosition.Y = workArea.Top - monitorArea.Top;
+                minMaxInfo.MaxSize.X = workArea.Right - workArea.Left;
+                minMaxInfo.MaxSize.Y = workArea.Bottom - workArea.Top;
+            }
         }
 
-        SetWindowLongPtr(hwnd, GwlExstyle, new IntPtr(style));
+        Marshal.StructureToPtr(minMaxInfo, lParam, true);
     }
 
     public static IReadOnlyList<MonitorInfo> GetMonitors()
@@ -116,7 +129,7 @@ internal static class NativeWindowHelper
     }
 
     [DllImport("user32.dll")]
-    private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, int flags);
 
     [DllImport("user32.dll")]
     private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr clip, MonitorEnumProc callback, IntPtr data);
@@ -127,25 +140,24 @@ internal static class NativeWindowHelper
     [DllImport("Shcore.dll")]
     private static extern int GetDpiForMonitor(IntPtr hMonitor, int dpiType, out uint dpiX, out uint dpiY);
 
-    private static IntPtr GetWindowLongPtr(IntPtr hwnd, int index)
-        => IntPtr.Size == 8 ? GetWindowLongPtr64(hwnd, index) : new IntPtr(GetWindowLong32(hwnd, index));
-
-    private static IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr value)
-        => IntPtr.Size == 8 ? SetWindowLongPtr64(hwnd, index, value) : new IntPtr(SetWindowLong32(hwnd, index, value.ToInt32()));
-
-    [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
-    private static extern int GetWindowLong32(IntPtr hwnd, int index);
-
-    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
-    private static extern IntPtr GetWindowLongPtr64(IntPtr hwnd, int index);
-
-    [DllImport("user32.dll", EntryPoint = "SetWindowLong")]
-    private static extern int SetWindowLong32(IntPtr hwnd, int index, int value);
-
-    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
-    private static extern IntPtr SetWindowLongPtr64(IntPtr hwnd, int index, IntPtr value);
-
     private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, IntPtr lprcMonitor, IntPtr data);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PointNative
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public PointNative Reserved;
+        public PointNative MaxSize;
+        public PointNative MaxPosition;
+        public PointNative MinTrackSize;
+        public PointNative MaxTrackSize;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RectNative

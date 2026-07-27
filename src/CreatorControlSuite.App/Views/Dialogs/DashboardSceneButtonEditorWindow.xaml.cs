@@ -5,7 +5,7 @@ using System.Windows.Media.Imaging;
 using CreatorControlSuite.Core.Configuration;
 using Microsoft.Win32;
 
-namespace CreatorControlSuite.App;
+namespace CreatorControlSuite.App.Views.Dialogs;
 
 public partial class DashboardSceneButtonEditorWindow : Window
 {

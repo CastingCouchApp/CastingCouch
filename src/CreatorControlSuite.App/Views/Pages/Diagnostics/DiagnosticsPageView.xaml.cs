@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-namespace CreatorControlSuite.App.Views;
+namespace CreatorControlSuite.App.Views.Pages.Diagnostics;
 
 public partial class DiagnosticsPageView : UserControl
 {

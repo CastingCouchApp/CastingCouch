@@ -3,7 +3,7 @@ using System.Windows;
 using CreatorControlSuite.App.Twitch;
 using Microsoft.Web.WebView2.Core;
 
-namespace CreatorControlSuite.App;
+namespace CreatorControlSuite.App.Views.Dialogs;
 
 public partial class TwitchWebLoginWindow : Window
 {
