@@ -1,4 +1,4 @@
-namespace CreatorControlSuite.Core.Configuration;
+﻿namespace CreatorControlSuite.Core.Configuration;
 
 public sealed class AppSettings
 {
@@ -122,6 +122,13 @@ public sealed class TwitchSettings
     public StreamEndMode StreamEndMode { get; set; } = StreamEndMode.EndSceneThenStop;
 
     public int RaidCountdownSeconds { get; set; } = 90;
+
+    /// <summary>
+    /// How long after the end scene the app keeps polling/retrying Start Raid
+    /// before finishing the stream without a raid.
+    /// </summary>
+    public int RaidStartTimeoutSeconds { get; set; } = 120;
+
     public bool StopStreamAfterRaid { get; set; } = true;
     public bool StopSpotifyAfterRaid { get; set; } = true;
     public int PlannedStreamEndSeconds { get; set; }

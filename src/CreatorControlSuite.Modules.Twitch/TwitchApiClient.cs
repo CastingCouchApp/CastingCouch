@@ -319,7 +319,8 @@ public sealed class TwitchApiClient(HttpClient httpClient) : ITwitchApiClient
             "raids?from_broadcaster_id=" + Uri.EscapeDataString(fromBroadcasterId) +
             "&to_broadcaster_id=" + Uri.EscapeDataString(toBroadcasterId),
             body: null,
-            cancellationToken);
+            cancellationToken,
+            TwitchRaidErrorMapper.FormatStartRaidError);
     }
 
     public async Task CancelRaidAsync(
@@ -330,7 +331,8 @@ public sealed class TwitchApiClient(HttpClient httpClient) : ITwitchApiClient
             HttpMethod.Delete,
             "raids?broadcaster_id=" + Uri.EscapeDataString(broadcasterId),
             body: null,
-            cancellationToken);
+            cancellationToken,
+            TwitchRaidErrorMapper.FormatCancelRaidError);
     }
 
     public async Task<int> GetFollowerCountAsync(
@@ -611,7 +613,8 @@ public sealed class TwitchApiClient(HttpClient httpClient) : ITwitchApiClient
         HttpMethod method,
         string relativeUrl,
         object? body,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<System.Net.HttpStatusCode, string, string>? errorFormatter = null)
     {
         EnsureConfigured();
 
@@ -641,11 +644,15 @@ public sealed class TwitchApiClient(HttpClient httpClient) : ITwitchApiClient
         {
             string text = await response.Content.ReadAsStringAsync(
                 cancellationToken);
+            System.Net.HttpStatusCode statusCode = response.StatusCode;
 
             response.Dispose();
 
-            throw new InvalidOperationException(
-                $"Twitch API {(int)response.StatusCode}: {text}");
+            string message = errorFormatter is not null
+                ? errorFormatter(statusCode, text)
+                : $"Twitch API {(int)statusCode}: {text}";
+
+            throw new InvalidOperationException(message);
         }
 
         return response;

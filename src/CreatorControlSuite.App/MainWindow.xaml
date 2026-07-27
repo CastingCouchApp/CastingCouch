@@ -1810,6 +1810,12 @@
                                             <TextBox x:Name="ServicesTwitchRaidCountdownSecondsBox" Width="70" Margin="8,0"/>
                                             <TextBlock Text="Sekunden (Twitch normalerweise 90)" VerticalAlignment="Center"/>
                                         </WrapPanel>
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <TextBlock Text="Auto-Raid Timeout" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="ServicesTwitchRaidStartTimeoutSecondsBox" Width="70" Margin="8,0"
+                                                     ToolTip="Nach der Endszene: wie lange Ziel-Status gepollt und StartRaid wiederholt wird, bevor ohne Raid beendet wird."/>
+                                            <TextBlock Text="Sekunden (Polling/Retry nach Endszene)" VerticalAlignment="Center"/>
+                                        </WrapPanel>
                                         <CheckBox x:Name="ServicesTwitchStopStreamAfterRaidBox" Content="Stream nach dem Raid automatisch beenden" Margin="0,8,0,0"/>
                                         <CheckBox x:Name="ServicesTwitchStopSpotifyAfterRaidBox" Content="Spotify nach dem Raid pausieren" Margin="0,5,0,0"/>
                                         <WrapPanel Margin="0,10,0,0">
