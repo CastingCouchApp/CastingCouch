@@ -1,5 +1,6 @@
 :root {
   --chat-font: "Segoe UI", system-ui, sans-serif;
+  --chat-font-size: 18px;
   --chat-text: #f5f5f5;
   --chat-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
   --chat-emote-size: 28px;
@@ -70,7 +71,7 @@ html, body {
 .line {
   display: block;
   line-height: 1.35;
-  font-size: 18px;
+  font-size: var(--chat-font-size);
   font-weight: 600;
   text-shadow: var(--chat-shadow);
   word-wrap: break-word;
@@ -113,5 +114,5 @@ html, body {
 .status {
   opacity: 0.7;
   font-weight: 500;
-  font-size: 14px;
+  font-size: calc(var(--chat-font-size) * 0.78);
 }

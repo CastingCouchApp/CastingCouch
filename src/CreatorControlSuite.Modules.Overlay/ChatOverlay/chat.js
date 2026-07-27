@@ -1,6 +1,7 @@
 (() => {
   const root = document.getElementById("chat");
   const maxLines = 80;
+  const seenMessageIds = new Set();
   const eventTypes = new Set([
     "channel.follow",
     "channel.subscribe",
@@ -43,12 +44,21 @@
     const radius = Math.max(0, Number(config.borderRadiusPx ?? 12));
     const gap = Math.max(0, Number(config.gapPx ?? 6));
     const color = String(config.backgroundColor || "#000000");
+    const fontSize = Math.min(72, Math.max(8, Number(config.fontSizePx ?? 18) || 18));
+    const fontFamily = String(config.fontFamily || "Segoe UI, system-ui, sans-serif").trim()
+      || "Segoe UI, system-ui, sans-serif";
 
     panel.style.setProperty("--chat-padding", `${padding}px`);
     panel.style.setProperty("--chat-radius", `${radius}px`);
     panel.style.setProperty("--chat-gap", `${gap}px`);
     panel.style.setProperty("--chat-bg-opacity", String(opacity));
     panel.style.setProperty("--chat-bg-color", color);
+    panel.style.setProperty("--chat-font-size", `${fontSize}px`);
+    panel.style.setProperty("--chat-font", fontFamily);
+    panel.style.setProperty("--chat-emote-size", `${Math.round(fontSize * 1.55)}px`);
+    panel.style.setProperty("--chat-badge-size", `${Math.round(fontSize)}px`);
+    document.documentElement.style.setProperty("--chat-font", fontFamily);
+    document.documentElement.style.setProperty("--chat-font-size", `${fontSize}px`);
 
     panel.classList.remove("has-bg", "bg-image");
     if (type === "Color") {
@@ -114,15 +124,30 @@
 
   function trimLines() {
     while (root.children.length > maxLines) {
-      root.removeChild(root.firstChild);
+      const first = root.firstChild;
+      if (first && first.dataset && first.dataset.messageId) {
+        seenMessageIds.delete(first.dataset.messageId);
+      }
+      root.removeChild(first);
     }
     root.scrollTop = root.scrollHeight;
   }
 
   function appendMessage(data) {
+    const messageId = data && data.messageId ? String(data.messageId) : "";
+    if (messageId && seenMessageIds.has(messageId)) {
+      return false;
+    }
+    if (messageId) {
+      seenMessageIds.add(messageId);
+    }
+
+    clearStatusIfNeeded();
     const line = document.createElement("div");
     line.className = "line";
-    line.dataset.messageId = data.messageId || "";
+    if (messageId) {
+      line.dataset.messageId = messageId;
+    }
 
     const color = data.color && /^#[0-9a-fA-F]{6}$/.test(data.color)
       ? data.color
@@ -135,9 +160,11 @@
 
     root.appendChild(line);
     trimLines();
+    return true;
   }
 
   function appendEvent(payload) {
+    clearStatusIfNeeded();
     const line = document.createElement("div");
     line.className = "line event";
     line.dataset.eventType = payload.type || "";
@@ -169,7 +196,6 @@
       }
 
       if (payload?.source === "twitch" && payload?.type === "channel.chat.message") {
-        clearStatusIfNeeded();
         appendMessage(payload.data || {});
         return;
       }
@@ -179,7 +205,6 @@
         payload?.source === "twitch" &&
         eventTypes.has(payload?.type)
       ) {
-        clearStatusIfNeeded();
         appendEvent(payload);
       }
     });
@@ -207,6 +232,26 @@
     }
   }
 
+  async function loadHistory() {
+    try {
+      const response = await fetch("/chat/history", { cache: "no-store" });
+      if (!response.ok) {
+        return;
+      }
+      const payload = await response.json();
+      const events = Array.isArray(payload.events) ? payload.events : [];
+      for (const evt of events) {
+        if (evt?.source === "twitch" && evt?.type === "channel.chat.message") {
+          appendMessage(evt.data || {});
+        }
+      }
+    } catch {
+      // optional
+    }
+  }
+
   setStatus("Verbinde…");
-  loadConfig().finally(connect);
+  loadConfig()
+    .then(loadHistory)
+    .finally(connect);
 })();

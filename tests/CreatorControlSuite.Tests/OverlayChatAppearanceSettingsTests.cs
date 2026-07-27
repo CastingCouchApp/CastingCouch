@@ -15,7 +15,9 @@ public sealed class OverlayChatAppearanceSettingsTests
             BorderRadiusPx = -3,
             GapPx = 100,
             BackgroundColor = "  #112233  ",
-            MaxBufferedMessages = 5000
+            MaxBufferedMessages = 5000,
+            FontSizePx = 200,
+            FontFamily = "  Arial  "
         };
 
         chat.NormalizeAppearance();
@@ -27,6 +29,17 @@ public sealed class OverlayChatAppearanceSettingsTests
         Assert.Equal(48, chat.GapPx);
         Assert.Equal("#112233", chat.BackgroundColor);
         Assert.Equal(1000, chat.MaxBufferedMessages);
+        Assert.Equal(72, chat.FontSizePx);
+        Assert.Equal("Arial", chat.FontFamily);
+    }
+
+    [Fact]
+    public void NormalizeAppearance_DefaultsEmptyFontFamily()
+    {
+        var chat = new OverlayChatSettings { FontFamily = "   ", FontSizePx = 3 };
+        chat.NormalizeAppearance();
+        Assert.Equal("Segoe UI, system-ui, sans-serif", chat.FontFamily);
+        Assert.Equal(8, chat.FontSizePx);
     }
 
     [Theory]

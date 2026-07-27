@@ -14,4 +14,13 @@ public sealed class ChatOverlayAssetsTests
         Assert.False(string.IsNullOrWhiteSpace(content));
         Assert.StartsWith(contentTypePrefix, contentType, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void ChatJs_LoadsSessionHistoryAndDedupsByMessageId()
+    {
+        Assert.True(ChatOverlayAssets.TryGet("chat.js", out string js, out _));
+        Assert.Contains("/chat/history", js);
+        Assert.Contains("messageId", js);
+        Assert.Contains("seenMessageIds", js);
+    }
 }

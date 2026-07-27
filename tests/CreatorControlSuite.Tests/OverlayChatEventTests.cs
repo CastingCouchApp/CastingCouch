@@ -105,4 +105,26 @@ public sealed class OverlayChatEventTests
 
         Assert.Empty(hub.GetBufferedChatEvents());
     }
+
+    [Fact]
+    public async Task GetBufferedChatEvents_PreservesSessionOrderForHistoryReplay()
+    {
+        var hub = new OverlayRealtimeHub();
+        hub.ConfigureChatBuffer(10);
+
+        await hub.PublishEventAsync(OverlayEventBridge.FromChatMessage(
+            "m1", "A", "a", "", [], "A: one", DateTimeOffset.UtcNow,
+            [new OverlayChatMessagePart("text", "one")]));
+        await hub.PublishEventAsync(OverlayEventBridge.FromChatMessage(
+            "m2", "B", "b", "", [], "B: two", DateTimeOffset.UtcNow,
+            [new OverlayChatMessagePart("text", "two")]));
+
+        IReadOnlyList<OverlayRealtimeEvent> history = hub.GetBufferedChatEvents();
+        Assert.Equal(["m1", "m2"], history.Select(e => e.Data["messageId"]).ToArray());
+        Assert.All(history, e =>
+        {
+            Assert.Equal("twitch", e.Source);
+            Assert.Equal(OverlayRealtimeHub.ChatMessageType, e.Type);
+        });
+    }
 }
