@@ -4,6 +4,49 @@ using CreatorControlSuite.Modules.Twitch;
 
 namespace CreatorControlSuite.Tests;
 
+public sealed class RaidChatCommandTests
+{
+    [Theory]
+    [InlineData("CoolStreamer", "/raid CoolStreamer")]
+    [InlineData("@CoolStreamer", "/raid CoolStreamer")]
+    [InlineData("  CoolStreamer  ", "/raid CoolStreamer")]
+    public void Format_BuildsSlashRaidCommand(string login, string expected)
+    {
+        Assert.Equal(expected, RaidChatCommand.Format(login));
+    }
+
+    [Fact]
+    public void Format_Empty_Throws()
+    {
+        Assert.Throws<ArgumentException>(() => RaidChatCommand.Format("  "));
+    }
+}
+
+public sealed class RaidCountdownPolicyTests
+{
+    [Fact]
+    public void DecideAfterCancellation_Skip_IsSuccessful()
+    {
+        RaidCountdownOutcome outcome = RaidCountdownPolicy.DecideAfterCancellation(skipRequested: true);
+        Assert.Equal(RaidCountdownOutcome.Skipped, outcome);
+        Assert.True(RaidCountdownPolicy.IsSuccessful(outcome));
+    }
+
+    [Fact]
+    public void DecideAfterCancellation_Cancel_IsNotSuccessful()
+    {
+        RaidCountdownOutcome outcome = RaidCountdownPolicy.DecideAfterCancellation(skipRequested: false);
+        Assert.Equal(RaidCountdownOutcome.Cancelled, outcome);
+        Assert.False(RaidCountdownPolicy.IsSuccessful(outcome));
+    }
+
+    [Fact]
+    public void Completed_IsSuccessful()
+    {
+        Assert.True(RaidCountdownPolicy.IsSuccessful(RaidCountdownOutcome.Completed));
+    }
+}
+
 public sealed class RaidStartPolicyTests
 {
     [Theory]

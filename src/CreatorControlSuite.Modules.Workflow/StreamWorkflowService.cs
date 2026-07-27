@@ -132,57 +132,115 @@ public sealed class StreamWorkflowService(
             || message.Contains("request code 207", StringComparison.OrdinalIgnoreCase);
     }
 
-    public async Task StartCountdownAsync(
+    public Task StartCountdownAsync(
+        CancellationToken cancellationToken = default) =>
+        StartCountdownCoreAsync(null, cancellationToken);
+
+    public Task StartCountdownAsync(
+        int durationSeconds,
+        CancellationToken cancellationToken = default) =>
+        StartCountdownCoreAsync(Math.Max(0, durationSeconds), cancellationToken);
+
+    public async Task StopCountdownAsync(
         CancellationToken cancellationToken = default)
     {
+        _countdownCancellation?.Cancel();
+
+        SetState(
+            StreamPhase.Preparing,
+            "Countdown gestoppt.",
+            State.CurrentScene,
+            0);
+
+        await ClearOverlayCountdownAsync(cancellationToken);
+    }
+
+    private async Task StartCountdownCoreAsync(
+        int? durationSeconds,
+        CancellationToken cancellationToken)
+    {
         AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        int totalSeconds = durationSeconds
+            ?? Math.Max(0, settings.Workflow.StartCountdownSeconds);
 
         _countdownCancellation?.Cancel();
         _countdownCancellation =
             CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken);
 
+        DateTimeOffset endsAt = DateTimeOffset.UtcNow.AddSeconds(totalSeconds);
+        string label = string.IsNullOrWhiteSpace(settings.Workflow.CountdownLabel)
+            ? "Countdown"
+            : settings.Workflow.CountdownLabel.Trim();
+
         SetState(
             StreamPhase.Countdown,
             "Countdown läuft.",
             settings.Obs.StartScene,
-            settings.Workflow.StartCountdownSeconds);
+            totalSeconds);
 
-        for (int remaining = settings.Workflow.StartCountdownSeconds;
-             remaining >= 0;
-             remaining--)
+        try
         {
-            _countdownCancellation.Token.ThrowIfCancellationRequested();
-
-            State = State with
+            for (int remaining = totalSeconds;
+                 remaining >= 0;
+                 remaining--)
             {
-                Phase = StreamPhase.Countdown,
-                CountdownRemainingSeconds = remaining,
-                Detail = "Countdown läuft."
-            };
+                _countdownCancellation.Token.ThrowIfCancellationRequested();
 
-            StateChanged?.Invoke(this, State);
-
-            await _overlay.UpdateAsync(
-                data =>
+                State = State with
                 {
-                    data.Stream.Phase =
-                        StreamPhase.Countdown.ToString();
-                    data.Stream.ElapsedSeconds = remaining;
-                    data.Stream.CurrentScene =
-                        settings.Obs.StartScene;
-                },
-                _countdownCancellation.Token);
+                    Phase = StreamPhase.Countdown,
+                    CountdownRemainingSeconds = remaining,
+                    Detail = "Countdown läuft."
+                };
 
-            if (remaining > 0)
-            {
-                await Task.Delay(
-                    TimeSpan.FromSeconds(1),
+                StateChanged?.Invoke(this, State);
+
+                await _overlay.UpdateAsync(
+                    data =>
+                    {
+                        data.Stream.Phase =
+                            StreamPhase.Countdown.ToString();
+                        data.Stream.ElapsedSeconds = remaining;
+                        data.Stream.CurrentScene =
+                            settings.Obs.StartScene;
+                        data.Countdown.IsRunning = true;
+                        data.Countdown.RemainingSeconds = remaining;
+                        data.Countdown.TotalSeconds = totalSeconds;
+                        data.Countdown.EndsAt = endsAt;
+                        data.Countdown.Label = label;
+                        data.Countdown.Mode = "stream-start";
+                    },
                     _countdownCancellation.Token);
-            }
-        }
 
-        await GoLiveAsync(cancellationToken);
+                if (remaining > 0)
+                {
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(1),
+                        _countdownCancellation.Token);
+                }
+            }
+
+            await ClearOverlayCountdownAsync(cancellationToken);
+            await GoLiveAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // StopCountdownAsync / Reset setzen den Zustand selbst.
+        }
+    }
+
+    private async Task ClearOverlayCountdownAsync(
+        CancellationToken cancellationToken)
+    {
+        await _overlay.UpdateAsync(
+            data =>
+            {
+                data.Countdown.IsRunning = false;
+                data.Countdown.RemainingSeconds = 0;
+                data.Countdown.EndsAt = null;
+            },
+            cancellationToken);
     }
 
     public async Task GoLiveAsync(
@@ -253,6 +311,9 @@ public sealed class StreamWorkflowService(
                         data.Stream.EndedAt = null;
                         data.Stream.CurrentScene =
                             settings.Obs.LiveScene;
+                        data.Countdown.IsRunning = false;
+                        data.Countdown.RemainingSeconds = 0;
+                        data.Countdown.EndsAt = null;
                     },
                     cancellationToken);
 
@@ -408,6 +469,7 @@ public sealed class StreamWorkflowService(
             {
                 data.Stream = new();
                 data.Stats = new();
+                data.Countdown = new();
             },
             cancellationToken);
 

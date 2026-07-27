@@ -48,6 +48,63 @@ public sealed class StreamWorkflowServiceTests
     }
 
     [Fact]
+    public async Task StartCountdownAsync_WritesOverlayCountdownState()
+    {
+        Harness harness = CreateHarness(settings =>
+        {
+            settings.Workflow.StartCountdownSeconds = 2;
+            settings.Workflow.AutoSwitchScenes = false;
+            settings.Workflow.AutoStartObsStream = false;
+            settings.Workflow.AutoFadeSpotifyOnLive = false;
+        });
+
+        Task countdown = harness.Service.StartCountdownAsync();
+        await Task.Delay(50);
+
+        Assert.True(harness.Overlay.Current.Countdown.IsRunning);
+        Assert.Equal(2, harness.Overlay.Current.Countdown.TotalSeconds);
+        Assert.True(harness.Overlay.Current.Countdown.RemainingSeconds >= 0);
+        Assert.NotNull(harness.Overlay.Current.Countdown.EndsAt);
+        Assert.Equal("stream-start", harness.Overlay.Current.Countdown.Mode);
+
+        await countdown;
+
+        Assert.Equal(StreamPhase.Live, harness.Service.State.Phase);
+        Assert.False(harness.Overlay.Current.Countdown.IsRunning);
+        Assert.Equal(0, harness.Overlay.Current.Countdown.RemainingSeconds);
+    }
+
+    [Fact]
+    public async Task StopCountdownAsync_ClearsOverlayCountdownWithoutGoingLive()
+    {
+        Harness harness = CreateHarness(settings =>
+        {
+            settings.Workflow.StartCountdownSeconds = 30;
+            settings.Workflow.AutoSwitchScenes = false;
+            settings.Workflow.AutoStartObsStream = false;
+            settings.Workflow.AutoFadeSpotifyOnLive = false;
+        });
+
+        Task countdown = harness.Service.StartCountdownAsync();
+        await Task.Delay(80);
+        Assert.Equal(StreamPhase.Countdown, harness.Service.State.Phase);
+
+        await harness.Service.StopCountdownAsync();
+        try
+        {
+            await countdown;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        Assert.NotEqual(StreamPhase.Live, harness.Service.State.Phase);
+        Assert.False(harness.Overlay.Current.Countdown.IsRunning);
+        Assert.Equal(0, harness.Overlay.Current.Countdown.RemainingSeconds);
+        Assert.Null(harness.Overlay.Current.Countdown.EndsAt);
+    }
+
+    [Fact]
     public async Task PauseAsync_Then_ResumeAsync_Transitions()
     {
         Harness harness = CreateHarness(settings =>

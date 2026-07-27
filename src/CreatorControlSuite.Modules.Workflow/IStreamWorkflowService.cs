@@ -11,6 +11,8 @@ public interface IStreamWorkflowService
 
     Task PrepareAsync(CancellationToken cancellationToken = default);
     Task StartCountdownAsync(CancellationToken cancellationToken = default);
+    Task StartCountdownAsync(int durationSeconds, CancellationToken cancellationToken = default);
+    Task StopCountdownAsync(CancellationToken cancellationToken = default);
     Task GoLiveAsync(CancellationToken cancellationToken = default);
     Task PauseAsync(CancellationToken cancellationToken = default);
     Task ResumeAsync(CancellationToken cancellationToken = default);

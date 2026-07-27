@@ -1,5 +1,6 @@
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Core.Modules;
+using CreatorControlSuite.Core.Twitch;
 using CreatorControlSuite.Modules.Twitch.Models;
 
 namespace CreatorControlSuite.Modules.Twitch;
@@ -149,8 +150,9 @@ public sealed class TwitchModule(
             throw new InvalidOperationException("Twitch ist nicht verbunden.");
         }
 
+        string login = RaidChatCommand.NormalizeLogin(targetLogin);
         TwitchUser target = await _apiClient.GetUserByLoginAsync(
-            targetLogin.Trim().TrimStart('@'),
+            login,
             cancellationToken)
             ?? throw new InvalidOperationException(
                 "Das ausgewählte Raid-Ziel wurde auf Twitch nicht gefunden.");
@@ -164,10 +166,26 @@ public sealed class TwitchModule(
                 "Der eigene Kanal kann nicht als Raid-Ziel verwendet werden.");
         }
 
+        // Helix StartRaid is the supported equivalent of chat "/raid".
         await _apiClient.StartRaidAsync(
             _channel.BroadcasterId,
             target.Id,
             cancellationToken);
+
+        // Best-effort: also emit "/raid <login>" into chat so the command is visible
+        // (Helix may strip slash-commands; raid already started above).
+        try
+        {
+            await _apiClient.SendChatMessageAsync(
+                _channel.BroadcasterId,
+                _currentUser.Id,
+                RaidChatCommand.Format(target.Login),
+                cancellationToken);
+        }
+        catch
+        {
+            // Raid already started via Helix – chat echo is optional.
+        }
     }
 
     public Task CancelRaidAsync(CancellationToken cancellationToken = default)
