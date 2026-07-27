@@ -35,6 +35,60 @@ public sealed class CanvasOverlayAssetsTests
     }
 
     [Fact]
+    public void CanvasRuntime_RegistersMusicWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("music:", runtime);
+        Assert.Contains("createSpotifyEl", runtime);
+        Assert.Contains("updateSpotify", runtime);
+        Assert.Contains("paintSpotifyProgress", runtime);
+        Assert.Contains("MUSIC_VARIANTS", runtime);
+        Assert.Contains("MUSIC_SIZE_PRESETS", runtime);
+        Assert.Contains("applyMusicVariant", runtime);
+        Assert.Contains("syncMusicMarquee", runtime);
+        Assert.Contains("sizePreset", runtime);
+        Assert.Contains("ccs-music-marquee", runtime);
+        Assert.Contains("ResizeObserver", runtime);
+        Assert.Contains("\"classic\"", runtime);
+        Assert.Contains("\"neon\"", runtime);
+        Assert.Contains("\"vinyl\"", runtime);
+        Assert.Contains("\"hud\"", runtime);
+        Assert.Contains("\"aurora\"", runtime);
+        Assert.Contains("\"ticker\"", runtime);
+        Assert.Contains("\"bubble\"", runtime);
+        Assert.Contains("\"ember\"", runtime);
+        Assert.Contains("Vinyl", runtime);
+        Assert.Contains("Banner", runtime);
+        Assert.Contains("Classic", runtime);
+        Assert.True(System.Text.RegularExpressions.Regex.Matches(runtime, "\"(?:classic|neon|minimal|glass|bold|outline|cyber|soft|solid|gradient|vinyl|hud|pill|stacked|ticker|aurora|mono|retro|bubble|stripe|frost|ember)\"").Count >= 20);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"music\"", editor);
+        Assert.Contains("selectProp(\"variant\"", editor);
+        Assert.Contains("selectProp(\"sizePreset\"", editor);
+        Assert.Contains("MUSIC_VARIANTS", editor);
+        Assert.Contains("MUSIC_SIZE_PRESETS", editor);
+        Assert.Contains("MUSIC_VARIANT_LABELS", editor);
+        Assert.Contains("music-look", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-spotify", styles);
+        Assert.Contains(".ccs-music-marquee", styles);
+        Assert.Contains("ccs-music-marquee-scroll", styles);
+        Assert.Contains("ccs-spotify-v-classic", styles);
+        Assert.Contains("ccs-spotify-v-neon", styles);
+        Assert.Contains("ccs-spotify-v-vinyl", styles);
+        Assert.Contains("ccs-spotify-v-hud", styles);
+        Assert.Contains("ccs-spotify-v-aurora", styles);
+        Assert.Contains("ccs-spotify-v-ticker", styles);
+        Assert.Contains("ccs-spotify-v-bubble", styles);
+        Assert.Contains("ccs-spotify-v-ember", styles);
+        Assert.Contains("--ccs-music-scale", styles);
+        Assert.Contains("container-type", styles);
+        Assert.True(System.Text.RegularExpressions.Regex.Matches(styles, @"ccs-spotify-v-(?:classic|neon|minimal|glass|bold|outline|cyber|soft|solid|gradient|vinyl|hud|pill|stacked|ticker|aurora|mono|retro|bubble|stripe|frost|ember)").Count >= 20);
+    }
+
+    [Fact]
     public void CanvasRuntime_RegistersTextWidget()
     {
         Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));

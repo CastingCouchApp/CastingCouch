@@ -1,10 +1,39 @@
-﻿import type { LayoutItem } from '../types';
+import type { LayoutItem } from '../types';
 import { prop } from '../utils/prop';
 import { escapeHtml } from '../utils/html';
-import { formatClock, formatUptime, formatMs } from '../utils/format';
+import { formatClock, formatUptime } from '../utils/format';
 import { rgbaFrom } from '../utils/color';
 import { SCENE_BG_PRESETS } from '../defaults/scene-bg';
 import { CARD_FRAME_VARIANTS, SHAPE_DEFAULTS } from '../defaults/shapes';
+
+import {
+  createSpotifyEl,
+  updateSpotify,
+  paintSpotifyProgress,
+  applyMusicVariant,
+  applyMusicSize,
+  fitMusic,
+  syncMusicMarquee,
+  resolveMusicState,
+  providerHeading,
+  MUSIC_VARIANTS,
+  MUSIC_SIZE_PRESETS
+} from '../widgets/music';
+
+export {
+  createSpotifyEl,
+  updateSpotify,
+  paintSpotifyProgress,
+  applyMusicVariant,
+  applyMusicSize,
+  fitMusic,
+  syncMusicMarquee,
+  resolveMusicState,
+  providerHeading,
+  MUSIC_VARIANTS,
+  MUSIC_SIZE_PRESETS
+};
+
 export function createOnlineEl(item) {
     const el = document.createElement("div");
     el.className = "ccs-online";
@@ -627,110 +656,6 @@ export function pumpAlert(el, item) {
         pumpAlert(el, item);
       }, 360);
     }, duration);
-  }
-
-export function createSpotifyEl() {
-    const el = document.createElement("div");
-    el.className = "ccs-spotify ccs-music";
-    el.innerHTML =
-      `<div class="ccs-spotify-content">` +
-      `<div class="ccs-spotify-cover"></div>` +
-      `<div class="ccs-spotify-info">` +
-      `<div class="ccs-spotify-topline">` +
-      `<div class="ccs-spotify-heading">MUSIC Â· NOW PLAYING</div>` +
-      `<div class="ccs-spotify-status">SPIELT</div>` +
-      `</div>` +
-      `<div class="ccs-spotify-title">-</div>` +
-      `<div class="ccs-spotify-artist">-</div>` +
-      `<div class="ccs-spotify-album"></div>` +
-      `<div class="ccs-spotify-progress-row">` +
-      `<div class="ccs-spotify-progress-track"><div class="ccs-spotify-progress"></div></div>` +
-      `<div class="ccs-spotify-time">00:00 / 00:00</div>` +
-      `</div></div></div>`;
-    el._progressBase = 0;
-    el._progressAt = Date.now();
-    el._duration = 0;
-    el._playing = false;
-    return el;
-  }
-
-export function resolveMusicState(data) {
-    const music = (data && data.music) || {};
-    const spotify = (data && data.spotify) || {};
-    // music hat Vorrang, wenn vorhanden; sonst spotify (DenverJohn-KompatibilitÃ¤t)
-    const hasMusic = music && (music.title || music.artist || music.connected === true || music.provider);
-    return hasMusic ? music : spotify;
-  }
-
-export function providerHeading(music) {
-    const name = (music.providerDisplayName || "").trim();
-    if (name) {
-      return name.toUpperCase() + " Â· NOW PLAYING";
-    }
-    const id = (music.provider || "").toLowerCase();
-    if (id === "ytmusic") {
-      return "YOUTUBE MUSIC Â· NOW PLAYING";
-    }
-    if (id === "spotify") {
-      return "SPOTIFY Â· NOW PLAYING";
-    }
-    return "MUSIC Â· NOW PLAYING";
-  }
-
-export function updateSpotify(el, item, data) {
-    const music = resolveMusicState(data);
-    const showTitle = prop(item, "showTitle", music.showTitle !== false);
-    const showArtist = prop(item, "showArtist", music.showArtist !== false);
-    const showCover = prop(item, "showAlbumCover", music.showAlbumCover !== false);
-    const showProgress = prop(item, "showProgress", music.showProgress !== false);
-    const hideWhenPaused = prop(item, "hideWhenPaused", music.hideWhenPaused === true);
-
-    const hasSong = Boolean(music.title || music.artist);
-    const connected = music.connected === true;
-    const showOverlay = music.showInOverlay !== false;
-    let show = showOverlay && connected && hasSong;
-    if (show && hideWhenPaused && !music.isPlaying) {
-      show = false;
-    }
-
-    el.classList.toggle("visible", show);
-    el.classList.toggle("paused", !music.isPlaying);
-
-    const content = el.querySelector(".ccs-spotify-content");
-    content.classList.toggle("no-cover", !showCover);
-    const cover = el.querySelector(".ccs-spotify-cover");
-    cover.style.display = showCover ? "" : "none";
-    const coverUrl = music.cover || music.coverUrl || "";
-    cover.style.backgroundImage = coverUrl ? `url("${coverUrl}")` : "none";
-
-    el.querySelector(".ccs-spotify-heading").textContent = providerHeading(music);
-    el.querySelector(".ccs-spotify-title").style.display = showTitle ? "" : "none";
-    el.querySelector(".ccs-spotify-artist").style.display = showArtist ? "" : "none";
-    el.querySelector(".ccs-spotify-album").style.display = showArtist ? "" : "none";
-    el.querySelector(".ccs-spotify-progress-row").style.display = showProgress ? "" : "none";
-
-    el.querySelector(".ccs-spotify-title").textContent = music.title || "Unbekannter Titel";
-    el.querySelector(".ccs-spotify-artist").textContent = music.artist || "Unbekannter KÃ¼nstler";
-    el.querySelector(".ccs-spotify-album").textContent = music.album || "";
-    el.querySelector(".ccs-spotify-status").textContent = music.isPlaying ? "SPIELT" : "PAUSIERT";
-
-    el._progressBase = Math.max(0, Number(music.progressMs) || 0);
-    el._progressAt = Date.now();
-    el._duration = Math.max(0, Number(music.durationMs) || 0);
-    el._playing = music.isPlaying === true;
-    paintSpotifyProgress(el);
-  }
-
-export function paintSpotifyProgress(el) {
-    let current = el._progressBase || 0;
-    if (el._playing) {
-      current += Date.now() - (el._progressAt || Date.now());
-    }
-    const duration = el._duration || 0;
-    const percent = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
-    el.querySelector(".ccs-spotify-progress").style.width = `${percent}%`;
-    el.querySelector(".ccs-spotify-time").textContent =
-      `${formatMs(current)} / ${formatMs(duration)}`;
   }
 
 export const CHAT_EVENT_TYPES = new Set([

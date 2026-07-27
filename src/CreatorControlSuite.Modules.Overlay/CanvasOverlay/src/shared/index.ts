@@ -4,6 +4,7 @@ import { DEFAULT_LAYOUT } from "./defaults/layout";
 import { WIDGET_DEFAULTS } from "./defaults/widgets";
 import { SHAPE_DEFAULTS, CARD_FRAME_SIZE_PRESETS, CARD_FRAME_VARIANTS } from "./defaults/shapes";
 import { SCENE_BG_PRESETS } from "./defaults/scene-bg";
+import { MUSIC_VARIANTS, MUSIC_VARIANT_LABELS, MUSIC_SIZE_PRESETS } from "./widgets/music";
 import { uid } from "./utils/format";
 import { fetchJson } from "./net/fetch-json";
 import { connectWs } from "./net/connect-ws";
@@ -22,6 +23,9 @@ const CcsCanvas = {
   SCENE_BG_PRESETS,
   CARD_FRAME_SIZE_PRESETS,
   CARD_FRAME_VARIANTS,
+  MUSIC_VARIANTS,
+  MUSIC_VARIANT_LABELS,
+  MUSIC_SIZE_PRESETS,
   DEFAULT_LAYOUT,
   uid,
   registerWidget,

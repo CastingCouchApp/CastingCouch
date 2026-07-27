@@ -6,6 +6,7 @@ import { textProp } from "../controls/text-prop";
 import { selectProp } from "../controls/select-prop";
 import { fontProp } from "../controls/font-prop";
 import { colorProp } from "../controls/color-prop";
+import { propSection } from "../sections/prop-section";
 import { renderEffectsPanel } from "../effects/effects-panel";
 
 export function syncProps(
@@ -40,11 +41,7 @@ export function syncProps(
   } else if (item.type === "alert") {
     propExtra.appendChild(numProp("durationMs", "Dauer (ms)", item, ctx, 5000));
   } else if (item.type === "music" || item.type === "spotify") {
-    propExtra.appendChild(boolProp("showTitle", "Titel", item, ctx));
-    propExtra.appendChild(boolProp("showArtist", "Artist", item, ctx));
-    propExtra.appendChild(boolProp("showAlbumCover", "Cover", item, ctx));
-    propExtra.appendChild(boolProp("showProgress", "Progress", item, ctx));
-    propExtra.appendChild(boolProp("hideWhenPaused", "Bei Pause ausblenden", item, ctx));
+    appendMusicProps(item, ctx, propExtra);
   } else if (item.type === "chat") {
     propExtra.appendChild(boolProp("showTwitchEvents", "Twitch-Events zeigen", item, ctx));
     propExtra.appendChild(numProp("maxLines", "Max. Zeilen", item, ctx, 80));
@@ -140,6 +137,37 @@ export function syncProps(
   }
 
   renderEffectsPanel(propExtra, item, ctx);
+}
+
+function appendMusicProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
+  const variants = window.CcsCanvas.MUSIC_VARIANTS || [];
+  const labels = window.CcsCanvas.MUSIC_VARIANT_LABELS || {};
+  const sizePresets = window.CcsCanvas.MUSIC_SIZE_PRESETS || {};
+
+  const look = propSection("music-look", "Look & Größe");
+  look.body.appendChild(selectProp("variant", "Style", item, ctx, variants.map((key) => ({
+    value: key,
+    label: (labels as Record<string, string>)[key] || key
+  })), "classic"));
+  look.body.appendChild(selectProp("sizePreset", "Größe", item, ctx, Object.keys(sizePresets).map((key) => ({
+    value: key,
+    label: (sizePresets as Record<string, { label?: string }>)[key].label || key
+  })), "standard", (live, value) => {
+    live.props.sizePreset = value;
+    const next = (sizePresets as Record<string, { w: number; h: number }>)[value];
+    if (!next) return;
+    live.w = next.w;
+    live.h = next.h;
+  }));
+  propExtra.appendChild(look.root);
+
+  const content = propSection("music-content", "Inhalt");
+  content.body.appendChild(boolProp("showTitle", "Titel", item, ctx));
+  content.body.appendChild(boolProp("showArtist", "Artist", item, ctx));
+  content.body.appendChild(boolProp("showAlbumCover", "Cover", item, ctx));
+  content.body.appendChild(boolProp("showProgress", "Progress", item, ctx));
+  content.body.appendChild(boolProp("hideWhenPaused", "Bei Pause ausblenden", item, ctx));
+  propExtra.appendChild(content.root);
 }
 
 function appendSocialsProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {

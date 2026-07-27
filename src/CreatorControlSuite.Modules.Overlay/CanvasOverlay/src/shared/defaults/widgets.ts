@@ -7,6 +7,8 @@ export const WIDGET_DEFAULTS: Record<string, WidgetDefaults> = {
     w: 950,
     h: 188,
     props: {
+      variant: "classic",
+      sizePreset: "standard",
       showTitle: true,
       showArtist: true,
       showAlbumCover: true,
@@ -101,6 +103,8 @@ export const WIDGET_DEFAULTS: Record<string, WidgetDefaults> = {
     w: 950,
     h: 188,
     props: {
+      variant: "classic",
+      sizePreset: "standard",
       showTitle: true,
       showArtist: true,
       showAlbumCover: true,
