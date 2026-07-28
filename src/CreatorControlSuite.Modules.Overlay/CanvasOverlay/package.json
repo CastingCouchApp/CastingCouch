@@ -5,7 +5,8 @@
   "description": "Creator Control Suite Canvas Overlay (TypeScript)",
   "scripts": {
     "build": "node esbuild.config.mjs",
-    "build:watch": "node esbuild.config.mjs --watch"
+    "build:watch": "node esbuild.config.mjs --watch",
+    "dev": "node dev/dev-server.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
