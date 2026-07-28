@@ -25,6 +25,7 @@ import { uid } from "./utils/format";
 import { fetchJson } from "./net/fetch-json";
 import { connectWs } from "./net/connect-ws";
 import { createRuntime } from "./runtime/create-runtime";
+import { createItemContent, paintItemContent } from "./runtime/item-content";
 import { registerWidget } from "./extensions/registry";
 import { EFFECT_STRATEGIES, registerEffect, listEffectTypes } from "./effects/registry";
 import { ANIMATION_STRATEGIES, registerAnimation, listAnimationTypes } from "./animations/registry";
@@ -33,6 +34,8 @@ import { loadExtensions } from "./extensions/loader";
 
 const CcsCanvas = {
   createRuntime,
+  createItemContent,
+  paintItemContent,
   fetchJson,
   connectWs,
   WIDGET_DEFAULTS,

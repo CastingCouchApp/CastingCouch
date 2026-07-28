@@ -1,13 +1,12 @@
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Core.Legal;
-using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Validation;
 namespace CreatorControlSuite.Core.Diagnostics;
 
-public sealed class InstallerSelfTestService(ISettingsStore settings, ISettingsValidator validator, ILegalConsentService legal, ILicenseService license, string dataRoot) : IInstallerSelfTestService
+public sealed class InstallerSelfTestService(ISettingsStore settings, ISettingsValidator validator, ILegalConsentService legal, string dataRoot) : IInstallerSelfTestService
 {
     private readonly ISettingsStore _settings = settings; private readonly ISettingsValidator _validator = validator;
-    private readonly ILegalConsentService _legal = legal; private readonly ILicenseService _license = license; private readonly string _dataRoot = dataRoot;
+    private readonly ILegalConsentService _legal = legal; private readonly string _dataRoot = dataRoot;
 
     public async Task<InstallerSelfTestReport> RunAsync(CancellationToken ct = default)
     {
@@ -25,9 +24,6 @@ public sealed class InstallerSelfTestService(ISettingsStore settings, ISettingsV
         items.Add(new("Rechtliche Bestätigung", legal ? InstallerSelfTestStatus.Warning : InstallerSelfTestStatus.Passed,
             legal ? "Aktuelle Rechtstexte wurden noch nicht bestätigt." : "Bestätigung ist aktuell.",
             legal ? "EULA und Datenschutzhinweise bestätigen." : ""));
-        LicenseStatus license = await _license.GetStatusAsync(ct);
-        items.Add(new("Lizenzstatus", license.IsUsable ? InstallerSelfTestStatus.Passed : InstallerSelfTestStatus.Warning,
-            license.Detail, license.IsUsable ? "" : "Lizenz aktivieren oder Entwicklungsmodus verwenden."));
         return new(started, DateTimeOffset.Now, !items.Any(x => x.Status == InstallerSelfTestStatus.Failed), items);
     }
     private static void FileCheck(ICollection<InstallerSelfTestItem> items, string name, string file)

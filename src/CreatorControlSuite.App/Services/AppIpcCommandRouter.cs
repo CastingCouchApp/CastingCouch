@@ -1,6 +1,5 @@
 using System.Windows;
 using CreatorControlSuite.Core.Ipc;
-using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Logging;
 using CreatorControlSuite.Modules.Alerts;
 using CreatorControlSuite.Modules.OBS;
@@ -16,7 +15,6 @@ public sealed class AppIpcCommandRouter(
     IObsWebSocketClient obs,
     SpotifyModule spotify,
     IAppLogger logger,
-    IFeatureGate featureGate,
     ExternalAlertActivityService externalAlerts) : IIpcCommandRouter
 {
     private readonly WorkflowModule _workflow = workflow;
@@ -24,7 +22,6 @@ public sealed class AppIpcCommandRouter(
     private readonly IObsWebSocketClient _obs = obs;
     private readonly SpotifyModule _spotify = spotify;
     private readonly IAppLogger _logger = logger;
-    private readonly IFeatureGate _featureGate = featureGate;
     private readonly ExternalAlertActivityService _externalAlerts = externalAlerts;
 
     public async Task<IpcResponse> ExecuteAsync(IpcCommand command, CancellationToken ct = default)
@@ -84,7 +81,6 @@ public sealed class AppIpcCommandRouter(
                     ["detail"] = state.Detail
                 });
             case IpcCommandNames.Prepare:
-                await _featureGate.RequireAsync(FeatureCatalog.Workflow, ct);
                 await _workflow.Service.PrepareAsync(ct); return Ok(command, "Vorbereitet.");
             case IpcCommandNames.Countdown:
                 _ = Task.Run(() => _workflow.Service.StartCountdownAsync()); return Ok(command, "Countdown gestartet.");
@@ -99,7 +95,6 @@ public sealed class AppIpcCommandRouter(
             case IpcCommandNames.End:
                 _ = Task.Run(() => _workflow.Service.EndAsync()); return Ok(command, "Streamende gestartet.");
             case IpcCommandNames.AlertTest:
-                await _featureGate.RequireAsync(FeatureCatalog.Alerts, ct);
                 await _alerts.EnqueueAsync(
                     GetAny(command, "Follow", "type", "value"),
                     Get(command, "user", "StreamDeck"),
@@ -115,7 +110,6 @@ public sealed class AppIpcCommandRouter(
                 _externalAlerts.ClearSource(Get(command, "source", "streamerbot"));
                 return Ok(command, "Externe Alerts zurückgesetzt.");
             case IpcCommandNames.ObsScene:
-                await _featureGate.RequireAsync(FeatureCatalog.Obs, ct);
                 string scene = GetAny(command, "", "scene", "value");
                 if (string.IsNullOrWhiteSpace(scene))
                 {
@@ -125,7 +119,6 @@ public sealed class AppIpcCommandRouter(
                 await _obs.SetCurrentProgramSceneAsync(scene, ct);
                 return Ok(command, "Szene aktiviert: " + scene);
             case IpcCommandNames.ObsMute:
-                await _featureGate.RequireAsync(FeatureCatalog.Obs, ct);
                 string input = GetAny(command, "", "input", "value");
                 if (string.IsNullOrWhiteSpace(input))
                 {
@@ -188,11 +181,9 @@ public sealed class AppIpcCommandRouter(
                     cancellationToken: ct);
                 return Ok(command, "Spotify-Playlist gestartet.");
             case IpcCommandNames.StreamStart:
-                await _featureGate.RequireAsync(FeatureCatalog.Obs, ct);
                 await _obs.StartStreamAsync(ct);
                 return Ok(command, "OBS-Stream gestartet.");
             case IpcCommandNames.StreamStop:
-                await _featureGate.RequireAsync(FeatureCatalog.Obs, ct);
                 await _obs.StopStreamAsync(ct);
                 return Ok(command, "OBS-Stream beendet.");
             default:

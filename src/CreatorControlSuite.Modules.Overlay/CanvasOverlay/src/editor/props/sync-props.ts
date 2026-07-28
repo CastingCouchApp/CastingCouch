@@ -9,7 +9,6 @@ import { colorProp } from "../controls/color-prop";
 import {
   advancedSection,
   contentSection,
-  featureSection,
   lookSection,
   propSection,
   styleSection
@@ -55,6 +54,9 @@ export function syncProps(
   (document.getElementById("propW") as HTMLInputElement).value = String(Math.round(item.w || 0));
   (document.getElementById("propH") as HTMLInputElement).value = String(Math.round(item.h || 0));
   (document.getElementById("propZ") as HTMLInputElement).value = String(item.z || 0);
+  (document.getElementById("propPadding") as HTMLInputElement).value = String(
+    Math.max(0, Math.round(Number(item.padding) || 0))
+  );
   (document.getElementById("propLocked") as HTMLInputElement).checked = !!item.locked;
   propExtra.innerHTML = "";
   const effectsPane = propEffects || document.getElementById("propEffects");
@@ -476,20 +478,8 @@ function appendFrameCardProps(item: LayoutItem, ctx: EditorContext, propExtra: H
   propExtra.appendChild(style.root);
 
   const advanced = advancedSection("frame-card");
-  advanced.body.appendChild(featureSection({
-    id: "frame-card-sweep",
-    title: "Sweep",
-    enabledKey: "showSweep",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  advanced.body.appendChild(featureSection({
-    id: "frame-card-lines",
-    title: "Linien",
-    enabledKey: "showLines",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  advanced.body.appendChild(boolProp("showSweep", "Sweep", item, ctx));
+  advanced.body.appendChild(boolProp("showLines", "Linien", item, ctx));
   propExtra.appendChild(advanced.root);
 }
 
@@ -541,26 +531,8 @@ function appendSceneBgProps(item: LayoutItem, ctx: EditorContext, propExtra: HTM
   propExtra.appendChild(style.root);
 
   const advanced = advancedSection("scene-bg");
-  advanced.body.appendChild(featureSection({
-    id: "scene-bg-stripes",
-    title: "Streifen",
-    enabledKey: "stripes",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  advanced.body.appendChild(featureSection({
-    id: "scene-bg-particles",
-    title: "Partikel",
-    enabledKey: "particles",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  advanced.body.appendChild(featureSection({
-    id: "scene-bg-paused",
-    title: "Pause",
-    enabledKey: "paused",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  advanced.body.appendChild(boolProp("stripes", "Streifen", item, ctx));
+  advanced.body.appendChild(boolProp("particles", "Partikel", item, ctx));
+  advanced.body.appendChild(boolProp("paused", "Pause", item, ctx));
   propExtra.appendChild(advanced.root);
 }

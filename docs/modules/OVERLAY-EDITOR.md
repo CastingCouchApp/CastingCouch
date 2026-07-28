@@ -39,9 +39,10 @@ Beispiel: `/editor/default`, `/view/just-chatting`.
 
 ## Editor-Hilfen (nur `/editor`, nicht `/view`)
 
-- **32px Padding** um die Zeichenfläche (Fit/Scale berücksichtigt den Abstand).
+- **Fenstergröße**: Modal über Toolbar-Button (Badge mit aktueller Größe); Preset / B×H, **Größe anwenden**, OBS-Base-Auflösung + **Von OBS übernehmen**.
 - **OBS-Vorschau** / **Raster** / **Einrasten** / **Magnet** (Toolbar-Icon-Toggles; Tooltips per `title`; Prefs in `localStorage` `ccs-editor-prefs`).
-- **Fenstergröße** (Palette, default eingeklappt): Preset / B×H, **Größe anwenden**, OBS-Base-Auflösung + **Von OBS übernehmen** (`baseWidth`/`baseHeight`).
+- **Widget-Palette**: Kategorien (Live, Interaktion, Content, Hintergrund, Frames, Masken, Deko) + Suche (Label/Typ/Kategorie/Keywords). Hover auf einer Karte zeigt eine Live-Vorschau mit Demodaten (skaliert).
+- **32px Padding** um die Zeichenfläche (Fit/Scale berücksichtigt den Abstand).
 - **Raster** Unterteilungen **H × V** (Default 32×16); liegt immer im Vordergrund über den Widgets (`pointer-events: none`). Editor-Layer (Grid/OBS-Vorschau) werden nach jedem `setLayout`/`renderItems` via `onAfterRender` neu gesetzt.
 - **Einrasten**: Snap an Rasterlinien (H×V) beim Verschieben **und** Skalieren (nur die gezogene Handle-Kante); Threshold ~20 % der Zellengröße (min. 8px), inkl. Guide-Linien. Unabhängig von der Raster-Anzeige.
 - **Magnet**: Snap an Kanten/Mitten **anderer Widgets** (Threshold 8px) beim Verschieben/Skalieren, inkl. Guide-Linien. Bei gleichzeitigem Einrasten gewinnt der Magnet, wenn er greift.
@@ -49,7 +50,7 @@ Beispiel: `/editor/default`, `/view/just-chatting`.
 
 ## Props-Panel
 
-Affinity-orientierter Inspector (Cool-Gray): Tabs **Layout** / **Widget** / **Effekte** / **Animationen**. Im Widget-Tab: **Inhalt** und **Look** default offen, **Stil** und **Erweitert** default zugeklappt (`contentSection` / `lookSection` / `styleSection` / `advancedSection`). Layout-Tab: **Position & Größe** default zugeklappt. Effekte-/Animationen-Tabs ohne zusätzlichen Section-Wrapper. Alle Props teilen das kompakte Row-Layout **Label | Control** (Zahlen: Label | Slider | Wert). Features nutzen LiveFX-artige `featureSection`-Toggles (in **Erweitert**). Farben: `colorProp` (Picker + Swatches), Schriften: `fontProp`. Aktiver Tab in `sessionStorage` (`ccs-props-tab`).
+Affinity-orientierter Inspector (Cool-Gray): Tabs **Layout** / **Widget** / **Effekte** / **Animationen**. Im Widget-Tab: **Inhalt** und **Look** default offen, **Stil** und **Erweitert** default zugeklappt (`contentSection` / `lookSection` / `styleSection` / `advancedSection`). Layout-Tab: **Position & Größe** default zugeklappt — inkl. einheitliches **Padding** (px) auf Item-Ebene für alle Widgets/Shapes. Effekte-/Animationen-Tabs ohne zusätzlichen Section-Wrapper. Alle Props teilen das kompakte Row-Layout **Label | Control** (Zahlen: Label | Slider | Wert). Features nutzen LiveFX-artige `featureSection`-Toggles (in **Erweitert**). Farben: `colorProp` (Expand-Handle + Picker; Swatches rechtsbündig mit Historie + Presets), Schriften: `fontProp`. Aktiver Tab in `sessionStorage` (`ccs-props-tab`).
 
 **Effekte:** Jedes Item hat `effects[]` — stapelbare Modifier (Glow, Particles, Scanlines, Vignette, Blur, Noise, Neon, Glitch, Sparkle, Aurora, Pulse Ring, Hologram, Outline, Drop Shadow, Rainbow, Spotlight). Pro Effekt optional **Ziel** `box`/`content` — nur wenn die Strategy `targets` inkl. `content` hat (Glow, Drop Shadow, Outline, Glitch); sonst kein Ziel-Select. Glow / Outline / Drop Shadow: **Animation** `Aus` / `Pulse` / `Atmen` + Tempo. Im Tab **Effekte**, einzeln aktivierbar. Weitere Modifier: Skill `overlay-effect` / Packs: `overlay-extension-pack`.
 

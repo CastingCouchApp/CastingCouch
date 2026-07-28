@@ -13,11 +13,6 @@ $Projects = @(
         Name = "Workflow"
         Project = Join-Path $Root "src\CreatorControlSuite.Modules.Workflow\CreatorControlSuite.Modules.Workflow.csproj"
         Output = Join-Path $Root "src\CreatorControlSuite.Modules.Workflow\bin\$Configuration\net10.0-windows\CreatorControlSuite.Modules.Workflow.dll"
-    },
-    @{
-        Name = "LicenseMockServer"
-        Project = Join-Path $Root "src\CreatorControlSuite.LicenseMockServer\CreatorControlSuite.LicenseMockServer.csproj"
-        Output = Join-Path $Root "src\CreatorControlSuite.LicenseMockServer\bin\$Configuration\net10.0-windows\CreatorControlSuite.LicenseMockServer.dll"
     }
 )
 

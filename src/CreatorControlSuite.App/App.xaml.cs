@@ -25,7 +25,6 @@ using CreatorControlSuite.Core.Diagnostics;
 using CreatorControlSuite.Core.Eventing;
 using CreatorControlSuite.Core.Ipc;
 using CreatorControlSuite.Core.Legal;
-using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Logging;
 using CreatorControlSuite.Core.Migration;
 using CreatorControlSuite.Core.Modules;
@@ -115,13 +114,6 @@ public partial class App : Application
             {
                 AppSettings startupSettings = await _host.Services.GetRequiredService<ISettingsStore>().LoadAsync();
                 string themeId = startupSettings.General.ThemeId;
-                IFeatureGate featureGate = _host.Services.GetRequiredService<IFeatureGate>();
-                ThemeDefinition theme = ThemeCatalog.Resolve(themeId);
-                if (theme.IsPremium && !await featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes))
-                {
-                    themeId = ThemeCatalog.ClassicId;
-                }
-
                 _host.Services.GetRequiredService<IThemeService>().Apply(themeId);
             }
             catch (Exception themeException)

@@ -564,9 +564,12 @@ export function applySocialsVariant(el, item) {
 
 export function fitSocials(el) {
     if (!el) return;
-    const w = Math.max(1, el.clientWidth || el.offsetWidth || 720);
-    const h = Math.max(1, el.clientHeight || el.offsetHeight || 96);
-    const scale = Math.max(0.5, Math.min(1.4, Math.min(w / 720, h / 96)));
+    // Reference matches WIDGET_DEFAULTS.socials (280×72)
+    const refW = 280;
+    const refH = 72;
+    const w = Math.max(1, el.clientWidth || el.offsetWidth || refW);
+    const h = Math.max(1, el.clientHeight || el.offsetHeight || refH);
+    const scale = Math.max(0.5, Math.min(1.4, Math.min(w / refW, h / refH)));
     el.style.setProperty("--ccs-socials-scale", String(scale));
   }
 
@@ -578,7 +581,7 @@ export function updateSocials(el, item) {
     }
     applySocialsVariant(el, item);
     const iconSize = Number(prop(item, "iconSize", 36)) || 36;
-    const gap = Number(prop(item, "gap", 18)) || 18;
+    const gap = Number(prop(item, "gap", 12)) || 12;
     const iconColor = String(prop(item, "iconColor", "#ffffff") || "#ffffff");
     el.style.setProperty("--ccs-socials-icon-size", iconSize + "px");
     el.style.setProperty("--ccs-socials-gap", gap + "px");

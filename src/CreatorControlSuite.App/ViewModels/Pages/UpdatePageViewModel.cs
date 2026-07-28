@@ -232,15 +232,22 @@ public sealed class UpdatePageViewModel : ViewModelBase
             return;
         }
 
-        await _updates.RestoreBackupAsync(
-            SelectedBackup.Id,
-            cancellationToken);
-        if (AfterRestoreAsync is not null)
+        try
         {
-            await AfterRestoreAsync();
-        }
+            await _updates.RestoreBackupAsync(
+                SelectedBackup.Id,
+                cancellationToken);
+            if (AfterRestoreAsync is not null)
+            {
+                await AfterRestoreAsync();
+            }
 
-        SetStatus("Backup wurde wiederhergestellt.", success: true);
+            SetStatus("Backup wurde wiederhergestellt.", success: true);
+        }
+        catch (Exception ex)
+        {
+            SetStatus(ex.Message, error: true);
+        }
     }
 
     private async Task RefreshBackupsAsync(

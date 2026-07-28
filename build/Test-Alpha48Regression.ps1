@@ -23,10 +23,6 @@ $WorkflowProject = Get-Content `
     -LiteralPath (Join-Path $Root "src\CreatorControlSuite.Modules.Workflow\CreatorControlSuite.Modules.Workflow.csproj") `
     -Raw
 
-$MockProject = Get-Content `
-    -LiteralPath (Join-Path $Root "src\CreatorControlSuite.LicenseMockServer\CreatorControlSuite.LicenseMockServer.csproj") `
-    -Raw
-
 $Checks = @(
     @{
         Name = "Spotify volume helper"
@@ -51,14 +47,6 @@ $Checks = @(
     @{
         Name = "Workflow library output"
         Passed = $WorkflowProject -match '<OutputType>Library</OutputType>'
-    },
-    @{
-        Name = "License mock exe output"
-        Passed = $MockProject -match '<OutputType>Exe</OutputType>'
-    },
-    @{
-        Name = "License mock no apphost"
-        Passed = $MockProject -match '<UseAppHost>false</UseAppHost>'
     },
     @{
         Name = "MajorUpgrade"

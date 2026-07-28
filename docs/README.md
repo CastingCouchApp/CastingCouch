@@ -2,12 +2,12 @@
 
 | Ordner | Inhalt |
 |--------|--------|
-| [`architecture/`](architecture/) | Architektur, Migration, Roadmap, Editions |
+| [`architecture/`](architecture/) | Architektur, Migration, Roadmap |
 | [`modules/`](modules/) | Module (OBS, Twitch, Spotify, Music Player, Overlay, Alerts, …) |
 | [`build/`](build/) | Build-/Installer-Härtung, Alpha-Build-Notizen |
 | [`releases/`](releases/) | Release-Notes und Checklisten |
 | [`changelogs/`](changelogs/) | Versions-Changelogs (`CHANGELOG-*`) |
-| [`licensing/`](licensing/) | Lizenzierung, Legal Consent |
+| [`licensing/`](licensing/) | Open-Source-Entscheidung, Legal Consent |
 | [`operations/`](operations/) | Security, Updates, Logging, Support |
 | [`guides/`](guides/) | First-Run, Testversion |
 

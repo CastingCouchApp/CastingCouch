@@ -15,7 +15,7 @@ const item: LayoutItem = {
   w: 100,
   h: 40,
   z: 1,
-  props: { show: true, animateFill: true }
+  props: { show: true, animateFill: true, pulse: true }
 };
 
 const ctx: EditorContext = {
@@ -43,5 +43,25 @@ describe("unified inspector checkboxes", () => {
 
     expect(bool.querySelector("input[type='checkbox']")?.classList.contains("ccs-check")).toBe(true);
     expect(feature.querySelector("input[type='checkbox']")?.classList.contains("ccs-check")).toBe(true);
+  });
+
+  it("uses Label | Checkbox order like Inner Glow / boolProp", () => {
+    const bool = boolProp("showInnerGlow", "Inner Glow", item, ctx);
+    const feature = featureSection({
+      id: "cam-ring-pulse",
+      title: "Pulse",
+      enabledKey: "pulse",
+      item,
+      commit: (apply) => {
+        ctx.commitProp(item, apply as (live: LayoutItem) => void);
+      }
+    });
+
+    for (const el of [bool, feature.querySelector(".ccs-feature-header") as HTMLElement]) {
+      expect(el.classList.contains("ccs-prop-row")).toBe(true);
+      const kids = [...el.children];
+      expect(kids[0].classList.contains("ccs-prop-row-label")).toBe(true);
+      expect((kids[1] as HTMLInputElement).type).toBe("checkbox");
+    }
   });
 });

@@ -1,0 +1,49 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Legal.LegalSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Margin="18">
+        <TextBlock Text="Rechtliche Dokumente"
+                   Foreground="{DynamicResource AccentBrush}"
+                   FontSize="18"
+                   FontWeight="Bold"/>
+        <Border Background="{DynamicResource InputAltBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12"
+                Margin="0,18,0,0">
+            <StackPanel>
+                <TextBlock Text="Dokumente"
+                           Foreground="{DynamicResource TextPrimaryBrush}"
+                           FontWeight="SemiBold"/>
+                <WrapPanel Margin="0,12,0,0">
+                    <Button Content="EULA öffnen"
+                            Command="{Binding OpenEulaCommand}"/>
+                    <Button Content="Datenschutz öffnen"
+                            Command="{Binding OpenPrivacyCommand}"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+        <TextBlock Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   Margin="0,12,0,0">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource MutedBrush}"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding StatusIsError}"
+                                     Value="True">
+                            <Setter Property="Foreground"
+                                    Value="IndianRed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        <TextBlock Text="Hinweis: Die mitgelieferten Rechtstexte sind technische Entwürfe und vor einer Veröffentlichung juristisch zu prüfen."
+                   Foreground="#FFB347"
+                   TextWrapping="Wrap"
+                   Margin="0,16,0,0"/>
+    </StackPanel>
+</UserControl>

@@ -93,7 +93,7 @@ Agent-gestützter Release-Flow: Skill `release` unter `.agents/skills/release/` 
 | Build / Installer | [`docs/build/`](docs/build/) |
 | Releases | [`docs/releases/`](docs/releases/) |
 | Changelogs | [`docs/changelogs/`](docs/changelogs/) |
-| Licensing | [`docs/licensing/`](docs/licensing/) |
+| Legal / Open Source | [`docs/licensing/`](docs/licensing/) |
 | Betrieb | [`docs/operations/`](docs/operations/) |
 | Guides | [`docs/guides/`](docs/guides/) |
 

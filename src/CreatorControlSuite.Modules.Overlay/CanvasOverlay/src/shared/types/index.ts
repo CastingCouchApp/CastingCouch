@@ -7,6 +7,8 @@ export interface LayoutItem {
   w: number;
   h: number;
   z: number;
+  /** Uniform content inset in px (box-sizing: border-box). */
+  padding?: number;
   rotation?: number;
   locked?: boolean;
   props: Record<string, unknown>;
@@ -154,6 +156,14 @@ declare global {
 
 export interface CcsCanvasApi {
   createRuntime: (options: RuntimeOptions) => CreateRuntime;
+  createItemContent: (item: LayoutItem) => HTMLElement;
+  paintItemContent: (
+    el: HTMLElement,
+    item: LayoutItem,
+    data?: Record<string, unknown> | null,
+    chatConfig?: unknown,
+    options?: { seedDemo?: boolean; [key: string]: unknown }
+  ) => void;
   fetchJson: (url: string) => Promise<unknown>;
   connectWs: (onEvent: (evt: Record<string, unknown>) => void) => WebSocket;
   WIDGET_DEFAULTS: Record<string, WidgetDefaults>;

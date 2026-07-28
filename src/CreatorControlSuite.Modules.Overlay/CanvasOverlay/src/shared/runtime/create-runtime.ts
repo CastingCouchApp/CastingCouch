@@ -393,6 +393,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
           w: def.w,
           h: def.h,
           z: (layout.items || []).length + 1,
+          padding: 0,
           rotation: 0,
           locked: false,
           effects: [],

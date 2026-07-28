@@ -985,7 +985,7 @@ html, body {
 .ccs-socials {
   --ccs-socials-scale: 1;
   --ccs-socials-icon-size: 36px;
-  --ccs-socials-gap: 18px;
+  --ccs-socials-gap: 12px;
   --ccs-socials-icon-color: #ffffff;
   container-type: size;
   box-sizing: border-box;
@@ -1005,7 +1005,7 @@ html, body {
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  padding: calc(8px * var(--ccs-socials-scale));
+  padding: 0;
 }
 
 .ccs-socials-item {
@@ -1094,7 +1094,7 @@ html, body {
 }
 
 .ccs-socials-v-pills .ccs-socials-item {
-  padding: calc(8px * var(--ccs-socials-scale)) calc(12px * var(--ccs-socials-scale));
+  padding: calc(4px * var(--ccs-socials-scale)) calc(10px * var(--ccs-socials-scale));
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.42);
   border: 1px solid rgba(255, 255, 255, 0.12);

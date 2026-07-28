@@ -13,6 +13,24 @@ const FALLBACK_PRESETS = [
 export interface CanvasSizeApi {
   applyCanvasSize: (width: number | string, height: number | string) => boolean;
   syncCanvasSizeUi: () => void;
+  openModal: () => void;
+  closeModal: () => void;
+}
+
+export function openCanvasSizeModal(modal: HTMLDialogElement): void {
+  if (typeof modal.showModal === "function") {
+    if (!modal.open) modal.showModal();
+  } else {
+    modal.setAttribute("open", "");
+  }
+}
+
+export function closeCanvasSizeModal(modal: HTMLDialogElement): void {
+  if (typeof modal.close === "function") {
+    if (modal.open) modal.close();
+  } else {
+    modal.removeAttribute("open");
+  }
 }
 
 export function setupCanvasSize(
@@ -25,6 +43,9 @@ export function setupCanvasSize(
   const canvasWidthInput = document.getElementById("canvasWidthInput") as HTMLInputElement;
   const canvasHeightInput = document.getElementById("canvasHeightInput") as HTMLInputElement;
   const canvasSizeBadge = document.getElementById("canvasSizeBadge")!;
+  const modal = document.getElementById("canvasSizeModal") as HTMLDialogElement | null;
+  const openBtn = document.getElementById("btnCanvasSize");
+  const closeBtn = document.getElementById("btnCloseCanvasSize");
 
   function fillSizePresets(list: typeof FALLBACK_PRESETS): void {
     sizePresets = list && list.length ? list : FALLBACK_PRESETS;
@@ -70,6 +91,17 @@ export function setupCanvasSize(
     return true;
   }
 
+  function openModal(): void {
+    if (!modal) return;
+    syncCanvasSizeUi();
+    openCanvasSizeModal(modal);
+  }
+
+  function closeModal(): void {
+    if (!modal) return;
+    closeCanvasSizeModal(modal);
+  }
+
   canvasSizePreset.addEventListener("change", () => {
     if (canvasSizePreset.value === "custom") return;
     const opt = canvasSizePreset.selectedOptions[0];
@@ -78,7 +110,19 @@ export function setupCanvasSize(
   });
 
   document.getElementById("btnApplyCanvasSize")!.addEventListener("click", () => {
-    applyCanvasSize(canvasWidthInput.value, canvasHeightInput.value);
+    if (applyCanvasSize(canvasWidthInput.value, canvasHeightInput.value)) {
+      closeModal();
+    }
+  });
+
+  openBtn?.addEventListener("click", openModal);
+  closeBtn?.addEventListener("click", closeModal);
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+  modal?.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    closeModal();
   });
 
   fillSizePresets(FALLBACK_PRESETS);
@@ -87,5 +131,5 @@ export function setupCanvasSize(
     syncCanvasSizeUi();
   }).catch(() => syncCanvasSizeUi());
 
-  return { applyCanvasSize, syncCanvasSizeUi };
+  return { applyCanvasSize, syncCanvasSizeUi, openModal, closeModal };
 }

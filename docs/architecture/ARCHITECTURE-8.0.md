@@ -40,6 +40,11 @@ Persistenz, Netzwerkzugriffe, Timer und Domänenorchestrierung. Sie wird
 strangler-artig in vertikale Features zerlegt. Neue Features dürfen diese
 Schuld nicht vergrößern.
 
+Die Anwendung enthält keine kommerzielle Laufzeit-Lizenzierung mehr. Editionen,
+Aktivierung, Lizenzserver und Feature-Gates wurden entfernt; alle Funktionen
+und Themes sind verfügbar. Die Wahl einer Open-Source-Lizenz bleibt eine
+rechtliche Repository-Entscheidung und ist kein Laufzeitdienst.
+
 ## Sicherheitsrelevante Datenflüsse
 
 | Fluss | Geheimnisse | Schutzgrenze |
@@ -71,7 +76,8 @@ Schuld nicht vergrößern.
 ## Verifikation
 
 `ArchitectureGuardTests` blockiert neue/gesteigerte Größenschuld,
-Core-Rückreferenzen und Referenzen von Modulen auf die App. Bestehende
+Core-Rückreferenzen, Referenzen von Modulen auf die App und die
+Wiedereinführung kommerzieller Laufzeit-Lizenzierung. Bestehende
 Überschreitungen sind als schrumpfende Baseline erfasst und dürfen nicht wachsen.
 OBS-Transport, Twitch-API-Verträge und Spotify-Token-/Playback-Helfer liegen in
 separaten Dateien; keine dieser Integrationsdateien überschreitet 1.000 Zeilen.
@@ -84,5 +90,17 @@ persistenten Store nicht.
 Der lokale Updateablauf wird durch `UpdateWorkflowService` orchestriert:
 Download, optionales Backup, Apply und Fortschrittsphasen sind unabhängig von
 WPF testbar.
+Der Settings-Tab hostet für lokale Updates eine eigene
+`UpdateSettingsView` mit `UpdatePageViewModel`. Prüfung, Installation,
+Backup-Liste und Restore-Zustand liegen damit nicht mehr in `MainWindow`.
+Legacy-Erkennung und -Import liegen analog in `MigrationSettingsView` und
+`MigrationPageViewModel`; die Shell stellt nur den Reload-Callback nach einem
+erfolgreichen Import bereit.
+Rechtliche Dokumente werden über `LegalSettingsView`,
+`LegalPageViewModel` und den testbaren `ILegalDocumentLauncher` geöffnet; die
+Shell kennt weder Dokumentpfade noch Prozessstart.
+Allgemeine Angaben, Theme-Auswahl und Verbindungs-Watchdog liegen in
+`GeneralSettingsView` und `GeneralSettingsPageViewModel`. Mapping,
+Intervallgrenzen und Live-Themewechsel sind unabhängig von der Shell testbar.
 Der Agent-Composition-Root liegt unter 1.000 Zeilen; Hosting, Discovery und
 Datei-/Update-Helfer sind in `AgentUtilities` isoliert.

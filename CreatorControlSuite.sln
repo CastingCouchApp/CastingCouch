@@ -27,8 +27,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CreatorControlSuite.Command
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CreatorControlSuite.Updater", "src/CreatorControlSuite.Updater/CreatorControlSuite.Updater.csproj", "{D3C5F020-E7B8-4814-A618-E8248542A438}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CreatorControlSuite.LicenseMockServer", "src/CreatorControlSuite.LicenseMockServer/CreatorControlSuite.LicenseMockServer.csproj", "{07D44FFA-9E7E-4D45-AE4A-279B766AD099}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CreatorControlSuite.Agent", "src/CreatorControlSuite.Agent/CreatorControlSuite.Agent.csproj", "{A12D311B-3B76-4D2B-B05A-6F2571B8A202}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
@@ -189,18 +187,6 @@ Global
 		{D3C5F020-E7B8-4814-A618-E8248542A438}.Release|x64.Build.0 = Release|Any CPU
 		{D3C5F020-E7B8-4814-A618-E8248542A438}.Release|x86.ActiveCfg = Release|Any CPU
 		{D3C5F020-E7B8-4814-A618-E8248542A438}.Release|x86.Build.0 = Release|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Debug|x64.Build.0 = Debug|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Debug|x86.Build.0 = Debug|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Release|Any CPU.Build.0 = Release|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Release|x64.ActiveCfg = Release|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Release|x64.Build.0 = Release|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Release|x86.ActiveCfg = Release|Any CPU
-		{07D44FFA-9E7E-4D45-AE4A-279B766AD099}.Release|x86.Build.0 = Release|Any CPU
 		{A12D311B-3B76-4D2B-B05A-6F2571B8A202}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A12D311B-3B76-4D2B-B05A-6F2571B8A202}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A12D311B-3B76-4D2B-B05A-6F2571B8A202}.Debug|x64.ActiveCfg = Debug|Any CPU

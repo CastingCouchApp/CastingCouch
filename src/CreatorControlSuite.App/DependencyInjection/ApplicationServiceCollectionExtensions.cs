@@ -14,7 +14,6 @@ using CreatorControlSuite.Core.Diagnostics;
 using CreatorControlSuite.Core.Eventing;
 using CreatorControlSuite.Core.Ipc;
 using CreatorControlSuite.Core.Legal;
-using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Logging;
 using CreatorControlSuite.Core.Migration;
 using CreatorControlSuite.Core.Profiles;
@@ -62,27 +61,11 @@ public static class ApplicationServiceCollectionExtensions
             new LegalConsentService(
                 Path.Combine(localAppData, "legal-consent.json"),
                 Path.Combine(AppContext.BaseDirectory, "Legal")));
-        services.AddSingleton<ILicenseService>(provider =>
-            new LocalLicenseService(
-                provider.GetRequiredService<ISecretStore>(),
-                Path.Combine(AppContext.BaseDirectory, "Keys", "license-public.pem"),
-#if DEBUG
-                developmentMode: true
-#else
-                developmentMode: false
-#endif
-            ));
+        services.AddSingleton<ILegalDocumentLauncher, LegalDocumentLauncher>();
         services.AddSingleton<IUpdateSignatureVerifier>(
             new RsaUpdateSignatureVerifier(
                 Path.Combine(AppContext.BaseDirectory, "Keys", "update-public.pem")));
-        services.AddSingleton<IFeatureGate, FeatureGate>();
-        services.AddSingleton<IFeatureActionRunner, FeatureActionRunner>();
         services.AddSingleton<IWorkflowE2eService, WorkflowE2eService>();
-        services.AddHttpClient<ILicenseServerClient, HttpLicenseServerClient>(client =>
-        {
-            client.BaseAddress = new Uri("https://license.invalid/");
-            client.Timeout = TimeSpan.FromSeconds(15);
-        });
         services.AddSingleton<ISupportPackageService>(provider =>
             new SupportPackageService(
                 localAppData,
@@ -95,7 +78,6 @@ public static class ApplicationServiceCollectionExtensions
                 provider.GetRequiredService<ISettingsStore>(),
                 provider.GetRequiredService<ISettingsValidator>(),
                 provider.GetRequiredService<ILegalConsentService>(),
-                provider.GetRequiredService<ILicenseService>(),
                 localAppData));
         services.AddSingleton<IBetaReadinessService, BetaReadinessService>();
         services.AddSingleton<IStartupDependencyValidationService, StartupDependencyValidationService>();
@@ -146,6 +128,14 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<MusicPlayerPageViewModel>();
         services.AddSingleton<IPageViewModel>(
             provider => provider.GetRequiredService<MusicPlayerPageViewModel>());
+        services.AddSingleton(provider =>
+            new UpdatePageViewModel(
+                provider.GetRequiredService<UpdateWorkflowService>(),
+                provider.GetRequiredService<IUpdateService>(),
+                currentVersionProvider));
+        services.AddSingleton<MigrationPageViewModel>();
+        services.AddSingleton<LegalPageViewModel>();
+        services.AddSingleton<GeneralSettingsPageViewModel>();
         services.AddSingleton<CreatorIntelligenceSectionViewModel>();
         services.AddSingleton<PageNavigationCoordinator>();
         services.AddSingleton<TimedAutomationTickPublisher>();
@@ -156,6 +146,8 @@ public static class ApplicationServiceCollectionExtensions
             provider => provider.GetRequiredService<AppEventBridge>());
         services.AddHostedService<ApplicationRuntimeHostedService>();
         services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<IThemeSelectionService>(
+            provider => provider.GetRequiredService<IThemeService>());
         services.AddSingleton<DiagnosticService>();
         services.AddSingleton<MainWindow>();
         return services;

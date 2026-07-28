@@ -9,14 +9,10 @@ Die Creator Control Suite unterstützt austauschbare App-Shell-Themes (Farben + 
 - Default / Fallback: `classic`
 - Umschalten wirkt sofort (Preview); Speichern persistiert die Auswahl
 
-## Lizenz
+## Verfügbarkeit
 
-| Theme | Gate |
-|-------|------|
-| Classic | immer frei |
-| alle anderen | Feature `premium-themes` (Pro-Edition) |
-
-Ohne Pro fallen ungültige oder Premium-Themes auf Classic zurück.
+Alle Themes sind ohne Editionen oder Feature-Gates verfügbar. Unbekannte
+Theme-IDs fallen weiterhin auf Classic zurück.
 
 ## Theme-Ids
 

@@ -4,5 +4,4 @@ public sealed record ThemeDefinition(
     string Id,
     string DisplayName,
     string Description,
-    string ResourcePath,
-    bool IsPremium);
+    string ResourcePath);

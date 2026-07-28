@@ -79,18 +79,22 @@ export function featureSection(options: {
   root.className = "ccs-feature-section";
   root.dataset.featureId = id;
 
-  const header = document.createElement("label");
-  header.className = "ccs-feature-header";
+  // Match boolProp row: Label | Checkbox
+  const header = document.createElement("div");
+  header.className = "ccs-prop-row ccs-feature-header";
+
+  const label = document.createElement("span");
+  label.className = "ccs-prop-row-label ccs-feature-title";
+  label.textContent = title;
+
   const enabled = !enabledKey || (item?.props?.[enabledKey] !== false);
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
   checkbox.className = "ccs-check";
   checkbox.checked = enabled;
-  const label = document.createElement("span");
-  label.className = "ccs-feature-title";
-  label.textContent = title;
-  header.appendChild(checkbox);
+
   header.appendChild(label);
+  header.appendChild(checkbox);
   root.appendChild(header);
 
   const body = document.createElement("div");

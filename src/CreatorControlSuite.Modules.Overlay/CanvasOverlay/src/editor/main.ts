@@ -3,7 +3,15 @@ import type { CreateRuntime, LayoutItem } from "../../shared/types";
 import type { EditorContext } from "./props/context";
 import { syncProps } from "./props/sync-props";
 import { propSection, featureSection } from "./sections/prop-section";
-import { fillPalette, setupPaletteDrop, type PaletteEntry } from "./shell/palette";
+import { fillCategorizedPalette, setupPaletteDrop, setupPaletteSearch, type PaletteEntry } from "./shell/palette";
+import { createPalettePreviewController } from "./shell/palette-preview";
+import {
+  applyPaletteDemoProps,
+  demoAlertPayload,
+  demoChatMessages,
+  demoTickerEvents,
+  PALETTE_DEMO_DATA
+} from "./shell/palette-demo";
 import { setupCanvasSize } from "./shell/canvas-size";
 import { setupDrag } from "./shell/drag";
 import { createSaveScheduler } from "./shell/save";
@@ -70,9 +78,11 @@ function bootEditor(): void {
     const label = document.getElementById("instanceLabel");
     if (!label) return;
     const title = (name || "").trim();
-    label.textContent = title
-      ? ("Canvas: " + title + " (" + (instanceId || "–") + ")")
-      : ("Canvas: " + (instanceId || "–"));
+    const text = title || instanceId || "–";
+    label.textContent = text;
+    label.title = title && instanceId && title !== instanceId
+      ? `${title} (${instanceId})`
+      : text;
   }
   setInstanceLabel("");
 
@@ -113,39 +123,61 @@ function bootEditor(): void {
   wrapGeometrySection();
   wireInspectorTabs();
 
-  const widgets: PaletteEntry[] = [
-    { type: "online", label: "Online + Zeit" },
-    { type: "alert", label: "Alert" },
-    { type: "music", label: "Music Player" },
-    { type: "chat", label: "Chat" },
-    { type: "ending-stats", label: "Ending Stats" },
-    { type: "text", label: "Text" },
-    { type: "image", label: "Image" },
-    { type: "countdown", label: "Countdown" },
-    { type: "socials", label: "Socials" },
-    { type: "partner-roulette", label: "Partner Roulette" },
-    { type: "goal-bar", label: "Goal Bar" },
-    { type: "event-ticker", label: "Event Ticker" },
-    { type: "viewer-count", label: "Viewer Count" },
-    { type: "lower-third", label: "Lower Third" },
-    { type: "qr-code", label: "QR Code" },
-    { type: "brb-panel", label: "BRB Panel" },
-    { type: "announcement-bar", label: "Announcement Bar" },
-    { type: "animated-background", label: "Animated Background" }
-  ];
-  const shapes: PaletteEntry[] = [
-    { type: "frame", label: "Frame" },
-    { type: "frame.card", label: "Card Frame" },
-    { type: "shape.vignette", label: "Vignette" },
-    { type: "shape.cutout", label: "Cutout" },
-    { type: "shape.scene-bg", label: "Starting Hintergrund" },
-    { type: "shape.divider", label: "Divider" },
-    { type: "shape.cam-ring", label: "Cam Ring" },
-    { type: "shape.sticker", label: "Sticker" }
+  const paletteItems: PaletteEntry[] = [
+    // Live
+    { type: "online", label: "Online + Zeit", category: "Live", kind: "widget", keywords: "uptime clock status" },
+    { type: "alert", label: "Alert", category: "Live", kind: "widget", keywords: "benachrichtigung" },
+    { type: "viewer-count", label: "Viewer Count", category: "Live", kind: "widget", keywords: "zuschauer" },
+    { type: "event-ticker", label: "Event Ticker", category: "Live", kind: "widget", keywords: "follows subs bits" },
+    { type: "goal-bar", label: "Goal Bar", category: "Live", kind: "widget", keywords: "ziel follower" },
+    { type: "ending-stats", label: "Ending Stats", category: "Live", kind: "widget", keywords: "statistik ende" },
+    // Interaktion
+    { type: "chat", label: "Chat", category: "Interaktion", kind: "widget" },
+    { type: "socials", label: "Socials", category: "Interaktion", kind: "widget", keywords: "twitch youtube discord" },
+    { type: "partner-roulette", label: "Partner Roulette", category: "Interaktion", kind: "widget", keywords: "logos sponsor" },
+    { type: "announcement-bar", label: "Announcement Bar", category: "Interaktion", kind: "widget", keywords: "marquee ticker" },
+    // Content
+    { type: "text", label: "Text", category: "Content", kind: "widget" },
+    { type: "image", label: "Image", category: "Content", kind: "widget", keywords: "bild" },
+    { type: "countdown", label: "Countdown", category: "Content", kind: "widget", keywords: "timer" },
+    { type: "lower-third", label: "Lower Third", category: "Content", kind: "widget", keywords: "name titel" },
+    { type: "brb-panel", label: "BRB Panel", category: "Content", kind: "widget", keywords: "starting pause" },
+    { type: "qr-code", label: "QR Code", category: "Content", kind: "widget" },
+    { type: "music", label: "Music Player", category: "Content", kind: "widget", keywords: "spotify youtube" },
+    // Hintergrund
+    { type: "animated-background", label: "Animated Background", category: "Hintergrund", kind: "widget", keywords: "bg parallax" },
+    { type: "shape.scene-bg", label: "Starting Hintergrund", category: "Hintergrund", kind: "shape", keywords: "scene bg" },
+    // Frames & Shapes
+    { type: "frame", label: "Frame", category: "Frames", kind: "shape", keywords: "rahmen" },
+    { type: "frame.card", label: "Card Frame", category: "Frames", kind: "shape" },
+    { type: "shape.cam-ring", label: "Cam Ring", category: "Frames", kind: "shape", keywords: "webcam" },
+    { type: "shape.vignette", label: "Vignette", category: "Masken", kind: "shape" },
+    { type: "shape.cutout", label: "Cutout", category: "Masken", kind: "shape", keywords: "loch maske" },
+    { type: "shape.divider", label: "Divider", category: "Deko", kind: "shape", keywords: "linie" },
+    { type: "shape.sticker", label: "Sticker", category: "Deko", kind: "shape" }
   ];
 
-  fillPalette(document.getElementById("widgetPalette")!, widgets, "widget", addItem);
-  fillPalette(document.getElementById("shapePalette")!, shapes, "shape", addItem);
+  const paletteRoot = document.getElementById("paletteRoot")!;
+  const palettePreview = createPalettePreviewController({
+    createItem: (type, kind) => editorRuntime.createItem(type, kind, 0, 0),
+    prepareItem: applyPaletteDemoProps,
+    createContent: (item) => window.CcsCanvas.createItemContent(item),
+    paintContent: (el, item) => {
+      window.CcsCanvas.paintItemContent(el, item, PALETTE_DEMO_DATA, null, {
+        seedDemo: true,
+        demoChatMessages: demoChatMessages(),
+        demoAlert: demoAlertPayload(),
+        demoTickerEvents: demoTickerEvents()
+      });
+    }
+  });
+  const renderPalette = (query: string) => {
+    palettePreview.hide();
+    fillCategorizedPalette(paletteRoot, paletteItems, addItem, query, palettePreview);
+  };
+  renderPalette("");
+  const searchInput = document.getElementById("paletteSearch") as HTMLInputElement | null;
+  if (searchInput) setupPaletteSearch(searchInput, renderPalette);
   setupPaletteDrop(stage, addItem, () => editorRuntime.getLayout());
 
   const canvasSize = setupCanvasSize(editorRuntime, saveStatus, scheduleSave);
@@ -172,7 +204,7 @@ function bootEditor(): void {
   applyEditorLayers(editorRuntime, prefs);
   if (prefs.obsPreview) void obsPolling.refreshNow();
 
-  ["propX", "propY", "propW", "propH", "propZ"].forEach((id) => {
+  ["propX", "propY", "propW", "propH", "propZ", "propPadding"].forEach((id) => {
     document.getElementById(id)!.addEventListener("change", () => {
       const item = selectedItem();
       if (!item || item.locked) return;
@@ -181,6 +213,7 @@ function bootEditor(): void {
       item.w = Math.max(20, Number((document.getElementById("propW") as HTMLInputElement).value) || 20);
       item.h = Math.max(20, Number((document.getElementById("propH") as HTMLInputElement).value) || 20);
       item.z = Number((document.getElementById("propZ") as HTMLInputElement).value) || 0;
+      item.padding = Math.max(0, Number((document.getElementById("propPadding") as HTMLInputElement).value) || 0);
       editorRuntime.renderItems();
       editorRuntime.select(item.id);
       scheduleSave();
@@ -337,7 +370,7 @@ function wireObsSize(
 function wrapGeometrySection(): void {
   const layoutPane = document.getElementById("propsPaneLayout");
   if (!layoutPane) return;
-  const ids = ["propX", "propY", "propW", "propH", "propZ"];
+  const ids = ["propX", "propY", "propW", "propH", "propZ", "propPadding"];
   const labels = layoutPane.querySelectorAll("label");
   const { root, body } = propSection("geometry", "Position & Größe", true);
   for (const label of Array.from(labels)) {

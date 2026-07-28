@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/CreatorControlSuite.Core/CreatorControlSuite.Core.csproj" />
+    <ProjectReference Include="../../src/CreatorControlSuite.App/CreatorControlSuite.App.csproj" />
     <ProjectReference Include="../../src/CreatorControlSuite.Modules.OBS/CreatorControlSuite.Modules.OBS.csproj" />
     <ProjectReference Include="../../src/CreatorControlSuite.Modules.Twitch/CreatorControlSuite.Modules.Twitch.csproj" />
     <ProjectReference Include="../../src/CreatorControlSuite.Modules.Spotify/CreatorControlSuite.Modules.Spotify.csproj" />

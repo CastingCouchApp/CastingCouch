@@ -45,7 +45,9 @@ Overlay Effect Progress:
 }
 ```
 
-Registrierung in `effects/registry.ts`. Runtime: `applyItemEffects`. Editor: generisches Effects-Panel.
+Registrierung in `effects/registry.ts`. Runtime: `applyItemEffects`. Editor: generisches
+Effects-Panel im Tab **Effekte** — **flach** (kein äußerer `propSection`), Felder über
+gemeinsame Controls (`colorProp` / `numProp` / `boolProp` / … mit `.ccs-prop-row`, Enable-Toggle `.ccs-check`).
 
 Ausgeliefert: `glow`, `particles`, `scanlines`, `vignette`, `blur`, `noise`,
 `neon`, `glitch`, `sparkle`, `aurora`, `pulse-ring`, `hologram`, `outline`,
@@ -53,13 +55,15 @@ Ausgeliefert: `glow`, `particles`, `scanlines`, `vignette`, `blur`, `noise`,
 
 Item-Animationen (`item.animations[]`) liegen parallel unter
 `shared/animations/` (`fade`, `slide`, `bounce`, `pop`, `shake`, `float`,
-`pulse`, `spin`, `wiggle`, `flip`) — gleiches Strategy-/Panel-Muster.
+`pulse`, `spin`, `wiggle`, `flip`) — gleiches Strategy-/Panel-Muster im Tab **Animationen** (ebenfalls flach).
 
 ## Anti-Patterns
 
 - Effekt nur in einem Widget hardcoden
 - Eigenen `if` im Editor für Settings
 - CSS ohne `pointer-events: none` auf FX-Layern
+- Äußeren „Effekte“-/„Animationen“-Section-Wrapper im jeweiligen Tab
+- Abweichende Control-/Checkbox-Styles statt `.ccs-prop-row` / `.ccs-check`
 
 ## Packs
 

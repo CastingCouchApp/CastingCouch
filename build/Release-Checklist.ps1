@@ -9,7 +9,6 @@ $RequiredFiles = @(
     "src\CreatorControlSuite.App\Keys\update-public.pem"
 )
 $OptionalButRecommended = @(
-    "src\CreatorControlSuite.App\Keys\license-public.pem",
     "artifacts\release\update-manifest.json"
 )
 foreach($Relative in $RequiredFiles){if(-not(Test-Path -LiteralPath (Join-Path $Root $Relative))){$Failures.Add("Fehlt: $Relative")}}

@@ -1,5 +1,4 @@
 Produktive Public Keys hier ablegen:
-license-public.pem
 update-public.pem
 
 Private Schlüssel niemals ausliefern.

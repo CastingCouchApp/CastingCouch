@@ -32,10 +32,7 @@ using CreatorControlSuite.Core.Eventing;
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Core.Diagnostics;
 using CreatorControlSuite.Core.Ipc;
-using CreatorControlSuite.Core.Legal;
-using CreatorControlSuite.Core.Licensing;
 using CreatorControlSuite.Core.Logging;
-using CreatorControlSuite.Core.Migration;
 using CreatorControlSuite.Core.Music;
 using CreatorControlSuite.Core.Profiles;
 using CreatorControlSuite.Core.Security;
@@ -101,6 +98,9 @@ public partial class MainWindow : Window
     private readonly ProfilesPageViewModel _profilesPageViewModel;
     private readonly AboutPageViewModel _aboutPageViewModel;
     private readonly MusicPlayerPageViewModel _musicPlayerPageViewModel;
+    private readonly UpdatePageViewModel _updatePageViewModel;
+    private readonly MigrationPageViewModel _migrationPageViewModel;
+    private readonly GeneralSettingsPageViewModel _generalSettingsPageViewModel;
     private readonly CreatorIntelligenceService _creatorIntelligence;
     private readonly AlertsModule _alertsModule;
     private readonly OverlayModule _overlayModule;
@@ -110,18 +110,12 @@ public partial class MainWindow : Window
     private readonly ITwitchApiClient _twitchApiClient;
     private readonly WorkflowModule _workflowModule;
     private readonly IProfileService _profileService;
-    private readonly IUpdateService _updateService;
-    private readonly UpdateWorkflowService _updateWorkflowService;
-    private readonly ILegacyMigrationService _migrationService;
     private readonly StreamDeckModule _streamDeckModule;
     private readonly IAppLogger _appLogger;
     private readonly SettingsApplicationService _settingsApplicationService;
     private readonly RuntimeHealthService _runtimeHealthService;
     private readonly ICrashReporter _crashReporter;
     private readonly ILocalIpcServer _ipcServer;
-    private readonly ILicenseService _licenseService;
-    private readonly ILegalConsentService _legalConsentService;
-    private readonly IFeatureGate _featureGate;
     private readonly ISupportPackageService _supportPackageService;
     private readonly IReleaseReadinessService _releaseReadinessService;
     private readonly IWorkflowE2eService _workflowE2eService;
@@ -184,7 +178,6 @@ public partial class MainWindow : Window
     private System.Windows.Point _dashboardDirectDragStart;
     private FrameworkElement? _dashboardSelectedSection;
     private AppSettings _settings = new();
-    private UpdatePackage? _pendingUpdatePackage;
     private bool _settingsUiLoaded;
     private bool _updatingSpotifyUi;
     private string? _lastSpotifyAlbumCoverUrl;
@@ -417,18 +410,12 @@ public partial class MainWindow : Window
         ITwitchApiClient twitchApiClient,
         WorkflowModule workflowModule,
         IProfileService profileService,
-        IUpdateService updateService,
-        UpdateWorkflowService updateWorkflowService,
-        ILegacyMigrationService migrationService,
         StreamDeckModule streamDeckModule,
         IAppLogger appLogger,
         SettingsApplicationService settingsApplicationService,
         RuntimeHealthService runtimeHealthService,
         ICrashReporter crashReporter,
         ILocalIpcServer ipcServer,
-        ILicenseService licenseService,
-        ILegalConsentService legalConsentService,
-        IFeatureGate featureGate,
         ISupportPackageService supportPackageService,
         IReleaseReadinessService releaseReadinessService,
         IWorkflowE2eService workflowE2eService,
@@ -446,6 +433,10 @@ public partial class MainWindow : Window
         ProfilesPageViewModel profilesPageViewModel,
         AboutPageViewModel aboutPageViewModel,
         MusicPlayerPageViewModel musicPlayerPageViewModel,
+        UpdatePageViewModel updatePageViewModel,
+        MigrationPageViewModel migrationPageViewModel,
+        LegalPageViewModel legalPageViewModel,
+        GeneralSettingsPageViewModel generalSettingsPageViewModel,
         CreatorIntelligenceService creatorIntelligence,
         IEventBus eventBus)
     {
@@ -468,11 +459,23 @@ public partial class MainWindow : Window
         _profilesPageViewModel = profilesPageViewModel;
         _aboutPageViewModel = aboutPageViewModel;
         _musicPlayerPageViewModel = musicPlayerPageViewModel;
+        _updatePageViewModel = updatePageViewModel;
+        _migrationPageViewModel = migrationPageViewModel;
+        _generalSettingsPageViewModel = generalSettingsPageViewModel;
         _creatorIntelligence = creatorIntelligence;
         _eventBus = eventBus;
         DiagnosticsModuleView.DataContext = _diagnosticsPageViewModel;
         ProfilesPageViewHost.DataContext = _profilesPageViewModel;
         AboutPageViewHost.DataContext = _aboutPageViewModel;
+        UpdateSettingsViewHost.DataContext = _updatePageViewModel;
+        MigrationSettingsViewHost.DataContext = _migrationPageViewModel;
+        LegalSettingsViewHost.DataContext = legalPageViewModel;
+        GeneralSettingsViewHost.DataContext = _generalSettingsPageViewModel;
+        _updatePageViewModel.ConfirmRestoreAsync = ConfirmUpdateRestoreAsync;
+        _updatePageViewModel.AfterRestoreAsync = LoadSettingsAsync;
+        _migrationPageViewModel.AfterImportAsync = LoadSettingsAsync;
+        _updatePageViewModel.ShutdownApplication =
+            () => Application.Current.Shutdown(0);
         _profilesPageViewModel.AfterProfileAppliedAsync = async () => await LoadSettingsAsync();
         _profilesPageViewModel.ProfilesChanged += (_, _) =>
         {
@@ -498,27 +501,19 @@ public partial class MainWindow : Window
         _twitchApiClient = twitchApiClient;
         _workflowModule = workflowModule;
         _profileService = profileService;
-        _updateService = updateService;
-        _updateWorkflowService = updateWorkflowService;
-        _migrationService = migrationService;
         _streamDeckModule = streamDeckModule;
         _appLogger = appLogger;
         _settingsApplicationService = settingsApplicationService;
         _runtimeHealthService = runtimeHealthService;
         _crashReporter = crashReporter;
         _ipcServer = ipcServer;
-        _licenseService = licenseService;
-        _legalConsentService = legalConsentService;
-        _featureGate = featureGate;
         _supportPackageService = supportPackageService;
         _releaseReadinessService = releaseReadinessService;
         _workflowE2eService = workflowE2eService;
         _installerSelfTestService = installerSelfTestService;
         _betaReadinessService = betaReadinessService;
 
-        ThemeBox.SelectionChanged += ThemeBox_SelectionChanged;
         _themeService.ThemeChanged += (_, _) => Dispatcher.Invoke(OnThemeChanged);
-        _ = RefreshThemePickerAsync();
 
         DashboardModuleOrderList.ItemsSource = _dashboardModuleOrderItems;
         DashboardModuleOrderList.PreviewMouseLeftButtonDown += DashboardModuleOrderList_PreviewMouseLeftButtonDown;
@@ -2663,29 +2658,6 @@ public partial class MainWindow : Window
             OpenLocalDataFolder("StreamDeck");
 
 
-        CheckUpdatesButton.Click += async (_, _) =>
-            await CheckUpdatesAsync();
-
-        InstallUpdateButton.Click += async (_, _) =>
-            await InstallUpdateAsync();
-
-        CreateBackupButton.Click += async (_, _) =>
-            await CreateBackupAsync();
-
-        RestoreBackupButton.Click += async (_, _) =>
-            await RestoreSelectedBackupAsync();
-
-        DetectLegacyButton.Click += async (_, _) =>
-            await DetectLegacyAsync();
-
-        ImportLegacyButton.Click += async (_, _) =>
-            await ImportSelectedLegacyAsync();
-
-        ActivateLicenseButton.Click += async (_, _) => await ActivateLicenseAsync();
-        DeactivateLicenseButton.Click += async (_, _) => await DeactivateLicenseAsync();
-        RefreshLicenseButton.Click += async (_, _) => await RefreshLicenseAsync();
-        OpenEulaButton.Click += (_, _) => OpenLegalDocument("eula");
-        OpenPrivacyButton.Click += (_, _) => OpenLegalDocument("privacy");
     }
 
     public void OpenSettingsPage()
@@ -3544,125 +3516,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task RefreshThemePickerAsync()
-    {
-        bool premiumEnabled = await _featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes);
-        string desiredId = string.IsNullOrWhiteSpace(_settings.General.ThemeId)
-            ? ThemeCatalog.ClassicId
-            : _settings.General.ThemeId;
-        ThemeDefinition desired = ThemeCatalog.Resolve(desiredId);
-        if (desired.IsPremium && !premiumEnabled)
-        {
-            desired = ThemeCatalog.Classic;
-            _settings.General.ThemeId = ThemeCatalog.ClassicId;
-        }
-
-        bool previousLoading = _loadingSettingsIntoUi;
-        _loadingSettingsIntoUi = true;
-        try
-        {
-            ThemeBox.ItemsSource = _themeService.Themes;
-            ThemeBox.SelectedValue = desired.Id;
-            UpdateThemeDescription(desired, premiumEnabled);
-            _themeService.Apply(desired.Id);
-            if (TryFindResource("AppFontFamily") is System.Windows.Media.FontFamily fontFamily)
-            {
-                FontFamily = fontFamily;
-            }
-        }
-        finally
-        {
-            _loadingSettingsIntoUi = previousLoading;
-        }
-    }
-
-    private async void ThemeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_loadingSettingsIntoUi || ThemeBox.SelectedItem is not ThemeDefinition selected)
-        {
-            return;
-        }
-
-        bool premiumEnabled = await _featureGate.IsEnabledAsync(FeatureCatalog.PremiumThemes);
-        if (selected.IsPremium && !premiumEnabled)
-        {
-            ThemeLicenseHintText.Text =
-                "Premium-Themes erfordern die Pro-Edition. Classic bleibt verfügbar.";
-            ThemeLicenseHintText.Visibility = Visibility.Visible;
-            _loadingSettingsIntoUi = true;
-            try
-            {
-                ThemeBox.SelectedValue = ThemeCatalog.ClassicId;
-            }
-            finally
-            {
-                _loadingSettingsIntoUi = false;
-            }
-
-            selected = ThemeCatalog.Classic;
-        }
-        else
-        {
-            ThemeLicenseHintText.Visibility = Visibility.Collapsed;
-            ThemeLicenseHintText.Text = string.Empty;
-        }
-
-        UpdateThemeDescription(selected, premiumEnabled);
-        _settings.General.ThemeId = selected.Id;
-        _themeService.Apply(selected.Id);
-        if (TryFindResource("AppFontFamily") is System.Windows.Media.FontFamily fontFamily)
-        {
-            FontFamily = fontFamily;
-        }
-
-        // Re-apply active nav highlight with new brushes.
-        Button? active = new Button?[]
-        {
-            DashboardButton, ServicesButton, WorkflowButton, StatisticsButton,
-            OverlaysButton, AlertsButton, SettingsButton, DiagnosticsButton
-        }.FirstOrDefault(b => b is not null && b.FontWeight == FontWeights.SemiBold);
-        if (active is not null)
-        {
-            SetActiveNavigationButton(active);
-        }
-    }
-
-    private void UpdateThemeDescription(ThemeDefinition theme, bool premiumEnabled)
-    {
-        ThemeDescriptionText.Text = theme.Description;
-        if (theme.IsPremium && !premiumEnabled)
-        {
-            ThemeLicenseHintText.Text =
-                "Premium-Themes erfordern die Pro-Edition. Classic bleibt verfügbar.";
-            ThemeLicenseHintText.Visibility = Visibility.Visible;
-        }
-        else if (theme.IsPremium)
-        {
-            ThemeLicenseHintText.Text = "Premium-Theme (Pro).";
-            ThemeLicenseHintText.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            ThemeLicenseHintText.Visibility = Visibility.Collapsed;
-            ThemeLicenseHintText.Text = string.Empty;
-        }
-    }
-
-    private string ResolveSelectedThemeId()
-    {
-        if (ThemeBox.SelectedValue is string id && !string.IsNullOrWhiteSpace(id))
-        {
-            return ThemeCatalog.Resolve(id).Id;
-        }
-
-        if (ThemeBox.SelectedItem is ThemeDefinition theme)
-        {
-            return theme.Id;
-        }
-
-        return ThemeCatalog.ClassicId;
-    }
-
     private async Task LoadSettingsAsync()
     {
         _loadingSettingsIntoUi = true;
@@ -3683,18 +3536,9 @@ public partial class MainWindow : Window
         RefreshTimedAutomationRules();
         RefreshRunOfShowSteps();
 
-        DisplayNameBox.Text = _settings.Branding.DisplayName;
-        ChannelNameBox.Text = _settings.Branding.ChannelName;
-        StartWithWindowsBox.IsChecked = _settings.General.StartWithWindows;
-        MinimizeToTrayBox.IsChecked = _settings.General.MinimizeToTray;
-        await RefreshThemePickerAsync();
-        ConnectionWatchdogEnabledBox.IsChecked = _settings.General.ConnectionWatchdogEnabled;
-        ConnectionWatchdogSecondsBox.Text = _settings.General.ConnectionWatchdogSeconds.ToString();
-        ReconnectObsBox.IsChecked = _settings.General.ReconnectObs;
-        ReconnectTwitchBox.IsChecked = _settings.General.ReconnectTwitch;
-        ReconnectSpotifyBox.IsChecked = _settings.General.ReconnectSpotify;
-        ReconnectYouTubeMusicBox.IsChecked = _settings.General.ReconnectYouTubeMusic;
-        ReconnectStreamerBotBox.IsChecked = _settings.General.ReconnectStreamerBot;
+        _generalSettingsPageViewModel.Load(
+            _settings.Branding,
+            _settings.General);
         _connectionWatchdogTimer.Interval = TimeSpan.FromSeconds(
             Math.Clamp(_settings.General.ConnectionWatchdogSeconds, 5, 300));
         DashboardAutoFocusOnStreamStartBox.IsChecked =
@@ -3915,19 +3759,7 @@ public partial class MainWindow : Window
         StreamDeckEnabledBox.IsChecked = _settings.StreamDeck.Enabled;
         StreamDeckProfileBox.IsChecked = _settings.StreamDeck.AutoInstallProfile;
 
-        AutoUpdateBox.IsChecked = _settings.Updates.AutoCheck;
-        BackupBeforeUpdateBox.IsChecked = _settings.Updates.BackupBeforeUpdate;
-        SelectUpdateChannelBox(_settings.Updates.Channel);
-        InstallUpdateButton.IsEnabled = false;
-        _pendingUpdatePackage = null;
-
-        BackupsList.ItemsSource = await _updateService.ListBackupsAsync();
-        await RefreshLicenseAsync();
-
-        if (_settings.Updates.AutoCheck)
-        {
-            await CheckUpdatesAsync(silent: true);
-        }
+        await _updatePageViewModel.LoadAsync(_settings.Updates);
 
         if (_settings.Obs.AutoConnect)
         {
@@ -4007,22 +3839,9 @@ public partial class MainWindow : Window
     {
         try
         {
-            _settings.Branding.DisplayName = DisplayNameBox.Text.Trim();
-            _settings.Branding.ChannelName = ChannelNameBox.Text.Trim();
-            _settings.General.StartWithWindows = StartWithWindowsBox.IsChecked == true;
-            _settings.General.MinimizeToTray = MinimizeToTrayBox.IsChecked == true;
-            _settings.General.ThemeId = ResolveSelectedThemeId();
-            _settings.General.ConnectionWatchdogEnabled = ConnectionWatchdogEnabledBox.IsChecked == true;
-            if (int.TryParse(ConnectionWatchdogSecondsBox.Text.Trim(), out int watchdogSeconds))
-            {
-                _settings.General.ConnectionWatchdogSeconds = Math.Clamp(watchdogSeconds, 5, 300);
-            }
-
-            _settings.General.ReconnectObs = ReconnectObsBox.IsChecked == true;
-            _settings.General.ReconnectTwitch = ReconnectTwitchBox.IsChecked == true;
-            _settings.General.ReconnectSpotify = ReconnectSpotifyBox.IsChecked == true;
-            _settings.General.ReconnectYouTubeMusic = ReconnectYouTubeMusicBox.IsChecked == true;
-            _settings.General.ReconnectStreamerBot = ReconnectStreamerBotBox.IsChecked == true;
+            _generalSettingsPageViewModel.ApplyTo(
+                _settings.Branding,
+                _settings.General);
 
             _settings.Obs.Host = ObsHostBox.Text.Trim();
             _settings.Obs.Port = int.Parse(ObsPortBox.Text.Trim());
@@ -4226,9 +4045,7 @@ public partial class MainWindow : Window
             _settings.StreamDeck.Enabled = StreamDeckEnabledBox.IsChecked == true;
             _settings.StreamDeck.AutoInstallProfile = StreamDeckProfileBox.IsChecked == true;
 
-            _settings.Updates.AutoCheck = AutoUpdateBox.IsChecked == true;
-            _settings.Updates.BackupBeforeUpdate = BackupBeforeUpdateBox.IsChecked == true;
-            _settings.Updates.Channel = GetSelectedUpdateChannel();
+            _updatePageViewModel.ApplyTo(_settings.Updates);
             _settings.Product.UpdateChannel = _settings.Updates.Channel;
             _settings.Product.Version = GetCurrentProductVersion();
 
@@ -4254,6 +4071,11 @@ public partial class MainWindow : Window
             RefreshRaidChannelSelectors();
 
             await _settingsApplicationService.SaveAsync(_settings);
+            _connectionWatchdogTimer.Interval = TimeSpan.FromSeconds(
+                Math.Clamp(
+                    _settings.General.ConnectionWatchdogSeconds,
+                    5,
+                    300));
             await RestartOverlayWebServerFromSettingsAsync();
             await _musicPlayerRouter.ApplyProviderAsync(_settings.MusicPlayer.ProviderId);
             ApplyMusicProviderUiState();
@@ -5492,50 +5314,6 @@ public partial class MainWindow : Window
         DashboardStreamHistorySection.Visibility = _settings.Dashboard.ShowStreamHistory
             ? Visibility.Visible
             : Visibility.Collapsed;
-    }
-
-    private async Task RefreshLicenseAsync()
-    {
-        LicenseStatus status = await _licenseService.GetStatusAsync();
-        LicenseStatusText.Text = $"Status: {status.State}\n" + status.Detail + (status.License is null ? "" : "\nEdition: " + status.License.Edition + "\nLizenznehmer: " + status.License.CustomerName + "\nLizenz-ID: " + status.License.LicenseId);
-        LicenseStatusText.Foreground = status.IsUsable ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.IndianRed;
-
-        IReadOnlyDictionary<string, bool> features = await _featureGate.SnapshotAsync();
-        FeatureGateGrid.ItemsSource = features.OrderBy(x => x.Key).Select(x => new { Feature = x.Key, Aktiv = x.Value }).ToList();
-    }
-
-    private async Task ActivateLicenseAsync()
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Creator Control Suite Lizenz (*.ccslicense)|*.ccslicense|JSON (*.json)|*.json" };
-        if (dialog.ShowDialog() != true)
-        {
-            return;
-        }
-
-        LicenseStatus status = await _licenseService.ActivateAsync(dialog.FileName);
-        await RefreshLicenseAsync();
-        if (!status.IsUsable)
-        {
-            MessageBox.Show(status.Detail, "Lizenz konnte nicht aktiviert werden", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private async Task DeactivateLicenseAsync()
-    {
-        if (MessageBox.Show("Lokale Lizenz wirklich deaktivieren?", "Lizenz", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        await _licenseService.DeactivateAsync(); await RefreshLicenseAsync();
-    }
-
-    private void OpenLegalDocument(string id)
-    {
-        LegalDocumentInfo? document = _legalConsentService.GetDocuments().FirstOrDefault(x => string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase));
-        string? documentPath = document?.FilePath;
-        if (string.IsNullOrWhiteSpace(documentPath) || !File.Exists(documentPath)) { MessageBox.Show("Dokument wurde nicht gefunden.", "Creator Control Suite", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-        Process.Start(new ProcessStartInfo { FileName = documentPath, UseShellExecute = true });
     }
 
     private async Task CreateSupportPackageAsync()
@@ -7132,131 +6910,6 @@ public partial class MainWindow : Window
             });
     }
 
-    private async Task CheckUpdatesAsync(bool silent = false)
-    {
-        try
-        {
-            InstallUpdateButton.IsEnabled = false;
-            _pendingUpdatePackage = null;
-
-            if (!silent)
-            {
-                UpdateStatusText.Text = "Suche nach Updates …";
-                UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
-            }
-
-            UpdateCheckResult result = await _updateWorkflowService.CheckAsync();
-            _pendingUpdatePackage = result.Package;
-            InstallUpdateButton.IsEnabled = result.UpdateAvailable && result.Package is not null;
-
-            if (result.UpdateAvailable && result.Package is not null)
-            {
-                string notes = string.IsNullOrWhiteSpace(result.Package.ReleaseNotes)
-                    ? string.Empty
-                    : " — " + Truncate(result.Package.ReleaseNotes, 160);
-                UpdateStatusText.Text =
-                    $"Update verfügbar: {result.Package.Version} (aktuell {result.CurrentVersion}){notes}";
-                UpdateStatusText.Foreground = System.Windows.Media.Brushes.LightGreen;
-            }
-            else
-            {
-                UpdateStatusText.Text = result.Detail;
-                UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
-            }
-        }
-        catch (Exception exception)
-        {
-            UpdateStatusText.Text = exception.Message;
-            UpdateStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
-            InstallUpdateButton.IsEnabled = false;
-            _pendingUpdatePackage = null;
-        }
-    }
-
-    private async Task InstallUpdateAsync()
-    {
-        if (_pendingUpdatePackage is null)
-        {
-            UpdateStatusText.Text = "Kein Update ausgewählt. Bitte zuerst suchen.";
-            UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
-            return;
-        }
-
-        try
-        {
-            InstallUpdateButton.IsEnabled = false;
-            CheckUpdatesButton.IsEnabled = false;
-            UpdateStatusText.Text = "Update wird heruntergeladen …";
-            UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
-
-            var progress = new Progress<UpdateWorkflowProgress>(
-                item => UpdateStatusText.Text =
-                    UpdateWorkflowPresentation.Format(item));
-
-            UpdateWorkflowResult result =
-                await _updateWorkflowService.InstallAsync(
-                _pendingUpdatePackage,
-                new UpdateWorkflowOptions(
-                    _settings.Updates.BackupBeforeUpdate,
-                    GetCurrentProductVersion()),
-                progress);
-            if (result.Backups.Count > 0)
-            {
-                BackupsList.ItemsSource = result.Backups;
-            }
-
-            Application.Current.Shutdown(0);
-        }
-        catch (Exception exception)
-        {
-            UpdateStatusText.Text = exception.Message;
-            UpdateStatusText.Foreground = System.Windows.Media.Brushes.IndianRed;
-            InstallUpdateButton.IsEnabled = _pendingUpdatePackage is not null;
-            CheckUpdatesButton.IsEnabled = true;
-        }
-    }
-
-    private static string Truncate(string value, int maxLength)
-    {
-        string normalized = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
-        if (normalized.Length <= maxLength)
-        {
-            return normalized;
-        }
-
-        return normalized[..maxLength].TrimEnd() + "…";
-    }
-
-    private void SelectUpdateChannelBox(string channel)
-    {
-        string normalized = string.IsNullOrWhiteSpace(channel) ? "Alpha" : channel.Trim();
-        foreach (ComboBoxItem item in UpdateChannelBox.Items.OfType<ComboBoxItem>())
-        {
-            if (string.Equals(
-                    item.Content?.ToString(),
-                    normalized,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                UpdateChannelBox.SelectedItem = item;
-                return;
-            }
-        }
-
-        UpdateChannelBox.SelectedIndex = 2;
-    }
-
-    private string GetSelectedUpdateChannel()
-    {
-        if (UpdateChannelBox.SelectedItem is ComboBoxItem item &&
-            item.Content is string content &&
-            !string.IsNullOrWhiteSpace(content))
-        {
-            return content.Trim();
-        }
-
-        return "Alpha";
-    }
-
     private static string GetCurrentProductVersion()
     {
         var assembly = System.Reflection.Assembly.GetExecutingAssembly();
@@ -7273,30 +6926,6 @@ public partial class MainWindow : Window
         }
 
         return assembly.GetName().Version?.ToString() ?? "0.0.0";
-    }
-
-    private async Task CreateBackupAsync()
-    {
-        try
-        {
-            UpdateBackup backup = await _updateService.CreateBackupAsync(
-                GetCurrentProductVersion());
-
-            BackupsList.ItemsSource =
-                await _updateService.ListBackupsAsync();
-
-            UpdateStatusText.Text =
-                "Backup erstellt: " + backup.Path;
-
-            UpdateStatusText.Foreground =
-                System.Windows.Media.Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            UpdateStatusText.Text = exception.Message;
-            UpdateStatusText.Foreground =
-                System.Windows.Media.Brushes.IndianRed;
-        }
     }
 
     private bool EnsureDefaultDashboardSceneButtons()
@@ -8747,73 +8376,14 @@ public partial class MainWindow : Window
         await SaveTwitchGoalsAsync();
     }
 
-    private async Task RestoreSelectedBackupAsync()
-    {
-        if (BackupsList.SelectedItem is not UpdateBackup backup)
-        {
-            return;
-        }
-
-        MessageBoxResult result = MessageBox.Show(
-            "Backup wirklich wiederherstellen?\n\n" +
-            "Die aktuellen Einstellungen und Profildaten werden überschrieben.",
-            "Backup wiederherstellen",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (result != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        await _updateService.RestoreBackupAsync(backup.Id);
-        await LoadSettingsAsync();
-
-        UpdateStatusText.Text =
-            "Backup wurde wiederhergestellt.";
-        UpdateStatusText.Foreground =
-            System.Windows.Media.Brushes.LightGreen;
-    }
-
-    private async Task DetectLegacyAsync()
-    {
-        IReadOnlyList<MigrationCandidate> candidates =
-            await _migrationService.DetectAsync();
-
-        LegacyCandidatesList.ItemsSource = candidates;
-
-        MigrationStatusText.Text = candidates.Count == 0
-            ? "Keine alte Suite automatisch gefunden."
-            : $"{candidates.Count} möglicher Installationsordner gefunden.";
-    }
-
-    private async Task ImportSelectedLegacyAsync()
-    {
-        if (LegacyCandidatesList.SelectedItem
-            is not MigrationCandidate candidate)
-        {
-            return;
-        }
-
-        MigrationResult result = await _migrationService.ImportAsync(
-            candidate.SourcePath);
-
-        await LoadSettingsAsync();
-
-        MigrationStatusText.Text =
-            result.Detail +
-            "\nImportiert: " +
-            string.Join(", ", result.ImportedItems) +
-            (result.Warnings.Count > 0
-                ? "\nHinweise: " +
-                  string.Join(" | ", result.Warnings)
-                : "");
-
-        MigrationStatusText.Foreground =
-            result.Success
-                ? System.Windows.Media.Brushes.LightGreen
-                : System.Windows.Media.Brushes.IndianRed;
-    }
+    private static Task<bool> ConfirmUpdateRestoreAsync() =>
+        Task.FromResult(
+            MessageBox.Show(
+                "Backup wirklich wiederherstellen?\n\n" +
+                "Die aktuellen Einstellungen und Profildaten werden überschrieben.",
+                "Backup wiederherstellen",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) == MessageBoxResult.Yes);
 
     private async Task RestartOverlayWebServerFromSettingsAsync()
     {

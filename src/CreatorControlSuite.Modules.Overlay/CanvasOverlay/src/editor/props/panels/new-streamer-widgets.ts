@@ -81,6 +81,10 @@ function featureToggle(
   ctx: EditorContext,
   children?: (body: HTMLElement) => void
 ): HTMLElement {
+  // Simple on/off → same row style as boolProp ("Inner Glow").
+  if (!children) {
+    return boolProp(enabledKey, title, item, ctx);
+  }
   return featureSection({
     id,
     title,

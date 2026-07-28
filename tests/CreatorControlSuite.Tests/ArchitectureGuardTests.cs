@@ -7,8 +7,8 @@ public sealed class ArchitectureGuardTests
     private static readonly IReadOnlyDictionary<string, int> OversizedFileBaseline =
         new Dictionary<string, int>(StringComparer.Ordinal)
         {
-            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml.cs"] = 25_036,
-            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml"] = 4_377
+            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml.cs"] = 24_606,
+            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml"] = 4_308
         };
 
     [Fact]
@@ -149,6 +149,63 @@ public sealed class ArchitectureGuardTests
             violations.Count == 0,
             "Unerlaubte Modulabhängigkeiten:" + Environment.NewLine +
             string.Join(Environment.NewLine, violations));
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void CommercialLicensing_IsNotPartOfProduct()
+    {
+        string root = FindRepositoryRoot();
+        string sourceRoot = Path.Combine(root, "src");
+        string licensingRoot = Path.Combine(
+            sourceRoot,
+            "CreatorControlSuite.Core",
+            "Licensing");
+        string[] licensingSources = Directory.Exists(licensingRoot)
+            ? Directory.GetFiles(licensingRoot, "*.cs", SearchOption.AllDirectories)
+            : [];
+
+        Assert.Empty(licensingSources);
+        Assert.False(
+            File.Exists(Path.Combine(
+                sourceRoot,
+                "CreatorControlSuite.LicenseMockServer",
+                "CreatorControlSuite.LicenseMockServer.csproj")),
+            "Der Lizenz-Mockserver darf nicht wieder eingeführt werden.");
+
+        string[] prohibitedTokens =
+        [
+            "CreatorControlSuite.Core.Licensing",
+            "IFeatureGate",
+            "ILicenseService",
+            "LicenseMockServer",
+            "license-public.pem"
+        ];
+        string[] sourceFiles = Directory
+            .EnumerateFiles(sourceRoot, "*", SearchOption.AllDirectories)
+            .Where(path =>
+                path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var violations = new List<string>();
+
+        foreach (string sourceFile in sourceFiles)
+        {
+            string content = File.ReadAllText(sourceFile);
+            foreach (string token in prohibitedTokens.Where(token =>
+                         content.Contains(token, StringComparison.Ordinal)))
+            {
+                violations.Add(
+                    $"{Path.GetRelativePath(root, sourceFile)}: {token}");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Kommerzielle Laufzeit-Lizenzierung gefunden:"
+            + Environment.NewLine
+            + string.Join(Environment.NewLine, violations));
     }
 
     private static string FindRepositoryRoot()

@@ -7,6 +7,10 @@
         xmlns:diag="clr-namespace:CreatorControlSuite.App.Views.Pages.Diagnostics"
         xmlns:profiles="clr-namespace:CreatorControlSuite.App.Views.Pages.Profiles"
         xmlns:about="clr-namespace:CreatorControlSuite.App.Views.Pages.About"
+        xmlns:updates="clr-namespace:CreatorControlSuite.App.Views.Pages.Updates"
+        xmlns:migration="clr-namespace:CreatorControlSuite.App.Views.Pages.Migration"
+        xmlns:legal="clr-namespace:CreatorControlSuite.App.Views.Pages.Legal"
+        xmlns:settings="clr-namespace:CreatorControlSuite.App.Views.Pages.Settings"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         x:Class="CreatorControlSuite.App.Shell.MainWindow"
         Title="Creator Control Suite"
@@ -3022,34 +3026,7 @@
                 </StackPanel>
                 <TabControl x:Name="SettingsTabControl" Grid.Row="1" Margin="0,18,0,18" Background="{DynamicResource SettingsTabBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}">
                     <TabItem Header="Allgemein">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="18">
-                                <TextBlock Text="Anzeigename" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
-                                <TextBox x:Name="DisplayNameBox"/>
-                                <TextBlock Text="Kanalname" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
-                                <TextBox x:Name="ChannelNameBox"/>
-                                <CheckBox x:Name="StartWithWindowsBox" Content="Mit Windows starten" Margin="0,16,0,0"/>
-                                <CheckBox x:Name="MinimizeToTrayBox" Content="Beim Schließen in den Infobereich minimieren" Margin="0,8,0,0"/>
-                                <Separator Margin="0,18,0,14"/>
-                                <TextBlock Text="Darstellung" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
-                                <TextBlock Text="Theme" Foreground="{DynamicResource AccentBrush}" Margin="0,10,0,6"/>
-                                <ComboBox x:Name="ThemeBox" DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
-                                <TextBlock x:Name="ThemeDescriptionText" Text="" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                                <TextBlock x:Name="ThemeLicenseHintText" Text="" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
-                                <Separator Margin="0,18,0,14"/>
-                                <TextBlock Text="Verbindungsüberwachung" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
-                                <CheckBox x:Name="ConnectionWatchdogEnabledBox" Content="Verbindungen automatisch überwachen und bei Abbruch wiederherstellen" Margin="0,10,0,0"/>
-                                <TextBlock Text="Prüfintervall in Sekunden" Foreground="{DynamicResource AccentBrush}" Margin="0,12,0,6"/>
-                                <TextBox x:Name="ConnectionWatchdogSecondsBox" Width="100" HorizontalAlignment="Left" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                <WrapPanel Margin="0,12,0,0">
-                                    <CheckBox x:Name="ReconnectObsBox" Content="OBS" Margin="0,0,16,0"/>
-                                    <CheckBox x:Name="ReconnectTwitchBox" Content="Twitch" Margin="0,0,16,0"/>
-                                    <CheckBox x:Name="ReconnectSpotifyBox" Content="Spotify" Margin="0,0,16,0"/>
-                                    <CheckBox x:Name="ReconnectYouTubeMusicBox" Content="YouTube Music" Margin="0,0,16,0"/>
-                                    <CheckBox x:Name="ReconnectStreamerBotBox" Content="Streamer.bot"/>
-                                </WrapPanel>
-                            </StackPanel>
-                        </ScrollViewer>
+                        <settings:GeneralSettingsView x:Name="GeneralSettingsViewHost"/>
                     </TabItem>
                     <TabItem Header="Dashboard" Visibility="Collapsed">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -3498,60 +3475,14 @@
                             </Border>
                         </StackPanel>
                     </TabItem>
-                    <TabItem Header="Lizenz">
-                        <StackPanel Margin="18">
-                            <TextBlock Text="Lizenz" Foreground="{DynamicResource AccentBrush}" FontSize="18" FontWeight="Bold"/>
-                            <TextBlock x:Name="LicenseStatusText" Text="Status wird geladen." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                            <TextBlock Text="Freigeschaltete Funktionen" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" Margin="0,18,0,6"/>
-                            <DataGrid x:Name="FeatureGateGrid" AutoGenerateColumns="True" IsReadOnly="True" Height="210" Background="{DynamicResource InputAltBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <WrapPanel Margin="0,14,0,0">
-                                <Button x:Name="ActivateLicenseButton" Content="Lizenzdatei aktivieren" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
-                                <Button x:Name="DeactivateLicenseButton" Content="Lizenz deaktivieren"/>
-                                <Button x:Name="RefreshLicenseButton" Content="Status aktualisieren"/>
-                            </WrapPanel>
-                            <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="Rechtliche Dokumente" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                                    <WrapPanel Margin="0,12,0,0">
-                                        <Button x:Name="OpenEulaButton" Content="EULA öffnen"/>
-                                        <Button x:Name="OpenPrivacyButton" Content="Datenschutz öffnen"/>
-                                    </WrapPanel>
-                                </StackPanel>
-                            </Border>
-                            <TextBlock Text="Hinweis: Die mitgelieferten Rechtstexte sind technische Entwürfe und vor einem kommerziellen Release juristisch zu prüfen." Foreground="#FFB347" TextWrapping="Wrap" Margin="0,16,0,0"/>
-                        </StackPanel>
+                    <TabItem Header="Rechtliches">
+                        <legal:LegalSettingsView x:Name="LegalSettingsViewHost"/>
                     </TabItem>
                     <TabItem Header="Updates">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="18">
-                                <CheckBox x:Name="AutoUpdateBox" Content="Automatisch nach Updates suchen"/>
-                                <CheckBox x:Name="BackupBeforeUpdateBox" Content="Vor Updates ein Backup erstellen" Margin="0,8,0,0"/>
-                                <TextBlock Text="Updatekanal" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
-                                <ComboBox x:Name="UpdateChannelBox">
-                                    <ComboBoxItem Content="Stable"/>
-                                    <ComboBoxItem Content="Beta"/>
-                                    <ComboBoxItem Content="Alpha"/>
-                                </ComboBox>
-                                <WrapPanel Margin="0,14,0,0">
-                                    <Button x:Name="CheckUpdatesButton" Content="Nach Updates suchen" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
-                                    <Button x:Name="InstallUpdateButton" Content="Update installieren" IsEnabled="False" Margin="8,0,0,0" Background="#315A3A" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold"/>
-                                    <Button x:Name="CreateBackupButton" Content="Backup jetzt erstellen"/>
-                                    <Button x:Name="RestoreBackupButton" Content="Ausgewähltes Backup wiederherstellen"/>
-                                </WrapPanel>
-                                <TextBlock x:Name="UpdateStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                                <ListBox x:Name="BackupsList" Height="160" Background="{DynamicResource WindowBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="Path" Margin="0,12,0,0"/>
-                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
-                                    <StackPanel>
-                                        <TextBlock Text="Migration aus der bisherigen Suite" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                        <TextBlock Text="Die Suche erkennt alte Einstellungsordner, Overlay-Inhalte und Alert-Dateien." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                                        <WrapPanel Margin="0,12,0,0">
-                                            <Button x:Name="DetectLegacyButton" Content="Alte Suite suchen"/>
-                                            <Button x:Name="ImportLegacyButton" Content="Ausgewählten Fund importieren" Background="#416B3C"/>
-                                        </WrapPanel>
-                                        <ListBox x:Name="LegacyCandidatesList" Height="130" Background="{DynamicResource WindowBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="SourcePath" Margin="0,10,0,0"/>
-                                        <TextBlock x:Name="MigrationStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                                    </StackPanel>
-                                </Border>
+                                <updates:UpdateSettingsView x:Name="UpdateSettingsViewHost"/>
+                                <migration:MigrationSettingsView x:Name="MigrationSettingsViewHost"/>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

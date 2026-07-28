@@ -1,3 +1,4 @@
+using System.IO;
 using System.IO.Compression;
 using CreatorControlSuite.Modules.Overlay.Extensions;
 
