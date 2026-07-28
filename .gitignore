@@ -94,11 +94,16 @@ $RECYCLE.BIN/
 *.css.map
 # esbuild outputs (npm run build / MSBuild BuildCanvasOverlay)
 **/CanvasOverlay/shared/runtime.js
+**/CanvasOverlay/shared/runtime.css
 **/CanvasOverlay/shared/styles.css
 **/CanvasOverlay/editor/editor.js
 **/CanvasOverlay/editor/editor.css
 **/CanvasOverlay/view/view.js
 **/CanvasOverlay/solo/solo.js
+**/CanvasOverlay/**/*.js.map
+**/CanvasOverlay/**/*.css.map
+**/CanvasOverlay/dev/.layouts/
+**/CanvasOverlay/dev/.data/
 
 # Misc / local agent state
 *.swp
