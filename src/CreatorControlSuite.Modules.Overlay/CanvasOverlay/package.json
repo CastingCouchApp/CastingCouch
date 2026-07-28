@@ -14,7 +14,7 @@
   "devDependencies": {
     "esbuild": "^0.25.0",
     "jsdom": "^30.0.0",
-    "typescript": "^5.7.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
 }
