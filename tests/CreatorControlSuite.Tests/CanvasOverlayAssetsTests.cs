@@ -32,6 +32,14 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("countdown", types);
         Assert.Contains("socials", types);
         Assert.Contains("partner-roulette", types);
+        Assert.Contains("goal-bar", types);
+        Assert.Contains("event-ticker", types);
+        Assert.Contains("viewer-count", types);
+        Assert.Contains("lower-third", types);
+        Assert.Contains("qr-code", types);
+        Assert.Contains("brb-panel", types);
+        Assert.Contains("announcement-bar", types);
+        Assert.Contains("animated-background", types);
         Assert.DoesNotContain("spotify", types);
     }
 
@@ -309,6 +317,9 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("shape.vignette", types);
         Assert.Contains("shape.scene-bg", types);
         Assert.Contains("shape.cutout", types);
+        Assert.Contains("shape.divider", types);
+        Assert.Contains("shape.cam-ring", types);
+        Assert.Contains("shape.sticker", types);
     }
 
     [Fact]
@@ -534,19 +545,98 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("registerEffect", runtime);
         Assert.Contains("listEffectTypes", runtime);
         Assert.Contains("glow", runtime);
+        Assert.Contains("motion", runtime);
+        Assert.Contains("ccs-item-fx-glow--", runtime);
+        Assert.Contains("ccs-item-glow-content--", runtime);
+        Assert.Contains("contentGlowFilter", runtime);
+        Assert.Contains("pulse", runtime);
+        Assert.Contains("breathe", runtime);
         Assert.Contains("particles", runtime);
         Assert.Contains("scanlines", runtime);
         Assert.Contains("vignette", runtime);
         Assert.Contains("blur", runtime);
         Assert.Contains("noise", runtime);
+        Assert.Contains("neon", runtime);
+        Assert.Contains("glitch", runtime);
+        Assert.Contains("sparkle", runtime);
+        Assert.Contains("aurora", runtime);
+        Assert.Contains("pulse-ring", runtime);
+        Assert.Contains("hologram", runtime);
+        Assert.Contains("outline", runtime);
+        Assert.Contains("drop-shadow", runtime);
+        Assert.Contains("rainbow", runtime);
+        Assert.Contains("spotlight", runtime);
         Assert.Contains("effects: []", runtime);
         Assert.Contains("loadExtensions", runtime);
         Assert.Contains("extUrl", runtime);
+        Assert.Contains("resolveEffectTarget", runtime);
+        Assert.Contains("effectTargets", runtime);
+        Assert.Contains("fxTarget", runtime);
+        Assert.Contains("\"content\"", runtime);
+        Assert.Contains("targets: [\"box\", \"content\"]", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("Effekt-Ziel", editor);
+        Assert.Contains("\"Inhalt\"", editor);
+        Assert.Contains("effectTargets", editor);
+        Assert.Contains("allowedTargets", editor);
+        Assert.Contains("target: \"box\"", editor);
 
         Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
         Assert.Contains("ccs-item-fx-layer", styles);
         Assert.Contains("ccs-item-fx-glow", styles);
+        Assert.Contains("ccs-item-fx-glow--pulse", styles);
+        Assert.Contains("ccs-item-fx-glow--breathe", styles);
+        Assert.Contains("ccs-fx-glow-pulse", styles);
+        Assert.Contains("ccs-item-glow-content--pulse", styles);
+        Assert.Contains("ccs-item-shadow-content--pulse", styles);
+        Assert.Contains("--ccs-fx-glow-i", styles);
+        Assert.Contains("ccs-item-outline--pulse", styles);
         Assert.Contains("ccs-item-fx-scanlines", styles);
+        Assert.Contains("ccs-item-fx-neon", styles);
+        Assert.Contains("ccs-item-fx-glitch", styles);
+        Assert.Contains("ccs-item-fx-sparkle", styles);
+        Assert.Contains("ccs-item-fx-aurora", styles);
+        Assert.Contains("ccs-item-fx-pulse-ring", styles);
+        Assert.Contains("ccs-item-fx-hologram", styles);
+        Assert.Contains("ccs-item-fx-outline", styles);
+        Assert.Contains("ccs-item-fx-drop-shadow", styles);
+        Assert.Contains("ccs-item-fx-rainbow", styles);
+        Assert.Contains("ccs-item-fx-spotlight", styles);
+    }
+
+    [Fact]
+    public void Runtime_ExposesAnimationStrategiesAndApplyItemAnimations()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("ANIMATION_STRATEGIES", runtime);
+        Assert.Contains("applyItemAnimations", runtime);
+        Assert.Contains("registerAnimation", runtime);
+        Assert.Contains("listAnimationTypes", runtime);
+        Assert.Contains("animations: []", runtime);
+        Assert.Contains("fade", runtime);
+        Assert.Contains("slide", runtime);
+        Assert.Contains("bounce", runtime);
+        Assert.Contains("pop", runtime);
+        Assert.Contains("shake", runtime);
+        Assert.Contains("float", runtime);
+        Assert.Contains("pulse", runtime);
+        Assert.Contains("spin", runtime);
+        Assert.Contains("wiggle", runtime);
+        Assert.Contains("flip", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains("ccs-item-anim-target", styles);
+        Assert.Contains("ccs-anim-fade", styles);
+        Assert.Contains("ccs-anim-slide", styles);
+        Assert.Contains("ccs-anim-bounce", styles);
+        Assert.Contains("ccs-anim-pop", styles);
+        Assert.Contains("ccs-anim-shake", styles);
+        Assert.Contains("ccs-anim-float", styles);
+        Assert.Contains("ccs-anim-pulse", styles);
+        Assert.Contains("ccs-anim-spin", styles);
+        Assert.Contains("ccs-anim-wiggle", styles);
+        Assert.Contains("ccs-anim-flip", styles);
     }
 
     [Fact]
@@ -558,10 +648,72 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("function fontProp", editor);
         Assert.Contains("function colorProp", editor);
         Assert.Contains("renderEffectsPanel", editor);
+        Assert.Contains("renderAnimationsPanel", editor);
         Assert.Contains("ccs-prop-section", editor);
+        Assert.Contains("ccs-prop-section-chevron", editor);
+        Assert.Contains("ccs-num-prop-label", editor);
         Assert.Contains("Position", editor);
         Assert.Contains("addBtn.textContent", editor);
         Assert.Contains("Effekt", editor);
+        Assert.Contains("Animation", editor);
+        Assert.Contains("wireInspectorTabs", editor);
+        Assert.Contains("ccs-props-tab", editor);
+        Assert.Contains("propEffects", editor);
+        Assert.Contains("propAnimations", editor);
+    }
+
+    [Fact]
+    public void EditorHtml_HasInspectorTabs()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("editor/index.html", out string html, out _));
+        Assert.Contains("id=\"propsTabs\"", html);
+        Assert.Contains("data-tab=\"layout\"", html);
+        Assert.Contains("data-tab=\"widget\"", html);
+        Assert.Contains("data-tab=\"effects\"", html);
+        Assert.Contains("data-tab=\"animations\"", html);
+        Assert.Contains("id=\"propEffects\"", html);
+        Assert.Contains("id=\"propAnimations\"", html);
+        Assert.Contains("id=\"propsPaneLayout\"", html);
+    }
+
+    [Fact]
+    public void EditorHtml_CanvasSizeSectionCollapsedByDefault()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("editor/index.html", out string html, out _));
+        Assert.Contains("<details class=\"ccs-palette-section\" id=\"canvasSizeSection\">", html);
+        Assert.Contains("Fenstergröße", html);
+        Assert.Contains("id=\"canvasSizePreset\"", html);
+        Assert.DoesNotContain("id=\"canvasSizeSection\" open", html);
+    }
+
+    [Fact]
+    public void EditorHtml_ToolbarUsesIconButtons()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("editor/index.html", out string html, out _));
+        Assert.Contains("class=\"ccs-toolbar-btn\"", html);
+        Assert.Contains("aria-label=\"Löschen\"", html);
+        Assert.Contains("aria-label=\"Duplizieren\"", html);
+        Assert.Contains("aria-label=\"Ganz nach oben\"", html);
+        Assert.Contains("aria-label=\"Ebene rauf\"", html);
+        Assert.Contains("aria-label=\"Ebene runter\"", html);
+        Assert.Contains("aria-label=\"Ganz nach unten\"", html);
+        Assert.Contains("title=\"OBS-Vorschau\"", html);
+        Assert.Contains("title=\"Raster\"", html);
+        Assert.Contains("title=\"Einrasten an Raster\"", html);
+        Assert.Contains("title=\"Magnet\"", html);
+        Assert.DoesNotContain(">Löschen</button>", html);
+        Assert.DoesNotContain(">Duplizieren</button>", html);
+    }
+
+    [Fact]
+    public void Editor_DeleteKeyRemovesSelectedItem()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("keydown", editor);
+        Assert.Contains("\"Delete\"", editor);
+        Assert.Contains("\"Backspace\"", editor);
+        Assert.Contains("runEditorCommand(\"delete\"", editor);
+        Assert.Contains("isEditableKeyboardTarget", editor);
     }
 
     [Fact]
@@ -571,5 +723,236 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("function setLayout(next, keepSelection)", runtime);
         Assert.Contains("keepSelection && selectedId", runtime);
         Assert.Contains("select(selectedId)", runtime);
+    }
+
+    [Fact]
+    public void Runtime_InvokesOnAfterRenderAfterRebuild()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("onAfterRender", runtime);
+        Assert.Contains("ccs-editor-grid", runtime);
+        Assert.Contains("ccs-obs-preview", runtime);
+        Assert.Contains("ccs-magnet-guides", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("onAfterRender", editor);
+        Assert.Contains("applyEditorLayers", editor);
+    }
+
+    [Fact]
+    public void Editor_ResizeSnapsActiveHandleEdges()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("activeEdgesFromHandle", editor);
+        Assert.Contains("applyGridSnap", editor);
+        Assert.Contains("mode === \"resize\"", editor);
+        Assert.Contains("active.right", editor);
+        Assert.Contains("active.bottom", editor);
+        Assert.Contains("active.left", editor);
+        Assert.Contains("active.top", editor);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersGoalBarWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"goal-bar\":", runtime);
+        Assert.Contains("createGoalBarEl", runtime);
+        Assert.Contains("updateGoalBar", runtime);
+        Assert.Contains("GOAL_BAR_VARIANTS", runtime);
+        Assert.Contains("GOAL_BAR_SIZE_PRESETS", runtime);
+        Assert.Contains("ccs-goal-bar", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"goal-bar\"", editor);
+        Assert.Contains("Goal Bar", editor);
+        Assert.Contains("appendGoalBarProps", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-goal-bar", styles);
+        Assert.Contains("ccs-goal-bar-v-neon", styles);
+        Assert.Contains("ccs-goal-bar-v-capsule", styles);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersEventTickerWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"event-ticker\":", runtime);
+        Assert.Contains("createEventTickerEl", runtime);
+        Assert.Contains("updateEventTicker", runtime);
+        Assert.Contains("pushEventTickerItem", runtime);
+        Assert.Contains("EVENT_TICKER_VARIANTS", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"event-ticker\"", editor);
+        Assert.Contains("Event Ticker", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-event-ticker", styles);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersViewerCountWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"viewer-count\":", runtime);
+        Assert.Contains("createViewerCountEl", runtime);
+        Assert.Contains("updateViewerCount", runtime);
+        Assert.Contains("VIEWER_COUNT_VARIANTS", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"viewer-count\"", editor);
+        Assert.Contains("Viewer Count", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-viewer-count", styles);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersLowerThirdWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"lower-third\":", runtime);
+        Assert.Contains("createLowerThirdEl", runtime);
+        Assert.Contains("updateLowerThird", runtime);
+        Assert.Contains("LOWER_THIRD_VARIANTS", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"lower-third\"", editor);
+        Assert.Contains("Lower Third", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-lower-third", styles);
+        Assert.Contains("ccs-lower-third-v-broadcast", styles);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersQrCodeWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"qr-code\":", runtime);
+        Assert.Contains("createQrCodeEl", runtime);
+        Assert.Contains("updateQrCode", runtime);
+        Assert.Contains("QR_CODE_VARIANTS", runtime);
+        Assert.Contains("encodeQrSvg", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"qr-code\"", editor);
+        Assert.Contains("QR Code", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-qr-code", styles);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersBrbPanelWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"brb-panel\":", runtime);
+        Assert.Contains("createBrbPanelEl", runtime);
+        Assert.Contains("updateBrbPanel", runtime);
+        Assert.Contains("paintBrbPanel", runtime);
+        Assert.Contains("BRB_PANEL_VARIANTS", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"brb-panel\"", editor);
+        Assert.Contains("BRB Panel", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-brb-panel", styles);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersAnnouncementBarWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"announcement-bar\":", runtime);
+        Assert.Contains("createAnnouncementBarEl", runtime);
+        Assert.Contains("updateAnnouncementBar", runtime);
+        Assert.Contains("ANNOUNCEMENT_BAR_VARIANTS", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"announcement-bar\"", editor);
+        Assert.Contains("Announcement Bar", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-announcement-bar", styles);
+        Assert.Contains("ccs-announcement-bar-v-ribbon", styles);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersAnimatedBackgroundWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"animated-background\":", runtime);
+        Assert.Contains("createAnimatedBackgroundEl", runtime);
+        Assert.Contains("updateAnimatedBackground", runtime);
+        Assert.Contains("ANIMATED_BACKGROUND_VARIANTS", runtime);
+        Assert.Contains("ANIMATED_BACKGROUND_SIZE_PRESETS", runtime);
+        Assert.Contains("\"hacker\"", runtime);
+        Assert.Contains("syncMatrixBackground", runtime);
+        Assert.Contains("MATRIX_GLYPHS", runtime);
+        Assert.Contains("\\uFF71\\uFF72\\uFF73\\uFF74\\uFF75", runtime);
+        Assert.Contains("\"retro\"", runtime);
+        Assert.Contains("\"meme\"", runtime);
+        Assert.Contains("\"queer\"", runtime);
+        Assert.Contains("\"peace\"", runtime);
+        Assert.Contains("\"street\"", runtime);
+        Assert.Contains("\"mountains\"", runtime);
+        Assert.Contains("\"alpine\"", runtime);
+        Assert.Contains("\"fuji\"", runtime);
+        Assert.Contains("\"neon-peaks\"", runtime);
+        Assert.Contains("\"ridge-storm\"", runtime);
+        Assert.Contains("syncParallaxBackground", runtime);
+        Assert.Contains("requestAnimationFrame", runtime);
+        Assert.True(System.Text.RegularExpressions.Regex.Matches(runtime, "\"(?:hacker|cyber|retro|vaporwave|meme|queer|peace|street|aurora|ocean|fire|cosmic|glitch|pixel|lava|ice|disco|rain|bubbles|grid|sunset|forest|candy|noir|mountains|alpine|fuji|mesa|neon-peaks|mist-peaks|lowpoly|papercut|floating|ridge-storm)\"").Count >= 34);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"animated-background\"", editor);
+        Assert.Contains("Animated Background", editor);
+        Assert.Contains("ANIMATED_BACKGROUND_VARIANTS", editor);
+        Assert.Contains("animated-background-look", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-animated-bg", styles);
+        Assert.Contains("ccs-animated-bg-v-hacker", styles);
+        Assert.Contains(".ccs-abg-matrix", styles);
+        Assert.Contains("ccs-animated-bg-v-queer", styles);
+        Assert.Contains("ccs-animated-bg-v-street", styles);
+        Assert.Contains("ccs-animated-bg-v-mountains", styles);
+        Assert.Contains("ccs-animated-bg-v-fuji", styles);
+        Assert.Contains("ccs-animated-bg-v-ridge-storm", styles);
+        Assert.Contains(".ccs-abg-parallax", styles);
+        Assert.Contains("--ccs-abg-speed", styles);
+        Assert.True(System.Text.RegularExpressions.Regex.Matches(styles, @"ccs-animated-bg-v-(?:hacker|cyber|retro|vaporwave|meme|queer|peace|street|aurora|ocean|fire|cosmic|glitch|pixel|lava|ice|disco|rain|bubbles|grid|sunset|forest|candy|noir|mountains|alpine|fuji|mesa|neon-peaks|mist-peaks|lowpoly|papercut|floating|ridge-storm)").Count >= 34);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersDividerCamRingStickerShapes()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"shape.divider\":", runtime);
+        Assert.Contains("\"shape.cam-ring\":", runtime);
+        Assert.Contains("\"shape.sticker\":", runtime);
+        Assert.Contains("createDividerEl", runtime);
+        Assert.Contains("createCamRingEl", runtime);
+        Assert.Contains("createStickerEl", runtime);
+        Assert.Contains("DIVIDER_VARIANTS", runtime);
+        Assert.Contains("CAM_RING_VARIANTS", runtime);
+        Assert.Contains("STICKER_PRESETS", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"shape.divider\"", editor);
+        Assert.Contains("type: \"shape.cam-ring\"", editor);
+        Assert.Contains("type: \"shape.sticker\"", editor);
+        Assert.Contains("Divider", editor);
+        Assert.Contains("Cam Ring", editor);
+        Assert.Contains("Sticker", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-divider", styles);
+        Assert.Contains(".ccs-cam-ring", styles);
+        Assert.Contains(".ccs-sticker", styles);
     }
 }
