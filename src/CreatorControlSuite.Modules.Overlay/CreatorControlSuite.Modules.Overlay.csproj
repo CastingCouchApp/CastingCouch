@@ -6,9 +6,12 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="ChatOverlay\**\*" />
-    <EmbeddedResource Include="CanvasOverlay\**\*"
-                      Exclude="CanvasOverlay\src\**;CanvasOverlay\node_modules\**;CanvasOverlay\package.json;CanvasOverlay\package-lock.json;CanvasOverlay\tsconfig.json;CanvasOverlay\esbuild.config.mjs;CanvasOverlay\**\*.map;CanvasOverlay\**\*.ts" />
   </ItemGroup>
+  <!--
+    CanvasOverlay-Bundles entstehen erst in BuildCanvasOverlay. Deshalb dürfen
+    die EmbeddedResources nicht zur Projektladezeit ausgewertet werden (sonst
+    fehlen sie auf sauberen CI-Checkouts).
+  -->
   <Target Name="BuildCanvasOverlay" BeforeTargets="BeforeBuild;BeforePublish">
     <PropertyGroup>
       <CanvasOverlayDir>$(MSBuildProjectDirectory)\CanvasOverlay</CanvasOverlayDir>
@@ -26,5 +29,13 @@
     <Exec Command="npm run build"
           WorkingDirectory="$(CanvasOverlayDir)"
           ConsoleToMSBuild="true" />
+  </Target>
+  <Target Name="IncludeCanvasOverlayEmbeddedResources"
+          AfterTargets="BuildCanvasOverlay"
+          BeforeTargets="PrepareForBuild;PrepareResourceNames;AssignTargetPaths">
+    <ItemGroup>
+      <EmbeddedResource Include="CanvasOverlay\**\*"
+                        Exclude="CanvasOverlay\src\**;CanvasOverlay\node_modules\**;CanvasOverlay\tests\**;CanvasOverlay\dev\**;CanvasOverlay\package.json;CanvasOverlay\package-lock.json;CanvasOverlay\tsconfig.json;CanvasOverlay\tsconfig.quality.json;CanvasOverlay\esbuild.config.mjs;CanvasOverlay\**\*.map;CanvasOverlay\**\*.ts;CanvasOverlay\**\*.mjs" />
+    </ItemGroup>
   </Target>
 </Project>

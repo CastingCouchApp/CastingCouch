@@ -20,6 +20,10 @@ Erster öffentlicher Beta-Release nach der Alpha-Serie (`8.0.0-alpha102`).
 - Start-Deadlock behoben: Chat-History-Kapazität lädt Layout/Settings async auf dem UI-Thread
   (kein `GetResult()` mehr → Fenster erscheint wieder zuverlässig).
 - Architecture-Guard ignoriert lokale `bin`/`obj`/`artifacts`-Buildreste unter `src/`.
+- Canvas-Overlay-Bundles werden erst nach dem TypeScript-Build als Embedded Resources eingebunden
+  (saubere CI-Checkouts behalten Runtime/Editor-Assets).
+- Twitch-History-Kennzahlen formatieren fest mit `de-DE` (kein CI-Culture-Drift mehr).
+- Overlay-Typecheck: entferntes TypeScript-`baseUrl` für TS 7.
 
 ## Architektur
 

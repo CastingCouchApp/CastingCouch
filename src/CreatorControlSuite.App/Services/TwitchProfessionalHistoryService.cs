@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace CreatorControlSuite.App.Services;
@@ -24,6 +25,8 @@ public sealed record TwitchProfessionalHistorySnapshot(
 
 public static class TwitchProfessionalHistoryService
 {
+    private static readonly CultureInfo DisplayCulture = CultureInfo.GetCultureInfo("de-DE");
+
     public static async Task<TwitchProfessionalHistorySnapshot> LoadAsync(
         string path,
         CancellationToken cancellationToken = default)
@@ -99,12 +102,12 @@ public static class TwitchProfessionalHistoryService
         ];
         int totalEngagement = rows.Sum(row => row.Chat + row.Events);
         return new TwitchProfessionalHistorySnapshot(
-            rows.Count.ToString(),
-            rows.Max(row => row.Peak).ToString(),
-            rows.Max(row => row.Average).ToString("0.0"),
+            rows.Count.ToString(DisplayCulture),
+            rows.Max(row => row.Peak).ToString(DisplayCulture),
+            rows.Max(row => row.Average).ToString("0.0", DisplayCulture),
             StreamStatisticsApplicationService.FormatDuration(
                 rows.Sum(row => row.DurationSeconds)),
-            rows.Sum(row => row.Followers).ToString(),
+            rows.Sum(row => row.Followers).ToString(DisplayCulture),
             viewerTrend,
             followerTrend,
             "Häufigste Kategorie: " + commonCategory,
@@ -203,10 +206,11 @@ public static class TwitchProfessionalHistoryService
         double later = recent.Skip(split).Average(row => row.Average);
         double delta = later - earlier;
         return (
-            $"Zuschauertrend: {(delta >= 0 ? "+" : "")}" +
-            $"{delta:0.0} Ø Zuschauer",
-            $"Followertrend: {recent.Average(row => row.Followers):0.0} " +
-            "pro Stream");
+            "Zuschauertrend: " + (delta >= 0 ? "+" : "") +
+            delta.ToString("0.0", DisplayCulture) + " Ø Zuschauer",
+            "Followertrend: " +
+            recent.Average(row => row.Followers).ToString("0.0", DisplayCulture) +
+            " pro Stream");
     }
 
     private static string DescribeConsistency(IEnumerable<double> values)
@@ -230,16 +234,22 @@ public static class TwitchProfessionalHistoryService
         };
     }
 
-    private static string PercentTrend(double current, double previous) =>
-        previous <= 0
-            ? "-"
-            : $"{(current - previous) / previous * 100:+0.0;-0.0;0.0}%";
+    private static string PercentTrend(double current, double previous)
+    {
+        if (previous <= 0)
+        {
+            return "-";
+        }
+
+        double percent = (current - previous) / previous * 100;
+        return percent.ToString("+0.0;-0.0;0.0", DisplayCulture) + "%";
+    }
 
     private static string FormatRate(
         int total,
         double hours,
         string format) =>
-        hours <= 0 ? "0" : (total / hours).ToString(format);
+        hours <= 0 ? "0" : (total / hours).ToString(format, DisplayCulture);
 
     private static double AverageOrZero(
         IReadOnlyCollection<HistoryRow> rows,
@@ -251,9 +261,9 @@ public static class TwitchProfessionalHistoryService
         DateTimeOffset local = row.StartedAt.ToLocalTime();
         TimeSpan duration = TimeSpan.FromSeconds(
             Math.Max(0, row.DurationSeconds));
-        return $"{local:dd.MM.yyyy HH:mm} · {duration:hh\\:mm\\:ss} · " +
-               $"Peak {row.Peak} · Ø {row.Average:0.0} · " +
-               $"+{row.Followers} Follower · {row.Category}";
+        return string.Create(
+            DisplayCulture,
+            $"{local:dd.MM.yyyy HH:mm} · {duration:hh\\:mm\\:ss} · Peak {row.Peak} · Ø {row.Average:0.0} · +{row.Followers} Follower · {row.Category}");
     }
 
     private static string GetString(
