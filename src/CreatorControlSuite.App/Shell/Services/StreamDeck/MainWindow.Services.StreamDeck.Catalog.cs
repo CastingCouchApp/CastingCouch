@@ -77,29 +77,33 @@ public partial class MainWindow
         Directory.CreateDirectory(StreamDeckActionsDirectory);
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionsFolderText.Text = StreamDeckActionsDirectory;
 
-        var entries = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd")
-            .Select(file => ReadStreamDeckMetadata(file))
-            .OrderBy(entry => entry.Profile)
-            .ThenBy(entry => entry.Page)
-            .ThenBy(entry => entry.Slot)
-            .ThenBy(entry => entry.Title)
-            .ToList();
+        List<StreamDeckCatalogEntry> entries =
+        [
+            .. Directory
+                .EnumerateFiles(StreamDeckActionsDirectory, "*.cmd")
+                .Select(StreamDeckCatalogApplicationService.ReadMetadata)
+        ];
 
         string selectedProfile = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckProfileFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
         string selectedPage = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckPageFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
+        StreamDeckCatalogProjection projection =
+            StreamDeckCatalogApplicationService.ProjectCatalog(
+                entries,
+                selectedProfile,
+                selectedPage);
 
-        RebuildStreamDeckFilter(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckProfileFilterBox, entries.Select(entry => entry.Profile), "Alle Profile", selectedProfile);
-        RebuildStreamDeckFilter(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckPageFilterBox, entries
-            .Where(entry => string.IsNullOrWhiteSpace(selectedProfile) || entry.Profile == selectedProfile)
-            .Select(entry => entry.Page), "Alle Seiten", selectedPage);
+        RebuildStreamDeckFilter(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckProfileFilterBox, projection.Profiles, "Alle Profile", selectedProfile);
+        RebuildStreamDeckFilter(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckPageFilterBox, projection.Pages, "Alle Seiten", selectedPage);
 
         selectedProfile = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckProfileFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
         selectedPage = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckPageFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
+        projection = StreamDeckCatalogApplicationService.ProjectCatalog(
+            entries,
+            selectedProfile,
+            selectedPage);
 
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckCreatedActionsList.Items.Clear();
-        foreach ((string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry in entries.Where(entry =>
-                     (string.IsNullOrWhiteSpace(selectedProfile) || entry.Profile == selectedProfile) &&
-                     (string.IsNullOrWhiteSpace(selectedPage) || entry.Page == selectedPage)))
+        foreach (StreamDeckCatalogEntry entry in projection.Entries)
         {
             string displayTitle = ResolveStreamDeckDisplayTitle(entry);
             ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckCreatedActionsList.Items.Add(new ListBoxItem
@@ -109,16 +113,17 @@ public partial class MainWindow
             });
         }
 
-        int occupied = entries.Select(entry => $"{entry.Profile}|{entry.Page}|{entry.Slot}").Distinct(StringComparer.OrdinalIgnoreCase).Count();
-        int conflicts = entries.GroupBy(entry => $"{entry.Profile}|{entry.Page}|{entry.Slot}", StringComparer.OrdinalIgnoreCase).Count(group => group.Count() > 1);
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckOccupancyText.Text = conflicts == 0 ? $"{occupied} Positionen belegt" : $"{occupied} belegt · {conflicts} Konflikte";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckOccupancyText.Foreground = conflicts == 0 ? Brushes.LightGreen : Brushes.OrangeRed;
+        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckOccupancyText.Text = projection.Conflicts == 0 ? $"{projection.OccupiedPositions} Positionen belegt" : $"{projection.OccupiedPositions} belegt · {projection.Conflicts} Konflikte";
+        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckOccupancyText.Foreground = projection.Conflicts == 0 ? Brushes.LightGreen : Brushes.OrangeRed;
         RebuildStreamDeckSlotGrid(entries, selectedProfile, selectedPage);
         RefreshSelectedStreamDeckActionDetails();
     }
 
 
-    private void RebuildStreamDeckSlotGrid(IEnumerable<(string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)> entries, string selectedProfile, string selectedPage)
+    private void RebuildStreamDeckSlotGrid(
+        IEnumerable<StreamDeckCatalogEntry> entries,
+        string selectedProfile,
+        string selectedPage)
     {
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckSlotGrid.Children.Clear();
         string profile = string.IsNullOrWhiteSpace(selectedProfile) ? "Standard" : selectedProfile;
@@ -128,7 +133,9 @@ public partial class MainWindow
         for (int slot = 1; slot <= 32; slot++)
         {
             int currentSlot = slot;
-            lookup.TryGetValue(slot, out List<(string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)>? assigned);
+            lookup.TryGetValue(
+                slot,
+                out List<StreamDeckCatalogEntry>? assigned);
             var button = new Button { Margin = new Thickness(2), MinHeight = 44, Tag = currentSlot, Content = assigned is null ? slot.ToString() : $"{slot}\n{ResolveStreamDeckDisplayTitle(assigned[0])}", ToolTip = assigned is null ? "Frei" : string.Join("\n", assigned.Select(e => e.Title)) };
             if (assigned is { Count: > 1 })
             {
@@ -157,7 +164,7 @@ public partial class MainWindow
             return;
         }
 
-        if (ReadStreamDeckMetadata(file).Locked) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Die Taste ist gesperrt. Bitte zuerst entsperren."; return; }
+        if (StreamDeckCatalogApplicationService.ReadMetadata(file).Locked) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Die Taste ist gesperrt. Bitte zuerst entsperren."; return; }
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
         var values = document.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone());
         var output = new Dictionary<string, object?>();
@@ -178,10 +185,11 @@ public partial class MainWindow
         string? selectedProfile = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckProfileFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
         if (string.IsNullOrWhiteSpace(selectedProfile)) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Bitte zuerst ein Profil filtern."; return; }
         string targetProfile = selectedProfile + " - Kopie";
-        var files = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Where(f => string.Equals(ReadStreamDeckMetadata(f).Profile, selectedProfile, StringComparison.OrdinalIgnoreCase)).ToList();
+        var files = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Where(f => string.Equals(StreamDeckCatalogApplicationService.ReadMetadata(f).Profile, selectedProfile, StringComparison.OrdinalIgnoreCase)).ToList();
         foreach (string? file in files)
         {
-            (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
+            StreamDeckCatalogEntry entry =
+                StreamDeckCatalogApplicationService.ReadMetadata(file);
             string target = Path.Combine(StreamDeckActionsDirectory, Path.GetFileNameWithoutExtension(file) + " - " + targetProfile + ".cmd");
             File.Copy(file, target, true);
             string metaPath = Path.ChangeExtension(file, ".json");
@@ -202,12 +210,12 @@ public partial class MainWindow
 
     private async Task ResolveStreamDeckConflictsAsync()
     {
-        var entries = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Select(ReadStreamDeckMetadata).OrderBy(e => e.Profile).ThenBy(e => e.Page).ThenBy(e => e.Slot).ToList();
+        var entries = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Select(StreamDeckCatalogApplicationService.ReadMetadata).OrderBy(e => e.Profile).ThenBy(e => e.Page).ThenBy(e => e.Slot).ToList();
         int changed = 0;
-        foreach (IGrouping<(string, string), (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)> group in entries.GroupBy(e => (e.Profile.ToLowerInvariant(), e.Page.ToLowerInvariant())))
+        foreach (IGrouping<(string, string), StreamDeckCatalogEntry> group in entries.GroupBy(e => (e.Profile.ToLowerInvariant(), e.Page.ToLowerInvariant())))
         {
             var used = new HashSet<int>();
-            foreach ((string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry in group)
+            foreach (StreamDeckCatalogEntry entry in group)
             {
                 int slot = entry.Slot;
                 if (slot is < 1 or > 32 || !used.Add(slot))
@@ -246,50 +254,6 @@ public partial class MainWindow
         box.SelectedItem = box.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), selected, StringComparison.OrdinalIgnoreCase)) ?? box.Items[0];
     }
 
-    private static (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) ReadStreamDeckMetadata(string file)
-    {
-        try
-        {
-            string metadataPath = Path.ChangeExtension(file, ".json");
-            if (!File.Exists(metadataPath))
-            {
-                return (file, Path.GetFileNameWithoutExtension(file), "–", "", "Standard", "Hauptseite", 0, 1, false, "", "", "");
-            }
-
-            using var document = JsonDocument.Parse(File.ReadAllText(metadataPath));
-            JsonElement root = document.RootElement;
-            string GetString(string name, string fallback) => root.TryGetProperty(name, out JsonElement node) ? node.GetString() ?? fallback : fallback;
-            int slot = root.TryGetProperty("slot", out JsonElement slotNode) && slotNode.TryGetInt32(out int slotValue) ? slotValue : 0;
-            int steps = root.TryGetProperty("steps", out JsonElement stepsNode) && stepsNode.ValueKind == JsonValueKind.Array ? stepsNode.GetArrayLength() : 1;
-            bool locked = root.TryGetProperty("locked", out JsonElement lockedNode) && lockedNode.ValueKind == JsonValueKind.True;
-            return (file, GetString("title", Path.GetFileNameWithoutExtension(file)), GetString("command", "–"), GetString("parameter", ""), GetString("profile", "Standard"), GetString("page", "Hauptseite"), slot, Math.Max(1, steps), locked, GetString("condition", ""), GetString("trueLabel", ""), GetString("falseLabel", ""));
-        }
-        catch
-        {
-            return (file, Path.GetFileNameWithoutExtension(file), "–", "", "Standard", "Hauptseite", 0, 1, false, "", "", "");
-        }
-    }
-
-    private static (bool ToggleMode, string AlternateCommand, string AlternateParameter) ReadStreamDeckToggleMetadata(string file)
-    {
-        try
-        {
-            string metadataPath = Path.ChangeExtension(file, ".json");
-            if (!File.Exists(metadataPath))
-            {
-                return (false, "", "");
-            }
-
-            using var document = JsonDocument.Parse(File.ReadAllText(metadataPath));
-            JsonElement root = document.RootElement;
-            bool toggle = root.TryGetProperty("toggleMode", out JsonElement toggleNode) && toggleNode.ValueKind == JsonValueKind.True;
-            string command = root.TryGetProperty("alternateCommand", out JsonElement commandNode) ? commandNode.GetString() ?? "" : "";
-            string parameter = root.TryGetProperty("alternateParameter", out JsonElement parameterNode) ? parameterNode.GetString() ?? "" : "";
-            return (toggle, command, parameter);
-        }
-        catch { return (false, "", ""); }
-    }
-
     private void DiagnoseStreamDeckActions()
     {
         Directory.CreateDirectory(StreamDeckActionsDirectory);
@@ -307,8 +271,10 @@ public partial class MainWindow
             if (!File.Exists(metadataPath)) { issues.Add($"• {Path.GetFileName(file)}: Metadatendatei fehlt."); continue; }
             try
             {
-                (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
-                (bool ToggleMode, string AlternateCommand, string AlternateParameter) = ReadStreamDeckToggleMetadata(file);
+                StreamDeckCatalogEntry entry =
+                    StreamDeckCatalogApplicationService.ReadMetadata(file);
+                StreamDeckToggleMetadata toggle =
+                    StreamDeckCatalogApplicationService.ReadToggleMetadata(file);
                 if (entry.Slot is < 1 or > 32)
                 {
                     issues.Add($"• {entry.Title}: ungültige Position {entry.Slot}.");
@@ -319,20 +285,20 @@ public partial class MainWindow
                     issues.Add($"• {entry.Title}: Hauptbefehl fehlt.");
                 }
 
-                if (ToggleMode && string.IsNullOrWhiteSpace(entry.Condition))
+                if (toggle.ToggleMode && string.IsNullOrWhiteSpace(entry.Condition))
                 {
                     issues.Add($"• {entry.Title}: Toggle aktiv, aber keine Zustandsbindung gesetzt.");
                 }
 
-                if (ToggleMode && string.IsNullOrWhiteSpace(AlternateCommand))
+                if (toggle.ToggleMode && string.IsNullOrWhiteSpace(toggle.AlternateCommand))
                 {
                     issues.Add($"• {entry.Title}: zweiter Toggle-Befehl fehlt.");
                 }
             }
             catch (Exception ex) { issues.Add($"• {Path.GetFileName(metadataPath)}: {ex.Message}"); }
         }
-        IEnumerable<IGrouping<string, (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)>> duplicates = cmdFiles.Select(ReadStreamDeckMetadata).GroupBy(e => $"{e.Profile}|{e.Page}|{e.Slot}", StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1);
-        foreach (IGrouping<string, (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel)>? group in duplicates)
+        IEnumerable<IGrouping<string, StreamDeckCatalogEntry>> duplicates = cmdFiles.Select(StreamDeckCatalogApplicationService.ReadMetadata).GroupBy(e => $"{e.Profile}|{e.Page}|{e.Slot}", StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1);
+        foreach (IGrouping<string, StreamDeckCatalogEntry>? group in duplicates)
         {
             issues.Add($"• Doppelbelegung {group.Key}: {string.Join(", ", group.Select(e => e.Title))}");
         }
@@ -350,10 +316,13 @@ public partial class MainWindow
             return;
         }
 
-        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
-        (bool ToggleMode, string AlternateCommand, string AlternateParameter) = ReadStreamDeckToggleMetadata(file);
-        (int DelayMs, int RetryCount, int CooldownMs) = ReadStreamDeckExecutionPolicy(file);
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckSelectedActionDetailsText.Text = $"{entry.Title}\nProfil: {entry.Profile} · Seite: {entry.Page} · Position: {entry.Slot}\nStatus: {(entry.Locked ? "Gesperrt" : "Bearbeitbar")}\nBefehl AUS: {entry.Command}\nParameter AUS: {(string.IsNullOrWhiteSpace(entry.Parameter) ? "–" : entry.Parameter)}\nBefehl AN: {(ToggleMode ? AlternateCommand : "–")}\nParameter AN: {(string.IsNullOrWhiteSpace(AlternateParameter) ? "–" : AlternateParameter)}\nSchritte: {entry.Steps} · Verzögerung: {DelayMs} ms · Wiederholungen: {RetryCount} · Cooldown: {CooldownMs} ms\nZustandsbindung: {(string.IsNullOrWhiteSpace(entry.Condition) ? "–" : entry.Condition)}\nAktuelle Beschriftung: {ResolveStreamDeckDisplayTitle(entry)}";
+        StreamDeckCatalogEntry entry =
+            StreamDeckCatalogApplicationService.ReadMetadata(file);
+        StreamDeckToggleMetadata toggle =
+            StreamDeckCatalogApplicationService.ReadToggleMetadata(file);
+        StreamDeckExecutionPolicy policy =
+            StreamDeckCatalogApplicationService.ReadExecutionPolicy(file);
+        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckSelectedActionDetailsText.Text = $"{entry.Title}\nProfil: {entry.Profile} · Seite: {entry.Page} · Position: {entry.Slot}\nStatus: {(entry.Locked ? "Gesperrt" : "Bearbeitbar")}\nBefehl AUS: {entry.Command}\nParameter AUS: {(string.IsNullOrWhiteSpace(entry.Parameter) ? "–" : entry.Parameter)}\nBefehl AN: {(toggle.ToggleMode ? toggle.AlternateCommand : "–")}\nParameter AN: {(string.IsNullOrWhiteSpace(toggle.AlternateParameter) ? "–" : toggle.AlternateParameter)}\nSchritte: {entry.Steps} · Verzögerung: {policy.DelayMs} ms · Wiederholungen: {policy.RetryCount} · Cooldown: {policy.CooldownMs} ms\nZustandsbindung: {(string.IsNullOrWhiteSpace(entry.Condition) ? "–" : entry.Condition)}\nAktuelle Beschriftung: {ResolveStreamDeckDisplayTitle(entry)}";
         ServicesPageViewHost.StreamDeckServiceViewHost.LockStreamDeckActionButton.Content = entry.Locked ? "TASTE ENTSPERREN" : "TASTE SPERREN";
     }
 
@@ -374,22 +343,10 @@ public partial class MainWindow
         ["spotify.playing"] = IsStatusLampActive(SpotifyDashboardLamp)
     };
 
-    private string ResolveStreamDeckDisplayTitle((string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry)
-    {
-        if (string.IsNullOrWhiteSpace(entry.Condition))
-        {
-            return entry.Title;
-        }
-
-        Dictionary<string, bool> states = GetStreamDeckRuntimeStates();
-        if (!states.TryGetValue(entry.Condition, out bool active))
-        {
-            return entry.Title;
-        }
-
-        string label = active ? entry.TrueLabel : entry.FalseLabel;
-        return string.IsNullOrWhiteSpace(label) ? entry.Title : label;
-    }
+    private string ResolveStreamDeckDisplayTitle(StreamDeckCatalogEntry entry) =>
+        StreamDeckCatalogApplicationService.ResolveDisplayTitle(
+            entry,
+            GetStreamDeckRuntimeStates());
 
     private async Task SyncStreamDeckRuntimeStateAsync(bool showConfirmation)
     {
@@ -422,24 +379,6 @@ public partial class MainWindow
     }
 
     private string StreamDeckExecutionLogFile => Path.Combine(StreamDeckActionsDirectory, "streamdeck-execution-log.jsonl");
-
-    private static (int DelayMs, int RetryCount, int CooldownMs) ReadStreamDeckExecutionPolicy(string file)
-    {
-        try
-        {
-            string metadataPath = Path.ChangeExtension(file, ".json");
-            if (!File.Exists(metadataPath))
-            {
-                return (250, 1, 1000);
-            }
-
-            using var document = JsonDocument.Parse(File.ReadAllText(metadataPath));
-            JsonElement root = document.RootElement;
-            int ReadInt(string name, int fallback) => root.TryGetProperty(name, out JsonElement node) && node.TryGetInt32(out int value) ? value : fallback;
-            return (Math.Clamp(ReadInt("stepDelayMs", 250), 0, 10000), Math.Clamp(ReadInt("retryCount", 1), 0, 5), Math.Clamp(ReadInt("cooldownMs", 1000), 0, 60000));
-        }
-        catch { return (250, 1, 1000); }
-    }
 
     private async Task AppendStreamDeckExecutionLogAsync(string action, string mode, bool success, long durationMs, string message)
     {
@@ -484,10 +423,12 @@ public partial class MainWindow
             ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Bitte zuerst eine erstellte Taste auswählen.";
             return;
         }
-        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
-        (int DelayMs, int RetryCount, int CooldownMs) = ReadStreamDeckExecutionPolicy(file);
-        int simulatedDuration = Math.Max(1, entry.Steps) * DelayMs;
-        await AppendStreamDeckExecutionLogAsync(entry.Title, "Simulation", true, simulatedDuration, $"{entry.Steps} Schritt(e), {RetryCount} Wiederholung(en), Cooldown {CooldownMs} ms");
+        StreamDeckCatalogEntry entry =
+            StreamDeckCatalogApplicationService.ReadMetadata(file);
+        StreamDeckExecutionPolicy policy =
+            StreamDeckCatalogApplicationService.ReadExecutionPolicy(file);
+        int simulatedDuration = Math.Max(1, entry.Steps) * policy.DelayMs;
+        await AppendStreamDeckExecutionLogAsync(entry.Title, "Simulation", true, simulatedDuration, $"{entry.Steps} Schritt(e), {policy.RetryCount} Wiederholung(en), Cooldown {policy.CooldownMs} ms");
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = $"Simulation erfolgreich: {entry.Title}";
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
     }
@@ -499,8 +440,10 @@ public partial class MainWindow
             ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Bitte zuerst eine erstellte Taste auswählen.";
             return;
         }
-        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
-        (int DelayMs, int RetryCount, _) = ReadStreamDeckExecutionPolicy(file);
+        StreamDeckCatalogEntry entry =
+            StreamDeckCatalogApplicationService.ReadMetadata(file);
+        StreamDeckExecutionPolicy policy =
+            StreamDeckCatalogApplicationService.ReadExecutionPolicy(file);
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
@@ -509,16 +452,16 @@ public partial class MainWindow
             string message;
             if (simulation)
             {
-                await Task.Delay(Math.Min(1000, Math.Max(20, entry.Steps * DelayMs)));
+                await Task.Delay(Math.Min(1000, Math.Max(20, entry.Steps * policy.DelayMs)));
                 success = true;
                 message = "Testsimulation – keine externen Befehle ausgeführt.";
             }
             else
             {
-                for (int attempt = 0; attempt <= RetryCount && !success; attempt++)
+                for (int attempt = 0; attempt <= policy.RetryCount && !success; attempt++)
                 {
                     success = Process.Start(new ProcessStartInfo(file) { UseShellExecute = true, WindowStyle = ProcessWindowStyle.Hidden }) is not null;
-                    if (!success && attempt < RetryCount)
+                    if (!success && attempt < policy.RetryCount)
                     {
                         await Task.Delay(250);
                     }
@@ -598,7 +541,8 @@ public partial class MainWindow
             return;
         }
 
-        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) entry = ReadStreamDeckMetadata(file);
+        StreamDeckCatalogEntry entry =
+            StreamDeckCatalogApplicationService.ReadMetadata(file);
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
         var output = document.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
         output["locked"] = !entry.Locked;
@@ -608,235 +552,31 @@ public partial class MainWindow
         RefreshStreamDeckActionsList();
     }
 
-    private void BackupStreamDeckConfiguration()
-    {
-        Directory.CreateDirectory(StreamDeckActionsDirectory);
-        var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "Stream-Deck-Komplettbackup (*.zip)|*.zip", FileName = $"CreatorControlSuite-StreamDeck-Backup-{DateTime.Now:yyyyMMdd-HHmm}.zip" };
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        if (File.Exists(dialog.FileName))
-        {
-            File.Delete(dialog.FileName);
-        }
-
-        System.IO.Compression.ZipFile.CreateFromDirectory(StreamDeckActionsDirectory, dialog.FileName);
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Komplettbackup erstellt: " + dialog.FileName;
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
-    }
-
-    private void RestoreStreamDeckConfiguration()
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Stream-Deck-Komplettbackup (*.zip)|*.zip" };
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        Directory.CreateDirectory(StreamDeckActionsDirectory);
-        foreach (string file in Directory.EnumerateFiles(StreamDeckActionsDirectory))
-        {
-            File.Delete(file);
-        }
-
-        System.IO.Compression.ZipFile.ExtractToDirectory(dialog.FileName, StreamDeckActionsDirectory, true);
-        RefreshStreamDeckActionsList();
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Stream-Deck-Konfiguration wiederhergestellt.";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
-    }
-
-    private void ExportStreamDeckActionCatalog()
-    {
-        Directory.CreateDirectory(StreamDeckActionsDirectory);
-        var dialog = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "Stream-Deck-Aktionskatalog (*.zip)|*.zip",
-            FileName = $"CreatorControlSuite-StreamDeck-Actions-{DateTime.Now:yyyyMMdd-HHmm}.zip"
-        };
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        if (File.Exists(dialog.FileName))
-        {
-            File.Delete(dialog.FileName);
-        }
-
-        System.IO.Compression.ZipFile.CreateFromDirectory(StreamDeckActionsDirectory, dialog.FileName);
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Aktionskatalog exportiert: " + dialog.FileName;
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
-    }
-
-    private void ImportStreamDeckActionCatalog()
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Stream-Deck-Aktionskatalog (*.zip)|*.zip" };
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        Directory.CreateDirectory(StreamDeckActionsDirectory);
-        System.IO.Compression.ZipFile.ExtractToDirectory(dialog.FileName, StreamDeckActionsDirectory, overwriteFiles: true);
-        RefreshStreamDeckActionsList();
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Aktionskatalog importiert.";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
-    }
-
-
-    private string StreamDeckTemplatesDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "CreatorControlSuite", "StreamDeck", "Templates");
-
-    private sealed record StreamDeckTemplateItem(string Name, string Path);
-
-    private void RefreshStreamDeckTemplates()
-    {
-        Directory.CreateDirectory(StreamDeckTemplatesDirectory);
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckTemplateBox.ItemsSource = Directory.EnumerateFiles(StreamDeckTemplatesDirectory, "*.json")
-            .OrderBy(Path.GetFileNameWithoutExtension)
-            .Select(path => new StreamDeckTemplateItem(Path.GetFileNameWithoutExtension(path), path))
-            .ToList();
-    }
-
-    private async Task SaveStreamDeckTemplateAsync()
-    {
-        string name = string.IsNullOrWhiteSpace(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckTemplateNameBox.Text) ? ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionTitleBox.Text.Trim() : ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckTemplateNameBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(name)) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Bitte einen Vorlagennamen eingeben."; return; }
-        string safe = string.Concat(name.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
-        Directory.CreateDirectory(StreamDeckTemplatesDirectory);
-        var data = new
-        {
-            name,
-            title = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionTitleBox.Text,
-            command = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCommandBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "workflow.prepare",
-            parameter = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionParameterBox.Text,
-            multiAction = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckMultiActionBox.Text,
-            condition = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckStateConditionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty,
-            trueLabel = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckTrueLabelBox.Text,
-            falseLabel = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckFalseLabelBox.Text,
-            toggleMode = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckToggleModeBox.IsChecked == true,
-            alternateCommand = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckAlternateCommandBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty,
-            alternateParameter = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckAlternateParameterBox.Text,
-            stepDelayMs = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckStepDelayBox.Text,
-            retryCount = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRetryCountBox.Text,
-            cooldownMs = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckCooldownBox.Text
-        };
-        await File.WriteAllTextAsync(Path.Combine(StreamDeckTemplatesDirectory, safe + ".json"), JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true }));
-        RefreshStreamDeckTemplates();
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = $"Vorlage gespeichert: {name}";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
-    }
-
-    private async Task LoadSelectedStreamDeckTemplateAsync()
-    {
-        if (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckTemplateBox.SelectedItem is not StreamDeckTemplateItem item || !File.Exists(item.Path)) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Bitte eine Vorlage auswählen."; return; }
-        using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(item.Path));
-        JsonElement r = doc.RootElement;
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionTitleBox.Text = r.TryGetProperty("title", out JsonElement v) ? v.GetString() ?? item.Name : item.Name;
-        SelectComboBoxByTag(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCommandBox, r.TryGetProperty("command", out v) ? v.GetString() : null);
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionParameterBox.Text = r.TryGetProperty("parameter", out v) ? v.GetString() ?? "" : "";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckMultiActionBox.Text = r.TryGetProperty("multiAction", out v) ? v.GetString() ?? "" : "";
-        SelectComboBoxByTag(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckStateConditionBox, r.TryGetProperty("condition", out v) ? v.GetString() : null);
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckTrueLabelBox.Text = r.TryGetProperty("trueLabel", out v) ? v.GetString() ?? "" : "";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckFalseLabelBox.Text = r.TryGetProperty("falseLabel", out v) ? v.GetString() ?? "" : "";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckToggleModeBox.IsChecked = r.TryGetProperty("toggleMode", out v) && v.ValueKind == JsonValueKind.True;
-        SelectComboBoxByTag(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckAlternateCommandBox, r.TryGetProperty("alternateCommand", out v) ? v.GetString() : null);
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckAlternateParameterBox.Text = r.TryGetProperty("alternateParameter", out v) ? v.GetString() ?? "" : "";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckStepDelayBox.Text = r.TryGetProperty("stepDelayMs", out v) ? v.ToString() : "250";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRetryCountBox.Text = r.TryGetProperty("retryCount", out v) ? v.ToString() : "1";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckCooldownBox.Text = r.TryGetProperty("cooldownMs", out v) ? v.ToString() : "1000";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = $"Vorlage geladen: {item.Name}";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
-    }
-
-    private static void SelectComboBoxByTag(ComboBox box, string? tag)
-    {
-        foreach (ComboBoxItem entry in box.Items.OfType<ComboBoxItem>())
-        {
-            if (string.Equals(entry.Tag?.ToString(), tag ?? string.Empty, StringComparison.OrdinalIgnoreCase)) { box.SelectedItem = entry; return; }
-        }
-    }
-
-    private void DeleteSelectedStreamDeckTemplate()
-    {
-        if (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckTemplateBox.SelectedItem is not StreamDeckTemplateItem item)
-        {
-            return;
-        }
-
-        if (File.Exists(item.Path))
-        {
-            File.Delete(item.Path);
-        }
-
-        RefreshStreamDeckTemplates();
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = $"Vorlage gelöscht: {item.Name}";
-    }
-
-    private void ExportSelectedStreamDeckAction()
-    {
-        if (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Bitte zuerst eine Taste auswählen."; return; }
-        var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "Stream-Deck-Taste (*.sdaction)|*.sdaction", FileName = Path.GetFileNameWithoutExtension(file) + ".sdaction" };
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        using ZipArchive archive = System.IO.Compression.ZipFile.Open(dialog.FileName, System.IO.Compression.ZipArchiveMode.Create);
-        archive.CreateEntryFromFile(file, Path.GetFileName(file));
-        string meta = Path.ChangeExtension(file, ".json"); if (File.Exists(meta))
-        {
-            archive.CreateEntryFromFile(meta, Path.GetFileName(meta));
-        }
-
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Taste exportiert: " + dialog.FileName;
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
-    }
-
-    private void ImportSingleStreamDeckAction()
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Stream-Deck-Taste (*.sdaction)|*.sdaction" };
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        Directory.CreateDirectory(StreamDeckActionsDirectory);
-        System.IO.Compression.ZipFile.ExtractToDirectory(dialog.FileName, StreamDeckActionsDirectory, true);
-        RefreshStreamDeckActionsList();
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Einzelne Taste importiert.";
-        ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = Brushes.LightGreen;
-    }
-
     private async Task QuickAssignSelectedStreamDeckActionAsync()
     {
         if (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Bitte zuerst eine Taste auswählen."; return; }
-        (string File, string Title, string Command, string Parameter, string Profile, string Page, int Slot, int Steps, bool Locked, string Condition, string TrueLabel, string FalseLabel) selected = ReadStreamDeckMetadata(file);
+        StreamDeckCatalogEntry selected =
+            StreamDeckCatalogApplicationService.ReadMetadata(file);
         if (selected.Locked) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Die Taste ist gesperrt."; return; }
-        var used = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Select(ReadStreamDeckMetadata)
-            .Where(e => e.File != file && string.Equals(e.Profile, selected.Profile, StringComparison.OrdinalIgnoreCase) && string.Equals(e.Page, selected.Page, StringComparison.OrdinalIgnoreCase))
-            .Select(e => e.Slot).ToHashSet();
-        int free = Enumerable.Range(1, 32).FirstOrDefault(slot => !used.Contains(slot));
+        int free = StreamDeckCatalogApplicationService.FindFirstFreeSlot(
+            Directory
+                .EnumerateFiles(StreamDeckActionsDirectory, "*.cmd")
+                .Select(StreamDeckCatalogApplicationService.ReadMetadata),
+            selected.Profile,
+            selected.Page,
+            file);
         if (free == 0) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = "Auf dieser Seite ist kein freier Platz vorhanden."; return; }
         await MoveSelectedStreamDeckActionToSlotAsync(free, selected.Profile, selected.Page);
     }
 
     private void CompareStreamDeckProfiles()
     {
-        var entries = Directory.EnumerateFiles(StreamDeckActionsDirectory, "*.cmd").Select(ReadStreamDeckMetadata).ToList();
-        var profiles = entries.Select(e => e.Profile).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToList();
-        if (profiles.Count < 2) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckDiagnosticsBox.Text = "Für einen Vergleich werden mindestens zwei Profile benötigt."; return; }
-        string baseline = profiles[0];
-        var baseKeys = entries.Where(e => e.Profile == baseline).Select(e => $"{e.Page}|{e.Slot}|{e.Command}|{e.Parameter}").ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var lines = new List<string> { $"Vergleichsbasis: {baseline}" };
-        foreach (string? profile in profiles.Skip(1))
-        {
-            var keys = entries.Where(e => e.Profile == profile).Select(e => $"{e.Page}|{e.Slot}|{e.Command}|{e.Parameter}").ToHashSet(StringComparer.OrdinalIgnoreCase);
-            lines.Add($"{profile}: {keys.Count} Tasten · +{keys.Except(baseKeys).Count()} hinzugefügt · -{baseKeys.Except(keys).Count()} fehlend");
-        }
+        IReadOnlyList<string> lines =
+            StreamDeckCatalogApplicationService.CompareProfiles(
+                Directory
+                    .EnumerateFiles(StreamDeckActionsDirectory, "*.cmd")
+                    .Select(StreamDeckCatalogApplicationService.ReadMetadata));
+        if (lines.Count == 0) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckDiagnosticsBox.Text = "Für einen Vergleich werden mindestens zwei Profile benötigt."; return; }
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckDiagnosticsBox.Text = string.Join(Environment.NewLine, lines);
     }
 }

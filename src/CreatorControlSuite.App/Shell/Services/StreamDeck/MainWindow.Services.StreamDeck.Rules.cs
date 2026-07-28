@@ -72,33 +72,6 @@ public partial class MainWindow
     private string StreamDeckRuleTemplatesFile => Path.Combine(StreamDeckActionsDirectory, "streamdeck-rule-templates.json");
     private string StreamDeckStableStateFile => Path.Combine(StreamDeckActionsDirectory, "streamdeck-stable-state.json");
 
-    private sealed class StreamDeckAutomationRule
-    {
-        public string Id { get; set; } = Guid.NewGuid().ToString("N");
-        public string Condition { get; set; } = "stream.live";
-        public string Condition2 { get; set; } = string.Empty;
-        public string LogicalOperator { get; set; } = "and";
-        public string Profile { get; set; } = "Standard";
-        public string Page { get; set; } = "Hauptseite";
-        public int Priority { get; set; } = 100;
-        public int DelaySeconds { get; set; }
-        public int HoldSeconds { get; set; } = 10;
-        public string Time { get; set; } = "20:00";
-        public bool IsFallback { get; set; }
-        public bool Enabled { get; set; } = true;
-        public string Group { get; set; } = "Standard";
-        public string ActiveDays { get; set; } = "Mo,Di,Mi,Do,Fr,Sa,So";
-        public string ActiveWindow { get; set; } = "00:00-23:59";
-        public DateTimeOffset? LastAppliedAt { get; set; }
-        public DateTimeOffset? LastEvaluatedAt { get; set; }
-        public int MatchCount { get; set; }
-        public int SuccessCount { get; set; }
-        public int FailureCount { get; set; }
-        public int ConsecutiveFailures { get; set; }
-        public string LastError { get; set; } = string.Empty;
-        public string DisabledReason { get; set; } = string.Empty;
-    }
-
     private List<StreamDeckAutomationRule> LoadStreamDeckAutomationRules()
     {
         try
@@ -172,7 +145,7 @@ public partial class MainWindow
             string group = string.IsNullOrWhiteSpace(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleGroupBox.Text) ? "Standard" : ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleGroupBox.Text.Trim();
             string days = string.IsNullOrWhiteSpace(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleDaysBox.Text) ? "Mo,Di,Mi,Do,Fr,Sa,So" : ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleDaysBox.Text.Trim();
             string window = string.IsNullOrWhiteSpace(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleWindowBox.Text) ? "00:00-23:59" : ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleWindowBox.Text.Trim();
-            if (!IsValidStreamDeckRuleWindow(window))
+            if (!StreamDeckAutomationRuleService.IsValidWindow(window))
             {
                 throw new InvalidOperationException("Der Aktivitätszeitraum muss im Format HH:mm-HH:mm eingetragen werden.");
             }
@@ -201,58 +174,6 @@ public partial class MainWindow
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleStatusText.Text = "Regel gelöscht.";
     }
 
-    private bool IsStreamDeckConditionMatch(string condition, StreamDeckAutomationRule rule, Dictionary<string, bool> states)
-    {
-        return condition switch
-        {
-            "stream.live" => states.GetValueOrDefault("stream.live"),
-            "stream.offline" => !states.GetValueOrDefault("stream.live"),
-            "obs.connected" => states.GetValueOrDefault("obs.connected"),
-            "obs.disconnected" => !states.GetValueOrDefault("obs.connected"),
-            "spotify.playing" => states.GetValueOrDefault("spotify.playing"),
-            "spotify.paused" => !states.GetValueOrDefault("spotify.playing"),
-            "time.reached" => TimeOnly.TryParse(rule.Time, out TimeOnly target) && TimeOnly.FromDateTime(DateTime.Now).Hour == target.Hour && TimeOnly.FromDateTime(DateTime.Now).Minute == target.Minute,
-            _ => false
-        };
-    }
-
-    private bool IsStreamDeckRuleMatch(StreamDeckAutomationRule rule, Dictionary<string, bool> states)
-    {
-        bool first = IsStreamDeckConditionMatch(rule.Condition, rule, states);
-        if (string.IsNullOrWhiteSpace(rule.Condition2))
-        {
-            return first;
-        }
-
-        bool second = IsStreamDeckConditionMatch(rule.Condition2, rule, states);
-        return string.Equals(rule.LogicalOperator, "or", StringComparison.OrdinalIgnoreCase) ? first || second : first && second;
-    }
-
-    private static bool IsValidStreamDeckRuleWindow(string value)
-    {
-        string[] parts = value.Split('-', StringSplitOptions.TrimEntries);
-        return parts.Length == 2 && TimeOnly.TryParse(parts[0], out _) && TimeOnly.TryParse(parts[1], out _);
-    }
-
-    private static bool IsStreamDeckRuleScheduleActive(StreamDeckAutomationRule rule, DateTime now)
-    {
-        string day = now.DayOfWeek switch { DayOfWeek.Monday => "Mo", DayOfWeek.Tuesday => "Di", DayOfWeek.Wednesday => "Mi", DayOfWeek.Thursday => "Do", DayOfWeek.Friday => "Fr", DayOfWeek.Saturday => "Sa", _ => "So" };
-        string[] days = (rule.ActiveDays ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (days.Length > 0 && !days.Contains(day, StringComparer.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        string[] parts = (rule.ActiveWindow ?? "00:00-23:59").Split('-', StringSplitOptions.TrimEntries);
-        if (parts.Length != 2 || !TimeOnly.TryParse(parts[0], out TimeOnly start) || !TimeOnly.TryParse(parts[1], out TimeOnly end))
-        {
-            return true;
-        }
-
-        var current = TimeOnly.FromDateTime(now);
-        return start <= end ? current >= start && current <= end : current >= start || current <= end;
-    }
-
     private void AddStreamDeckRuleHistory(string message)
     {
         _streamDeckRuleHistory.Insert(0, $"{DateTime.Now:HH:mm:ss} · {message}");
@@ -267,39 +188,8 @@ public partial class MainWindow
     private void TestStreamDeckAutomationRules()
     {
         List<StreamDeckAutomationRule> rules = LoadStreamDeckAutomationRules();
-        var issues = new List<string>();
-        foreach (StreamDeckAutomationRule rule in rules)
-        {
-            if (string.IsNullOrWhiteSpace(rule.Profile) || string.IsNullOrWhiteSpace(rule.Page))
-            {
-                issues.Add($"{rule.Id}: Zielprofil oder Zielseite fehlt.");
-            }
-
-            if (rule.Priority is < 0 or > 1000)
-            {
-                issues.Add($"{rule.Id}: Priorität außerhalb 0–1000.");
-            }
-
-            if (rule.DelaySeconds is < 0 or > 3600 || rule.HoldSeconds is < 0 or > 3600)
-            {
-                issues.Add($"{rule.Id}: Verzögerung oder Sperrzeit ungültig.");
-            }
-
-            if (rule.Condition == "time.reached" && !TimeOnly.TryParse(rule.Time, out _))
-            {
-                issues.Add($"{rule.Id}: Uhrzeit ungültig.");
-            }
-
-            if (!IsValidStreamDeckRuleWindow(rule.ActiveWindow))
-            {
-                issues.Add($"{rule.Id}: Aktivitätszeitraum ungültig.");
-            }
-
-            if (string.IsNullOrWhiteSpace(rule.Group))
-            {
-                issues.Add($"{rule.Id}: Regelgruppe fehlt.");
-            }
-        }
+        IReadOnlyList<string> issues =
+            StreamDeckAutomationRuleService.Validate(rules);
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleStatusText.Text = issues.Count == 0 ? $"Regeltest erfolgreich: {rules.Count} Regel(n) sind formal gültig." : string.Join(Environment.NewLine, issues);
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleStatusText.Foreground = issues.Count == 0 ? Brushes.LightGreen : Brushes.IndianRed;
     }
@@ -318,7 +208,14 @@ public partial class MainWindow
         }
 
         List<StreamDeckAutomationRule> allRules = LoadStreamDeckAutomationRules();
-        var rules = allRules.Where(r => r.Enabled && IsStreamDeckRuleScheduleActive(r, DateTime.Now)).OrderByDescending(r => r.Priority).ToList();
+        var rules = allRules
+            .Where(rule =>
+                rule.Enabled &&
+                StreamDeckAutomationRuleService.IsScheduleActive(
+                    rule,
+                    DateTime.Now))
+            .OrderByDescending(rule => rule.Priority)
+            .ToList();
         if (rules.Count == 0) { if (showConfirmation) { ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleStatusText.Text = "Es sind keine aktuell aktiven Automatikregeln vorhanden."; } return; }
         Dictionary<string, bool> states = GetStreamDeckRuntimeStates();
         DateTimeOffset now = DateTimeOffset.Now;
@@ -326,7 +223,10 @@ public partial class MainWindow
         foreach (StreamDeckAutomationRule? rule in rules)
         {
             rule.LastEvaluatedAt = now;
-            bool matched = IsStreamDeckRuleMatch(rule, states);
+            bool matched = StreamDeckAutomationRuleService.IsRuleMatch(
+                rule,
+                states,
+                DateTime.Now);
             if (!matched) { _streamDeckRuleFirstMatch.Remove(rule.Id); continue; }
             rule.MatchCount++;
             if (!_streamDeckRuleFirstMatch.TryGetValue(rule.Id, out DateTimeOffset firstMatch)) { _streamDeckRuleFirstMatch[rule.Id] = now; firstMatch = now; }
@@ -575,203 +475,4 @@ public partial class MainWindow
         ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRuleStatusText.Foreground = Brushes.LightGreen;
     }
 
-    private async Task CreateStreamDeckActionAsync()
-    {
-        try
-        {
-            string title = string.IsNullOrWhiteSpace(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionTitleBox.Text) ? "Neue Aktion" : ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionTitleBox.Text.Trim();
-            var item = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCommandBox.SelectedItem as ComboBoxItem;
-            string command = item?.Tag?.ToString() ?? "workflow.prepare";
-            string parameter = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionParameterBox.Text.Trim();
-            string profile = string.IsNullOrWhiteSpace(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckProfileNameBox.Text) ? "Standard" : ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckProfileNameBox.Text.Trim();
-            string page = string.IsNullOrWhiteSpace(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckPageNameBox.Text) ? "Hauptseite" : ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckPageNameBox.Text.Trim();
-            string condition = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckStateConditionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
-            string trueLabel = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckTrueLabelBox.Text.Trim();
-            string falseLabel = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckFalseLabelBox.Text.Trim();
-            bool toggleMode = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckToggleModeBox.IsChecked == true;
-            string alternateCommand = (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckAlternateCommandBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
-            string alternateParameter = ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckAlternateParameterBox.Text.Trim();
-            if (!int.TryParse(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckStepDelayBox.Text, out int stepDelayMs) || stepDelayMs < 0 || stepDelayMs > 10000)
-            {
-                throw new InvalidOperationException("Die Schrittverzögerung muss zwischen 0 und 10000 ms liegen.");
-            }
-
-            if (!int.TryParse(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckRetryCountBox.Text, out int retryCount) || retryCount < 0 || retryCount > 5)
-            {
-                throw new InvalidOperationException("Die Wiederholungszahl muss zwischen 0 und 5 liegen.");
-            }
-
-            if (!int.TryParse(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckCooldownBox.Text, out int cooldownMs) || cooldownMs < 0 || cooldownMs > 60000)
-            {
-                throw new InvalidOperationException("Die Tastensperre muss zwischen 0 und 60000 ms liegen.");
-            }
-
-            if (toggleMode && string.IsNullOrWhiteSpace(condition))
-            {
-                throw new InvalidOperationException("Für eine Toggle-Taste muss eine Zustandsbindung ausgewählt werden.");
-            }
-
-            if (!int.TryParse(ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckSlotBox.Text, out int slot) || slot < 1 || slot > 32)
-            {
-                throw new InvalidOperationException("Die Position muss zwischen 1 und 32 liegen.");
-            }
-
-            var steps = new List<(string Command, string Parameter)>();
-            foreach (string line in ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckMultiActionBox.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-            {
-                string[] parts = line.Split('|', 2);
-                string stepCommand = parts[0].Trim();
-                if (string.IsNullOrWhiteSpace(stepCommand))
-                {
-                    continue;
-                }
-
-                steps.Add((stepCommand, parts.Length > 1 ? parts[1].Trim() : string.Empty));
-            }
-            if (steps.Count == 0)
-            {
-                steps.Add((command, parameter));
-            }
-
-            if (steps.Count > 20)
-            {
-                throw new InvalidOperationException("Eine Mehrfachaktion darf höchstens 20 Schritte enthalten.");
-            }
-
-            string safeName = string.Concat(title.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)).Trim();
-            if (string.IsNullOrWhiteSpace(safeName))
-            {
-                safeName = "Neue Aktion";
-            }
-
-            Directory.CreateDirectory(StreamDeckActionsDirectory);
-            string clientPath = Path.Combine(AppContext.BaseDirectory, "CreatorControlSuite.CommandClient.exe");
-            string cmdPath = Path.Combine(StreamDeckActionsDirectory, safeName + ".cmd");
-            var content = new StringBuilder("@echo off\r\n");
-            if (toggleMode)
-            {
-                string stateExpression = condition switch
-                {
-                    "stream.live" => "$s.stream.isLive",
-                    "obs.connected" => "$s.obs.connected",
-                    "spotify.playing" => "$s.spotify.isPlaying",
-                    _ => "$false"
-                };
-                content.AppendLine($"powershell -NoProfile -ExecutionPolicy Bypass -Command \"$s=Get-Content -Raw '{StreamDeckRuntimeStateFile.Replace("'", "''")}'|ConvertFrom-Json; if({stateExpression}){{exit 0}}else{{exit 1}}\"");
-                content.AppendLine("if errorlevel 1 goto stateoff");
-                string alternateArgs = string.IsNullOrWhiteSpace(alternateParameter)
-                    ? alternateCommand
-                    : FormatStreamDeckCommandArgs(alternateCommand, alternateParameter);
-                content.AppendLine($"start \"\" /wait /min \"{clientPath}\" {alternateArgs}");
-                content.AppendLine("goto end");
-                content.AppendLine(":stateoff");
-            }
-            int stepNumber = 0;
-            foreach ((string Command, string Parameter) in steps)
-            {
-                stepNumber++;
-                string args = FormatStreamDeckCommandArgs(Command, Parameter);
-                string successLabel = $"step_{stepNumber}_ok";
-                for (int attempt = 0; attempt <= retryCount; attempt++)
-                {
-                    content.AppendLine($"start \"\" /wait /min \"{clientPath}\" {args}");
-                    content.AppendLine($"if not errorlevel 1 goto {successLabel}");
-                }
-                content.AppendLine($":{successLabel}");
-                if (stepDelayMs > 0)
-                {
-                    content.AppendLine($"powershell -NoProfile -Command \"Start-Sleep -Milliseconds {stepDelayMs}\"");
-                }
-            }
-            if (toggleMode)
-            {
-                content.AppendLine(":end");
-            }
-
-            if (cooldownMs > 0)
-            {
-                content.AppendLine($"powershell -NoProfile -Command \"Start-Sleep -Milliseconds {cooldownMs}\"");
-            }
-
-            await File.WriteAllTextAsync(cmdPath, content.ToString());
-            var meta = new { title, command = steps[0].Command, parameter = steps[0].Parameter, profile, page, slot, steps = steps.Select(step => new { command = step.Command, parameter = step.Parameter }).ToArray(), locked = false, condition, trueLabel, falseLabel, toggleMode, alternateCommand, alternateParameter, stepDelayMs, retryCount, cooldownMs, createdAt = DateTimeOffset.Now };
-            await File.WriteAllTextAsync(Path.ChangeExtension(cmdPath, ".json"), System.Text.Json.JsonSerializer.Serialize(meta, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-            ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = $"Aktionstaste erstellt: {cmdPath}";
-            ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(92, 184, 92));
-            RefreshStreamDeckActionsList();
-        }
-        catch (Exception ex)
-        {
-            ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Text = ex.Message;
-            ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckActionCreateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(220, 90, 90));
-        }
-    }
-
-    private static string FormatStreamDeckCommandArgs(string command, string parameter)
-    {
-        if (string.IsNullOrWhiteSpace(parameter))
-        {
-            return command;
-        }
-
-        string key = command switch
-        {
-            "spotify.volume" => "volume",
-            "spotify.playlist" => "uri",
-            "obs.scene" => "scene",
-            "obs.mute" => "input",
-            "alert.test" or "alerts.test" => "type",
-            _ => "value"
-        };
-
-        return $"{command} {key}=\"{parameter.Replace("\"", "\"\"")}\"";
-    }
-
-    private void OpenStreamDeckActionsFolder()
-    {
-        Directory.CreateDirectory(StreamDeckActionsDirectory);
-        Process.Start(new ProcessStartInfo("explorer.exe", StreamDeckActionsDirectory) { UseShellExecute = true });
-    }
-
-    private void DeleteSelectedStreamDeckAction()
-    {
-        if (ServicesPageViewHost.StreamDeckServiceViewHost.StreamDeckCreatedActionsList.SelectedItem is not ListBoxItem item || item.Tag is not string file)
-        {
-            return;
-        }
-
-        if (File.Exists(file))
-        {
-            File.Delete(file);
-        }
-
-        string json = Path.ChangeExtension(file, ".json");
-        if (File.Exists(json))
-        {
-            File.Delete(json);
-        }
-
-        RefreshStreamDeckActionsList();
-    }
-
-    private async Task ExportStreamDeckProfileAsync()
-    {
-        try
-        {
-            StreamDeckProfilePackage package =
-                await _streamDeckModule.BuildDefaultProfileAsync();
-
-            SettingsPageViewHost.StreamDeckStatusText.Text =
-                "Profil exportiert: " + package.Path;
-
-            SettingsPageViewHost.StreamDeckStatusText.Foreground =
-                System.Windows.Media.Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            SettingsPageViewHost.StreamDeckStatusText.Text = exception.Message;
-            SettingsPageViewHost.StreamDeckStatusText.Foreground =
-                System.Windows.Media.Brushes.IndianRed;
-        }
-    }
 }
