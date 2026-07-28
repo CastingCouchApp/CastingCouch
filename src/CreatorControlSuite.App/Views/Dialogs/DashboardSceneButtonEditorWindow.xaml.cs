@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using CreatorControlSuite.Core.Configuration;
+using CreatorControlSuite.Modules.Overlay.Assets;
 using Microsoft.Win32;
 
 namespace CreatorControlSuite.App.Views.Dialogs;
@@ -32,14 +33,17 @@ public partial class DashboardSceneButtonEditorWindow : Window
     ];
 
     private readonly bool _seedTitleFromScene;
+    private readonly IOverlayAssetStore? _assetStore;
 
     public DashboardSceneButtonSettings Result { get; private set; }
 
     public DashboardSceneButtonEditorWindow(
         IReadOnlyList<string> availableScenes,
-        DashboardSceneButtonSettings? existing = null)
+        DashboardSceneButtonSettings? existing = null,
+        IOverlayAssetStore? assetStore = null)
     {
         InitializeComponent();
+        _assetStore = assetStore;
 
         Result = existing is null
             ? new DashboardSceneButtonSettings()
@@ -103,6 +107,7 @@ public partial class DashboardSceneButtonEditorWindow : Window
         ImageKindRadio.Checked += (_, _) => UpdateIconPanels();
         SceneBox.SelectionChanged += OnSceneSelectionChanged;
         BrowseImageButton.Click += (_, _) => BrowseImage();
+        BrowseLibraryButton.Click += (_, _) => BrowseLibrary();
         CancelButton.Click += (_, _) =>
         {
             DialogResult = false;
@@ -166,6 +171,29 @@ public partial class DashboardSceneButtonEditorWindow : Window
 
         ImagePathBox.Text = dialog.FileName;
         UpdateImagePreview(dialog.FileName);
+    }
+
+    private void BrowseLibrary()
+    {
+        if (_assetStore is null)
+        {
+            MessageBox.Show(
+                this,
+                "Asset-Bibliothek ist nicht verfügbar.",
+                "Dashboard",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new AssetLibraryWindow(_assetStore) { Owner = this };
+        if (window.ShowDialog() != true || window.SelectedAsset is null)
+        {
+            return;
+        }
+
+        ImagePathBox.Text = window.SelectedAsset.LocalPath;
+        UpdateImagePreview(window.SelectedAsset.LocalPath);
     }
 
     private void UpdateImagePreview(string? path)

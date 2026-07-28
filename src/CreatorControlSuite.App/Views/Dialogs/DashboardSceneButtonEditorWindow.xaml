@@ -44,9 +44,11 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="ImagePathBox" MinHeight="30" IsReadOnly="True"/>
                         <Button x:Name="BrowseImageButton" Grid.Column="1" Content="Datei…" Margin="8,0,0,0" Padding="12,6"/>
+                        <Button x:Name="BrowseLibraryButton" Grid.Column="2" Content="Bibliothek…" Margin="8,0,0,0" Padding="12,6"/>
                     </Grid>
                     <Border Margin="0,10,0,0" Width="64" Height="64" HorizontalAlignment="Left"
                             Background="{DynamicResource ElevatedBackgroundBrush}"

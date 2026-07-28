@@ -413,6 +413,8 @@ public sealed class OverlayCanvasPageViewModel : ViewModelBase
         new("Widget: QR Code", "qr-code"),
         new("Widget: BRB Panel", "brb-panel"),
         new("Widget: Announcement Bar", "announcement-bar"),
+        new("Widget: Bubatz Cantina", "bubatz-cantina"),
+        new("Widget: fruppis Landadel", "fruppis-landadel"),
         new("Widget: Animated Background", "animated-background"),
         new("Shape: Frame", "shape/frame"),
         new("Shape: Card Frame", "shape/frame.card"),

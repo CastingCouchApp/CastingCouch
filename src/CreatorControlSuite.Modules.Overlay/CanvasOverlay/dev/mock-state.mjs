@@ -18,6 +18,7 @@ export const WIDGET_TYPES = [
   "qr-code",
   "brb-panel",
   "announcement-bar",
+  "bubatz-cantina",
   "animated-background"
 ];
 

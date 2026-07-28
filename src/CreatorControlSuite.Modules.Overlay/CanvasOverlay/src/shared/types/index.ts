@@ -201,6 +201,11 @@ export interface CcsCanvasApi {
   BRB_PANEL_MODES?: readonly string[];
   ANNOUNCEMENT_BAR_VARIANTS?: readonly string[];
   ANNOUNCEMENT_BAR_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  BUBATZ_CANTINA_VARIANTS?: readonly string[];
+  BUBATZ_CANTINA_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  BUBATZ_CANTINA_MODES?: readonly string[];
+  FRUPPIS_LANDADEL_VARIANTS?: readonly string[];
+  FRUPPIS_LANDADEL_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
   ANIMATED_BACKGROUND_VARIANTS?: readonly string[];
   ANIMATED_BACKGROUND_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
   ANIMATED_BACKGROUND_VARIANT_LABELS?: Record<string, string>;

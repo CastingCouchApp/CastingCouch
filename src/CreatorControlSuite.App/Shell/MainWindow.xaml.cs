@@ -220,6 +220,8 @@ public partial class MainWindow : Window
             text => Clipboard.SetText(text);
         _overlayConnectionSettingsPageViewModel.BrowseBackgroundRequestedAsync =
             BrowseOverlayChatBackgroundImageAsync;
+        _overlayConnectionSettingsPageViewModel.BrowseAssetLibraryRequestedAsync =
+            BrowseOverlayAssetLibraryImageAsync;
         _overlayCanvasPageViewModel.CopyTextRequested =
             text => Clipboard.SetText(text);
         _overlayCanvasPageViewModel.PromptNameRequestedAsync =

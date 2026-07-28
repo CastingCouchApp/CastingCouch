@@ -23,6 +23,30 @@ function refresh(runtime: CreateRuntime, itemId: string | null, scheduleSave: ()
   scheduleSave();
 }
 
+/** Deep-clone a layout item with a new id. Offset defaults to +20/+20 (duplicate button). */
+export function cloneLayoutItem(
+  item: LayoutItem,
+  items: LayoutItem[],
+  offsetX = 20,
+  offsetY = 20
+): LayoutItem {
+  return {
+    ...item,
+    id: uid(),
+    x: (item.x || 0) + offsetX,
+    y: (item.y || 0) + offsetY,
+    z: Math.max(0, ...items.map((i) => i.z || 0)) + 1,
+    locked: false,
+    props: { ...(item.props || {}) },
+    effects: Array.isArray(item.effects)
+      ? item.effects.map((e) => ({ ...e, settings: { ...(e.settings || {}) } }))
+      : [],
+    animations: Array.isArray(item.animations)
+      ? item.animations.map((a) => ({ ...a, settings: { ...(a.settings || {}) } }))
+      : []
+  };
+}
+
 export function runEditorCommand(
   command: EditorCommand,
   runtime: CreateRuntime,
@@ -42,21 +66,7 @@ export function runEditorCommand(
       return true;
     }
     case "duplicate": {
-      const copy: LayoutItem = {
-        ...item,
-        id: uid(),
-        x: (item.x || 0) + 20,
-        y: (item.y || 0) + 20,
-        z: Math.max(0, ...items.map((i) => i.z || 0)) + 1,
-        locked: false,
-        props: { ...(item.props || {}) },
-        effects: Array.isArray(item.effects)
-          ? item.effects.map((e) => ({ ...e, settings: { ...(e.settings || {}) } }))
-          : [],
-        animations: Array.isArray(item.animations)
-          ? item.animations.map((a) => ({ ...a, settings: { ...(a.settings || {}) } }))
-          : []
-      };
+      const copy = cloneLayoutItem(item, items);
       layout.items = [...items, copy];
       runtime.setLayout(layout, true);
       refresh(runtime, copy.id, scheduleSave);

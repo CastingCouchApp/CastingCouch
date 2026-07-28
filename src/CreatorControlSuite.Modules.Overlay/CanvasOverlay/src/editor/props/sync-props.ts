@@ -3,6 +3,7 @@ import type { EditorContext } from "./context";
 import { boolProp } from "../controls/bool-prop";
 import { numProp } from "../controls/num-prop";
 import { textProp } from "../controls/text-prop";
+import { imageProp, attachImageLibraryButton } from "../controls/image-prop";
 import { selectProp } from "../controls/select-prop";
 import { fontProp } from "../controls/font-prop";
 import { colorProp } from "../controls/color-prop";
@@ -23,6 +24,8 @@ import {
   appendQrCodeProps,
   appendBrbPanelProps,
   appendAnnouncementBarProps,
+  appendBubatzCantinaProps,
+  appendFruppisLandadelProps,
   appendAnimatedBackgroundProps,
   appendDividerProps,
   appendCamRingProps,
@@ -137,7 +140,7 @@ export function syncProps(
     propExtra.appendChild(style.root);
   } else if (item.type === "image") {
     const content = contentSection("image");
-    content.body.appendChild(textProp("src", "Bild-URL", item, ctx, ""));
+    content.body.appendChild(imageProp("src", "Bild-URL", item, ctx, ""));
     content.body.appendChild(selectProp("fit", "Einpassung", item, ctx, [
       { value: "contain", label: "Contain" },
       { value: "cover", label: "Cover" },
@@ -196,6 +199,10 @@ export function syncProps(
     appendBrbPanelProps(item, ctx, propExtra);
   } else if (item.type === "announcement-bar") {
     appendAnnouncementBarProps(item, ctx, propExtra);
+  } else if (item.type === "bubatz-cantina") {
+    appendBubatzCantinaProps(item, ctx, propExtra);
+  } else if (item.type === "fruppis-landadel") {
+    appendFruppisLandadelProps(item, ctx, propExtra);
   } else if (item.type === "animated-background") {
     appendAnimatedBackgroundProps(item, ctx, propExtra);
   } else if (item.type === "frame.card") {
@@ -218,6 +225,34 @@ export function syncProps(
 
   if (effectsPane) renderEffectsPanel(effectsPane, item, ctx);
   if (animationsPane) renderAnimationsPanel(animationsPane, item, ctx);
+  setPropsLockedState(propsForm, !!item.locked, effectsPane, animationsPane);
+}
+
+/** Disable all inspector controls except the lock checkbox when the item is locked. */
+export function setPropsLockedState(
+  propsForm: HTMLElement,
+  locked: boolean,
+  ...extraRoots: Array<HTMLElement | null | undefined>
+): void {
+  propsForm.classList.toggle("ccs-props-locked", locked);
+  const roots: HTMLElement[] = [propsForm];
+  for (const root of extraRoots) {
+    if (root) {
+      root.classList.toggle("ccs-props-locked", locked);
+      roots.push(root);
+    }
+  }
+  for (const root of roots) {
+    root.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement>(
+      "input, select, textarea, button"
+    ).forEach((el) => {
+      if (el.id === "propLocked") {
+        el.disabled = false;
+        return;
+      }
+      el.disabled = locked;
+    });
+  }
 }
 
 function appendMusicProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -268,7 +303,7 @@ function appendSocialsProps(item: LayoutItem, ctx: EditorContext, propExtra: HTM
   content.body.appendChild(textProp("handle", "Handle", item, ctx, ""));
   content.body.appendChild(textProp("url", "URL (optional)", item, ctx, ""));
   content.body.appendChild(textProp("label", "Label (optional)", item, ctx, ""));
-  content.body.appendChild(textProp("iconUrl", "Icon-URL (optional)", item, ctx, ""));
+  content.body.appendChild(imageProp("iconUrl", "Icon-URL (optional)", item, ctx, ""));
   content.body.appendChild(selectProp("variant", "Variante", item, ctx, [
     { value: "row", label: "Row" },
     { value: "pills", label: "Pills" },
@@ -388,6 +423,15 @@ function appendPartnerRouletteProps(item: LayoutItem, ctx: EditorContext, propEx
       });
 
       row.appendChild(input);
+      row.appendChild(
+        attachImageLibraryButton(input, (url) => {
+          ctx.commitProp(item, (next) => {
+            const nextImages = readRouletteImages(next);
+            nextImages[i] = url;
+            next.props.images = nextImages;
+          });
+        })
+      );
       row.appendChild(remove);
       card.appendChild(row);
       list.appendChild(card);

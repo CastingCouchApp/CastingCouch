@@ -18,6 +18,8 @@ import {
   updateQrCode,
   updateBrbPanel,
   updateAnnouncementBar,
+  updateBubatzCantina,
+  updateFruppisLandadel,
   updateAnimatedBackground,
   updateDivider,
   updateCamRing,
@@ -75,6 +77,8 @@ export function paintItemContent(
   else if (type === "qr-code") updateQrCode(el, item);
   else if (type === "brb-panel") updateBrbPanel(el, item, payload);
   else if (type === "announcement-bar") updateAnnouncementBar(el, item);
+  else if (type === "bubatz-cantina") updateBubatzCantina(el, item);
+  else if (type === "fruppis-landadel") updateFruppisLandadel(el, item);
   else if (type === "animated-background") updateAnimatedBackground(el, item);
   else if (type === "shape.divider") updateDivider(el, item);
   else if (type === "shape.cam-ring") updateCamRing(el, item);

@@ -751,6 +751,144 @@
   left: 0;
 }
 
+.ccs-spacing-line {
+  position: absolute;
+  background: #38bdf8;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.ccs-spacing-line.v {
+  width: 1px;
+}
+
+.ccs-spacing-line.h {
+  height: 1px;
+}
+
+.ccs-spacing-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+  border: 1px solid rgba(56, 189, 248, 0.7);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ccs-props-locked .ccs-prop-row,
+.ccs-props-locked .ccs-effect-instance,
+.ccs-props-locked .ccs-feature-section {
+  opacity: 0.55;
+}
+
+.ccs-image-prop-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}
+
+.ccs-image-prop-controls .ccs-prop-row-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.ccs-image-prop-library {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.ccs-asset-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.ccs-asset-modal {
+  width: min(820px, 100%);
+  max-height: min(80vh, 720px);
+  overflow: auto;
+  background: #1f1a17;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 16px;
+  color: #f5f0eb;
+}
+
+.ccs-asset-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ccs-asset-modal-close {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.ccs-asset-modal-toolbar {
+  margin-bottom: 12px;
+}
+
+.ccs-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.ccs-asset-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ccs-asset-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+
+.ccs-asset-card-name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ccs-asset-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.ccs-asset-card-actions button {
+  flex: 1;
+  font-size: 11px;
+}
+
+.ccs-asset-modal-empty {
+  opacity: 0.7;
+  font-size: 13px;
+  padding: 12px 0;
+}
+
 .ccs-context-menu {
   position: fixed;
   z-index: 100000;

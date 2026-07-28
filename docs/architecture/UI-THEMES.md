@@ -30,6 +30,7 @@ Theme-IDs fallen weiterhin auf Classic zurück.
 | `gold-rush-studio` | Gold Rush Studio |
 | `arctic-glass-lab` | Arctic Glass Lab |
 | `biomilchs-bubatz-cantina` | biomilchs Bubatz Cantina |
+| `fruppis-landadel-kanzlei` | fruppis Landadel Kanzlei |
 
 ## Technik
 

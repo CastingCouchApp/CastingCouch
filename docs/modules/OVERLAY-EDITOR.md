@@ -28,6 +28,8 @@ Siehe auch: [`OVERLAY-SYSTEM.md`](OVERLAY-SYSTEM.md)
 | `/w/qr-code` | Solo QR Code |
 | `/w/brb-panel` | Solo BRB / Starting Panel |
 | `/w/announcement-bar` | Solo Announcement Bar |
+| `/w/bubatz-cantina` | Solo Bubatz Cantina (Schild/Menü/Status/Ticker) |
+| `/w/fruppis-landadel` | Solo fruppis Landadel (Persona-Karte) |
 | `/w/animated-background` | Solo Animated Background (34 Styles, inkl. Parallax-Berge) |
 | `/w/shape/{shapeId}` | Solo Frame/Shape, z. B. `/w/shape/frame` |
 | `GET/PUT /layout/{id}` | Layout laden/speichern (PUT nur Loopback) |
@@ -45,12 +47,17 @@ Beispiel: `/editor/default`, `/view/just-chatting`.
 - **32px Padding** um die Zeichenfläche (Fit/Scale berücksichtigt den Abstand).
 - **Raster** Unterteilungen **H × V** (Default 32×18 für 16:9; `gridDivisionsForCanvas` leitet V aus dem Canvas-Seitenverhältnis ab); liegt immer im Vordergrund über den Widgets (`pointer-events: none`). Editor-Layer (Grid/OBS-Vorschau) werden nach jedem `setLayout`/`renderItems` via `onAfterRender` neu gesetzt.
 - **Einrasten**: Snap an Rasterlinien (H×V) beim Verschieben **und** Skalieren (nur die gezogene Handle-Kante); Threshold ~20 % der Zellengröße (min. 8px), inkl. Guide-Linien. Unabhängig von der Raster-Anzeige.
-- **Magnet**: Snap an Kanten/Mitten **anderer Widgets** (Threshold 8px) beim Verschieben/Skalieren, inkl. Guide-Linien. Bei gleichzeitigem Einrasten gewinnt der Magnet, wenn er greift.
+- **Magnet**: Snap an Canvas-Kanten/Mitte **und** Kanten/Mitten anderer Widgets (Threshold 8px) beim Verschieben/Skalieren, inkl. Guide-Linien. Bei gleichzeitigem Einrasten gewinnt der Magnet, wenn er greift.
+- **Abstände** (OBS-Style): Beim Verschieben Linien + Pixel-Labels zu den vier Canvas-Rändern und zu benachbarten Widgets (positiver Gap bei orthogonaler Überlappung).
+- **Pfeiltasten**: selektiertes Widget um 1 px bewegen; **Shift+Pfeil** = 10 px (nicht bei Fokus in Eingabefeldern / gesperrt).
+- **Alt+Ziehen**: beim Move-Start klonen und den Klon bewegen (Original bleibt).
 - **Rechtsklick-Menü** / Toolbar-Icons / **Entf** bzw. **Backspace**: Duplizieren, Sperren/Entsperren, Ganz nach oben/unten, Ebene rauf/runter, Löschen (nicht bei Fokus in Eingabefeldern; gesperrte Items bleiben).
 
 ## Props-Panel
 
-Affinity-orientierter Inspector (Cool-Gray): Tabs **Layout** / **Widget** / **Effekte** / **Animationen**. Im Widget-Tab: **Inhalt** und **Look** default offen, **Stil** und **Erweitert** default zugeklappt (`contentSection` / `lookSection` / `styleSection` / `advancedSection`). Layout-Tab: **Position & Größe** default zugeklappt — inkl. einheitliches **Padding** (px) auf Item-Ebene für alle Widgets/Shapes. Effekte-/Animationen-Tabs ohne zusätzlichen Section-Wrapper. Alle Props teilen das kompakte Row-Layout **Label | Control** (Zahlen: Label | Slider | Wert). Features nutzen LiveFX-artige `featureSection`-Toggles (in **Erweitert**). Farben: `colorProp` (Expand-Handle + Picker; Swatches rechtsbündig mit Historie + Presets), Schriften: `fontProp`. Aktiver Tab in `sessionStorage` (`ccs-props-tab`).
+Affinity-orientierter Inspector (Cool-Gray): Tabs **Layout** / **Widget** / **Effekte** / **Animationen**. Im Widget-Tab: **Inhalt** und **Look** default offen, **Stil** und **Erweitert** default zugeklappt (`contentSection` / `lookSection` / `styleSection` / `advancedSection`). Layout-Tab: **Position & Größe** default zugeklappt — inkl. einheitliches **Padding** (px) auf Item-Ebene für alle Widgets/Shapes. Effekte-/Animationen-Tabs ohne zusätzlichen Section-Wrapper. Alle Props teilen das kompakte Row-Layout **Label | Control** (Zahlen: Label | Slider | Wert). Features nutzen LiveFX-artige `featureSection`-Toggles (in **Erweitert**). Farben: `colorProp` (Expand-Handle + Picker; Swatches rechtsbündig mit Historie + Presets), Schriften: `fontProp`. Bild-Felder: `imageProp` (URL + Button **Bibliothek…** → Asset-Modal mit Upload/Auswahl). Aktiver Tab in `sessionStorage` (`ccs-props-tab`).
+
+**Gesperrt:** Bei `locked` sind alle Inspector-Controls und Item-Toolbar-Aktionen deaktiviert — Ausnahme: Checkbox „Gesperrt“.
 
 **Effekte:** Jedes Item hat `effects[]` — stapelbare Modifier (Glow, Particles, Scanlines, Vignette, Blur, Noise, Neon, Glitch, Sparkle, Aurora, Pulse Ring, Hologram, Outline, Drop Shadow, Rainbow, Spotlight) plus Pack-Effekte aus installierten Extension Packs (`ext:…`). Pro Effekt optional **Ziel** `box`/`content` — nur wenn die Strategy `targets` inkl. `content` hat (Glow, Drop Shadow, Outline, Glitch); sonst kein Ziel-Select. Glow / Outline / Drop Shadow: **Animation** `Aus` / `Pulse` / `Atmen` + Tempo. Im Tab **Effekte**, einzeln aktivierbar. Weitere Modifier: Skill `overlay-effect` / Packs: `overlay-extension-pack`.
 
@@ -107,6 +114,8 @@ Standalone-Chat bleibt zusätzlich unter `/chat` verfügbar.
 | `qr-code` | QR aus URL (clientseitig) + Caption/Logo; `errorCorrection`, `fg`/`bg` |
 | `brb-panel` | BRB/Starting/Tech-Pause Panel; optional globaler `countdown.*` |
 | `announcement-bar` | Ankündigungsbanner mit optionalem Marquee |
+| `bubatz-cantina` | Orbit-Cantina: Schild/Menü/Status/Ticker mit Bubatz-Grün, Blue-Milk-Türkis, Cantina-Gold (14 Variants, 6 Sizes) |
+| `fruppis-landadel` | Persona-Karte (Peter Saul Defaults): CSS-Figur mit Hoodie/Hose/Schuhe, 16 Variants, Outfit-`colorProp`s, Moods, Quote/Stats |
 | `animated-background` | Animierter Full-Bleed-Hintergrund mit **34 Styles**: CSS-Looks (`cyber` … `noir`), **JS-Matrix-Rain** (`hacker`: fallende Katakana/Symbole), plus **JS-Parallax-Berge** (`mountains` … `ridge-storm`); Props: `variant`, `sizePreset`, `color`/`color2`/`color3`, `speed`, `intensity`, `density`, `opacity`, Features `vignette` / `paused` |
 
 ## Globaler Countdown

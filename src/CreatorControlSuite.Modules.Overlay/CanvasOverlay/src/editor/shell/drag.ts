@@ -1,6 +1,8 @@
 import type { CreateRuntime, LayoutItem } from "../../shared/types";
+import { cloneLayoutItem } from "./commands";
 import { activeEdgesFromHandle, applyGridSnap } from "./grid-snap";
 import { applyMagnetSnap, type MagnetGuide } from "./magnet";
+import { computeSpacingHelpers, type SpacingHelper } from "./spacing";
 import { getStageMetrics } from "./stage-metrics";
 
 export interface DragOptions {
@@ -26,7 +28,13 @@ function ensureGuides(canvas: HTMLElement): HTMLElement {
   return el;
 }
 
-function paintGuides(canvas: HTMLElement, guides: MagnetGuide[], canvasW: number, canvasH: number): void {
+function paintGuides(
+  canvas: HTMLElement,
+  guides: MagnetGuide[],
+  spacing: SpacingHelper[],
+  canvasW: number,
+  canvasH: number
+): void {
   const host = ensureGuides(canvas);
   host.innerHTML = "";
   for (const g of guides) {
@@ -42,6 +50,28 @@ function paintGuides(canvas: HTMLElement, guides: MagnetGuide[], canvasW: number
       line.style.width = canvasW + "px";
     }
     host.appendChild(line);
+  }
+
+  for (const s of spacing) {
+    const line = document.createElement("div");
+    line.className = "ccs-spacing-line " + (s.orientation === "v" ? "v" : "h");
+    if (s.orientation === "v") {
+      line.style.left = s.cross + "px";
+      line.style.top = s.from + "px";
+      line.style.height = Math.max(1, s.to - s.from) + "px";
+    } else {
+      line.style.top = s.cross + "px";
+      line.style.left = s.from + "px";
+      line.style.width = Math.max(1, s.to - s.from) + "px";
+    }
+    host.appendChild(line);
+
+    const label = document.createElement("div");
+    label.className = "ccs-spacing-label";
+    label.textContent = s.distance + " px";
+    label.style.left = s.labelX + "px";
+    label.style.top = s.labelY + "px";
+    host.appendChild(label);
   }
 }
 
@@ -74,16 +104,32 @@ export function setupDrag(
       runtime.select(null);
       return;
     }
-    const id = (wrapper as HTMLElement).dataset.id!;
-    const item = (runtime.getLayout().items || []).find((i) => i.id === id);
+    let id = (wrapper as HTMLElement).dataset.id!;
+    let item = (runtime.getLayout().items || []).find((i) => i.id === id);
     if (!item) return;
     runtime.select(id);
     if (item.locked) return;
+    const mode = handle ? (handle as HTMLElement).dataset.handle! : "move";
+
+    // Alt+move: clone at same position and drag the clone.
+    if (mode === "move" && e.altKey) {
+      const layout = runtime.getLayout();
+      const items = layout.items || [];
+      const copy = cloneLayoutItem(item, items, 0, 0);
+      layout.items = [...items, copy];
+      runtime.setLayout(layout, true);
+      runtime.renderItems();
+      runtime.select(copy.id);
+      item = copy;
+      id = copy.id;
+      syncProps(copy);
+    }
+
     const layout = runtime.getLayout();
     const metrics = getStageMetrics(stage, layout.canvasWidth || 1920, layout.canvasHeight || 1080);
     drag = {
       id,
-      mode: handle ? (handle as HTMLElement).dataset.handle! : "move",
+      mode,
       startX: e.clientX,
       startY: e.clientY,
       orig: { x: item.x, y: item.y, w: item.w, h: item.h },
@@ -127,8 +173,9 @@ export function setupDrag(
     const layout = runtime.getLayout();
     const canvasW = layout.canvasWidth || 1920;
     const canvasH = layout.canvasHeight || 1080;
+    const others = otherRects(runtime, item.id);
 
-    // Grid first, then magnet (magnet can pull off-grid when near other widgets).
+    // Grid first, then magnet (magnet can pull off-grid when near other widgets / canvas).
     if (options?.isGridSnapEnabled()) {
       const div = options.getGridDivisions();
       const snapped = applyGridSnap(
@@ -151,10 +198,12 @@ export function setupDrag(
     if (options?.isMagnetEnabled()) {
       const snapped = applyMagnetSnap(
         { x, y, w, h },
-        otherRects(runtime, item.id),
+        others,
         8,
         mode,
-        mode === "resize" ? activeEdges : undefined
+        mode === "resize" ? activeEdges : undefined,
+        canvasW,
+        canvasH
       );
       x = snapped.x;
       y = snapped.y;
@@ -171,7 +220,11 @@ export function setupDrag(
     item.w = w;
     item.h = h;
 
-    paintGuides(runtime.canvas, guides, canvasW, canvasH);
+    const spacing =
+      drag.mode === "move"
+        ? computeSpacingHelpers({ x, y, w, h }, canvasW, canvasH, others)
+        : [];
+    paintGuides(runtime.canvas, guides, spacing, canvasW, canvasH);
 
     const node = runtime.itemNodes.get(item.id);
     if (node) {

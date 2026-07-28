@@ -77,6 +77,20 @@ const DEMO_PROPS: Record<string, Record<string, unknown>> = {
     message: "Folge für mehr Content · !discord · !socials",
     hideWhenEmpty: false
   },
+  "bubatz-cantina": {
+    title: "biomilchs Bubatz Cantina",
+    subtitle: "Open late · Orbit Sector 7",
+    message: "Blue Milk & Hyperspace Haze — heute happy hour",
+    hideWhenEmpty: false
+  },
+  "fruppis-landadel": {
+    name: "Peter Saul",
+    title: "Anwalt",
+    subtitle: "Cambridge · Landadel",
+    tag: "ZWIELICHTIG",
+    quote: "Weiße Schuhe, rote Hose, blauer Hoodie.",
+    stats: "1,75 m · sportlich"
+  },
   "qr-code": {
     url: "https://twitch.tv/creator",
     caption: "Folgen",

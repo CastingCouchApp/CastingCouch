@@ -1,0 +1,411 @@
+.ccs-fruppis-landadel {
+  --ccs-fl-hoodie: #2e6bb0;
+  --ccs-fl-pants: #b91c3a;
+  --ccs-fl-shoes: #f2eee6;
+  --ccs-fl-hair: #e8d5a3;
+  --ccs-fl-eyes: #4a90d9;
+  --ccs-fl-skin: #e8c4a8;
+  --ccs-fl-accent: #2e6bb0;
+  --ccs-fl-accent2: #b91c3a;
+  --ccs-fl-text: #f2eee6;
+  --ccs-fl-muted: #c8b890;
+  --ccs-fl-tag: #e8d5a3;
+  --ccs-fl-quote: #a8b8c8;
+  --ccs-fl-bg: rgba(8, 12, 18, 0.82);
+  --ccs-fl-name-font: Georgia, Cambria, "Times New Roman", serif;
+  --ccs-fl-title-font: var(--ccs-fl-name-font);
+  --ccs-fl-quote-font: Georgia, Cambria, serif;
+  --ccs-fl-name-size: 1.45em;
+  --ccs-fl-title-size: 0.95em;
+  --ccs-fl-quote-size: 0.82em;
+  --ccs-fl-radius: 14px;
+  --ccs-fl-pad: 16px;
+  --ccs-fl-gap: 14px;
+  --ccs-fl-shade: 0.45;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  color: var(--ccs-fl-text);
+  font-family: var(--ccs-fl-name-font);
+  overflow: hidden;
+  border-radius: var(--ccs-fl-radius);
+  background: var(--ccs-fl-bg);
+  box-shadow: inset 0 0 0 1px rgba(232, 213, 163, 0.12);
+}
+
+.ccs-fruppis-landadel-hide-empty {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ccs-fruppis-landadel-accent {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: linear-gradient(180deg, var(--ccs-fl-accent), var(--ccs-fl-accent2));
+  z-index: 2;
+}
+
+.ccs-fruppis-landadel-accent-bar .ccs-fruppis-landadel-accent {
+  display: block;
+}
+
+.ccs-fruppis-landadel-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--ccs-fl-gap);
+  padding: var(--ccs-fl-pad);
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.ccs-fruppis-landadel-layout-figure-right .ccs-fruppis-landadel-inner {
+  flex-direction: row-reverse;
+}
+
+.ccs-fruppis-landadel-layout-stacked .ccs-fruppis-landadel-inner {
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.ccs-fruppis-landadel-layout-banner .ccs-fruppis-landadel-inner {
+  flex-direction: row;
+}
+
+.ccs-fruppis-landadel-layout-banner .ccs-fruppis-landadel-figure {
+  transform: scale(0.85);
+}
+
+/* CSS figure — Peter Saul silhouette */
+.ccs-fruppis-landadel-figure {
+  position: relative;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 118px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, calc(0.25 + var(--ccs-fl-shade) * 0.35)));
+}
+
+.ccs-fruppis-landadel-head {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 36px;
+  height: 36px;
+  transform: translateX(-50%);
+}
+
+.ccs-fruppis-landadel-face {
+  position: absolute;
+  inset: 6px 4px 2px;
+  border-radius: 50% 50% 46% 46%;
+  background: var(--ccs-fl-skin);
+}
+
+.ccs-fruppis-landadel-hair {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 0;
+  height: 16px;
+  border-radius: 18px 18px 4px 4px;
+  background: var(--ccs-fl-hair);
+  z-index: 1;
+}
+
+.ccs-fruppis-landadel-side-part .ccs-fruppis-landadel-hair::after {
+  content: "";
+  position: absolute;
+  left: 42%;
+  top: -1px;
+  width: 3px;
+  height: 14px;
+  background: color-mix(in srgb, var(--ccs-fl-hair) 70%, #fff 30%);
+  border-radius: 2px;
+  transform: rotate(-12deg);
+  opacity: 0.85;
+}
+
+.ccs-fruppis-landadel-eye {
+  position: absolute;
+  top: 42%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ccs-fl-eyes);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.ccs-fl-eye-l { left: 22%; }
+.ccs-fl-eye-r { right: 22%; }
+
+.ccs-fruppis-landadel-hoodie {
+  position: absolute;
+  left: 50%;
+  top: 34px;
+  width: 54px;
+  height: 42px;
+  transform: translateX(-50%);
+  border-radius: 18px 18px 10px 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ccs-fl-hoodie) 88%, #fff 12%), var(--ccs-fl-hoodie));
+  box-shadow: inset 0 -8px 0 rgba(0, 0, 0, 0.12);
+}
+
+.ccs-fruppis-landadel-hoodie::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  width: 28px;
+  height: 14px;
+  transform: translateX(-50%);
+  border-radius: 10px 10px 4px 4px;
+  background: color-mix(in srgb, var(--ccs-fl-hoodie) 75%, #000 25%);
+}
+
+.ccs-fruppis-landadel-pants {
+  position: absolute;
+  left: 50%;
+  top: 72px;
+  width: 40px;
+  height: 30px;
+  transform: translateX(-50%);
+  border-radius: 4px 4px 6px 6px;
+  background: linear-gradient(180deg, var(--ccs-fl-pants), color-mix(in srgb, var(--ccs-fl-pants) 70%, #000 30%));
+}
+
+.ccs-fruppis-landadel-shoes {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 48px;
+  height: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: space-between;
+}
+
+.ccs-fruppis-landadel-shoes span {
+  width: 20px;
+  height: 8px;
+  border-radius: 4px 8px 3px 3px;
+  background: var(--ccs-fl-shoes);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.ccs-fruppis-landadel-avatar-wrap {
+  flex: 0 0 auto;
+}
+
+.ccs-fruppis-landadel-avatar {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+  box-shadow: 0 0 0 2px rgba(232, 213, 163, 0.28);
+}
+
+.ccs-fruppis-landadel-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+}
+
+.ccs-fruppis-landadel-layout-stacked .ccs-fruppis-landadel-text {
+  align-items: center;
+}
+
+.ccs-fruppis-landadel-tag {
+  font-size: 0.62em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--ccs-fl-tag);
+}
+
+.ccs-fruppis-landadel-name {
+  font-size: var(--ccs-fl-name-size);
+  font-family: var(--ccs-fl-name-font);
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--ccs-fl-text);
+}
+
+.ccs-fruppis-landadel-uppercase .ccs-fruppis-landadel-name {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ccs-fruppis-landadel-title {
+  font-size: var(--ccs-fl-title-size);
+  font-family: var(--ccs-fl-title-font);
+  font-weight: 650;
+  color: var(--ccs-fl-accent);
+}
+
+.ccs-fruppis-landadel-subtitle {
+  font-size: 0.88em;
+  color: var(--ccs-fl-muted);
+}
+
+.ccs-fruppis-landadel-quote {
+  font-size: var(--ccs-fl-quote-size);
+  font-family: var(--ccs-fl-quote-font);
+  font-style: italic;
+  color: var(--ccs-fl-quote);
+  opacity: 0.95;
+  margin-top: 2px;
+}
+
+.ccs-fruppis-landadel-stats {
+  font-size: 0.72em;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--ccs-fl-muted) 80%, #fff 20%);
+  opacity: 0.9;
+}
+
+/* Size presets */
+.ccs-fruppis-landadel-s-compact { font-size: 13px; }
+.ccs-fruppis-landadel-s-standard { font-size: 15px; }
+.ccs-fruppis-landadel-s-wide { font-size: 16px; }
+.ccs-fruppis-landadel-s-banner { font-size: 15px; }
+.ccs-fruppis-landadel-s-tall { font-size: 16px; }
+.ccs-fruppis-landadel-s-portrait { font-size: 16px; }
+.ccs-fruppis-landadel-s-portrait .ccs-fruppis-landadel-inner {
+  flex-direction: column;
+  justify-content: flex-end;
+  text-align: center;
+}
+.ccs-fruppis-landadel-s-portrait .ccs-fruppis-landadel-figure {
+  width: 96px;
+  height: 160px;
+  transform: scale(1.15);
+  margin-bottom: 8px;
+}
+
+/* Moods */
+.ccs-fruppis-landadel-mood-shady {
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 213, 163, 0.1),
+    inset 40px 0 60px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.35));
+}
+.ccs-fruppis-landadel-mood-polished {
+  box-shadow: inset 0 0 0 1px rgba(232, 213, 163, 0.22);
+}
+.ccs-fruppis-landadel-mood-casual {
+  box-shadow: inset 0 0 0 1px rgba(46, 107, 176, 0.25);
+}
+
+/* Entrances */
+.ccs-fruppis-landadel-entrance-slide.has-content {
+  animation: ccs-fl-slide 0.55s ease-out both;
+}
+.ccs-fruppis-landadel-entrance-fade.has-content {
+  animation: ccs-fl-fade 0.55s ease-out both;
+}
+.ccs-fruppis-landadel-entrance-pop.has-content {
+  animation: ccs-fl-pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes ccs-fl-slide {
+  from { transform: translateX(-18px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes ccs-fl-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ccs-fl-pop {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+/* Variants */
+.ccs-fruppis-landadel-v-gentry {
+  background: linear-gradient(135deg, rgba(12, 18, 28, 0.92), rgba(8, 12, 18, 0.88));
+}
+.ccs-fruppis-landadel-v-counsel {
+  box-shadow: inset 0 0 0 1px rgba(232, 213, 163, 0.28);
+}
+.ccs-fruppis-landadel-v-counsel .ccs-fruppis-landadel-name {
+  letter-spacing: 0.02em;
+}
+.ccs-fruppis-landadel-v-cambridge {
+  background: linear-gradient(160deg, rgba(20, 40, 72, 0.9), rgba(8, 12, 18, 0.88));
+}
+.ccs-fruppis-landadel-v-hoodie .ccs-fruppis-landadel-title {
+  color: var(--ccs-fl-hoodie);
+}
+.ccs-fruppis-landadel-v-estate {
+  background: linear-gradient(180deg, rgba(18, 22, 18, 0.92), rgba(8, 12, 12, 0.9));
+}
+.ccs-fruppis-landadel-v-shadow {
+  background: rgba(4, 6, 10, 0.92);
+  filter: saturate(0.9);
+}
+.ccs-fruppis-landadel-v-shadow .ccs-fruppis-landadel-figure {
+  opacity: 0.88;
+}
+.ccs-fruppis-landadel-v-ivory {
+  background: linear-gradient(135deg, rgba(42, 38, 32, 0.9), rgba(12, 12, 14, 0.88));
+  box-shadow: inset 0 0 0 1px rgba(242, 238, 230, 0.28);
+}
+.ccs-fruppis-landadel-v-crimson .ccs-fruppis-landadel-accent {
+  background: linear-gradient(180deg, var(--ccs-fl-pants), var(--ccs-fl-accent));
+}
+.ccs-fruppis-landadel-v-split .ccs-fruppis-landadel-inner {
+  background: linear-gradient(90deg, rgba(46, 107, 176, 0.18) 0 38%, transparent 38%);
+  border-radius: calc(var(--ccs-fl-radius) - 2px);
+}
+.ccs-fruppis-landadel-v-crest .ccs-fruppis-landadel-tag::before {
+  content: "◆ ";
+  color: var(--ccs-fl-accent2);
+}
+.ccs-fruppis-landadel-v-dossier {
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(200, 184, 144, 0.35);
+  background: linear-gradient(180deg, rgba(24, 28, 34, 0.95), rgba(10, 12, 16, 0.92));
+}
+.ccs-fruppis-landadel-v-dossier .ccs-fruppis-landadel-name {
+  font-variant: small-caps;
+}
+.ccs-fruppis-landadel-v-portrait .ccs-fruppis-landadel-quote {
+  max-width: 22em;
+}
+.ccs-fruppis-landadel-v-ribbon .ccs-fruppis-landadel-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ccs-fl-accent) 28%, transparent);
+  color: var(--ccs-fl-text);
+  width: fit-content;
+}
+.ccs-fruppis-landadel-v-glass {
+  background: rgba(16, 24, 36, 0.45);
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.ccs-fruppis-landadel-v-neon {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ccs-fl-accent) 55%, transparent),
+    0 0 18px color-mix(in srgb, var(--ccs-fl-accent) 35%, transparent);
+}
+.ccs-fruppis-landadel-v-neon .ccs-fruppis-landadel-name {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--ccs-fl-accent) 50%, transparent);
+}
+.ccs-fruppis-landadel-v-minimal {
+  background: transparent;
+  box-shadow: none;
+}
+.ccs-fruppis-landadel-v-minimal .ccs-fruppis-landadel-accent {
+  width: 3px;
+}

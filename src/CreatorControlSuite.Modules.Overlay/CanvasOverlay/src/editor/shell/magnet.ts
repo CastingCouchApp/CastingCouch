@@ -51,24 +51,34 @@ function nearestSnap(value: number, targets: number[], threshold: number): numbe
   return best;
 }
 
-/** Snap moving/resizing rect to other widget edges and centers. */
+/** Snap moving/resizing rect to other widget edges/centers and canvas edges/center. */
 export function applyMagnetSnap(
   rect: Rect,
   others: Rect[],
   threshold: number = DEFAULT_THRESHOLD,
   mode: "move" | "resize" = "move",
-  activeEdges?: SnapActiveEdges
+  activeEdges?: SnapActiveEdges,
+  canvasW?: number,
+  canvasH?: number
 ): MagnetResult {
-  if (!others.length) {
-    return { ...rect, guides: [] };
-  }
-
   const targetsX: number[] = [];
   const targetsY: number[] = [];
+
+  if (typeof canvasW === "number" && canvasW > 0) {
+    targetsX.push(0, canvasW / 2, canvasW);
+  }
+  if (typeof canvasH === "number" && canvasH > 0) {
+    targetsY.push(0, canvasH / 2, canvasH);
+  }
+
   for (const o of others) {
     const e = edges(o);
     targetsX.push(e.left, e.right, e.cx);
     targetsY.push(e.top, e.bottom, e.cy);
+  }
+
+  if (!targetsX.length && !targetsY.length) {
+    return { ...rect, guides: [] };
   }
 
   let { x, y, w, h } = rect;

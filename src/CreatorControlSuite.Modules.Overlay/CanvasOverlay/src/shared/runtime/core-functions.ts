@@ -72,6 +72,19 @@ import {
   ANNOUNCEMENT_BAR_SIZE_PRESETS
 } from '../widgets/announcement-bar';
 import {
+  createBubatzCantinaEl,
+  updateBubatzCantina,
+  BUBATZ_CANTINA_VARIANTS,
+  BUBATZ_CANTINA_SIZE_PRESETS,
+  BUBATZ_CANTINA_MODES
+} from '../widgets/bubatz-cantina';
+import {
+  createFruppisLandadelEl,
+  updateFruppisLandadel,
+  FRUPPIS_LANDADEL_VARIANTS,
+  FRUPPIS_LANDADEL_SIZE_PRESETS
+} from '../widgets/fruppis-landadel';
+import {
   createAnimatedBackgroundEl,
   updateAnimatedBackground,
   ANIMATED_BACKGROUND_VARIANTS,
@@ -154,6 +167,15 @@ export {
   updateAnnouncementBar,
   ANNOUNCEMENT_BAR_VARIANTS,
   ANNOUNCEMENT_BAR_SIZE_PRESETS,
+  createBubatzCantinaEl,
+  updateBubatzCantina,
+  BUBATZ_CANTINA_VARIANTS,
+  BUBATZ_CANTINA_SIZE_PRESETS,
+  BUBATZ_CANTINA_MODES,
+  createFruppisLandadelEl,
+  updateFruppisLandadel,
+  FRUPPIS_LANDADEL_VARIANTS,
+  FRUPPIS_LANDADEL_SIZE_PRESETS,
   createAnimatedBackgroundEl,
   updateAnimatedBackground,
   ANIMATED_BACKGROUND_VARIANTS,
@@ -710,6 +732,8 @@ export function createItemContent(item) {
     if (item.type === "qr-code") return createQrCodeEl(item);
     if (item.type === "brb-panel") return createBrbPanelEl(item);
     if (item.type === "announcement-bar") return createAnnouncementBarEl(item);
+    if (item.type === "bubatz-cantina") return createBubatzCantinaEl(item);
+    if (item.type === "fruppis-landadel") return createFruppisLandadelEl(item);
     if (item.type === "animated-background") return createAnimatedBackgroundEl(item);
     const unknown = document.createElement("div");
     unknown.textContent = item.type || "unknown";

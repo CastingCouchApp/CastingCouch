@@ -75,7 +75,9 @@ public static class CanvasOverlayAssets
         "qr-code",
         "brb-panel",
         "announcement-bar",
-        "animated-background"
+        "animated-background",
+        "bubatz-cantina",
+        "fruppis-landadel"
     ];
 
     public static IReadOnlyList<string> ListShapeTypes() =>

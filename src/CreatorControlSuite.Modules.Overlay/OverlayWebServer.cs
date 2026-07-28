@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Modules.OBS;
+using CreatorControlSuite.Modules.Overlay.Assets;
 using CreatorControlSuite.Modules.Overlay.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -19,6 +20,7 @@ public sealed class OverlayWebServer(
     IOverlayLayoutStore layoutStore,
     OverlayRealtimeHub realtimeHub,
     IOverlayExtensionStore extensionStore,
+    IOverlayAssetStore assetStore,
     IObsWebSocketClient obsClient) : IOverlayWebServer, IAsyncDisposable
 {
     private readonly ISettingsStore _settingsStore = settingsStore;
@@ -26,6 +28,7 @@ public sealed class OverlayWebServer(
     private readonly IOverlayLayoutStore _layoutStore = layoutStore;
     private readonly OverlayRealtimeHub _realtimeHub = realtimeHub;
     private readonly IOverlayExtensionStore _extensionStore = extensionStore;
+    private readonly IOverlayAssetStore _assetStore = assetStore;
     private readonly IObsWebSocketClient _obsClient = obsClient;
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
 
@@ -168,6 +171,7 @@ public sealed class OverlayWebServer(
 
             MapCanvasRoutes(app);
             MapExtensionRoutes(app);
+            OverlayAssetHttp.MapRoutes(app, _assetStore);
 
             app.MapGet("/chat", async (HttpContext context) =>
             {

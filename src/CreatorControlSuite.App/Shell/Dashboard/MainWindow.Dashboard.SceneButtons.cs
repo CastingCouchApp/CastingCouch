@@ -253,7 +253,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var editor = new DashboardSceneButtonEditorWindow(scenes)
+        var editor = new DashboardSceneButtonEditorWindow(scenes, assetStore: _overlayModule.AssetStore)
         {
             Owner = this
         };
@@ -284,7 +284,7 @@ public partial class MainWindow : Window
             scenes.Add(settings.SceneName);
         }
 
-        var editor = new DashboardSceneButtonEditorWindow(scenes, settings)
+        var editor = new DashboardSceneButtonEditorWindow(scenes, settings, _overlayModule.AssetStore)
         {
             Owner = this
         };

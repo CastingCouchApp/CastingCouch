@@ -19,6 +19,7 @@ import { createSaveScheduler } from "./shell/save";
 import { loadEditorPrefs, saveEditorPrefs, type EditorPrefs } from "./shell/editor-prefs";
 import { applyEditorLayers, setupObsPreviewPolling } from "./shell/obs-preview";
 import { runEditorCommand } from "./shell/commands";
+import { nudgeDeltaForKey, nudgeSelected } from "./shell/nudge";
 import { setupContextMenu } from "./shell/context-menu";
 import { wireInspectorTabs } from "./shell/inspector-tabs";
 
@@ -62,6 +63,7 @@ function selectedItem(): LayoutItem | null {
 
 function refreshSelectionUi(): void {
   const item = selectedItem();
+  const locked = !!item?.locked;
   const btnDelete = document.getElementById("btnDelete") as HTMLButtonElement;
   const propsEmpty = document.getElementById("propsEmpty")!;
   const propsForm = document.getElementById("propsForm")!;
@@ -69,6 +71,10 @@ function refreshSelectionUi(): void {
   const propEffects = document.getElementById("propEffects");
   const propAnimations = document.getElementById("propAnimations");
   syncProps(item, editorCtx, propExtra, propsEmpty, propsForm, btnDelete, propEffects, propAnimations);
+  for (const id of ["btnDuplicate", "btnFront", "btnBack", "btnLayerUp", "btnLayerDown", "btnDelete"]) {
+    const btn = document.getElementById(id) as HTMLButtonElement | null;
+    if (btn) btn.disabled = !item || locked;
+  }
 }
 
 function bootEditor(): void {
@@ -104,7 +110,7 @@ function bootEditor(): void {
     editing: true,
     center: true,
     instanceId,
-    onSelect: (item) => syncSelection(item),
+    onSelect: () => refreshSelectionUi(),
     onChange: () => scheduleSave(),
     onAfterRender: ({ canvas }) => applyEditorLayers(canvas, prefs)
   });
@@ -145,6 +151,8 @@ function bootEditor(): void {
     { type: "brb-panel", label: "BRB Panel", category: "Content", kind: "widget", keywords: "starting pause" },
     { type: "qr-code", label: "QR Code", category: "Content", kind: "widget" },
     { type: "music", label: "Music Player", category: "Content", kind: "widget", keywords: "spotify youtube" },
+    { type: "bubatz-cantina", label: "Bubatz Cantina", category: "Content", kind: "widget", keywords: "cantina space starwars food bubatz cannabis turquoise biomilch menu" },
+    { type: "fruppis-landadel", label: "fruppis Landadel", category: "Content", kind: "widget", keywords: "peter saul anwalt cambridge hoodie landadel kanzlei fruppi persona" },
     // Hintergrund
     { type: "animated-background", label: "Animated Background", category: "Hintergrund", kind: "widget", keywords: "bg parallax" },
     { type: "shape.scene-bg", label: "Starting Hintergrund", category: "Hintergrund", kind: "shape", keywords: "scene bg" },
@@ -232,7 +240,7 @@ function bootEditor(): void {
     if (!item) return;
     item.locked = (e.target as HTMLInputElement).checked;
     scheduleSave();
-    syncSelection(item);
+    refreshSelectionUi();
   });
 
   void boot(instanceId, setInstanceLabel, applyPackPalette, () => {
@@ -333,10 +341,19 @@ function wireCommands(): void {
   });
 
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Delete" && e.key !== "Backspace") return;
     if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
     if (isEditableKeyboardTarget(e.target)) return;
-    if (!runEditorCommand("delete", editorRuntime, scheduleSave)) return;
+
+    if (e.key === "Delete" || e.key === "Backspace") {
+      if (!runEditorCommand("delete", editorRuntime, scheduleSave)) return;
+      e.preventDefault();
+      refreshSelectionUi();
+      return;
+    }
+
+    const delta = nudgeDeltaForKey(e.key, e.shiftKey);
+    if (!delta) return;
+    if (!nudgeSelected(editorRuntime, delta.dx, delta.dy, scheduleSave)) return;
     e.preventDefault();
     refreshSelectionUi();
   });

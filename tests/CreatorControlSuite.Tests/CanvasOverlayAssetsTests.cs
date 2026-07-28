@@ -40,6 +40,8 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("brb-panel", types);
         Assert.Contains("announcement-bar", types);
         Assert.Contains("animated-background", types);
+        Assert.Contains("bubatz-cantina", types);
+        Assert.Contains("fruppis-landadel", types);
         Assert.DoesNotContain("spotify", types);
     }
 
@@ -131,7 +133,8 @@ public sealed class CanvasOverlayAssetsTests
 
         Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
         Assert.Contains("type: \"image\"", editor);
-        Assert.Contains("textProp(\"src\"", editor);
+        Assert.Contains("imageProp(\"src\"", editor);
+        Assert.Contains("Bibliothek", editor);
         Assert.Contains("selectProp(\"fit\"", editor);
 
         Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
@@ -897,6 +900,49 @@ public sealed class CanvasOverlayAssetsTests
         Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
         Assert.Contains(".ccs-announcement-bar", styles);
         Assert.Contains("ccs-announcement-bar-v-ribbon", styles);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersBubatzCantinaWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"bubatz-cantina\":", runtime);
+        Assert.Contains("createBubatzCantinaEl", runtime);
+        Assert.Contains("updateBubatzCantina", runtime);
+        Assert.Contains("BUBATZ_CANTINA_VARIANTS", runtime);
+        Assert.Contains("BUBATZ_CANTINA_SIZE_PRESETS", runtime);
+        Assert.Contains("BUBATZ_CANTINA_MODES", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"bubatz-cantina\"", editor);
+        Assert.Contains("Bubatz Cantina", editor);
+        Assert.Contains("appendBubatzCantinaProps", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-bubatz-cantina", styles);
+        Assert.Contains("ccs-bubatz-cantina-v-hyperspace", styles);
+        Assert.Contains("ccs-bubatz-cantina-v-blue-milk", styles);
+    }
+
+    [Fact]
+    public void CanvasRuntime_RegistersFruppisLandadelWidget()
+    {
+        Assert.True(CanvasOverlayAssets.TryGet("shared/runtime.js", out string runtime, out _));
+        Assert.Contains("\"fruppis-landadel\":", runtime);
+        Assert.Contains("createFruppisLandadelEl", runtime);
+        Assert.Contains("updateFruppisLandadel", runtime);
+        Assert.Contains("FRUPPIS_LANDADEL_VARIANTS", runtime);
+        Assert.Contains("FRUPPIS_LANDADEL_SIZE_PRESETS", runtime);
+
+        Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
+        Assert.Contains("type: \"fruppis-landadel\"", editor);
+        Assert.Contains("fruppis Landadel", editor);
+        Assert.Contains("appendFruppisLandadelProps", editor);
+
+        Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
+        Assert.Contains(".ccs-fruppis-landadel", styles);
+        Assert.Contains("ccs-fruppis-landadel-v-gentry", styles);
+        Assert.Contains("ccs-fruppis-landadel-v-shadow", styles);
     }
 
     [Fact]

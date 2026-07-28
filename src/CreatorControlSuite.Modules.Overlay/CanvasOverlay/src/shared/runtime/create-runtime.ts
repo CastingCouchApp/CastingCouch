@@ -14,7 +14,8 @@ import {
   updateCountdown, updateSocials, updatePartnerRoulette, paintSpotifyProgress, paintEndingStats, paintCountdown,
   enqueueAlert, appendChatMessage, appendChatEvent, CHAT_EVENT_TYPES,
   updateGoalBar, updateEventTicker, pushEventTickerItem, updateViewerCount, updateLowerThird,
-  updateQrCode, updateBrbPanel, paintBrbPanel, updateAnnouncementBar, updateAnimatedBackground,
+  updateQrCode, updateBrbPanel, paintBrbPanel, updateAnnouncementBar, updateBubatzCantina, updateFruppisLandadel,
+  updateAnimatedBackground,
   updateDivider, updateCamRing, updateSticker
 } from './core-functions';
 
@@ -203,6 +204,8 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
       if (item.type === "qr-code") updateQrCode(node.content, item);
       if (item.type === "brb-panel") updateBrbPanel(node.content, item, data);
       if (item.type === "announcement-bar") updateAnnouncementBar(node.content, item);
+      if (item.type === "bubatz-cantina") updateBubatzCantina(node.content, item);
+      if (item.type === "fruppis-landadel") updateFruppisLandadel(node.content, item);
       if (item.type === "animated-background") updateAnimatedBackground(node.content, item);
       if (item.type === "shape.divider") updateDivider(node.content, item);
       if (item.type === "shape.cam-ring") updateCamRing(node.content, item);

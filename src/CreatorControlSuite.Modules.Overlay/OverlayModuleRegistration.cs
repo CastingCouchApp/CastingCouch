@@ -1,4 +1,5 @@
 using CreatorControlSuite.Core.Modules;
+using CreatorControlSuite.Modules.Overlay.Assets;
 using CreatorControlSuite.Modules.Overlay.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +17,7 @@ public sealed class OverlayModuleRegistration : IModuleRegistration
         services.AddSingleton<IOverlayDataService, OverlayDataService>();
         services.AddSingleton<IOverlayLayoutStore, OverlayLayoutStore>();
         services.AddSingleton<IOverlayExtensionStore, OverlayExtensionStore>();
+        services.AddSingleton<IOverlayAssetStore, OverlayAssetStore>();
         services.AddSingleton<IOverlayWebServer, OverlayWebServer>();
         services.AddSingleton<OverlayModule>();
         services.AddStreamingModuleBinding<OverlayModule>();

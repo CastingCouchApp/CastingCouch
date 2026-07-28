@@ -22,16 +22,18 @@ TDD: zuerst Tests, dann Implementation. Keine Widget-Änderung ohne passende Ass
 
 ```
 Overlay Widget Progress:
-- [ ] 1. Typ/Daten/Props klären (Inhalt/Look/Stil/Erweitert; color/font; bool-Keys)
-- [ ] 2. Tests (rot) — Bundle-Symbole + List*Types
-- [ ] 3. shared/widgets/<name>/ oder shapes/<name>/ + co-located CSS
-- [ ] 4. ListWidgetTypes / ListShapeTypes
-- [ ] 5. editor/props (sync-props oder panels/<name>/) + Palette — Sections + Controls
-- [ ] 6. npm run build (CanvasOverlay)
-- [ ] 7. App Solo-URL-Combo
-- [ ] 8. Docs
-- [ ] 9. Tests grün
+- [x] 1. Typ/Daten/Props klären (Inhalt/Look/Stil/Erweitert; color/font; bool-Keys)
+- [x] 2. Tests (rot) — Bundle-Symbole + List*Types
+- [x] 3. shared/widgets/<name>/ oder shapes/<name>/ + co-located CSS
+- [x] 4. ListWidgetTypes / ListShapeTypes
+- [x] 5. editor/props (sync-props oder panels/<name>/) + Palette — Sections + Controls
+- [x] 6. npm run build (CanvasOverlay)
+- [x] 7. App Solo-URL-Combo
+- [x] 8. Docs
+- [x] 9. Tests grün
 ```
+
+<!-- Last widget: bubatz-cantina (biomilchs Bubatz Cantina) -->
 
 ## Architektur
 

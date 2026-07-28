@@ -13,6 +13,8 @@ public sealed class OverlayConnectionSettingsPageViewModel : ViewModelBase
             () => Copy(ChatUrl, "Chat-URL kopiert."));
         BrowseBackgroundCommand = new AsyncRelayCommand(
             _ => BrowseBackgroundAsync());
+        BrowseAssetLibraryCommand = new AsyncRelayCommand(
+            _ => BrowseAssetLibraryAsync());
     }
 
     public bool WebServerEnabled
@@ -141,9 +143,13 @@ public sealed class OverlayConnectionSettingsPageViewModel : ViewModelBase
 
     public AsyncRelayCommand BrowseBackgroundCommand { get; }
 
+    public AsyncRelayCommand BrowseAssetLibraryCommand { get; }
+
     public Action<string>? CopyTextRequested { get; set; }
 
     public Func<Task<string?>>? BrowseBackgroundRequestedAsync { get; set; }
+
+    public Func<Task<string?>>? BrowseAssetLibraryRequestedAsync { get; set; }
 
     public void Load(OverlaySettings settings)
     {
@@ -238,6 +244,23 @@ public sealed class OverlayConnectionSettingsPageViewModel : ViewModelBase
         }
 
         string? selected = await BrowseBackgroundRequestedAsync();
+        if (string.IsNullOrWhiteSpace(selected))
+        {
+            return;
+        }
+
+        BackgroundImagePath = selected;
+        BackgroundType = "Image";
+    }
+
+    private async Task BrowseAssetLibraryAsync()
+    {
+        if (BrowseAssetLibraryRequestedAsync is null)
+        {
+            return;
+        }
+
+        string? selected = await BrowseAssetLibraryRequestedAsync();
         if (string.IsNullOrWhiteSpace(selected))
         {
             return;

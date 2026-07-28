@@ -3,6 +3,7 @@ import type { EditorContext } from "../context";
 import { boolProp } from "../../controls/bool-prop";
 import { numProp } from "../../controls/num-prop";
 import { textProp } from "../../controls/text-prop";
+import { imageProp } from "../../controls/image-prop";
 import { selectProp } from "../../controls/select-prop";
 import { fontProp } from "../../controls/font-prop";
 import { colorProp } from "../../controls/color-prop";
@@ -262,7 +263,7 @@ export function appendLowerThirdProps(item: LayoutItem, ctx: EditorContext, prop
   content.body.appendChild(textProp("name", "Name", item, ctx, "Streamer"));
   content.body.appendChild(textProp("subtitle", "Untertitel", item, ctx, "Just Chatting"));
   content.body.appendChild(textProp("tag", "Tag", item, ctx, "LIVE"));
-  content.body.appendChild(textProp("avatarUrl", "Avatar-URL", item, ctx, ""));
+  content.body.appendChild(imageProp("avatarUrl", "Avatar-URL", item, ctx, ""));
   content.body.appendChild(boolProp("showAvatar", "Avatar", item, ctx));
   content.body.appendChild(boolProp("showSubtitle", "Untertitel", item, ctx));
   content.body.appendChild(boolProp("showTag", "Tag", item, ctx));
@@ -335,7 +336,7 @@ export function appendQrCodeProps(item: LayoutItem, ctx: EditorContext, propExtr
     { value: "H", label: "H" }
   ], "M"));
   content.body.appendChild(numProp("quietZone", "Quiet Zone", item, ctx, 2));
-  content.body.appendChild(textProp("logoUrl", "Logo-URL", item, ctx, ""));
+  content.body.appendChild(imageProp("logoUrl", "Logo-URL", item, ctx, ""));
   content.body.appendChild(boolProp("showLogo", "Logo", item, ctx));
   content.body.appendChild(boolProp("frame", "Rahmen", item, ctx));
   propExtra.appendChild(content.root);
@@ -379,7 +380,7 @@ export function appendBrbPanelProps(item: LayoutItem, ctx: EditorContext, propEx
   content.body.appendChild(textProp("title", "Titel", item, ctx, ""));
   content.body.appendChild(textProp("message", "Nachricht", item, ctx, ""));
   content.body.appendChild(textProp("icon", "Icon", item, ctx, ""));
-  content.body.appendChild(textProp("iconUrl", "Icon-URL", item, ctx, ""));
+  content.body.appendChild(imageProp("iconUrl", "Icon-URL", item, ctx, ""));
   content.body.appendChild(boolProp("showTitle", "Titel", item, ctx));
   content.body.appendChild(boolProp("showMessage", "Nachricht", item, ctx));
   content.body.appendChild(boolProp("showIcon", "Icon", item, ctx));
@@ -465,6 +466,168 @@ export function appendAnnouncementBarProps(item: LayoutItem, ctx: EditorContext,
     featureToggle("announcement-bar-uppercase", "Uppercase", "uppercase", item, ctx),
     featureToggle("announcement-bar-accent", "Akzent-Punkt", "showAccentDot", item, ctx),
     featureToggle("announcement-bar-hide-empty", "Leer ausblenden", "hideWhenEmpty", item, ctx)
+  ]);
+}
+
+export function appendBubatzCantinaProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
+  const api = window.CcsCanvas as {
+    BUBATZ_CANTINA_VARIANTS?: string[];
+    BUBATZ_CANTINA_SIZE_PRESETS?: SizeMap;
+    BUBATZ_CANTINA_MODES?: string[];
+  };
+  const variants = api.BUBATZ_CANTINA_VARIANTS || [
+    "cantina-neon", "turquoise-glow", "holo-booth", "menu-board", "spacerun", "leaf-badge",
+    "glass-booth", "pixel-cantina", "soft-haze", "outline-neon", "booth-card", "ticker-strip",
+    "hyperspace", "blue-milk"
+  ];
+  const sizes = api.BUBATZ_CANTINA_SIZE_PRESETS || {
+    mini: { w: 280, h: 120, label: "Mini" },
+    compact: { w: 360, h: 160, label: "Compact" },
+    standard: { w: 480, h: 220, label: "Standard" },
+    wide: { w: 720, h: 200, label: "Wide" },
+    banner: { w: 960, h: 140, label: "Banner" },
+    poster: { w: 420, h: 560, label: "Poster" }
+  };
+  const modes = api.BUBATZ_CANTINA_MODES || ["sign", "menu", "status", "ticker"];
+
+  const content = contentSection("bubatz-cantina");
+  content.body.appendChild(selectProp("mode", "Modus", item, ctx, [
+    { value: "sign", label: "Schild" },
+    { value: "menu", label: "Menü" },
+    { value: "status", label: "Status" },
+    { value: "ticker", label: "Ticker" }
+  ].filter((opt) => modes.includes(opt.value)), "sign"));
+  content.body.appendChild(textProp("title", "Titel", item, ctx, "biomilchs Bubatz Cantina"));
+  content.body.appendChild(textProp("subtitle", "Untertitel", item, ctx, "Open late · Orbit Sector 7"));
+  content.body.appendChild(textProp("message", "Nachricht", item, ctx, "Blue Milk & Hyperspace Haze — heute happy hour"));
+  content.body.appendChild(textProp("menuLines", "Menüzeilen", item, ctx, "Blue Milk · 4 Credits"));
+  content.body.appendChild(textProp("statusLabel", "Status-Label", item, ctx, "Special"));
+  content.body.appendChild(textProp("statusValue", "Status-Wert", item, ctx, "Bubatz live"));
+  content.body.appendChild(textProp("icon", "Icon", item, ctx, "🌿"));
+  content.body.appendChild(boolProp("showLeaf", "Leaf", item, ctx));
+  content.body.appendChild(boolProp("showStars", "Sterne", item, ctx));
+  content.body.appendChild(boolProp("showTitle", "Titel", item, ctx));
+  content.body.appendChild(boolProp("showSubtitle", "Untertitel", item, ctx));
+  content.body.appendChild(boolProp("showMessage", "Nachricht", item, ctx));
+  content.body.appendChild(boolProp("showMenu", "Menü", item, ctx));
+  content.body.appendChild(boolProp("showStatus", "Status", item, ctx));
+  content.body.appendChild(numProp("speed", "Ticker-Speed", item, ctx, 40));
+  content.body.appendChild(numProp("repeatGap", "Repeat-Gap", item, ctx, 48));
+  propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("bubatz-cantina", item, ctx, variants, sizes, "cantina-neon", "standard").root);
+
+  const style = styleSection("bubatz-cantina");
+  style.body.appendChild(fontProp("titleFontFamily", "Titel-Font", item, ctx, "Bahnschrift, Segoe UI Semibold, Segoe UI"));
+  style.body.appendChild(fontProp("bodyFontFamily", "Body-Font", item, ctx, "Segoe UI"));
+  style.body.appendChild(numProp("titleSizePx", "Titel px", item, ctx, 28));
+  style.body.appendChild(numProp("bodySizePx", "Body px", item, ctx, 15));
+  style.body.appendChild(colorProp("color", "Bubatz-Grün", item, ctx, "#5CDB6A"));
+  style.body.appendChild(colorProp("color2", "Blue Milk", item, ctx, "#2EE6C5"));
+  style.body.appendChild(colorProp("color3", "Cantina-Gold", item, ctx, "#E8B84A"));
+  style.body.appendChild(colorProp("textColor", "Text", item, ctx, "#EAF6FF"));
+  style.body.appendChild(colorProp("mutedColor", "Muted", item, ctx, "#9EC4D8"));
+  style.body.appendChild(colorProp("bgColor", "Hintergrund", item, ctx, "#060B14"));
+  style.body.appendChild(numProp("bgOpacity", "BG Opacity", item, ctx, 0.88));
+  style.body.appendChild(numProp("borderRadiusPx", "Radius px", item, ctx, 16));
+  style.body.appendChild(numProp("paddingPx", "Padding px", item, ctx, 20));
+  style.body.appendChild(numProp("gapPx", "Gap px", item, ctx, 10));
+  propExtra.appendChild(style.root);
+
+  const advanced = advancedSection("bubatz-cantina");
+  advanced.body.appendChild(boolProp("scroll", "Scroll / Marquee", item, ctx));
+  advanced.body.appendChild(boolProp("uppercase", "Uppercase", item, ctx));
+  advanced.body.appendChild(boolProp("pulseLeaf", "Leaf-Pulse", item, ctx));
+  advanced.body.appendChild(boolProp("twinkleStars", "Sternen-Twinkle", item, ctx));
+  advanced.body.appendChild(boolProp("hideWhenEmpty", "Leer ausblenden", item, ctx));
+  propExtra.appendChild(advanced.root);
+}
+
+export function appendFruppisLandadelProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
+  const api = window.CcsCanvas as {
+    FRUPPIS_LANDADEL_VARIANTS?: string[];
+    FRUPPIS_LANDADEL_SIZE_PRESETS?: SizeMap;
+  };
+  const variants = api.FRUPPIS_LANDADEL_VARIANTS || [
+    "gentry", "counsel", "cambridge", "hoodie", "estate", "shadow", "ivory", "crimson",
+    "split", "crest", "dossier", "portrait", "ribbon", "glass", "neon", "minimal"
+  ];
+  const sizes = api.FRUPPIS_LANDADEL_SIZE_PRESETS || {
+    compact: { w: 420, h: 148, label: "Compact" },
+    standard: { w: 560, h: 200, label: "Standard" },
+    wide: { w: 760, h: 200, label: "Wide" },
+    banner: { w: 960, h: 160, label: "Banner" },
+    tall: { w: 480, h: 280, label: "Tall" },
+    portrait: { w: 360, h: 520, label: "Portrait" }
+  };
+
+  const content = contentSection("fruppis-landadel");
+  content.body.appendChild(textProp("name", "Name", item, ctx, "Peter Saul"));
+  content.body.appendChild(textProp("title", "Titel", item, ctx, "Anwalt"));
+  content.body.appendChild(textProp("subtitle", "Untertitel", item, ctx, "Cambridge · Landadel"));
+  content.body.appendChild(textProp("tag", "Tag", item, ctx, "ZWIELICHTIG"));
+  content.body.appendChild(textProp("quote", "Zitat", item, ctx, "Weiße Schuhe, rote Hose, blauer Hoodie."));
+  content.body.appendChild(textProp("stats", "Stats", item, ctx, "1,75 m · sportlich"));
+  content.body.appendChild(imageProp("avatarUrl", "Avatar-URL", item, ctx, ""));
+  content.body.appendChild(boolProp("showFigure", "Figur", item, ctx));
+  content.body.appendChild(boolProp("showAvatar", "Avatar", item, ctx));
+  content.body.appendChild(boolProp("showName", "Name", item, ctx));
+  content.body.appendChild(boolProp("showTitle", "Titel", item, ctx));
+  content.body.appendChild(boolProp("showSubtitle", "Untertitel", item, ctx));
+  content.body.appendChild(boolProp("showTag", "Tag", item, ctx));
+  content.body.appendChild(boolProp("showQuote", "Zitat", item, ctx));
+  content.body.appendChild(boolProp("showStats", "Stats", item, ctx));
+  content.body.appendChild(boolProp("showAccentBar", "Akzentleiste", item, ctx));
+  content.body.appendChild(selectProp("layout", "Layout", item, ctx, [
+    { value: "figure-left", label: "Figur links" },
+    { value: "figure-right", label: "Figur rechts" },
+    { value: "stacked", label: "Gestapelt" },
+    { value: "banner", label: "Banner" }
+  ], "figure-left"));
+  content.body.appendChild(selectProp("mood", "Mood", item, ctx, [
+    { value: "shady", label: "Zwielichtig" },
+    { value: "polished", label: "Polished" },
+    { value: "casual", label: "Casual" }
+  ], "shady"));
+  content.body.appendChild(selectProp("entrance", "Entrance", item, ctx, [
+    { value: "none", label: "None" },
+    { value: "slide", label: "Slide" },
+    { value: "fade", label: "Fade" },
+    { value: "pop", label: "Pop" }
+  ], "none"));
+  propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("fruppis-landadel", item, ctx, variants, sizes, "gentry", "standard").root);
+
+  const style = styleSection("fruppis-landadel");
+  style.body.appendChild(fontProp("nameFontFamily", "Name-Font", item, ctx));
+  style.body.appendChild(fontProp("titleFontFamily", "Titel-Font", item, ctx));
+  style.body.appendChild(fontProp("quoteFontFamily", "Zitat-Font", item, ctx));
+  style.body.appendChild(numProp("nameSizePx", "Name px", item, ctx, 28));
+  style.body.appendChild(numProp("titleSizePx", "Titel px", item, ctx, 16));
+  style.body.appendChild(numProp("quoteSizePx", "Zitat px", item, ctx, 13));
+  style.body.appendChild(colorProp("hoodieColor", "Hoodie", item, ctx, "#2E6BB0"));
+  style.body.appendChild(colorProp("pantsColor", "Hose", item, ctx, "#B91C3A"));
+  style.body.appendChild(colorProp("shoeColor", "Schuhe", item, ctx, "#F2EEE6"));
+  style.body.appendChild(colorProp("hairColor", "Haar", item, ctx, "#E8D5A3"));
+  style.body.appendChild(colorProp("eyeColor", "Augen", item, ctx, "#4A90D9"));
+  style.body.appendChild(colorProp("skinColor", "Haut", item, ctx, "#E8C4A8"));
+  style.body.appendChild(colorProp("color", "Akzent", item, ctx, "#2E6BB0"));
+  style.body.appendChild(colorProp("color2", "Akzent 2", item, ctx, "#B91C3A"));
+  style.body.appendChild(colorProp("textColor", "Name-Farbe", item, ctx, "#F2EEE6"));
+  style.body.appendChild(colorProp("subtitleColor", "Subtitle-Farbe", item, ctx, "#C8B890"));
+  style.body.appendChild(colorProp("tagColor", "Tag-Farbe", item, ctx, "#E8D5A3"));
+  style.body.appendChild(colorProp("quoteColor", "Zitat-Farbe", item, ctx, "#A8B8C8"));
+  style.body.appendChild(colorProp("bgColor", "Hintergrund", item, ctx, "#080C12"));
+  style.body.appendChild(numProp("bgOpacity", "BG Opacity", item, ctx, 0.82));
+  style.body.appendChild(numProp("borderRadiusPx", "Radius px", item, ctx, 14));
+  style.body.appendChild(numProp("paddingPx", "Padding px", item, ctx, 16));
+  style.body.appendChild(numProp("gapPx", "Gap px", item, ctx, 14));
+  propExtra.appendChild(style.root);
+
+  appendAdvanced("fruppis-landadel", propExtra, [
+    featureToggle("fruppis-landadel-side-part", "Seitenscheitel", "showSidePart", item, ctx),
+    featureToggle("fruppis-landadel-uppercase", "Name Uppercase", "uppercaseName", item, ctx),
+    numProp("shadeIntensity", "Schatten", item, ctx, 0.45),
+    featureToggle("fruppis-landadel-hide-empty", "Leer ausblenden", "hideWhenEmpty", item, ctx)
   ]);
 }
 
@@ -652,7 +815,7 @@ export function appendStickerProps(item: LayoutItem, ctx: EditorContext, propExt
   const look = lookSection("sticker");
   look.body.appendChild(selectProp("variant", "Hülle", item, ctx, variantOptions(variants), "flat"));
   look.body.appendChild(selectProp("preset", "Preset", item, ctx, variantOptions(presets), "heart"));
-  look.body.appendChild(textProp("src", "Custom-URL", item, ctx, ""));
+  look.body.appendChild(imageProp("src", "Custom-URL", item, ctx, ""));
   look.body.appendChild(selectProp("fit", "Fit", item, ctx, [
     { value: "contain", label: "Contain" },
     { value: "cover", label: "Cover" },

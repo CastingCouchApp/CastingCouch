@@ -59,6 +59,18 @@ ZIP-Pakete mit zusätzlichen Widgets, Effekten, Animationen und Schriften, ohne 
 
 Verwaltung in der Overlay-Seite: Karte „Extension Packs“ (ZIP importieren, deinstallieren). Implementierung: `IOverlayExtensionStore` / `OverlayExtensionStore` in `CreatorControlSuite.Modules.Overlay/Extensions/`.
 
+## Asset-Bibliothek
+
+Importierte Bilder für Overlay und App-UI (kopiert, nicht nur referenziert).
+
+- Speicherort: `%LocalAppData%\CreatorControlSuite\Overlay\assets\` (+ `index.json`)
+- Katalog: `GET /assets` → `{ assets: [{ id, name, url, contentType, size, createdAt }] }`
+- Datei: `GET /assets/{id}` (Content-Type aus Extension; `no-store`)
+- Verwaltung (nur Loopback): `POST /assets` (multipart Bild), `DELETE /assets/{id}`
+- Allowlist: `.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg` · Größenlimit 15 MB
+- Overlay-Layout speichert relative URLs `/assets/{id}`; WPF-Picker (Chat-Hintergrund, Dashboard-Icons) speichern den lokalen Kopie-Pfad
+- Implementierung: `IOverlayAssetStore` / `OverlayAssetStore` in `CreatorControlSuite.Modules.Overlay/Assets/`
+
 ## WebSocket-Event-Schema
 
 Jedes Frame ist ein JSON-Objekt:

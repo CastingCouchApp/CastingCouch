@@ -227,6 +227,20 @@ public partial class MainWindow : Window
         return Task.FromResult<string?>(null);
     }
 
+    private Task<string?> BrowseOverlayAssetLibraryImageAsync()
+    {
+        var window = new Views.Dialogs.AssetLibraryWindow(_overlayModule.AssetStore)
+        {
+            Owner = this
+        };
+        if (window.ShowDialog() == true && window.SelectedAsset is not null)
+        {
+            return Task.FromResult<string?>(window.SelectedAsset.LocalPath);
+        }
+
+        return Task.FromResult<string?>(null);
+    }
+
     private string ResolveConfiguredOverlayRoot()
     {
         string fromSettings = _settings.Overlay.RootPath?.Trim() ?? "";

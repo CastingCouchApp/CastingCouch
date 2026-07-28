@@ -65,7 +65,12 @@ public static class ThemeCatalog
             "biomilchs-bubatz-cantina",
             "biomilchs Bubatz Cantina",
             "Orbit-Cantina für die große Liebe: Bubatz-Grün, Blue-Milk-Türkis und warmes Cantina-Gold auf Tiefraumblau.",
-            "Themes/BiomilchsBubatzCantina.xaml")
+            "Themes/BiomilchsBubatzCantina.xaml"),
+        new(
+            "fruppis-landadel-kanzlei",
+            "fruppis Landadel Kanzlei",
+            "Zwielichtiger Cambridge-Landadel: Estate-Navy, Hoodie-Blau, Hosen-Karmesin und Schuh-Elfenbein.",
+            "Themes/FruppisLandadelKanzlei.xaml")
     ];
 
     public static ThemeDefinition Classic => All[0];
