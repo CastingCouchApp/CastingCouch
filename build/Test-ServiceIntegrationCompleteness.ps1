@@ -2,8 +2,28 @@ Set-StrictMode -Version 1.0
 $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent $PSScriptRoot
-$Xaml = Get-Content -LiteralPath (Join-Path $Root "src\CreatorControlSuite.App\MainWindow.xaml") -Raw
-$Code = Get-Content -LiteralPath (Join-Path $Root "src\CreatorControlSuite.App\MainWindow.xaml.cs") -Raw
+$AppRoot = Join-Path $Root "src\CreatorControlSuite.App"
+$ShellRoot = Join-Path $AppRoot "Shell"
+$ServicesViews = Join-Path $AppRoot "Views\Pages\Services"
+
+$XamlPaths = @(
+    (Join-Path $ShellRoot "MainWindow.xaml")
+    (Join-Path $ServicesViews "ObsServiceView.xaml")
+    (Join-Path $ServicesViews "SpotifyServiceView.xaml")
+    (Join-Path $ServicesViews "TwitchServiceView.xaml")
+    (Join-Path $ServicesViews "StreamerBotServiceView.xaml")
+)
+foreach ($path in $XamlPaths) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "XAML fehlt: $path"
+    }
+}
+
+$Xaml = ($XamlPaths | ForEach-Object { Get-Content -LiteralPath $_ -Raw }) -join "`n"
+$Code = (
+    Get-ChildItem -LiteralPath $ShellRoot -Recurse -Filter "MainWindow*.cs" |
+        ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
+) -join "`n"
 $ObsApi = Get-Content -LiteralPath (Join-Path $Root "src\CreatorControlSuite.Modules.OBS\IObsWebSocketClient.cs") -Raw
 $SpotifyApi = Get-Content -LiteralPath (Join-Path $Root "src\CreatorControlSuite.Modules.Spotify\ISpotifyApiClient.cs") -Raw
 $TwitchApi = Get-Content -LiteralPath (Join-Path $Root "src\CreatorControlSuite.Modules.Twitch\ITwitchApiClient.cs") -Raw
