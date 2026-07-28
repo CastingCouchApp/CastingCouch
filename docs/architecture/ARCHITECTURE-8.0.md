@@ -174,14 +174,69 @@ vertikal in `RunOfShowView`, `TimedAutomationView`, `WorkflowDesignerView`
 und `ShortStreamTestView` gegliedert. Der Seitenrahmen delegiert Prepare,
 Countdown, Live, Pause, Resume und Ende über `WorkflowPageActions`.
 Die umfangreichen Regieplan- und Automationseingaben bleiben während der
-Strangler-Migration über explizite Komponentenhosts kompatibel und werden
-anschließend in eigene ViewModels und Anwendungsservices überführt.
+Strangler-Migration über explizite Komponentenhosts kompatibel. Initialisierung,
+Legacy-Übernahme, vollständiges Kopieren, Importnormalisierung, Plan-Lifecycle,
+Validierung und Runtime-Projektion des Regieplans liegen im
+WPF-unabhängigen `RunOfShowPlanService`; die Integrationsausführung wird
+schrittweise nachgezogen.
+Für zeitgesteuerte Automationen übernimmt
+`TimedAutomationRuleService` bereits die fällige Regelauswahl,
+Workflowgruppen-Sortierung und strukturelle Validierung ohne WPF-Abhängigkeit.
+`TimedAutomationRuntimeService` entscheidet zusätzlich Abhängigkeiten,
+begrenzte Timeout-/Retry-Richtlinien und die am Streamende zurückzusetzenden
+Regeln.
+Das OBS-Connection-Dashboard delegiert einfache Sichtbarkeitsregeln,
+Szenenaktivierungsregeln, Szenennamenprojektion, Audioquellen-Auswahl,
+Streamstart-Priorisierung und -Rekonstruktion sowie die gegen kurzzeitige
+Offline-Snapshots abgesicherte Live-Zustandsprojektion an
+`ObsDashboardApplicationService`.
+Das Twitch-Dashboard delegiert normalisierte Raid-Historien, die
+priorisierte und deduplizierte Zielsuche, die Auswahl der abzufragenden
+Live-Status-Kandidaten, Chatkanal-Auflösung, Live-Dauerformatierung sowie
+den Raid-Aktionszustand an
+`TwitchDashboardApplicationService`.
+Das Twitch-Professional-Dashboard liest und aggregiert seine JSONL-Historie
+über `TwitchProfessionalHistoryService`. Trendvergleich, Raten,
+Kategoriebewertung, Konsistenz und die letzten Sessions werden ohne
+WPF-Abhängigkeit projiziert; beschädigte Einzelzeilen werden isoliert.
+Der Stream-Deck-Katalog delegiert Sidecar-Metadaten, Toggle- und
+Ausführungsrichtlinien, Filter-/Belegungsprojektion, freie Positionswahl,
+zustandsabhängige Beschriftungen und Profilvergleiche an
+`StreamDeckCatalogApplicationService`. Diese Regeln sind ohne WPF und ohne
+angeschlossenes Stream Deck testbar.
+Zeitfenster, Wochentage, kombinierte Zustandsbedingungen und strukturelle
+Validierung der Automatikregeln liegen im
+`StreamDeckAutomationRuleService`.
+Die Streamer.bot-Shell delegiert Aktionsantworten, Suche,
+Favoritenpriorisierung, Gruppenprojektion, Argument-JSON sowie
+Event-Aliasauflösung und Alert-Klassifikation an
+`StreamerBotApplicationService`. Die WebSocket-Verbindung und
+UI-Aktualisierung verbleiben als schlanke Orchestrierung in der Shell.
 Die zugehörigen Legacy-Orchestrierungen sind bis dahin physisch in
 `MainWindow.Workflow.RunOfShow.cs`,
+`MainWindow.Workflow.RunOfShowRuntime.cs`,
 `MainWindow.Workflow.AutomationEditor.cs` und
 `MainWindow.Workflow.Designer.cs` begrenzt. Keine dieser Partial-Dateien
-überschreitet 1.000 Zeilen; sie bilden ausdrücklich keine endgültige
-Domänengrenze.
+überschreitet 1.000 Zeilen. Der Run-of-Show-Plan-/Editor-Slice liegt bei
+622 Zeilen und die getrennte Integrations-/Automatikruntime bei 375 Zeilen.
+Beide besitzen eigene Architekturgrenzen von 650 beziehungsweise 400 Zeilen.
+Die Timed-Automation-Runtime ist in einen 583-Zeilen-Orchestrator und einen
+449-Zeilen-Aktions-Slice für OBS, Streamer.bot, Overlay und Spotify geteilt.
+Architekturgrenzen blockieren Wachstum ab 600 beziehungsweise 475 Zeilen.
+Diese Grenzen werden durch Architekturtests nach unten fixiert; die Partials
+bilden ausdrücklich keine endgültige Domänengrenze.
+Der OBS-Connection-/Dashboard-Slice liegt nach der weiteren Extraktion bei
+601 Zeilen. Streambeobachtung, Dashboard-Preview und Startkoordination liegen
+im eigenen `MainWindow.Services.Obs.StreamObservation.cs` mit 315 Zeilen.
+Architekturgrenzen blockieren Wachstum ab 620 beziehungsweise 330 Zeilen.
+Das frühere Twitch-Dashboard-/Raid-Partial ist nach Chat, Live-Metriken und
+Raid-Orchestrierung getrennt. Die Slices liegen bei 190, 276 und 437 Zeilen;
+Architekturgrenzen blockieren Wachstum ab 220, 300 beziehungsweise
+450 Zeilen.
+Der frühere Twitch-API-/Professional-Slice ist nach Professional-Dashboard,
+Verbindung/Kanaldaten und Moderation/Chat getrennt. Die Slices liegen bei
+395, 266 und 226 Zeilen; Architekturgrenzen blockieren Wachstum ab
+420, 290 beziehungsweise 250 Zeilen.
 Die Einstellungen-Seite wird durch `SettingsPageView` gehostet. Sie komponiert
 die bereits extrahierten General-, Legal-, Update- und Migration-Views und
 kapselt Save, Status und Tabnavigation. Die verbleibende kompatible
@@ -192,9 +247,15 @@ testbaren Services.
 Die Dienste-Seite ist über `ServicesPageView` nach Integrationsgrenzen
 gegliedert: Spotify, Twitch, OBS, Streamer.bot und Stream Deck besitzen eigene
 Views. Die Host-View verantwortet ausschließlich Übersicht und Navigation.
-Der umfangreiche Legacy-Code für Stream-Deck-Katalog/Runtime und
-Regelverwaltung liegt vor der weiteren Service-Migration in zwei
-Partial-Dateien unterhalb des 1.000-Zeilen-Gates.
+Der Stream-Deck-Katalog ist in Katalog-/Runtime-Orchestrierung,
+Backup/Import und Vorlagenverwaltung mit 582, 197 und 243 Zeilen getrennt.
+Architekturgrenzen blockieren Wachstum ab 600, 220 beziehungsweise
+270 Zeilen. Die Regelverwaltung und Aktionsdatei-Erzeugung sind zusätzlich
+in 478- und 358-Zeilen-Slices getrennt; Grenzen greifen bei 500 und
+380 Zeilen. Der Regelservice bleibt unter 210 Zeilen.
+Der Streamer.bot-Slice ist in Aktionskatalog/-ausführung und
+WebSocket-/Event-Lifecycle mit 454 und 466 Zeilen getrennt.
+Architekturgrenzen blockieren Wachstum ab 470 beziehungsweise 480 Zeilen.
 Auch die verbleibende Shell-Orchestrierung für Twitch, Spotify und OBS ist
 nach Integrations- und Ablaufgrenzen in begrenzte Partial-Dateien unter
 `Shell/Services/` verschoben. Twitch trennt Dashboard/Raid, Engagement und
@@ -224,5 +285,14 @@ Für die Shell-XAML existiert daher keine Legacy-Größenbaseline mehr.
 `MainWindow.xaml.cs` liegt mit 495 Zeilen erstmals unter dem Zielwert von
 500 Zeilen. Architekturtests blockieren sowohl ein erneutes Wachstum als
 auch neue Partial-Dateien ab 1.000 Zeilen.
-Der Agent-Composition-Root liegt unter 1.000 Zeilen; Hosting, Discovery und
-Datei-/Update-Helfer sind in `AgentUtilities` isoliert.
+Der Agent-Composition-Root liegt bei 128 Zeilen und enthält keine
+Routenimplementierung mehr. Die HTTP-Oberfläche ist in getrennte Gruppen für
+Operations, Security/Pairing, OBS und Updates aufgeteilt; alle Gruppen erhalten
+ihre veränderlichen Zustände und Adapter als explizite Abhängigkeiten. Hosting,
+Discovery und Datei-/Update-Helfer sind in `AgentUtilities` isoliert.
+Vertragstests prüfen alle Methoden/Pfade; Ausführungstests sichern 401 ohne
+Credential und 403 ohne explizite OBS-/Update-Berechtigung. Ein zentraler
+RFC-7807-Fehlervertrag liefert stabile Fehlercodes, redigiert interne
+Ausnahmedetails und begrenzt Pairing auf 4 KiB, Standardanfragen auf 1 MiB
+sowie Update-Staging auf 140 MiB. Architekturtests verhindern abweichende
+lokale Fehlerantworten.

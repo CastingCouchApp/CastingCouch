@@ -12,6 +12,9 @@
   21,13 % Lines und 12,86 % Branches statt auf einer unbelegten Zielzahl.
 - `FileUpdateTransaction` erreicht mit der automatisierten Abbruch-,
   Recovery- und Retry-Matrix 92 von 92 abgedeckte Branches.
+- Agent-Hardening-Tests sichern RFC-7807-Fehlercodes, 4-KiB-/1-MiB-/
+  140-MiB-Payload-Limits, fehlerhaftes JSON und die Redaktion interner
+  Exception-Details einschließlich Befehlshistorie.
 
 ## Erweiterbarkeit / Wartbarkeit
 
@@ -22,6 +25,7 @@
 - MVVM-Fundament (`NavigationService`, `DiagnosticsPageViewModel`)
 - `SecretJsonStore<T>`, `AutomationRuleEngine`, `NowPlayingWidget`
 - Agent: `WithObsControl`-Helper für OBS-Routen
+- Agent: zentraler Problem-Factory und endpunktspezifische Request-Limits
 - `IEventBus` nach Core verschoben und über `AppEventBridge` verdrahtet
 
 ## Twitch-Ziele
@@ -140,6 +144,51 @@
 - Die Dashboard-Kurztestaktion öffnet nun den tatsächlichen Kurztest-Tab.
 - Regieplan, Automation-Editor/Kurztest und Workflow-Designer sind zusätzlich
   in drei Partial-Dateien unterhalb des 1.000-Zeilen-Gates aufgeteilt.
+- `RunOfShowPlanService` übernimmt Initialisierung und Legacy-Übernahme,
+  vollständiges Kopieren, Importnormalisierung, Plan-Lifecycle, Validierung
+  und Runtime-Projektion ohne WPF-Abhängigkeit. Acht Tests sichern die Regeln;
+  dabei bleiben auch alle Spotify-Felder bei Export, Import und Duplizieren
+  erhalten.
+- Plan-/Editor-Orchestrierung und Integrations-/Automatikruntime liegen nun in
+  getrennten Run-of-Show-Partials mit 622 beziehungsweise 375 Zeilen.
+  CI-blockierende Gates verhindern Wachstum ab 650 beziehungsweise 400 Zeilen.
+- `TimedAutomationRuleService` übernimmt fällige Regelauswahl,
+  Workflowgruppen-Sortierung und strukturelle Regelvalidierung ohne
+  WPF-Abhängigkeit. `TimedAutomationRuntimeService` übernimmt
+  Abhängigkeitsentscheidungen, begrenzte Timeout-/Retry-Richtlinien und die
+  Auswahl der Streamende-Resets. Sieben Tests sichern Prioritäten, Laufstatus,
+  Gruppensortierung, Abhängigkeiten, Laufzeitgrenzen, Referenzen und
+  Schleifenerkennung.
+- Die Timed-Automation-Runtime ist in einen 583-Zeilen-Orchestrator und einen
+  449-Zeilen-Aktions-Slice für OBS, Streamer.bot, Overlay und Spotify geteilt.
+  CI-blockierende Gates verhindern Wachstum ab 600 beziehungsweise 475 Zeilen.
+- `ObsDashboardApplicationService` übernimmt einfache
+  Sichtbarkeitsautomationen, Szenenaktivierungsregeln, Szenennamenprojektion,
+  Audioquellen-Auswahl, Streamstart-Priorisierung/-Rekonstruktion und die
+  gegen kurzzeitige OBS-Offlinemeldungen abgesicherte Live-Zustandsprojektion.
+  Neun Tests decken Reihenfolge, Mapping, Debouncing, Verbindungsabbrüche,
+  Timecodes, Szenen und Quellenauswahl ab.
+- OBS Connection/Dashboard sinkt von 875 auf 601 Zeilen. Streambeobachtung,
+  Dashboard-Preview und Startkoordination liegen im neuen
+  `MainWindow.Services.Obs.StreamObservation.cs` mit 315 Zeilen.
+- Architekturtests blockieren Wachstum der beiden OBS-Slices ab 620
+  beziehungsweise 330 Zeilen.
+- `TwitchDashboardApplicationService` übernimmt Raid-Historien,
+  priorisierte und deduplizierte Zielvorschläge, die Auswahl der
+  Live-Status-Kandidaten, Chatkanal-Auflösung, Live-Dauerformatierung sowie
+  die Raid-Aktionsprojektion. Zehn Testfälle sichern Normalisierung,
+  Begrenzung, Reihenfolge, Fallbacks und Zustände.
+- Der frühere Twitch-Dashboard-/Raid-Slice wird in Chat (190 Zeilen),
+  Live-Metriken (276 Zeilen) und Raid-Orchestrierung (437 Zeilen) getrennt.
+  CI-blockierende Grenzen greifen bei 220, 300 und 450 Zeilen.
+- `TwitchProfessionalHistoryService` übernimmt fehlertolerantes JSONL-Lesen,
+  Trendvergleiche, Raten, Kategoriebewertung, Konsistenz und
+  Session-Projektionen ohne WPF-Abhängigkeit. Drei Tests decken leere,
+  beschädigte, aggregierte und vergleichbare Historien ab.
+- Der frühere Twitch-API-/Professional-Slice ist weiter in
+  Professional-Dashboard (395 Zeilen), Verbindung/Kanaldaten (266 Zeilen)
+  und Moderation/Chat (226 Zeilen) getrennt. CI-Gates greifen bei
+  420, 290 beziehungsweise 250 Zeilen.
 - Die Architektur-Baseline sinkt auf 21.814 Zeilen Code-behind und
   3.392 Zeilen XAML.
 
@@ -164,8 +213,9 @@
   Streamer.bot und Stream Deck zerlegt.
 - Übersicht, Tabumschaltung und Service-Auswahl sind hinter der
   `ServicesPageView`-API gekapselt.
-- Stream-Deck-Katalog/Runtime und Regelverwaltung/Export liegen in zwei
-  Partial-Dateien mit 842 beziehungsweise 777 Zeilen.
+- Stream Deck ist entlang Katalog/Runtime, Transfer, Vorlagen,
+  Regelorchestrierung und Aktionserzeugung in begrenzte Partial-Dateien
+  getrennt.
 - Keine neue Services-View oder Partial-Datei überschreitet 1.000 Zeilen.
 - Die Architektur-Baseline sinkt auf 19.854 Zeilen Code-behind und
   1.591 Zeilen XAML.
@@ -206,6 +256,32 @@
 - `MainWindow.xaml.cs` sinkt von 19.854 auf 495 Zeilen und erfüllt damit
   erstmals den Zielwert unter 500. Ein expliziter Architekturtest verhindert
   Regressionen.
+- Stream-Deck-Sidecar-Metadaten, Toggle-/Ausführungsrichtlinien,
+  Katalogfilter, Belegungsstatistik, freie Positionswahl,
+  zustandsabhängige Beschriftungen und Profilvergleiche liegen im neuen
+  `StreamDeckCatalogApplicationService`.
+- Der Stream-Deck-Katalog ist weiter in Katalog/Runtime (582 Zeilen),
+  Backup/Import (197 Zeilen) und Vorlagenverwaltung (243 Zeilen) getrennt.
+  Architekturtests blockieren Wachstum ab 600, 220 beziehungsweise
+  270 Zeilen sowie eine Rückverlagerung der extrahierten Regeln.
+- Die bisher 777-zeilige Stream-Deck-Regel-/Aktionsdatei ist in
+  Regelorchestrierung (478 Zeilen) und Aktionserzeugung (358 Zeilen)
+  getrennt. CI-Gates greifen bei 500 und 380 Zeilen.
+- `StreamDeckAutomationRuleService` übernimmt Zeitfenster, Wochentage,
+  kombinierte Zustandsbedingungen und Regelvalidierung. Drei neue Unit-Tests
+  sichern AND/OR-Verknüpfung, Nachtfenster und Fehlerlisten.
+- Fünf neue Unit-Tests sichern gültige und beschädigte Sidecars,
+  Richtliniengrenzen, Filter/Belegung, Zustandsbeschriftung, freie Slots und
+  Profilvergleiche ab.
+- Streamer.bot-Aktionsmapping, Suche/Favoriten, Gruppenprojektion,
+  Argument-JSON und Eventklassifikation liegen im neuen
+  `StreamerBotApplicationService`.
+- Der Streamer.bot-Shell-Slice ist weiter in Aktionskatalog/-ausführung
+  (454 Zeilen) und WebSocket-/Event-Lifecycle (466 Zeilen) getrennt.
+  Architekturtests blockieren Wachstum ab 470 beziehungsweise 480 Zeilen
+  und die Rückkehr der extrahierten JSON-Regeln.
+- Sechs Unit-Tests sichern Aktionsantworten, Fehlerverträge, Suche,
+  Favoritenreihenfolge, Parameterobjekte und Event-Aliasse ab.
 
 ## IPC-Vertrag
 
@@ -245,6 +321,17 @@
 - Die Handshake-Erzeugung ist aus dem Client extrahiert und lehnt nicht
   unterstützte RPC-Versionen sowie unvollständige Challenges explizit ab.
 - 13 Contract-Testfälle decken valide, fehlerhafte und übergroße Frames ab.
+- Die 19 OBS-Agent-Routen liegen in `ObsEndpointMappings` und erhalten
+  Authentifizierung, Berechtigungen, OBS-Factory und Preset-Pfad als explizite
+  Abhängigkeiten.
+- `Agent/Program.cs` sinkt von 999 auf 128 Zeilen und enthält keine
+  Routenimplementierung mehr.
+- Operations, Pairing/Credentials, OBS und Updates besitzen vier getrennte
+  Endpunktgruppen mit expliziten Abhängigkeiten.
+- Vertragstests prüfen sämtliche Methoden und versionierten Pfade;
+  Ausführungstests sichern 401 ohne Credential und 403 ohne explizite
+  OBS-/Update-Berechtigung.
+- Architekturtests verhindern die Rückkehr von Routen in den Composition Root.
 
 ## Multi-PC
 
