@@ -227,7 +227,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: artifacts/test-results/**
@@ -235,7 +235,7 @@ jobs:
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: artifacts/test-results/**/coverage.cobertura.xml
@@ -278,7 +278,7 @@ jobs:
           -o artifacts/publish/win-x64
 
       - name: Upload publish output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: publish-win-x64
           path: artifacts/publish/win-x64/**
