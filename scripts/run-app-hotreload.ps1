@@ -264,7 +264,7 @@ if (-not (Test-Path -LiteralPath $projectFile)) {
 Stop-AppInstances
 
 Write-Host ""
-Write-Host "Creator Control Suite - Hot Reload Mode" -ForegroundColor Cyan
+Write-Host "CastingCouch - Hot Reload Mode" -ForegroundColor Cyan
 Write-Host ("  Projekt:       {0}" -f $projectFile)
 Write-Host ("  Konfiguration: {0}" -f $Configuration)
 if ($DebounceSeconds -gt 0) {

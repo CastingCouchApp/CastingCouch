@@ -316,7 +316,7 @@ public partial class MainWindow : Window
 
         MessageBox.Show(
             "Logs wurden exportiert.",
-            "Creator Control Suite",
+            "CastingCouch",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
     }

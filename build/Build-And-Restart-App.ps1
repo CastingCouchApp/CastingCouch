@@ -11,7 +11,7 @@ $projectPath = Join-Path $repositoryRoot "src\CreatorControlSuite.App\CreatorCon
 $outputDirectory = Join-Path $repositoryRoot "artifacts\bin\CreatorControlSuite.App\$Configuration\net10.0-windows"
 $executablePath = Join-Path $outputDirectory "CreatorControlSuite.exe"
 
-Write-Host "Creator Control Suite wird gebaut ($Configuration) ..." -ForegroundColor Cyan
+Write-Host "CastingCouch wird gebaut ($Configuration) ..." -ForegroundColor Cyan
 & dotnet build $projectPath --configuration $Configuration
 if ($LASTEXITCODE -ne 0) {
     throw "Der Build ist fehlgeschlagen. Die laufende Suite wurde nicht beendet."

@@ -5,7 +5,7 @@
         <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
             <StackPanel>
                 <TextBlock Text="Alert-Quelle" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="17"/>
-                <CheckBox Content="Eigene Alerts der Creator Control Suite verwenden" IsChecked="{Binding Enabled}" Margin="0,10,0,0"/>
+                <CheckBox Content="Eigene Alerts der CastingCouch verwenden" IsChecked="{Binding Enabled}" Margin="0,10,0,0"/>
                 <TextBlock Text="Die Alert-Bibliothek und der Designer bleiben vollständig nutzbar. Jeder Alert kann einzeln aktiviert oder deaktiviert werden." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="24,4,0,0"/>
                 <CheckBox Content="Streamer.bot-Alertaktionen deaktivieren, solange Suite-Alerts aktiv sind" IsChecked="{Binding SuppressStreamerBotAlerts}" Command="{Binding ApplySuppressionCommand}" Margin="0,14,0,0"/>
                 <TextBlock Text="Die Suite ruft dafür zwei frei benennbare Aktionen in Streamer.bot auf. Diese Aktionen können dort z. B. die Alert-Aktionsgruppe deaktivieren bzw. wieder aktivieren." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="24,4,0,0"/>

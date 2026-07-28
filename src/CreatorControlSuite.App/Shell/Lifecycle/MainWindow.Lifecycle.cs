@@ -98,7 +98,7 @@ public partial class MainWindow : Window
             MessageBox.Show(
                 this,
                 "Das Streamende läuft noch. Bitte warte, bis der Stream beendet ist, oder brich den Ablauf ab.",
-                "Creator Control Suite",
+                "CastingCouch",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -113,7 +113,7 @@ public partial class MainWindow : Window
         MessageBoxResult result = MessageBox.Show(
             this,
             "Der Stream läuft noch. Die Anwendung kann erst geschlossen werden, wenn der Stream beendet ist.\n\nStreamende-Dialog öffnen?",
-            "Creator Control Suite",
+            "CastingCouch",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
@@ -149,6 +149,215 @@ public partial class MainWindow : Window
         TitleBarMaximizeIcon.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
         TitleBarRestoreIcon.Visibility = maximized ? Visibility.Visible : Visibility.Collapsed;
         TitleBarMaximizeButton.ToolTip = maximized ? "Wiederherstellen" : "Maximieren";
+    }
+
+    private void GeneralSettingsPageViewModelOnPropertyChanged(
+        object? sender,
+        PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(GeneralSettingsPageViewModel.TitleBarWidgetCardsEnabled))
+        {
+            ApplyTitleBarChrome();
+        }
+    }
+
+    private void TitleBar_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source
+            && FindAncestor<Button>(source) is not null)
+        {
+            return;
+        }
+
+        ContextMenu menu = BuildTitleBarEditContextMenu();
+        if (sender is FrameworkElement target)
+        {
+            menu.PlacementTarget = target;
+        }
+
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private ContextMenu BuildTitleBarEditContextMenu()
+    {
+        _settings.General.TitleBarHiddenWidgets ??= [];
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem
+        {
+            Header = "TitleBar-Widgets",
+            IsEnabled = false,
+            FontWeight = FontWeights.SemiBold
+        });
+        menu.Items.Add(new Separator());
+
+        foreach ((string key, string label) in TitleBarWidgetVisibility.All)
+        {
+            var item = new MenuItem
+            {
+                Header = label,
+                IsCheckable = true,
+                IsChecked = TitleBarWidgetVisibility.IsVisible(
+                    _settings.General.TitleBarHiddenWidgets,
+                    key),
+                StaysOpenOnClick = true,
+                Tag = key
+            };
+            item.Click += TitleBarWidgetVisibilityMenuItem_Click;
+            menu.Items.Add(item);
+        }
+
+        menu.Items.Add(new Separator());
+        var cardsItem = new MenuItem
+        {
+            Header = "Als Cards darstellen",
+            IsCheckable = true,
+            IsChecked = _generalSettingsPageViewModel.TitleBarWidgetCardsEnabled,
+            StaysOpenOnClick = true
+        };
+        cardsItem.Click += (_, _) =>
+        {
+            bool enabled = cardsItem.IsChecked == true;
+            _generalSettingsPageViewModel.TitleBarWidgetCardsEnabled = enabled;
+            _settings.General.TitleBarWidgetCardsEnabled = enabled;
+            _ = _settingsStore.SaveAsync(_settings);
+        };
+        menu.Items.Add(cardsItem);
+
+        var showAllItem = new MenuItem { Header = "Alle Widgets einblenden" };
+        showAllItem.Click += (_, _) =>
+        {
+            _settings.General.TitleBarHiddenWidgets = [];
+            ApplyTitleBarChrome();
+            _ = _settingsStore.SaveAsync(_settings);
+        };
+        menu.Items.Add(showAllItem);
+        return menu;
+    }
+
+    private void TitleBarWidgetVisibilityMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string key } item)
+        {
+            return;
+        }
+
+        _settings.General.TitleBarHiddenWidgets ??= [];
+        TitleBarWidgetVisibility.SetHidden(
+            _settings.General.TitleBarHiddenWidgets,
+            key,
+            hide: item.IsChecked != true);
+        ApplyTitleBarChrome();
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    private void ApplyTitleBarChrome()
+    {
+        ApplyTitleBarWidgetChrome(_generalSettingsPageViewModel.TitleBarWidgetCardsEnabled);
+        ApplyTitleBarWidgetVisibility();
+    }
+
+    private void ApplyTitleBarWidgetChrome(bool cardsEnabled)
+    {
+        string styleKey = cardsEnabled
+            ? "TitleBarWidgetCardStyle"
+            : "TitleBarWidgetStyle";
+        if (TryFindResource(styleKey) is not Style widgetStyle)
+        {
+            return;
+        }
+
+        foreach (Border border in EnumerateLogicalBorders(DashboardTopStatusRow))
+        {
+            if (Equals(border.Tag, "TitleBarChromeWidget"))
+            {
+                border.Style = widgetStyle;
+            }
+        }
+    }
+
+    private void ApplyTitleBarWidgetVisibility()
+    {
+        _settings.General.TitleBarHiddenWidgets ??= [];
+        IReadOnlyList<string> hidden = _settings.General.TitleBarHiddenWidgets;
+        bool cardsEnabled = _generalSettingsPageViewModel.TitleBarWidgetCardsEnabled;
+
+        SetTitleBarWidgetVisibility(DashboardTitleBarStreamWidget, TitleBarWidgetVisibility.Stream, hidden);
+        SetTitleBarWidgetVisibility(DashboardStreamQualityModule, TitleBarWidgetVisibility.Quality, hidden);
+        SetTitleBarWidgetVisibility(DashboardTopMusicWidget, TitleBarWidgetVisibility.Music, hidden);
+        SetTitleBarWidgetVisibility(DashboardTitleBarCommunityWidget, TitleBarWidgetVisibility.Community, hidden);
+        SetTitleBarWidgetVisibility(DashboardTitleBarSessionWidget, TitleBarWidgetVisibility.Session, hidden);
+        SetTitleBarWidgetVisibility(DashboardCountdownModule, TitleBarWidgetVisibility.Countdown, hidden);
+        SetTitleBarWidgetVisibility(DashboardConnectionSummaryChip, TitleBarWidgetVisibility.Connections, hidden);
+
+        foreach (Border border in EnumerateLogicalBorders(DashboardTopStatusRow))
+        {
+            if (!Equals(border.Tag, "TitleBarChromeDivider")
+                || string.IsNullOrWhiteSpace(border.Uid))
+            {
+                continue;
+            }
+
+            bool showDivider = !cardsEnabled
+                && TitleBarWidgetVisibility.ShouldShowDividerBefore(hidden, border.Uid);
+            border.Visibility = showDivider ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    private static void SetTitleBarWidgetVisibility(
+        FrameworkElement? element,
+        string key,
+        IReadOnlyList<string> hidden)
+    {
+        if (element is null)
+        {
+            return;
+        }
+
+        element.Visibility = TitleBarWidgetVisibility.IsVisible(hidden, key)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? current)
+        where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = LogicalTreeHelper.GetParent(current)
+                ?? VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Border> EnumerateLogicalBorders(DependencyObject? root)
+    {
+        if (root is null)
+        {
+            yield break;
+        }
+
+        if (root is Border border)
+        {
+            yield return border;
+        }
+
+        foreach (object child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is DependencyObject dependencyObject)
+            {
+                foreach (Border nested in EnumerateLogicalBorders(dependencyObject))
+                {
+                    yield return nested;
+                }
+            }
+        }
     }
 
     private void OnThemeChanged()

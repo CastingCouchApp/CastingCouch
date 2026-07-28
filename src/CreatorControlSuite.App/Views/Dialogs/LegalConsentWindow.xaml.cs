@@ -20,5 +20,5 @@ public partial class LegalConsentWindow : Window
             }
         }
     }
-    private async Task AcceptAsync() { if (AcceptEulaBox.IsChecked != true || AcknowledgePrivacyBox.IsChecked != true) { MessageBox.Show("Bitte beide Bestätigungen aktivieren.", "Creator Control Suite", MessageBoxButton.OK, MessageBoxImage.Information); return; } await _service.SaveAcceptedAsync(); DialogResult = true; Close(); }
+    private async Task AcceptAsync() { if (AcceptEulaBox.IsChecked != true || AcknowledgePrivacyBox.IsChecked != true) { MessageBox.Show("Bitte beide Bestätigungen aktivieren.", "CastingCouch", MessageBoxButton.OK, MessageBoxImage.Information); return; } await _service.SaveAcceptedAsync(); DialogResult = true; Close(); }
 }

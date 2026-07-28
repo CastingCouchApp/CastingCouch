@@ -31,7 +31,7 @@
                     <TextBox Grid.Column="1"
                              Text="{Binding WebServerPort}"/>
                     <TextBox Grid.Column="2"
-                             Text="{Binding BaseUrl}"
+                             Text="{Binding BaseUrl, Mode=OneWay}"
                              IsReadOnly="True"
                              Margin="12,0,0,0"/>
                     <Button Grid.Column="3"
@@ -180,7 +180,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox Text="{Binding ChatUrl}"
+                    <TextBox Text="{Binding ChatUrl, Mode=OneWay}"
                              IsReadOnly="True"/>
                     <Button Grid.Column="1"
                             Content="URL KOPIEREN"

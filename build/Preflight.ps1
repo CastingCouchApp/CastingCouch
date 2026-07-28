@@ -44,7 +44,7 @@ if (Test-Path -LiteralPath $SettingsModel) {
 }
 
 Write-Host ""
-Write-Host "Creator Control Suite Build-Preflight" -ForegroundColor Cyan
+Write-Host "CastingCouch Build-Preflight" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 
 foreach ($Warning in $Warnings) {

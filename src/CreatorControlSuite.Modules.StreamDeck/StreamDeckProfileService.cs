@@ -120,7 +120,7 @@ public sealed class StreamDeckProfileService
 
         var manifest = new
         {
-            name = "Creator Control Suite",
+            name = "CastingCouch",
             version = "6.5.0",
             commandClient = "CreatorControlSuite.CommandClient.exe",
             pipeName = "CreatorControlSuite.CommandPipe.v1",
@@ -159,7 +159,7 @@ public sealed class StreamDeckProfileService
             includeBaseDirectory: false);
 
         return new StreamDeckProfilePackage(
-            "Creator Control Suite Standard",
+            "CastingCouch Standard",
             packagePath,
             timestamp,
             actions);

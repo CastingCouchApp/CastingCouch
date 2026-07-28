@@ -14,7 +14,7 @@
 
 ## Learned Workspace Facts
 
-- Creator Control Suite ist eine WPF-Desktop-App auf .NET 10 (`net10.0-windows`); `Directory.Build.props` setzt `EnableWindowsTargeting` außerhalb von Windows (restore/format auf macOS); Vollbuild/Test braucht Windows, CI auf `windows-latest`.
+- CastingCouch ist eine WPF-Desktop-App auf .NET 10 (`net10.0-windows`); `Directory.Build.props` setzt `EnableWindowsTargeting` außerhalb von Windows (restore/format auf macOS); Vollbuild/Test braucht Windows, CI auf `windows-latest`.
 - GitHub-Remote: `frankhildebrandt/CreatorControlSuite`.
 - Versionsquelle ist `Directory.Build.props` (`<Version>`); Changelogs liegen als `docs/changelogs/CHANGELOG-<version>.md`.
 - Build-Ausgabe unter `artifacts/`; lokale Kurzbefehle über `Makefile` (`restore`/`build`/`test`/`publish`/`ci`/`release`/`format`).

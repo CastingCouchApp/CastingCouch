@@ -165,7 +165,15 @@ export interface CcsCanvasApi {
     options?: { seedDemo?: boolean; [key: string]: unknown }
   ) => void;
   fetchJson: (url: string) => Promise<unknown>;
-  connectWs: (onEvent: (evt: Record<string, unknown>) => void) => WebSocket;
+  connectWs: (
+    onEvent: (evt: Record<string, unknown>) => void,
+    options?: {
+      onOpen?: (ws: WebSocket) => void;
+      onSocket?: (ws: WebSocket) => void;
+      retryDelayMs?: number;
+      maxRetryDelayMs?: number;
+    }
+  ) => WebSocket;
   WIDGET_DEFAULTS: Record<string, WidgetDefaults>;
   SHAPE_DEFAULTS: Record<string, WidgetDefaults>;
   SCENE_BG_PRESETS: Record<string, Record<string, unknown>>;

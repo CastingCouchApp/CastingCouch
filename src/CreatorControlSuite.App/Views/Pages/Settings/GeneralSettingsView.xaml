@@ -32,6 +32,10 @@
                        Foreground="{DynamicResource TextMutedBrush}"
                        TextWrapping="Wrap"
                        Margin="0,8,0,0"/>
+            <CheckBox IsChecked="{Binding TitleBarWidgetCardsEnabled}"
+                      Content="TitleBar-Widgets als Cards darstellen"
+                      Margin="0,14,0,0"
+                      ToolTip="Kartenrahmen um Stream/Qualität/Music/Community/Session/Countdown. Aus: flache Widgets mit Trennern."/>
             <Separator Margin="0,18,0,14"/>
             <TextBlock Text="Verbindungsüberwachung"
                        FontSize="18"

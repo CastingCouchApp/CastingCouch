@@ -7,7 +7,7 @@ description: >-
   bump, Tag, Ship, alpha-Release oder „Release machen“.
 ---
 
-# Release (Creator Control Suite)
+# Release (CastingCouch)
 
 Führe den Flow strikt der Reihe nach aus. Bei Rot: fixen, erneut prüfen, erst dann weiter. Nicht überspringen.
 

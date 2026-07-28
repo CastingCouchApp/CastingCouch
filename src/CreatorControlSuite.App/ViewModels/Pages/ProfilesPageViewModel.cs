@@ -166,7 +166,7 @@ public sealed class ProfilesPageViewModel : ViewModelBase, IPageViewModel
 
         var dialog = new SaveFileDialog
         {
-            Filter = "Creator Control Suite Profil (*.ccsprofile)|*.ccsprofile",
+            Filter = "CastingCouch Profil (*.ccsprofile)|*.ccsprofile",
             FileName = SelectedProfile.Name + ".ccsprofile"
         };
         if (dialog.ShowDialog() != true)
@@ -183,7 +183,7 @@ public sealed class ProfilesPageViewModel : ViewModelBase, IPageViewModel
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "Creator Control Suite Profil (*.ccsprofile;*.json)|*.ccsprofile;*.json"
+            Filter = "CastingCouch Profil (*.ccsprofile;*.json)|*.ccsprofile;*.json"
         };
         if (dialog.ShowDialog() != true)
         {

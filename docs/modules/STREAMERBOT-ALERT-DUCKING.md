@@ -1,6 +1,6 @@
 # Streamer.bot-Alerts an die Spotify-Absenkung melden
 
-Die Creator Control Suite berücksichtigt jetzt eigene Alerts und Alerts aus Streamer.bot gemeinsam.
+Die CastingCouch berücksichtigt jetzt eigene Alerts und Alerts aus Streamer.bot gemeinsam.
 
 Füge in jede Streamer.bot-Alert-Aktion am Anfang eine **Execute Program**-Sub-Action ein:
 

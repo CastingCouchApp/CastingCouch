@@ -2,7 +2,7 @@
   "name": "ccs-canvas-overlay",
   "private": true,
   "version": "1.0.0",
-  "description": "Creator Control Suite Canvas Overlay (TypeScript)",
+  "description": "CastingCouch Canvas Overlay (TypeScript)",
   "scripts": {
     "build": "node esbuild.config.mjs",
     "build:watch": "node esbuild.config.mjs --watch",
@@ -12,9 +12,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.1",
     "jsdom": "^30.0.0",
-    "typescript": "^5.7.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
 }

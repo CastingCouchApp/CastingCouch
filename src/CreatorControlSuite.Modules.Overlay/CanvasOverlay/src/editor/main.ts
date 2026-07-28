@@ -236,9 +236,26 @@ function bootEditor(): void {
   });
 
   void boot(instanceId, setInstanceLabel, applyPackPalette, () => {
-    ws = window.CcsCanvas.connectWs((evt) => {
-      editorRuntime.handleRealtime(evt);
-    });
+    const refreshChat = async () => {
+      try {
+        editorRuntime.setChatConfig(await window.CcsCanvas.fetchJson("/chat/config"));
+      } catch { /* optional */ }
+      await editorRuntime.loadChatHistory();
+    };
+
+    ws = window.CcsCanvas.connectWs(
+      (evt) => {
+        editorRuntime.handleRealtime(evt);
+      },
+      {
+        onSocket: (socket) => {
+          ws = socket;
+        },
+        onOpen: () => {
+          void refreshChat();
+        }
+      }
+    );
   });
 }
 
@@ -427,10 +444,6 @@ async function boot(
   try {
     editorRuntime.setData((await window.CcsCanvas.fetchJson("/data/overlay-data.json")) as Record<string, unknown>);
   } catch { /* optional */ }
-  try {
-    editorRuntime.setChatConfig(await window.CcsCanvas.fetchJson("/chat/config"));
-  } catch { /* optional */ }
-  await editorRuntime.loadChatHistory();
   applyEditorLayers(editorRuntime, prefs);
   connect();
   setInterval(async () => {

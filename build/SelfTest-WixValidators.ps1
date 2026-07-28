@@ -12,7 +12,7 @@ try {
     @'
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package>
-    <Feature Id="MainFeature" Title="Creator Control Suite" Level="1">
+    <Feature Id="MainFeature" Title="CastingCouch" Level="1">
       <ComponentGroupRef Id="PublishedApplicationFiles" />
     </Feature>
   </Package>

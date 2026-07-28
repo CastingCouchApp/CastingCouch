@@ -9,5 +9,5 @@ if errorlevel 1 (
     exit /b 1
 )
 echo.
-echo Creator Control Suite wurde erfolgreich installiert oder aktualisiert.
+echo CastingCouch wurde erfolgreich installiert oder aktualisiert.
 pause

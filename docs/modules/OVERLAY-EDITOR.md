@@ -80,7 +80,7 @@ Persistenz: `CanvasOverlay/dev/.layouts/`, `dev/.data/` (gitignored). Extension-
 
 ## OBS-Setup
 
-**Variante A – mehrere Canvases:** Pro Design eine Browserquelle auf `/view/{id}` (Canvas-Auflösung, transparent). In OBS-Szenen die passende Quelle ein-/ausblenden.
+**Variante A – mehrere Canvases:** Pro Design eine Browserquelle auf `/view/{id}` (Canvas-Auflösung, transparent). In OBS-Szenen die passende Quelle ein-/ausblenden. WebSocket reconnectet automatisch und lädt Chat-Config/-Historie bei jedem Connect neu.
 
 **Variante B – Einzelquellen:** jeweils `/w/…` oder `/w/shape/…` als eigene Browserquelle.
 

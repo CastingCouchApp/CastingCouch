@@ -12,8 +12,8 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
     <BaseOutputPath>$(MSBuildThisFileDirectory)artifacts\bin\$(MSBuildProjectName)\</BaseOutputPath>
     <DefaultItemExcludes>$(DefaultItemExcludes);**\artifacts\**</DefaultItemExcludes>
-    <Company>Creator Control Suite</Company>
-    <Product>Creator Control Suite</Product>
+    <Company>CastingCouch</Company>
+    <Product>CastingCouch</Product>
     <Version>8.0.0-alpha102</Version>
   </PropertyGroup>
 </Project>

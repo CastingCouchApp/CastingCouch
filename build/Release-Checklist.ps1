@@ -17,6 +17,6 @@ $DraftFiles=Get-ChildItem -LiteralPath (Join-Path $Root "src\CreatorControlSuite
 if($DraftFiles){$Failures.Add("Es sind noch DRAFT-Rechtstexte enthalten.")}
 $PrivateKeys=Get-ChildItem -LiteralPath $Root -Recurse -Include "*private*.pem","*.pfx","*.p12" -ErrorAction SilentlyContinue | Where-Object {$_.FullName -notlike "*\tools\dev-keys\*"}
 if($PrivateKeys){$Failures.Add("Private Schlüssel im Projekt gefunden.")}
-Write-Host "Creator Control Suite Release-Check" -ForegroundColor Cyan
+Write-Host "CastingCouch Release-Check" -ForegroundColor Cyan
 if($Failures.Count -gt 0){$Failures|ForEach-Object{Write-Host "BLOCKER: $_" -ForegroundColor Red};exit 1}
 Write-Host "Automatischer Release-Check bestanden." -ForegroundColor Green

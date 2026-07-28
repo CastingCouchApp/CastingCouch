@@ -2,7 +2,7 @@ namespace CreatorControlSuite.Core.Configuration;
 
 public sealed class ProductSettings
 {
-    public string ProductName { get; set; } = "Creator Control Suite";
+    public string ProductName { get; set; } = "CastingCouch";
     public string Version { get; set; } = "0.0.0";
     public string UpdateChannel { get; set; } = "Alpha";
 }
@@ -11,6 +11,8 @@ public sealed class GeneralSettings
 {
     public string Language { get; set; } = "de-DE";
     public string ThemeId { get; set; } = "classic";
+    public bool TitleBarWidgetCardsEnabled { get; set; }
+    public List<string> TitleBarHiddenWidgets { get; set; } = [];
     public string DataRoot { get; set; } = "";
     public string BackupRoot { get; set; } = "";
     public string OverlayManifestPath { get; set; } = "";

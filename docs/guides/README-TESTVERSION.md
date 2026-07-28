@@ -1,4 +1,4 @@
-# Creator Control Suite 2.0.116 – vollständiger Teststand
+# CastingCouch 2.0.116 – vollständiger Teststand
 
 Dieses Paket enthält den vollständigen rekonstruierten Quellstand bis Version 2.0.116.
 

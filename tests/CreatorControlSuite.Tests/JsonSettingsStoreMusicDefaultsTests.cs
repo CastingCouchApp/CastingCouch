@@ -16,7 +16,7 @@ public sealed class JsonSettingsStoreMusicDefaultsTests
             // Legacy settings ohne MusicPlayer / YouTubeMusic.
             await File.WriteAllTextAsync(path, """
                 {
-                  "Product": { "ProductName": "Creator Control Suite", "Version": "2.0.81" },
+                  "Product": { "ProductName": "CastingCouch", "Version": "2.0.81" },
                   "Spotify": { "ClientId": "test" }
                 }
                 """, Encoding.UTF8);

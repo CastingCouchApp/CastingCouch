@@ -74,8 +74,8 @@ internal static class OperationsEndpointMappings
                     case "obs.stop": foreach (Process p in Process.GetProcessesByName("obs64")) { p.CloseMainWindow(); } break;
                     case "spotify.playpause": Process.Start(new ProcessStartInfo("spotify:playpause") { UseShellExecute = true }); break;
                     case "streamerbot.start": StartConfigured(dependencies.Settings().StreamerBotPath, "Streamer.bot.exe"); break;
-                    case "system.restart": Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 5 /c \"Creator Control Suite Remote-Neustart\"") { UseShellExecute = false, CreateNoWindow = true }); break;
-                    case "system.shutdown": Process.Start(new ProcessStartInfo("shutdown.exe", "/s /t 5 /c \"Creator Control Suite Remote-Herunterfahren\"") { UseShellExecute = false, CreateNoWindow = true }); break;
+                    case "system.restart": Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 5 /c \"CastingCouch Remote-Neustart\"") { UseShellExecute = false, CreateNoWindow = true }); break;
+                    case "system.shutdown": Process.Start(new ProcessStartInfo("shutdown.exe", "/s /t 5 /c \"CastingCouch Remote-Herunterfahren\"") { UseShellExecute = false, CreateNoWindow = true }); break;
                     default: return AgentApiResults.BadRequest("unbekannter Befehl");
                 }
                 DateTimeOffset acceptedAt = DateTimeOffset.UtcNow;

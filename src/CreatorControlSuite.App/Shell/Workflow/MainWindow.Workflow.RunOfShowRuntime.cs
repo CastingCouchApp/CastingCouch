@@ -215,7 +215,7 @@ public partial class MainWindow
                     action,
                     args = new
                     {
-                        source = "Creator Control Suite",
+                        source = "CastingCouch",
                         runOfShowStep = step.Name
                     }
                 });

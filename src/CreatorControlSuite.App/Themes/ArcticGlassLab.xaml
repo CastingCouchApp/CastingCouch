@@ -17,6 +17,13 @@
     <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#0E1820"/>
     <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#0C161E"/>
     <SolidColorBrush x:Key="SidebarBackgroundEndBrush" Color="#102028"/>
+    <LinearGradientBrush x:Key="TitleBarBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#162830" Offset="0"/>
+        <GradientStop Color="#0C161E" Offset="0.48"/>
+        <GradientStop Color="#081018" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="TitleBarHighlightBrush" Color="#30FFFFFF"/>
+    <SolidColorBrush x:Key="TitleBarDividerBrush" Color="#203040"/>
     <SolidColorBrush x:Key="CardBackgroundBrush" Color="#142028"/>
     <SolidColorBrush x:Key="ElevatedBackgroundBrush" Color="#1A2830"/>
     <SolidColorBrush x:Key="InputBackgroundBrush" Color="#162430"/>

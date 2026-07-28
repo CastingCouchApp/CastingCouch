@@ -1,4 +1,4 @@
-# Creator Control Suite — EditorConfig for `dotnet format` / IDE
+# CastingCouch — EditorConfig for `dotnet format` / IDE
 # https://learn.microsoft.com/dotnet/fundamentals/code-analysis/code-style-rule-options
 
 root = true

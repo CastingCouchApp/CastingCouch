@@ -56,6 +56,12 @@ public sealed class GeneralSettingsPageViewModel(
 
     public string ThemeDescription => SelectedTheme?.Description ?? "";
 
+    public bool TitleBarWidgetCardsEnabled
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
     public bool ConnectionWatchdogEnabled
     {
         get;
@@ -108,6 +114,7 @@ public sealed class GeneralSettingsPageViewModel(
             StartWithWindows = general.StartWithWindows;
             MinimizeToTray = general.MinimizeToTray;
             SelectedTheme = ThemeCatalog.Resolve(general.ThemeId);
+            TitleBarWidgetCardsEnabled = general.TitleBarWidgetCardsEnabled;
             ConnectionWatchdogEnabled =
                 general.ConnectionWatchdogEnabled;
             ConnectionWatchdogSeconds =
@@ -134,6 +141,7 @@ public sealed class GeneralSettingsPageViewModel(
         general.MinimizeToTray = MinimizeToTray;
         general.ThemeId =
             ThemeCatalog.Resolve(SelectedTheme?.Id).Id;
+        general.TitleBarWidgetCardsEnabled = TitleBarWidgetCardsEnabled;
         general.ConnectionWatchdogEnabled =
             ConnectionWatchdogEnabled;
         if (int.TryParse(

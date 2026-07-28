@@ -32,6 +32,8 @@ import { ANIMATION_STRATEGIES, registerAnimation, listAnimationTypes } from "./a
 import { extUrl } from "./extensions/ext-url";
 import { loadExtensions } from "./extensions/loader";
 
+export { connectWs, stopWsReconnect } from "./net/connect-ws";
+
 const CcsCanvas = {
   createRuntime,
   createItemContent,

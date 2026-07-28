@@ -8,7 +8,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $appProject = Join-Path $root "src\CreatorControlSuite.App\CreatorControlSuite.App.csproj"
 $outDir = Join-Path $root "artifacts\portable\CreatorControlSuite-2.0.116-$Runtime"
 
-Write-Host "Publishing Creator Control Suite 2.0.116 ($Runtime, self-contained)..." -ForegroundColor Cyan
+Write-Host "Publishing CastingCouch 2.0.116 ($Runtime, self-contained)..." -ForegroundColor Cyan
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     throw "Das .NET SDK wurde nicht gefunden. Installiere das zu diesem Projekt passende .NET SDK und starte das Skript erneut."
 }
@@ -29,7 +29,7 @@ dotnet publish $appProject `
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish ist fehlgeschlagen." }
 
 $readme = @"
-Creator Control Suite 2.0.116 - Portable Windows Testversion
+CastingCouch 2.0.116 - Portable Windows Testversion
 
 1. Den gesamten Ordner auf den Testrechner kopieren.
 2. CreatorControlSuite.App.exe starten.

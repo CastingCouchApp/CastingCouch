@@ -1,0 +1,17 @@
+{
+  "id": "denver-john",
+  "name": "Denver John",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "widgets": [
+    {
+      "id": "logo",
+      "name": "Logo",
+      "entry": "widgets/logo/index.js",
+      "css": "widgets/logo/logo.css"
+    }
+  ],
+  "effects": [],
+  "fonts": [],
+  "assets": []
+}

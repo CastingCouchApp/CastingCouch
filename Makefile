@@ -1,4 +1,4 @@
-# Creator Control Suite — lokale Build-Targets
+# CastingCouch — lokale Build-Targets
 # Voraussetzung: .NET 10 SDK (x64), Windows (WPF / net10.0-windows)
 
 DOTNET      ?= dotnet
@@ -8,13 +8,21 @@ CMDCLIENT   := src/CreatorControlSuite.CommandClient/CreatorControlSuite.Command
 UPDATER     := src/CreatorControlSuite.Updater/CreatorControlSuite.Updater.csproj
 TESTS       := tests/CreatorControlSuite.Tests/CreatorControlSuite.Tests.csproj
 CONFIG      ?= Release
+RUN_CONFIG ?= Debug
 RID         ?= win-x64
 ARTIFACTS   := artifacts
 PUBLISH_DIR := $(ARTIFACTS)/publish/$(RID)
 LOG_DIR     := $(ARTIFACTS)/build-logs
 TEST_DIR    := $(ARTIFACTS)/test-results
 
-.PHONY: help restore canvas canvas-dev build test publish app clean ci release watch format format-check format-analyzers
+# Windows hat oft nur powershell.exe; pwsh optional via PWSH=pwsh
+ifeq ($(OS),Windows_NT)
+PWSH ?= powershell
+else
+PWSH ?= pwsh
+endif
+
+.PHONY: help restore canvas canvas-dev build test publish app clean ci release run watch format format-check format-analyzers
 
 help:
 	@echo "Targets:"
@@ -30,10 +38,11 @@ help:
 	@echo "  make app             - restore + test + publish"
 	@echo "  make ci              - restore + build + test"
 	@echo "  make release         - voller Release-Build (App+Client+Updater+MSI, Windows/pwsh)"
+	@echo "  make run             - App bauen, alte Instanz beenden, neu starten (RUN_CONFIG=$(RUN_CONFIG))"
 	@echo "  make watch           - App mit Hot Reload starten (dotnet watch)"
 	@echo "  make clean           - Build-Artefakte löschen"
 	@echo ""
-	@echo "Variablen: CONFIG=$(CONFIG) RID=$(RID) DOTNET=$(DOTNET)"
+	@echo "Variablen: CONFIG=$(CONFIG) RUN_CONFIG=$(RUN_CONFIG) RID=$(RID) DOTNET=$(DOTNET) PWSH=$(PWSH)"
 
 CANVAS_DIR := src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
 
@@ -80,11 +89,16 @@ app: restore test publish
 ci: restore build test
 
 release:
-	@command -v pwsh >/dev/null 2>&1 || { echo "pwsh nicht gefunden"; exit 1; }
-	pwsh -NoProfile -ExecutionPolicy Bypass -File ./build/Build-Release.ps1 -Configuration $(CONFIG)
+	@command -v $(PWSH) >/dev/null 2>&1 || { echo "$(PWSH) nicht gefunden"; exit 1; }
+	$(PWSH) -NoProfile -ExecutionPolicy Bypass -File ./build/Build-Release.ps1 -Configuration $(CONFIG)
+
+# App bauen, laufende Instanz beenden, neu starten.
+# Override: make run RUN_CONFIG=Release
+run:
+	$(PWSH) -NoProfile -ExecutionPolicy Bypass -File ./build/Build-And-Restart-App.ps1 -Configuration $(RUN_CONFIG)
 
 watch:
-	pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-app-hotreload.ps1 -Configuration $(CONFIG)
+	$(PWSH) -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-app-hotreload.ps1 -Configuration $(CONFIG)
 
 # C# coding style: .editorconfig + SDK `dotnet format`
 # Whitespace + Style sind solution-weit reliable.

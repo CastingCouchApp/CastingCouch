@@ -1,4 +1,4 @@
-﻿param(
+param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Debug"
 )
@@ -71,7 +71,7 @@ public static class CreatorControlSuiteWin32
 
 Stop-AppInstances
 
-Write-Host ("Baue Creator Control Suite ({0}) aus den Quellen ..." -f $Configuration)
+Write-Host ("Baue CastingCouch ({0}) aus den Quellen ..." -f $Configuration)
 & dotnet build $projectFile -c $Configuration --nologo
 if ($LASTEXITCODE -ne 0) {
     [System.Environment]::Exit($LASTEXITCODE)
@@ -84,7 +84,7 @@ if (-not (Test-Path -LiteralPath $exePath)) {
 # Erneuter Stop falls waehrend des Builds noch eine Instanz gestartet wurde.
 Stop-AppInstances
 
-Write-Host "Starte Creator Control Suite im Vordergrund ..."
+Write-Host "Starte CastingCouch im Vordergrund ..."
 $started = Start-Process -FilePath $exePath -WorkingDirectory $outputDir -PassThru
 if (-not $started) {
     throw ("Start von '{0}' fehlgeschlagen." -f $exePath)
@@ -98,5 +98,5 @@ if (-not (Show-WindowInForeground -Process $started)) {
     Write-Host ("Hinweis: Fenster-Handle noch nicht verfuegbar - App laeuft (PID {0})." -f $started.Id)
 }
 
-Write-Host ("Creator Control Suite gestartet (PID {0})." -f $started.Id) -ForegroundColor Green
+Write-Host ("CastingCouch gestartet (PID {0})." -f $started.Id) -ForegroundColor Green
 [System.Environment]::Exit(0)
