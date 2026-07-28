@@ -71,7 +71,7 @@ public partial class MainWindow : Window
     {
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Filter = "Creator Control Suite Supportpaket (*.ccssupport)|*.ccssupport",
+            Filter = "CastingCouch Supportpaket (*.ccssupport)|*.ccssupport",
             FileName = "CreatorControlSuite-Support-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".ccssupport"
         };
         if (dialog.ShowDialog() != true)
@@ -82,7 +82,7 @@ public partial class MainWindow : Window
         try
         {
             SupportPackageResult result = await _supportPackageService.CreateAsync(dialog.FileName, new SupportPackageOptions(true, true, true, true, true, true));
-            MessageBox.Show("Supportpaket erstellt:\n\n" + result.PackagePath + (result.Warnings.Count == 0 ? "" : "\n\nHinweise:\n" + string.Join("\n", result.Warnings.Select(x => "• " + x))), "Creator Control Suite", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Supportpaket erstellt:\n\n" + result.PackagePath + (result.Warnings.Count == 0 ? "" : "\n\nHinweise:\n" + string.Join("\n", result.Warnings.Select(x => "• " + x))), "CastingCouch", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception exception)
         {

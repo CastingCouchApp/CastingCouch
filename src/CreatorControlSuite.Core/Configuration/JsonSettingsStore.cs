@@ -149,6 +149,7 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
     {
         settings.Product ??= new ProductSettings();
         settings.General ??= new GeneralSettings();
+        settings.General.TitleBarHiddenWidgets ??= [];
         settings.Branding ??= new BrandingSettings();
         settings.Obs ??= new ObsSettings();
         settings.Twitch ??= new TwitchSettings();

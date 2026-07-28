@@ -73,7 +73,7 @@ if ([string]::IsNullOrWhiteSpace($ReleaseNotes) -and -not [string]::IsNullOrWhit
 }
 
 if ([string]::IsNullOrWhiteSpace($ReleaseNotes)) {
-    $ReleaseNotes = "Creator Control Suite $Version"
+    $ReleaseNotes = "CastingCouch $Version"
 }
 
 $ReleaseNotes = $ReleaseNotes -replace "`r`n", "`n"

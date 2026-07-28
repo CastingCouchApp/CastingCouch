@@ -28,7 +28,7 @@ $TestsProject =
 $DotNet = & (Join-Path $PSScriptRoot "Test-DotNetSdk.ps1") -RequiredMajor 10
 
 Write-Host ""
-Write-Host "Creator Control Suite 2.0.129 - Clean Release Build" -ForegroundColor Cyan
+Write-Host "CastingCouch 2.0.129 - Clean Release Build" -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
 

@@ -73,7 +73,7 @@ public sealed class AgentCredentialStore
             DateTimeOffset now = DateTimeOffset.UtcNow;
             var credential = new AgentCredential(
                 Guid.NewGuid().ToString("N"),
-                string.IsNullOrWhiteSpace(displayName) ? "Creator Control Suite" : displayName.Trim(),
+                string.IsNullOrWhiteSpace(displayName) ? "CastingCouch" : displayName.Trim(),
                 Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
                 now,
                 now);

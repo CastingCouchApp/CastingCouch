@@ -245,7 +245,7 @@ public partial class MainWindow : Window
             Dictionary<string, object?> arguments =
                 StreamerBotApplicationService.ParseArguments(
                     ServicesPageViewHost.StreamerBotServiceViewHost.ServicesStreamerBotActionArgumentsBox.Text);
-            arguments["source"] = "Creator Control Suite";
+            arguments["source"] = "CastingCouch";
             arguments["manual"] = true;
             using JsonDocument response = await SendStreamerBotRequestAsync(new
             {

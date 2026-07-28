@@ -6,7 +6,7 @@ Set-StrictMode -Version 1.0
 $ErrorActionPreference = "Stop"
 
 $Version = "2.0.81"
-$ProductName = "Creator Control Suite"
+$ProductName = "CastingCouch"
 $ScriptPath = $MyInvocation.MyCommand.Path
 $ScriptRoot = Split-Path -Parent $ScriptPath
 $Payload = Join-Path $ScriptRoot "Payload"
@@ -79,7 +79,7 @@ function Get-ExistingInstallLocation {
     $Default =
         Join-Path `
             $env:ProgramFiles `
-            "Creator Control Suite"
+            "CastingCouch"
 
     if (Test-Path -LiteralPath $Default -PathType Container) {
         return $Default
@@ -149,7 +149,7 @@ function Create-Shortcut {
     $Shortcut.WorkingDirectory =
         Split-Path -Parent $TargetPath
     $Shortcut.Description =
-        "Creator Control Suite"
+        "CastingCouch"
     $Shortcut.Save()
 }
 
@@ -170,7 +170,7 @@ if ([string]::IsNullOrWhiteSpace($InstallDir)) {
         $Default =
             Join-Path `
                 $env:ProgramFiles `
-                "Creator Control Suite"
+                "CastingCouch"
 
         Write-Host ""
         Write-Host "Installationsordner"
@@ -281,7 +281,7 @@ Get-Process -Name "CreatorControlSuite" -ErrorAction SilentlyContinue |
 $StartMenu =
     Join-Path `
         $env:ProgramData `
-        "Microsoft\Windows\Start Menu\Programs\Creator Control Suite.lnk"
+        "Microsoft\Windows\Start Menu\Programs\CastingCouch.lnk"
 
 Remove-Item -LiteralPath $StartMenu -Force -ErrorAction SilentlyContinue
 
@@ -321,7 +321,7 @@ Start-Process `
     $ShortcutPath =
         Join-Path `
             $StartMenuDir `
-            "Creator Control Suite.lnk"
+            "CastingCouch.lnk"
 
     Create-Shortcut `
         -ShortcutPath $ShortcutPath `
@@ -351,7 +351,7 @@ Start-Process `
     New-ItemProperty `
         -Path $RegPath `
         -Name "Publisher" `
-        -Value "Creator Control Suite" `
+        -Value "CastingCouch" `
         -PropertyType String `
         -Force | Out-Null
 

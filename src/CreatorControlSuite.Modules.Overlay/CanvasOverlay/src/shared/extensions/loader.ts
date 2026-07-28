@@ -63,38 +63,73 @@ interface CatalogResponse {
   packs?: PackSummary[];
 }
 
-function loadScript(url: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[data-ccs-ext="${url}"]`);
-    if (existing) {
-      resolve();
-      return;
+/** Absolute URL — relative paths are unreliable in some OBS CEF builds. */
+export function absoluteUrl(path: string): string {
+  if (!path) return path;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return path;
+  try {
+    if (typeof location !== "undefined" && location.href) {
+      return new URL(path, location.href).href;
     }
-    const script = document.createElement("script");
-    script.src = url;
-    script.async = true;
-    script.dataset.ccsExt = url;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load " + url));
-    document.head.appendChild(script);
+  } catch {
+    /* ignore */
+  }
+  return path;
+}
+
+/**
+ * Rewrite relative url(...) in pack CSS so fetch-injected <style> still resolves
+ * against the stylesheet location (not the overlay page).
+ */
+export function rewriteCssUrls(css: string, cssFileUrl: string): string {
+  return css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (match, quote: string, ref: string) => {
+    const trimmed = (ref || "").trim();
+    if (!trimmed || /^(data:|https?:|blob:|\/)/i.test(trimmed)) return match;
+    try {
+      return `url(${quote}${new URL(trimmed, cssFileUrl).href}${quote})`;
+    } catch {
+      return match;
+    }
   });
 }
 
-function loadStylesheet(url: string): Promise<void> {
-  return new Promise((resolve) => {
-    const existing = document.querySelector(`link[data-ccs-ext="${url}"]`) as HTMLLinkElement | null;
-    if (existing) {
-      resolve();
-      return;
-    }
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = url;
-    link.dataset.ccsExt = url;
-    link.onload = () => resolve();
-    link.onerror = () => resolve(); // optional asset
-    document.head.appendChild(link);
-  });
+/**
+ * OBS Browser Source (CEF) often never fires <script src> / <link> onload.
+ * Fetch + inline inject executes reliably and does not hang the boot chain.
+ */
+async function loadScript(url: string): Promise<void> {
+  const abs = absoluteUrl(url);
+  if (document.querySelector(`script[data-ccs-ext="${abs}"]`)) {
+    return;
+  }
+  const res = await fetch(abs, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error("Failed to load " + abs);
+  }
+  const code = await res.text();
+  const script = document.createElement("script");
+  script.type = "text/javascript";
+  script.dataset.ccsExt = abs;
+  script.text = code;
+  document.head.appendChild(script);
+}
+
+async function loadStylesheet(url: string): Promise<void> {
+  const abs = absoluteUrl(url);
+  if (document.querySelector(`[data-ccs-ext="${abs}"]`)) {
+    return;
+  }
+  try {
+    const res = await fetch(abs, { cache: "no-store" });
+    if (!res.ok) return;
+    const css = rewriteCssUrls(await res.text(), abs);
+    const style = document.createElement("style");
+    style.dataset.ccsExt = abs;
+    style.textContent = css;
+    document.head.appendChild(style);
+  } catch {
+    /* optional */
+  }
 }
 
 function registerPackFonts(packId: string, fonts: PackFont[] | undefined): void {
@@ -106,7 +141,7 @@ function registerPackFonts(packId: string, fonts: PackFont[] | undefined): void 
     if (!family || !src) continue;
     const weight = font.weight || font.Weight || "400";
     const style = font.style || font.Style || "normal";
-    const url = extUrl(packId, src);
+    const url = absoluteUrl(extUrl(packId, src));
     css += `@font-face{font-family:${JSON.stringify(family)};src:url(${JSON.stringify(url)}) format("woff2");font-weight:${weight};font-style:${style};font-display:swap;}`;
     try {
       const w = window as unknown as { __ccsPackFonts?: string[] };
@@ -150,7 +185,7 @@ async function loadPackEntries(
  */
 export async function loadExtensions(): Promise<PackSummary[]> {
   try {
-    const res = await fetch("/extensions", { cache: "no-store" });
+    const res = await fetch(absoluteUrl("/extensions"), { cache: "no-store" });
     if (!res.ok) return [];
     const data = (await res.json()) as CatalogResponse | PackSummary[];
     const packs = Array.isArray(data) ? data : (data.packs || []);

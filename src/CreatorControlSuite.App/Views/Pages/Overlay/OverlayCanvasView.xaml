@@ -46,7 +46,7 @@
                     Command="{Binding CopyViewUrlCommand}"
                     DockPanel.Dock="Right"
                     Margin="8,0,0,0"/>
-            <TextBox Text="{Binding ViewUrl}"
+            <TextBox Text="{Binding ViewUrl, Mode=OneWay}"
                      IsReadOnly="True"/>
         </DockPanel>
         <TextBlock Text="Editor"
@@ -60,7 +60,7 @@
                     Background="{DynamicResource AccentBrush}"
                     Foreground="{DynamicResource TextOnAccentBrush}"
                     FontWeight="Bold"/>
-            <TextBox Text="{Binding EditorUrl}"
+            <TextBox Text="{Binding EditorUrl, Mode=OneWay}"
                      IsReadOnly="True"/>
         </DockPanel>
         <TextBlock Text="Einzel-Widgets / Shapes (OBS)"

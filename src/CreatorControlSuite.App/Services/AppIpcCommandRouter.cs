@@ -64,7 +64,7 @@ public sealed class AppIpcCommandRouter(
                 });
 
                 return activationSucceeded
-                    ? Ok(command, "Creator Control Suite wurde in den Vordergrund geholt.")
+                    ? Ok(command, "CastingCouch wurde in den Vordergrund geholt.")
                     : new IpcResponse(
                         command.Id,
                         false,

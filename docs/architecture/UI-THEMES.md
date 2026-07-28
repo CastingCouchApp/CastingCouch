@@ -1,6 +1,6 @@
 # UI-Themes
 
-Die Creator Control Suite unterstützt austauschbare App-Shell-Themes (Farben + Fonts). Overlay-/Broadcast-Branding bleibt davon getrennt.
+Die CastingCouch unterstützt austauschbare App-Shell-Themes (Farben + Fonts). Overlay-/Broadcast-Branding bleibt davon getrennt.
 
 ## Auswahl und Persistenz
 
@@ -41,7 +41,7 @@ Theme-IDs fallen weiterhin auf Classic zurück.
 
 Flächen: `WindowBackgroundBrush`, `PanelBackgroundBrush`, `SidebarBackgroundBrush`, `CardBackgroundBrush`, `ElevatedBackgroundBrush`, `InputBackgroundBrush`
 
-Shell-Chrome: Custom Titlebar nutzt `SidebarBackgroundBrush`, `SidebarBorderBrush`, Caption-Hover über Nav-/Danger-Tokens
+Shell-Chrome: Custom Titlebar nutzt `TitleBarBackgroundBrush` (Vertikal-Gradient für leichten 3D-Effekt), `TitleBarHighlightBrush` (obere Highlight-Kante), `TitleBarDividerBrush` (Widget-Trenner), `SidebarBorderBrush`; Caption-Hover über Nav-/Danger-Tokens. TitleBar-Widgets default flach (`TitleBarWidgetStyle` / `TitleBarDividerStyle`); optional Cards über `General.TitleBarWidgetCardsEnabled`. Einzelne Widgets per Rechtsklick-Menü ein-/ausblendbar (`General.TitleBarHiddenWidgets`, Keys in `TitleBarWidgetVisibility`).
 
 Text: `TextPrimaryBrush`, `TextSecondaryBrush`, `TextMutedBrush`, `TextOnAccentBrush`
 

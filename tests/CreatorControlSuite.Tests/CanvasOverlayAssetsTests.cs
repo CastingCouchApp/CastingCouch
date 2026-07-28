@@ -572,6 +572,10 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("/ext/", runtime);
         Assert.Contains("pack.animations", runtime);
         Assert.Contains("updateRegisteredWidget", runtime);
+        Assert.Contains("rewriteCssUrls", runtime);
+        Assert.Contains("script.text", runtime);
+        Assert.Contains("scheduleReconnect", runtime);
+        Assert.Contains("onOpen", runtime);
         Assert.Contains("resolveEffectTarget", runtime);
         Assert.Contains("effectTargets", runtime);
         Assert.Contains("fxTarget", runtime);

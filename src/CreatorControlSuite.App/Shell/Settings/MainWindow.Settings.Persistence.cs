@@ -91,6 +91,7 @@ public partial class MainWindow
         _generalSettingsPageViewModel.Load(
             _settings.Branding,
             _settings.General);
+        ApplyTitleBarChrome();
         _connectionWatchdogTimer.Interval = TimeSpan.FromSeconds(
             Math.Clamp(_settings.General.ConnectionWatchdogSeconds, 5, 300));
         SettingsPageViewHost.DashboardAutoFocusOnStreamStartBox.IsChecked =

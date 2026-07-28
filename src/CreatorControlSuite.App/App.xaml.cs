@@ -83,9 +83,9 @@ public partial class App : Application
                 if (!activated)
                 {
                     MessageBox.Show(
-                        "Creator Control Suite ist bereits gestartet, konnte aber nicht in den Vordergrund geholt werden. " +
+                        "CastingCouch ist bereits gestartet, konnte aber nicht in den Vordergrund geholt werden. " +
                         "Bitte prüfe den Infobereich der Windows-Taskleiste oder beende den vorhandenen Prozess im Task-Manager.",
-                        "Creator Control Suite",
+                        "CastingCouch",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
                 }
@@ -133,7 +133,7 @@ public partial class App : Application
             _appLogger.Write(
                 AppLogLevel.Information,
                 "Application",
-                "Creator Control Suite wurde gestartet.");
+                "CastingCouch wurde gestartet.");
             InstallationTransition installationTransition = await _host.Services.GetRequiredService<IInstallationStateService>()
                 .RegisterStartAsync(GetCurrentProductVersion(), CancellationToken.None);
             _appLogger.Write(AppLogLevel.Information, "Installation",
@@ -214,10 +214,10 @@ public partial class App : Application
             string crashReportPath = await ReportCrashAsync(exception, "Application startup");
 
             MessageBox.Show(
-                "Creator Control Suite konnte nicht gestartet werden.\n\n" +
+                "CastingCouch konnte nicht gestartet werden.\n\n" +
                 exception.Message + "\n\n" +
                 "Crashbericht:\n" + crashReportPath,
-                "Creator Control Suite – Startfehler",
+                "CastingCouch – Startfehler",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
 
@@ -364,7 +364,7 @@ public partial class App : Application
             _appLogger?.Write(
                 AppLogLevel.Information,
                 "Application",
-                "Creator Control Suite wird beendet.");
+                "CastingCouch wird beendet.");
 
             if (_host is not null)
             {
@@ -452,7 +452,7 @@ public partial class App : Application
         MessageBox.Show(
             "Ein unerwarteter Fehler ist aufgetreten.\n\n" +
             "Crashbericht:\n" + path,
-            "Creator Control Suite",
+            "CastingCouch",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
     }

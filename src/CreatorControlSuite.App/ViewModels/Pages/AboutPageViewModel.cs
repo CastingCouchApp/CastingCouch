@@ -7,7 +7,7 @@ public sealed class AboutPageViewModel : ViewModelBase, IPageViewModel
 {
     public AboutPageViewModel()
     {
-        VersionText = "Creator Control Suite " + ResolveVersion();
+        VersionText = "CastingCouch " + ResolveVersion();
     }
 
     public string Key => "about";

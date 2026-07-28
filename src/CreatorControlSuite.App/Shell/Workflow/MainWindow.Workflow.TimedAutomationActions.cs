@@ -159,7 +159,7 @@ public partial class MainWindow
                 },
                 args = new
                 {
-                    source = "Creator Control Suite",
+                    source = "CastingCouch",
                     automationRule = rule.Name
                 }
             });

@@ -24,7 +24,7 @@ Start-Transcript -LiteralPath $Transcript -Force
 try {
     & (Join-Path $PSScriptRoot "Test-CriticalProjectConfiguration.ps1")
 
-    Write-Host "Creator Control Suite 2.0.81 Build Fix 1" -ForegroundColor Cyan
+    Write-Host "CastingCouch 2.0.81 Build Fix 1" -ForegroundColor Cyan
     Write-Host "===========================================" -ForegroundColor Cyan
 
     & (Join-Path $PSScriptRoot "Diagnose-BuildEnvironment.ps1")

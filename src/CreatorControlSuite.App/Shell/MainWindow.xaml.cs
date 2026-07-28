@@ -200,6 +200,7 @@ public partial class MainWindow : Window
         SettingsPageViewHost.MigrationSettingsViewHost.DataContext = _migrationPageViewModel;
         SettingsPageViewHost.LegalSettingsViewHost.DataContext = legalPageViewModel;
         SettingsPageViewHost.GeneralSettingsViewHost.DataContext = _generalSettingsPageViewModel;
+        _generalSettingsPageViewModel.PropertyChanged += GeneralSettingsPageViewModelOnPropertyChanged;
         ServicesPageViewHost.TwitchServiceViewHost.TwitchGoalsViewHost.DataContext = _twitchGoalsPageViewModel;
         _twitchGoalsPageViewModel.SaveRequestedAsync = SaveTwitchGoalsAsync;
         ServicesPageViewHost.SpotifyServiceViewHost.SpotifyAutomationViewHost.DataContext = _spotifyAutomationPageViewModel;

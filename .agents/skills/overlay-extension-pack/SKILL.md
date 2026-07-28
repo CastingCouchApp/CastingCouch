@@ -91,7 +91,8 @@ CcsCanvas.registerAnimation("ext:cool-kit:wobble", {
 });
 ```
 
-Katalog: `GET /extensions` → `{ packs: [...] }`. Loader lädt Widgets/Effects/Animations + Fonts beim Boot.
+Katalog: `GET /extensions` → `{ packs: [...] }`. Loader lädt Widgets/Effects/Animations + Fonts
+beim Boot per **fetch + Inline-Inject** (nicht via `<script src>`/`<link>`-onload — das hängt in OBS-CEF).
 
 **Editor:** Nach `loadExtensions()` erscheinen Pack-Widgets unter `Extension · {Pack-Name}` in der linken Palette. Pack-Effekte/-Animationen landen über `registerEffect`/`registerAnimation` in den Inspector-Dropdowns (`listEffectTypes` / `listAnimationTypes`).
 

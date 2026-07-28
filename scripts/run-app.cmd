@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0.."
-title Creator Control Suite - Build and Run
+title CastingCouch - Build and Run
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0run-app.ps1" %*
 if errorlevel 1 goto :fail

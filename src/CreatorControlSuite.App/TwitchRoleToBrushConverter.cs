@@ -31,7 +31,7 @@ public sealed class TwitchRoleToBrushConverter : IValueConverter
             return new SolidColorBrush(Color.FromRgb(167, 139, 250));
         }
 
-        return Application.Current.TryFindResource("TextPrimaryBrush") as Brush
+        return Application.Current?.TryFindResource("TextPrimaryBrush") as Brush
                ?? Brushes.White;
     }
 

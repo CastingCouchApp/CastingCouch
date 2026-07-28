@@ -547,7 +547,7 @@ public partial class MainWindow : Window
             }
 
             // Die alte DenverJohn-StreamingSuite schreibt periodisch in dieselbe
-            // Overlay/data/overlay-data.json wie die Creator Control Suite. Ein
+            // Overlay/data/overlay-data.json wie die CastingCouch. Ein
             // paralleler Betrieb erzeugt wechselnde connected-/Live-Zustände.
             // Beende ausschließlich Prozesse, deren Befehlszeile exakt auf dieses
             // Legacy-Skript verweist.
@@ -596,7 +596,7 @@ public partial class MainWindow : Window
 
             string markerPath = Path.Combine(legacyRoot, "LEGACY-WRITER-DISABLED.txt");
             await File.WriteAllTextAsync(markerPath,
-                "Die alte DenverJohn StreamingSuite wurde deaktiviert, weil sie parallel zur Creator Control Suite in Overlay\\data\\overlay-data.json geschrieben hat.\r\n" +
+                "Die alte DenverJohn StreamingSuite wurde deaktiviert, weil sie parallel zur CastingCouch in Overlay\\data\\overlay-data.json geschrieben hat.\r\n" +
                 "Dadurch wechselten Spotify- und Live-Status zwischen unterschiedlichen Zuständen.\r\n" +
                 "Deaktiviert am: " + DateTimeOffset.Now.ToString("O"));
 

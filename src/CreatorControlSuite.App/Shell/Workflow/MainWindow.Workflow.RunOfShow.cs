@@ -459,7 +459,7 @@ public partial class MainWindow
     private sealed class RunOfShowExportDocument
     {
         public int FormatVersion { get; set; } = 1;
-        public string Name { get; set; } = "Creator Control Suite Regieplan";
+        public string Name { get; set; } = "CastingCouch Regieplan";
         public DateTimeOffset ExportedAt { get; set; } = DateTimeOffset.Now;
         public List<RunOfShowStepSettings> Steps { get; set; } = [];
     }
@@ -482,7 +482,7 @@ public partial class MainWindow
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
                 Title = "Regieplan exportieren",
-                Filter = "Creator Control Suite Regieplan (*.ccs-regieplan.json)|*.ccs-regieplan.json|JSON-Datei (*.json)|*.json",
+                Filter = "CastingCouch Regieplan (*.ccs-regieplan.json)|*.ccs-regieplan.json|JSON-Datei (*.json)|*.json",
                 DefaultExt = ".ccs-regieplan.json",
                 AddExtension = true,
                 FileName = SanitizeFileName((CurrentRunOfShowPlan()?.Name ?? "Mein-Regieplan") + ".ccs-regieplan.json")
@@ -494,7 +494,7 @@ public partial class MainWindow
 
             var document = new RunOfShowExportDocument
             {
-                Name = CurrentRunOfShowPlan()?.Name ?? "Creator Control Suite Regieplan",
+                Name = CurrentRunOfShowPlan()?.Name ?? "CastingCouch Regieplan",
                 Steps = [.. _runOfShowSteps.Select(
                     RunOfShowPlanService.CloneStep)]
             };
@@ -517,7 +517,7 @@ public partial class MainWindow
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
                 Title = "Regieplan importieren",
-                Filter = "Creator Control Suite Regieplan (*.ccs-regieplan.json;*.json)|*.ccs-regieplan.json;*.json|Alle Dateien (*.*)|*.*",
+                Filter = "CastingCouch Regieplan (*.ccs-regieplan.json;*.json)|*.ccs-regieplan.json;*.json|Alle Dateien (*.*)|*.*",
                 Multiselect = false
             };
             if (dialog.ShowDialog(this) != true)

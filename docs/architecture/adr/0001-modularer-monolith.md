@@ -5,7 +5,7 @@
 
 ## Entscheidung
 
-Creator Control Suite bleibt eine WPF/.NET-10-Anwendung als modularer Monolith.
+CastingCouch bleibt eine WPF/.NET-10-Anwendung als modularer Monolith.
 Core enthält Contracts und reine Policies. Integrationsmodule enthalten jeweils
 einen externen Partner. WPF- und modulübergreifende Use Cases liegen in
 testbaren App-Services.

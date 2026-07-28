@@ -16,7 +16,7 @@ function Add-Line {
     Write-Host $Text
 }
 
-Add-Line "Creator Control Suite Build Environment"
+Add-Line "CastingCouch Build Environment"
 Add-Line "======================================="
 Add-Line "Zeit: $(Get-Date -Format o)"
 Add-Line "Computer: $env:COMPUTERNAME"

@@ -54,8 +54,8 @@ ZIP-Pakete mit zusätzlichen Widgets, Effekten, Animationen und Schriften, ohne 
 - Verwaltung (nur Loopback): `POST /extensions/install` (multipart ZIP), `DELETE /extensions/{packId}`
 - Manifest-Schema (`apiVersion: 1`): `id` (Slug `[a-z0-9-]+`), `name`, `version`, `apiVersion`, `widgets[]`, `effects[]`, optional `animations[]`, `fonts[]`, optional `assets[]`
 - Installation validiert Manifest, erlaubte Dateitypen (`.js,.css,.woff2,.woff,.ttf,.otf,.svg,.png,.jpg,.jpeg,.webp,.gif,.json,.md`), Zip-Slip-Schutz und eine Größenobergrenze (50 MB)
+- Runtime (`/view`, `/w/…`, Editor-Canvas): `loadExtensions()` läuft **vor** dem ersten `setLayout`/`renderItems`; Pack-CSS/-JS per `fetch` + Inline-Inject (OBS-CEF feuert oft kein `<link>`/`<script src>`-`onload`); Pack-`update`-Hooks bei Data-Refresh
 - Editor: Pack-Widgets erscheinen nach Boot automatisch in der linken Palette (`Extension · {Pack}`); Effekte und Animationen nach `registerEffect`/`registerAnimation` in den Inspector-Dropdowns
-- Runtime (`/view`, `/w/…`, Editor-Canvas): `loadExtensions()` läuft **vor** dem ersten `setLayout`/`renderItems`; Pack-CSS wird abgewartet; `update`-Hooks der Pack-Widgets werden bei Data-Refresh aufgerufen
 
 Verwaltung in der Overlay-Seite: Karte „Extension Packs“ (ZIP importieren, deinstallieren). Implementierung: `IOverlayExtensionStore` / `OverlayExtensionStore` in `CreatorControlSuite.Modules.Overlay/Extensions/`.
 

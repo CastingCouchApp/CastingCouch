@@ -1,4 +1,4 @@
-# Creator Control Suite
+# CastingCouch
 
 Windows-Desktop-Suite für Creator-Workflows: Live-Dashboard, OBS, Twitch, Spotify, Alerts, Overlays, Stream Deck und Automatisierung — gebündelt in einer WPF-App.
 

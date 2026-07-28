@@ -1,4 +1,4 @@
-# Creator Control Suite 3.0 architecture migration
+# CastingCouch 3.0 architecture migration
 
 This alpha starts the migration without removing existing functionality.
 

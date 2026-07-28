@@ -1,4 +1,4 @@
-# Creator Control Suite 8.x – Ist- und Zielarchitektur
+# CastingCouch 8.x – Ist- und Zielarchitektur
 
 Stand: 28. Juli 2026
 
@@ -6,7 +6,7 @@ Stand: 28. Juli 2026
 
 ```mermaid
 flowchart LR
-    creator["Creator / Operator"] --> app["Creator Control Suite WPF"]
+    creator["Creator / Operator"] --> app["CastingCouch WPF"]
     app --> obs["OBS WebSocket"]
     app --> twitch["Twitch APIs / EventSub"]
     app --> spotify["Spotify APIs"]

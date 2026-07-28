@@ -33,7 +33,7 @@ public sealed class SupportPackageService(string root, ISettingsStore settings, 
                     warn.Add("overlay-data.json wurde nicht gefunden.");
                 }
             }
-            await File.WriteAllTextAsync(Path.Combine(stage, "support-package-info.txt"), "Creator Control Suite Supportpaket\nVersion: 2.0.81\nOAuth-Tokens und DPAPI-Secrets werden nicht exportiert.", ct);
+            await File.WriteAllTextAsync(Path.Combine(stage, "support-package-info.txt"), "CastingCouch Supportpaket\nVersion: 2.0.81\nOAuth-Tokens und DPAPI-Secrets werden nicht exportiert.", ct);
             if (File.Exists(target))
             {
                 File.Delete(target);

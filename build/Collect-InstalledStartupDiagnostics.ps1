@@ -1,14 +1,14 @@
 $ErrorActionPreference = "Continue"
 $Out = Join-Path $env:USERPROFILE "Desktop\CreatorControlSuite-StartupDiagnostics.txt"
 $Lines = New-Object System.Collections.Generic.List[string]
-$Lines.Add("Creator Control Suite Startup Diagnostics")
+$Lines.Add("CastingCouch Startup Diagnostics")
 $Lines.Add("Time: $(Get-Date -Format o)")
 $Lines.Add("")
 
 $Candidates = @(
-    "$env:ProgramFiles\Creator Control Suite\CreatorControlSuite.exe",
+    "$env:ProgramFiles\CastingCouch\CreatorControlSuite.exe",
     "$env:ProgramFiles\CreatorControlSuite\CreatorControlSuite.exe",
-    "${env:ProgramFiles(x86)}\Creator Control Suite\CreatorControlSuite.exe"
+    "${env:ProgramFiles(x86)}\CastingCouch\CreatorControlSuite.exe"
 )
 
 foreach($Candidate in $Candidates) {

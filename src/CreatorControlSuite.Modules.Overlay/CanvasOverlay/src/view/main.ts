@@ -8,6 +8,13 @@
     instanceId
   });
 
+  async function refreshChat(): Promise<void> {
+    try {
+      runtime.setChatConfig(await CcsCanvas.fetchJson("/chat/config"));
+    } catch { /* optional */ }
+    await runtime.loadChatHistory();
+  }
+
   async function boot(): Promise<void> {
     await CcsCanvas.loadExtensions();
     if (instanceId) {
@@ -20,11 +27,16 @@
     try {
       runtime.setData(await CcsCanvas.fetchJson("/data/overlay-data.json") as Record<string, unknown>);
     } catch { /* ignore */ }
-    try {
-      runtime.setChatConfig(await CcsCanvas.fetchJson("/chat/config"));
-    } catch { /* ignore */ }
-    await runtime.loadChatHistory();
-    CcsCanvas.connectWs((evt) => runtime.handleRealtime(evt));
+
+    CcsCanvas.connectWs(
+      (evt) => runtime.handleRealtime(evt),
+      {
+        onOpen: () => {
+          void refreshChat();
+        }
+      }
+    );
+
     setInterval(async () => {
       try {
         runtime.setData(await CcsCanvas.fetchJson("/data/overlay-data.json") as Record<string, unknown>);

@@ -19,6 +19,7 @@ public sealed class GeneralSettingsPageViewModelTests
         var general = new GeneralSettings
         {
             ThemeId = "pink-cage-flair",
+            TitleBarWidgetCardsEnabled = true,
             ConnectionWatchdogSeconds = 42,
             ReconnectSpotify = false
         };
@@ -28,6 +29,7 @@ public sealed class GeneralSettingsPageViewModelTests
         Assert.Equal("Stream", viewModel.DisplayName);
         Assert.Equal("42", viewModel.ConnectionWatchdogSeconds);
         Assert.False(viewModel.ReconnectSpotify);
+        Assert.True(viewModel.TitleBarWidgetCardsEnabled);
         Assert.Equal("pink-cage-flair", viewModel.SelectedTheme?.Id);
         Assert.Equal("pink-cage-flair", themes.LastAppliedThemeId);
     }
@@ -41,6 +43,7 @@ public sealed class GeneralSettingsPageViewModelTests
                 DisplayName = " Stream ",
                 ChannelName = " channel ",
                 SelectedTheme = ThemeCatalog.Resolve("arctic-glass-lab"),
+                TitleBarWidgetCardsEnabled = true,
                 ConnectionWatchdogSeconds = "999",
                 ReconnectObs = false,
                 ReconnectTwitch = true
@@ -53,6 +56,7 @@ public sealed class GeneralSettingsPageViewModelTests
         Assert.Equal("Stream", branding.DisplayName);
         Assert.Equal("channel", branding.ChannelName);
         Assert.Equal("arctic-glass-lab", general.ThemeId);
+        Assert.True(general.TitleBarWidgetCardsEnabled);
         Assert.Equal(300, general.ConnectionWatchdogSeconds);
         Assert.False(general.ReconnectObs);
         Assert.True(general.ReconnectTwitch);
@@ -69,6 +73,30 @@ public sealed class GeneralSettingsPageViewModelTests
 
         Assert.Equal("neon-night-market", themes.LastAppliedThemeId);
         Assert.Contains("Lime", viewModel.ThemeDescription);
+    }
+
+    [Fact]
+    public void TitleBarWidgetCardsEnabled_DefaultsToFalseAndRaisesPropertyChanged()
+    {
+        var viewModel = new GeneralSettingsPageViewModel(new FakeThemeService());
+        var changed = new List<string>();
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is not null)
+            {
+                changed.Add(e.PropertyName);
+            }
+        };
+
+        Assert.False(viewModel.TitleBarWidgetCardsEnabled);
+        Assert.False(new GeneralSettings().TitleBarWidgetCardsEnabled);
+
+        viewModel.TitleBarWidgetCardsEnabled = true;
+
+        Assert.True(viewModel.TitleBarWidgetCardsEnabled);
+        Assert.Contains(
+            nameof(GeneralSettingsPageViewModel.TitleBarWidgetCardsEnabled),
+            changed);
     }
 
     private sealed class FakeThemeService : IThemeSelectionService

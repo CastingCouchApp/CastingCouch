@@ -112,7 +112,7 @@ public partial class MainWindow : Window
     {
         MessageBox.Show(
             $"{feature} ist in dieser Alpha bereits in der Oberfläche vorbereitet und wird im nächsten Modul-Meilenstein produktiv angeschlossen.",
-            "Creator Control Suite",
+            "CastingCouch",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
     }

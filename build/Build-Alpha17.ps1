@@ -22,7 +22,7 @@ $Transcript = Join-Path $TriageRoot "alpha17-build-$Timestamp.txt"
 Start-Transcript -LiteralPath $Transcript -Force
 
 try {
-    Write-Host "Creator Control Suite 2.0.81 Build" -ForegroundColor Cyan
+    Write-Host "CastingCouch 2.0.81 Build" -ForegroundColor Cyan
     Write-Host "====================================" -ForegroundColor Cyan
 
     & (Join-Path $PSScriptRoot "Diagnose-BuildEnvironment.ps1")

@@ -184,40 +184,6 @@
     root.innerHTML = `<div class="line status">${escapeHtml(text)}</div>`;
   }
 
-  function connect() {
-    const socket = new WebSocket(wsUrl());
-
-    socket.addEventListener("message", (event) => {
-      let payload;
-      try {
-        payload = JSON.parse(event.data);
-      } catch {
-        return;
-      }
-
-      if (payload?.source === "twitch" && payload?.type === "channel.chat.message") {
-        appendMessage(payload.data || {});
-        return;
-      }
-
-      if (
-        showTwitchEvents &&
-        payload?.source === "twitch" &&
-        eventTypes.has(payload?.type)
-      ) {
-        appendEvent(payload);
-      }
-    });
-
-    socket.addEventListener("close", () => {
-      setTimeout(connect, 1500);
-    });
-
-    socket.addEventListener("error", () => {
-      try { socket.close(); } catch { /* ignore */ }
-    });
-  }
-
   async function loadConfig() {
     try {
       const response = await fetch("/chat/config", { cache: "no-store" });
@@ -250,8 +216,44 @@
     }
   }
 
+  function connect() {
+    const socket = new WebSocket(wsUrl());
+
+    socket.addEventListener("open", () => {
+      void loadConfig().then(loadHistory);
+    });
+
+    socket.addEventListener("message", (event) => {
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      if (payload?.source === "twitch" && payload?.type === "channel.chat.message") {
+        appendMessage(payload.data || {});
+        return;
+      }
+
+      if (
+        showTwitchEvents &&
+        payload?.source === "twitch" &&
+        eventTypes.has(payload?.type)
+      ) {
+        appendEvent(payload);
+      }
+    });
+
+    socket.addEventListener("close", () => {
+      setTimeout(connect, 1500);
+    });
+
+    socket.addEventListener("error", () => {
+      try { socket.close(); } catch { /* ignore */ }
+    });
+  }
+
   setStatus("Verbinde…");
-  loadConfig()
-    .then(loadHistory)
-    .finally(connect);
+  connect();
 })();

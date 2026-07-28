@@ -24,7 +24,6 @@
   }
 
   async function boot(): Promise<void> {
-    // Pack registerWidget/CSS must run before the first render.
     await CcsCanvas.loadExtensions();
 
     const kind = (type === "frame" || type.startsWith("frame.") || type.startsWith("shape.") || type === "shape.vignette" || type === "shape.scene-bg")
@@ -60,20 +59,30 @@
 
     runtime.setLayout(layout as never);
 
+    async function refreshChat(): Promise<void> {
+      try {
+        runtime.setChatConfig(await CcsCanvas.fetchJson("/chat/config"));
+      } catch { /* ignore */ }
+      await runtime.loadChatHistory();
+    }
+
     async function refreshData(): Promise<void> {
       try {
         runtime.setData(await CcsCanvas.fetchJson("/data/overlay-data.json") as Record<string, unknown>);
       } catch { /* ignore */ }
     }
 
-    CcsCanvas.connectWs((evt) => runtime.handleRealtime(evt));
+    CcsCanvas.connectWs(
+      (evt) => runtime.handleRealtime(evt),
+      {
+        onOpen: () => {
+          void refreshChat();
+        }
+      }
+    );
+
     void refreshData();
     setInterval(refreshData, 1500);
-
-    try {
-      runtime.setChatConfig(await CcsCanvas.fetchJson("/chat/config"));
-    } catch { /* ignore */ }
-    await runtime.loadChatHistory();
   }
 
   void boot();

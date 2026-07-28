@@ -254,12 +254,12 @@ public sealed class SpotifyOAuthClient(HttpClient httpClient, IAppLogger logger)
 
         string html =
             "<!doctype html><html><head><meta charset=\"utf-8\">" +
-            "<title>Creator Control Suite</title></head>" +
+            "<title>CastingCouch</title></head>" +
             "<body style=\"font-family:Segoe UI;background:#101010;" +
             "color:white;display:grid;place-items:center;height:100vh\">" +
             "<div style=\"max-width:650px;padding:32px;border:1px solid #444;" +
             "border-radius:12px;background:#181818\">" +
-            "<h1 style=\"color:" + color + "\">Creator Control Suite</h1>" +
+            "<h1 style=\"color:" + color + "\">CastingCouch</h1>" +
             "<p style=\"font-size:18px\">" +
             WebUtility.HtmlEncode(message) +
             "</p></div></body></html>";
