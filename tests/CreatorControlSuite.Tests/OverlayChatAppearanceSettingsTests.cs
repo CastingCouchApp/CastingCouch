@@ -28,7 +28,7 @@ public sealed class OverlayChatAppearanceSettingsTests
         Assert.Equal(0, chat.BorderRadiusPx);
         Assert.Equal(48, chat.GapPx);
         Assert.Equal("#112233", chat.BackgroundColor);
-        Assert.Equal(1000, chat.MaxBufferedMessages);
+        Assert.Equal(2000, chat.MaxBufferedMessages);
         Assert.Equal(72, chat.FontSizePx);
         Assert.Equal("Arial", chat.FontFamily);
     }

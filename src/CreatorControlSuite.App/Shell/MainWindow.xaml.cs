@@ -490,8 +490,6 @@ public partial class MainWindow : Window
 
     private sealed record TwitchRewardRedemptionItem(TwitchRewardRedemption Redemption)
     {
-        public string DisplayText => $"{Redemption.UserDisplayName} · {Redemption.RewardTitle}" +
-            (string.IsNullOrWhiteSpace(Redemption.UserInput) ? "" : $" · {Redemption.UserInput}");
+        public string DisplayText => $"{Redemption.UserDisplayName} · {Redemption.RewardTitle}" + (string.IsNullOrWhiteSpace(Redemption.UserInput) ? "" : $" · {Redemption.UserInput}");
     }
-
 }

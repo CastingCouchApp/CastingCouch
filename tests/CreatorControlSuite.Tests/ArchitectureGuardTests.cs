@@ -22,6 +22,7 @@ public sealed class ArchitectureGuardTests
                      sourceRoot,
                      "*",
                      SearchOption.AllDirectories)
+                 .Where(IsTrackedSourcePath)
                  .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
                                 path.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase)))
         {
@@ -911,6 +912,7 @@ public sealed class ArchitectureGuardTests
         ];
         string[] sourceFiles = Directory
             .EnumerateFiles(sourceRoot, "*", SearchOption.AllDirectories)
+            .Where(IsTrackedSourcePath)
             .Where(path =>
                 path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
                 || path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
@@ -1297,6 +1299,17 @@ public sealed class ArchitectureGuardTests
                 "Shell",
                 "MainWindow.xaml")).Count() < 1_000,
             "MainWindow.xaml muss dauerhaft unter 1.000 Zeilen bleiben.");
+    }
+
+    private static bool IsTrackedSourcePath(string path)
+    {
+        string[] segments = path.Split(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        return !segments.Any(segment =>
+            segment.Equals("bin", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("obj", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("artifacts", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string FindRepositoryRoot()
