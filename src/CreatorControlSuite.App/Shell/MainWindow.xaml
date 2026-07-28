@@ -11,6 +11,11 @@
         xmlns:migration="clr-namespace:CreatorControlSuite.App.Views.Pages.Migration"
         xmlns:legal="clr-namespace:CreatorControlSuite.App.Views.Pages.Legal"
         xmlns:settings="clr-namespace:CreatorControlSuite.App.Views.Pages.Settings"
+        xmlns:twitchgoals="clr-namespace:CreatorControlSuite.App.Views.Pages.Twitch"
+        xmlns:spotify="clr-namespace:CreatorControlSuite.App.Views.Pages.Spotify"
+        xmlns:workflow="clr-namespace:CreatorControlSuite.App.Views.Pages.Workflow"
+        xmlns:overlayconfig="clr-namespace:CreatorControlSuite.App.Views.Pages.Overlay"
+        xmlns:alertsview="clr-namespace:CreatorControlSuite.App.Views.Pages.Alerts"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         x:Class="CreatorControlSuite.App.Shell.MainWindow"
         Title="Creator Control Suite"
@@ -464,7 +469,7 @@
                             <Button x:Name="ServicesStreamDeckButton" Content="▦   Stream Deck" Style="{StaticResource SidebarNavButtonStyle}" Padding="16,9"/>
                         </StackPanel>
                         <Button x:Name="WorkflowButton" Content="✣   Automatisierung" Style="{StaticResource SidebarNavButtonStyle}"/>
-                        <Button x:Name="MultiPcButton" Content="▣   Multi-PC" Style="{StaticResource SidebarNavButtonStyle}"/>
+                        <Button x:Name="MultiPcButton" Content="▣   Multi-PC (Alpha)" Style="{StaticResource SidebarNavButtonStyle}"/>
                         <Button x:Name="StatisticsButton" Content="▥   Statistiken" Style="{StaticResource SidebarNavButtonStyle}"/>
                         <Button x:Name="OverlaysButton" Content="▱   Overlays" Style="{StaticResource SidebarNavButtonStyle}"/>
                         <Button x:Name="AlertsButton" Content="♧   Alerts" Style="{StaticResource SidebarNavButtonStyle}"/>
@@ -1377,48 +1382,7 @@
                                 <Slider x:Name="ServicesSpotifyVolumeSlider" Minimum="0" Maximum="100" Value="100" TickFrequency="1" IsSnapToTickEnabled="False" Width="420" HorizontalAlignment="Left" ToolTip="Spotify-Lautstärke wird während des Verschiebens live geändert"/>
                                 <TextBlock x:Name="ServicesSpotifyVolumeText" Text="100 %" Foreground="{DynamicResource MutedBrush}" Margin="4,4,0,0"/>
                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
-                                    <StackPanel>
-                                        <TextBlock Text="Spotify-Automatik" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                                        <TextBlock Text="Startplaylist" Margin="0,12,0,5"/>
-                                        <ComboBox x:Name="ServicesSpotifyStartPlaylistBox" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}" Background="{DynamicResource TextMutedBrush}" MinWidth="360" HorizontalAlignment="Left"/>
-                                        <CheckBox x:Name="ServicesSpotifyAutoStartOnStreamBox" Content="Startplaylist beim Streamstart automatisch starten" Foreground="#FFFFFF" Margin="0,10,0,0"/>
-                                        <CheckBox x:Name="ServicesSpotifyEndMusicBox" Content="Startplaylist auch beim Wechsel in die Endszene starten" Foreground="#FFFFFF" Margin="0,7,0,0"/>
-                                        <CheckBox x:Name="ServicesSpotifyPauseOnStreamEndBox" Content="Spotify nach dem tatsächlichen Streamende pausieren" Foreground="#FFFFFF" Margin="0,7,0,0"/>
-                                        <TextBlock Text="Die Endmusik startet vor dem Endszene-Countdown. Nach dem Stoppen des OBS-Streams kann Spotify automatisch pausiert werden." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="22,5,0,0"/>
-                                        <Separator Margin="0,14,0,12"/>
-                                        <TextBlock Text="Beim Wechsel Start → Game" Foreground="#FFFFFF" FontWeight="SemiBold"/>
-                                        <CheckBox x:Name="ServicesSpotifySetLiveVolumeBox" Content="Spotify-Lautstärke automatisch setzen" Foreground="#FFFFFF" Margin="0,9,0,0"/>
-                                        <WrapPanel Margin="22,8,0,0">
-                                            <TextBlock Text="Lautstärke" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="ServicesSpotifyLiveVolumeBox" Width="70" Text="75" Margin="8,0,4,0"/>
-                                            <TextBlock Text="%" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                                        </WrapPanel>
-
-                                        <Separator Margin="0,14,0,12"/>
-                                        <TextBlock Text="Während Alerts" Foreground="#FFFFFF" FontWeight="SemiBold"/>
-                                        <CheckBox x:Name="ServicesSpotifyMuteDuringAlertsBox" Content="Spotify während Alerts automatisch leiser machen" Foreground="#FFFFFF" Margin="0,9,0,0"/>
-                                        <Grid Margin="22,9,0,0" Width="430" HorizontalAlignment="Left">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="190"/><ColumnDefinition Width="80"/><ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Lautstärke während Alert" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="ServicesSpotifyAlertVolumeBox" Grid.Column="1" Width="70" Text="50"/>
-                                            <TextBlock Grid.Column="2" Text="%" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                        </Grid>
-                                        <Grid Margin="22,8,0,0" Width="430" HorizontalAlignment="Left">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="190"/><ColumnDefinition Width="80"/><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Absenken in" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="ServicesSpotifyAlertFadeOutMsBox" Grid.Column="1" Width="70" Text="500"/>
-                                            <TextBlock Grid.Column="2" Text="ms · zurück in" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="ServicesSpotifyAlertFadeInMsBox" Grid.Column="3" Width="70" Text="500"/>
-                                        </Grid>
-                                        <TextBlock Text="Nach dem letzten Alert wird die Lautstärke auf den Wert vor dem Alert zurückgestellt. Pausierte Musik bleibt unverändert." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="22,6,0,0"/>
-                                        <TextBlock x:Name="ServicesSpotifyAlertMuteStatusText" Text="Bereit" Foreground="{DynamicResource TextSecondaryBrush}" Margin="22,8,0,0"/>
-
-                                        <Button x:Name="ServicesSpotifySaveAutomationButton" Content="SPOTIFY-AUTOMATIK SPEICHERN" HorizontalAlignment="Left" Margin="0,14,0,0"/>
-                                    </StackPanel>
+                                    <spotify:SpotifyAutomationView x:Name="SpotifyAutomationViewHost"/>
                                 </Border>
                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
                                     <StackPanel>
@@ -1844,44 +1808,7 @@
                                     </StackPanel>
                                 </Border>
                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
-                                    <StackPanel>
-                                        <TextBlock Text="Stream-Ziele &amp; Overlay-Content" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
-                                        <TextBlock Text="Hier legst du die Ziele fest. Die aktuellen Follower- und Sub-Zahlen werden nach der Twitch-Verbindung automatisch aktualisiert. Die Ziel-Overlays werden in einer eigenen OBS-Szene angelegt. Diese Szene kannst du anschließend in beliebigen OBS-Szenen als Szenenquelle verwenden." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,12"/>
-
-                                        <StackPanel Margin="0,0,0,12">
-                                            <TextBlock Text="OBS-Szene für Ziele &amp; Overlay-Daten" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            <TextBox x:Name="GoalOverlaySceneBox" Width="280"/>
-                                        </StackPanel>
-
-                                        <TextBlock Text="Follower-Ziel" FontWeight="SemiBold" Margin="0,4,0,5"/>
-                                        <WrapPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="FollowerGoalTitleBox" Width="150"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="FollowerGoalCurrentBox" Width="80" ToolTip="Wird bei Twitch-Verbindung automatisch aktualisiert"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="FollowerGoalTargetBox" Width="80"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="FollowerGoalFontBox" Width="150"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="FollowerGoalFontSizeBox" Width="70"/></StackPanel>
-                                        </WrapPanel>
-
-                                        <TextBlock Text="Sub-Ziel" FontWeight="SemiBold" Margin="0,8,0,5"/>
-                                        <WrapPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="SubGoalTitleBox" Width="150"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="SubGoalCurrentBox" Width="80" ToolTip="Wird bei Twitch-Verbindung automatisch aktualisiert"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="SubGoalTargetBox" Width="80"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="SubGoalFontBox" Width="150"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="SubGoalFontSizeBox" Width="70"/></StackPanel>
-                                        </WrapPanel>
-
-                                        <TextBlock Text="Donation-Ziel" FontWeight="SemiBold" Margin="0,8,0,5"/>
-                                        <WrapPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="DonationGoalTitleBox" Width="150"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="DonationGoalCurrentBox" Width="80"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="DonationGoalTargetBox" Width="80"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Währung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="DonationGoalCurrencyBox" Width="70"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="DonationGoalFontBox" Width="150"/></StackPanel>
-                                            <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox x:Name="DonationGoalFontSizeBox" Width="70"/></StackPanel>
-                                        </WrapPanel>
-                                        <Button x:Name="SaveTwitchGoalsButton" Content="ZIELE SPEICHERN &amp; OVERLAY-DATEN AKTUALISIEREN" HorizontalAlignment="Left" Margin="0,10,0,0"/>
-                                    </StackPanel>
+                                    <twitchgoals:TwitchGoalsView x:Name="TwitchGoalsViewHost"/>
                                 </Border>
                             </StackPanel>
                         </ScrollViewer>
@@ -2545,136 +2472,14 @@
                 </StackPanel>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Grid.Row="1" Margin="0,18,0,18">
                     <StackPanel Margin="18">
-                        <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,0,0,16">
-                            <StackPanel>
-                                <TextBlock Text="Overlay-Webserver" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                <TextBlock Text="OBS-Browserquellen nutzen http://127.0.0.1:&lt;Port&gt;/o/&lt;id&gt;/… Live-Events über ws://127.0.0.1:&lt;Port&gt;/ws." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,10"/>
-                                <CheckBox x:Name="OverlayWebServerEnabledBox" Content="Webserver aktivieren" Margin="0,0,0,8"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="80"/>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Port" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayWebServerPortBox" Grid.Column="1"/>
-                                    <TextBox x:Name="OverlayWebServerUrlBox" Grid.Column="2" IsReadOnly="True" Margin="12,0,0,0"/>
-                                    <Button x:Name="CopyOverlayWebServerUrlButton" Grid.Column="3" Content="WS-BASE KOPIEREN" Margin="8,0,0,0"/>
-                                </Grid>
-                                <TextBlock x:Name="OverlayWebServerStatusText" Text="Webserver: –" Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Border>
+                        <overlayconfig:OverlayConnectionSettingsView
+                            x:Name="OverlayConnectionSettingsViewHost"/>
 
-                        <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,0,0,16">
-                            <StackPanel>
-                                <TextBlock Text="Chat-Overlay" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                <TextBlock Text="Eingebaute Seite unter /chat. Nachrichten inkl. Emotes kommen über denselben WebSocket (/ws)." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,10"/>
-                                <CheckBox x:Name="OverlayChatEnabledBox" Content="Chat-Overlay aktiv" Margin="0,0,0,8"/>
-                                <CheckBox x:Name="OverlayChatShowEventsBox" Content="Twitch-Events einblenden (Follow, Sub, Raid, …)" Margin="0,0,0,8"/>
-                                <CheckBox x:Name="OverlayChatBttvBox" Content="BTTV-Emotes" Margin="0,0,0,4"/>
-                                <CheckBox x:Name="OverlayChatFfzBox" Content="FrankerFaceZ-Emotes" Margin="0,0,0,4"/>
-                                <CheckBox x:Name="OverlayChatSevenTvBox" Content="7TV-Emotes" Margin="0,0,0,12"/>
+                        <overlayconfig:OverlayCanvasView
+                            x:Name="OverlayCanvasViewHost"/>
 
-                                <TextBlock Text="Darstellung" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="140"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Text="Hintergrund" VerticalAlignment="Center"/>
-                                    <ComboBox x:Name="OverlayChatBackgroundTypeBox" Grid.Column="1" Margin="0,0,0,6">
-                                        <ComboBoxItem Content="Keiner (transparent)" Tag="None"/>
-                                        <ComboBoxItem Content="Farbe" Tag="Color"/>
-                                        <ComboBoxItem Content="Bild" Tag="Image"/>
-                                    </ComboBox>
-                                    <TextBlock Text="Farbe" Grid.Row="1" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayChatBackgroundColorBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,6" ToolTip="#RRGGBB"/>
-                                    <TextBlock Text="Bild" Grid.Row="2" VerticalAlignment="Center"/>
-                                    <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,6">
-                                        <Button x:Name="BrowseOverlayChatBackgroundButton" Content="Durchsuchen…" DockPanel.Dock="Right" Margin="8,0,0,0"/>
-                                        <TextBox x:Name="OverlayChatBackgroundImageBox"/>
-                                    </DockPanel>
-                                    <TextBlock Text="Transparenz %" Grid.Row="3" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayChatBackgroundOpacityBox" Grid.Row="3" Grid.Column="1" Margin="0,0,0,6" ToolTip="0–100, nur Hintergrund"/>
-                                    <TextBlock Text="Padding px" Grid.Row="4" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayChatPaddingBox" Grid.Row="4" Grid.Column="1" Margin="0,0,0,6"/>
-                                    <TextBlock Text="Eckenradius px" Grid.Row="5" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayChatRadiusBox" Grid.Row="5" Grid.Column="1" Margin="0,0,0,6"/>
-                                    <TextBlock Text="Abstand px" Grid.Row="6" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayChatGapBox" Grid.Row="6" Grid.Column="1" Margin="0,0,0,6"/>
-                                    <TextBlock Text="Schriftgröße px" Grid.Row="7" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayChatFontSizeBox" Grid.Row="7" Grid.Column="1" Margin="0,0,0,6" ToolTip="8–72"/>
-                                    <TextBlock Text="Schriftart" Grid.Row="8" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="OverlayChatFontFamilyBox" Grid.Row="8" Grid.Column="1" ToolTip="z. B. Segoe UI, Arial, Impact"/>
-                                </Grid>
-
-                                <Grid Margin="0,10,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="OverlayChatUrlBox" IsReadOnly="True"/>
-                                    <Button x:Name="CopyOverlayChatUrlButton" Grid.Column="1" Content="URL KOPIEREN" Margin="8,0,0,0"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <TextBlock Text="Canvas Overlay" Foreground="{DynamicResource AccentBrush}" Margin="0,6,0,6" FontWeight="Bold"/>
-                        <TextBlock Text="Mehrere benannte Canvases für OBS (/view/…id…). Pro Design eine Browserquelle; Layout im Editor bearbeiten." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                        <StackPanel>
-                            <TextBlock Text="Canvas" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
-                            <DockPanel Margin="0,0,0,10">
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
-                                    <Button x:Name="NewOverlayCanvasButton" Content="NEU" Margin="0,0,6,0" Padding="10,4"/>
-                                    <Button x:Name="RenameOverlayCanvasButton" Content="UMBENENNEN" Margin="0,0,6,0" Padding="10,4"/>
-                                    <Button x:Name="DuplicateOverlayCanvasButton" Content="DUPLIZIEREN" Margin="0,0,6,0" Padding="10,4"/>
-                                    <Button x:Name="DeleteOverlayCanvasButton" Content="LÖSCHEN" Padding="10,4"/>
-                                </StackPanel>
-                                <ComboBox x:Name="OverlayCanvasCombo" IsEditable="False" DisplayMemberPath="Name"/>
-                            </DockPanel>
-                            <TextBlock Text="Canvas View (OBS)" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
-                            <DockPanel Margin="0,0,0,10">
-                                <Button x:Name="CopyOverlayViewUrlButton" Content="VIEW KOPIEREN" DockPanel.Dock="Right" Margin="8,0,0,0"/>
-                                <TextBox x:Name="OverlayViewUrlBox" IsReadOnly="True"/>
-                            </DockPanel>
-                            <TextBlock Text="Editor" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
-                            <DockPanel Margin="0,0,0,10">
-                                <Button x:Name="OpenOverlayEditorButton" Content="EDITOR ÖFFNEN" DockPanel.Dock="Right" Margin="8,0,0,0"
-                                        Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
-                                <TextBox x:Name="OverlayEditorUrlBox" IsReadOnly="True"/>
-                            </DockPanel>
-                            <TextBlock Text="Einzel-Widgets / Shapes (OBS)" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
-                            <DockPanel>
-                                <Button x:Name="CopyOverlayWidgetUrlButton" Content="URL KOPIEREN" DockPanel.Dock="Right" Margin="8,0,0,0"/>
-                                <ComboBox x:Name="OverlayWidgetUrlCombo" IsEditable="False"/>
-                            </DockPanel>
-                        </StackPanel>
-
-                        <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,16,0,0">
-                            <StackPanel>
-                                <TextBlock Text="Extension Packs" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                                <TextBlock Text="ZIP-Pakete mit zusätzlichen Widgets, Effekten und Schriften. Installierte Packs werden unter /extensions und /ext/&lt;id&gt;/… ausgeliefert." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,10"/>
-                                <ListBox x:Name="OverlayExtensionPacksList" Height="120"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                    <Button x:Name="ImportOverlayExtensionPackButton" Content="ZIP IMPORTIEREN" Margin="0,0,6,0" Padding="10,4"/>
-                                    <Button x:Name="UninstallOverlayExtensionPackButton" Content="DEINSTALLIEREN" Padding="10,4"/>
-                                </StackPanel>
-                                <TextBlock x:Name="OverlayExtensionPacksStatusText" Text="Keine Extension Packs installiert." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                            </StackPanel>
-                        </Border>
-                        <TextBlock x:Name="OverlayStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,14,0,0"/>
+                        <overlayconfig:OverlayExtensionPacksView
+                            x:Name="OverlayExtensionPacksViewHost"/>
                     </StackPanel>
                 </ScrollViewer>
                 <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
@@ -2693,45 +2498,26 @@
                 </StackPanel>
                 <Grid Grid.Row="1" Margin="0,18,0,18">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="18">
-            <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="Alert-Bibliothek" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="17"/>
-                        <TextBlock Text="Gespeicherte Alerts auswählen, aktivieren, duplizieren oder löschen." Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,8"/>
-                        <ListBox x:Name="AlertLibraryList" MinHeight="120" MaxHeight="220" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" DisplayMemberPath="DisplayName"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="12,24,0,0" MinWidth="190">
-                        <Button x:Name="NewAlertDefinitionButton" Content="NEUER ALERT" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
-                        <Button x:Name="DuplicateAlertDefinitionButton" Content="DUPLIZIEREN" Margin="0,8,0,0"/>
-                        <Button x:Name="ToggleAlertDefinitionButton" Content="AKTIV / INAKTIV" Margin="0,8,0,0"/>
-                        <Button x:Name="DeleteAlertDefinitionButton" Content="LÖSCHEN" Background="#7A3838" Margin="0,8,0,0"/>
-                        <TextBlock x:Name="AlertLibraryStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
+        <StackPanel x:Name="AlertsContentPanel" Margin="18">
+            <alertsview:AlertLibraryView x:Name="AlertLibraryViewHost"/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Margin="0,0,8,0">
+                <StackPanel x:Name="AlertDesignerPanel" Margin="0,0,8,0">
                     <TextBlock Text="Alert Designer" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="17"/>
                     <TextBlock Text="Alert-Typ" Margin="0,12,0,6"/>
                     <ComboBox x:Name="AlertTypeBox"/>
                     <TextBlock Text="Textvorlage" Margin="0,12,0,6"/>
-                    <TextBox x:Name="AlertTextTemplateBox"/>
+                    <TextBox x:Name="AlertTextTemplateBox" Text="{Binding TextTemplate, UpdateSourceTrigger=PropertyChanged}"/>
                     <TextBlock Text="MP4 / Medienpfad" Margin="0,12,0,6"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="AlertMediaPathBox"/>
+                        <TextBox x:Name="AlertMediaPathBox" Text="{Binding MediaPath, UpdateSourceTrigger=PropertyChanged}"/>
                         <Button x:Name="BrowseAlertMediaButton" Grid.Column="1" Content="Durchsuchen..." Margin="8,0,0,0"/>
                     </Grid>
                     <TextBlock Text="Soundpfad" Margin="0,12,0,6"/>
@@ -2740,7 +2526,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="AlertSoundPathBox"/>
+                        <TextBox x:Name="AlertSoundPathBox" Text="{Binding SoundPath, UpdateSourceTrigger=PropertyChanged}"/>
                         <Button x:Name="BrowseAlertSoundButton" Grid.Column="1" Content="Durchsuchen..." Margin="8,0,0,0"/>
                     </Grid>
                     <TextBlock Text="Audioausgabe" Margin="0,12,0,6"/>
@@ -2749,7 +2535,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <ComboBox x:Name="AlertAudioOutputDeviceBox" DisplayMemberPath="FriendlyName" SelectedValuePath="ID"/>
+                        <ComboBox x:Name="AlertAudioOutputDeviceBox" DisplayMemberPath="FriendlyName" SelectedValuePath="ID" SelectedValue="{Binding AudioOutputDeviceId, UpdateSourceTrigger=PropertyChanged}"/>
                         <Button x:Name="RefreshAlertAudioDevicesButton" Grid.Column="1" Content="Neu einlesen" Margin="8,0,0,0"/>
                     </Grid>
                     <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0">
@@ -2757,10 +2543,10 @@
                             <TextBlock Text="Audioausschnitt festlegen" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
                             <MediaElement x:Name="AlertAudioPreviewMedia" Height="0" LoadedBehavior="Manual" UnloadedBehavior="Stop" MediaOpened="AlertAudioPreviewMedia_OnMediaOpened"/>
                             <TextBlock Text="Start des Ausschnitts" Margin="0,8,0,3"/>
-                            <Slider x:Name="AlertAudioStartSlider" Minimum="0" Maximum="1" ValueChanged="AlertAudioTrimSlider_OnValueChanged"/>
+                            <Slider x:Name="AlertAudioStartSlider" Minimum="0" Maximum="1" Value="{Binding SoundStartSeconds, UpdateSourceTrigger=PropertyChanged}" ValueChanged="AlertAudioTrimSlider_OnValueChanged"/>
                             <TextBlock x:Name="AlertAudioStartText" Text="Start: 00:00.000" Foreground="{DynamicResource MutedBrush}"/>
                             <TextBlock Text="Ende des Ausschnitts" Margin="0,8,0,3"/>
-                            <Slider x:Name="AlertAudioEndSlider" Minimum="0" Maximum="1" Value="1" ValueChanged="AlertAudioTrimSlider_OnValueChanged"/>
+                            <Slider x:Name="AlertAudioEndSlider" Minimum="0" Maximum="1" Value="{Binding SoundEndSeconds, UpdateSourceTrigger=PropertyChanged}" ValueChanged="AlertAudioTrimSlider_OnValueChanged"/>
                             <TextBlock x:Name="AlertAudioEndText" Text="Ende: 00:00.000" Foreground="{DynamicResource MutedBrush}"/>
                             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                 <Button x:Name="PlayAlertAudioSelectionButton" Content="Ausschnitt anhören"/>
@@ -2778,9 +2564,9 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Dauer" VerticalAlignment="Center"/>
-                        <TextBox x:Name="AlertDurationBox" Grid.Column="1"/>
+                        <TextBox x:Name="AlertDurationBox" Grid.Column="1" Text="{Binding DurationSeconds, UpdateSourceTrigger=PropertyChanged}"/>
                         <TextBlock Text="Priorität" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBox x:Name="AlertPriorityBox" Grid.Column="3"/>
+                        <TextBox x:Name="AlertPriorityBox" Grid.Column="3" Text="{Binding Priority, UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
                     <Grid Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
@@ -2790,9 +2576,9 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Schrift" VerticalAlignment="Center"/>
-                        <TextBox x:Name="AlertFontFaceBox" Grid.Column="1"/>
+                        <TextBox x:Name="AlertFontFaceBox" Grid.Column="1" Text="{Binding FontFace, UpdateSourceTrigger=PropertyChanged}"/>
                         <TextBlock Text="Größe" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBox x:Name="AlertFontSizeBox" Grid.Column="3"/>
+                        <TextBox x:Name="AlertFontSizeBox" Grid.Column="3" Text="{Binding FontSize, UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
                     <Grid Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
@@ -2802,9 +2588,9 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Farbe" VerticalAlignment="Center"/>
-                        <TextBox x:Name="AlertFontColorBox" Grid.Column="1"/>
+                        <TextBox x:Name="AlertFontColorBox" Grid.Column="1" Text="{Binding FontColor, UpdateSourceTrigger=PropertyChanged}"/>
                         <TextBlock Text="Animation" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                        <ComboBox x:Name="AlertAnimationBox" Grid.Column="3">
+                        <ComboBox x:Name="AlertAnimationBox" Grid.Column="3" SelectedValuePath="Content" SelectedValue="{Binding Animation, UpdateSourceTrigger=PropertyChanged}">
                             <ComboBoxItem Content="Fade"/>
                             <ComboBoxItem Content="Slide"/>
                             <ComboBoxItem Content="Zoom"/>
@@ -2843,81 +2629,7 @@
                     <TextBlock x:Name="AlertPreviewStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0"/>
                 </StackPanel>
             </Grid>
-            <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
-                <StackPanel>
-                    <TextBlock Text="Alert-Quelle" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="17"/>
-                    <CheckBox x:Name="SuiteAlertsEnabledBox" Content="Eigene Alerts der Creator Control Suite verwenden" IsChecked="True" Margin="0,10,0,0"/>
-                    <TextBlock Text="Die Alert-Bibliothek und der Designer bleiben vollständig nutzbar. Jeder Alert kann einzeln aktiviert oder deaktiviert werden." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="24,4,0,0"/>
-                    <CheckBox x:Name="SuppressStreamerBotAlertsBox" Content="Streamer.bot-Alertaktionen deaktivieren, solange Suite-Alerts aktiv sind" Margin="0,14,0,0"/>
-                    <TextBlock Text="Die Suite ruft dafür zwei frei benennbare Aktionen in Streamer.bot auf. Diese Aktionen können dort z. B. die Alert-Aktionsgruppe deaktivieren bzw. wieder aktivieren." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="24,4,0,0"/>
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="170"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="170"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Aktion zum Deaktivieren" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="StreamerBotDisableAlertsActionBox" Grid.Column="1" IsEditable="True" DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
-                        <TextBlock Text="Aktion zum Aktivieren" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                        <ComboBox x:Name="StreamerBotEnableAlertsActionBox" Grid.Column="3" IsEditable="True" DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
-                    </Grid>
-                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                        <Button x:Name="RefreshStreamerBotAlertActionsButton" Content="AKTIONEN AUS STREAMER.BOT LADEN"/>
-                        <Button x:Name="DisableStreamerBotAlertsNowButton" Margin="8,0,0,0" Content="STREAMER.BOT-ALERTS JETZT DEAKTIVIEREN"/>
-                        <Button x:Name="EnableStreamerBotAlertsNowButton" Content="WIEDER AKTIVIEREN" Margin="8,0,0,0"/>
-                    </StackPanel>
-                    <TextBlock x:Name="StreamerBotAlertGroupsText" Text="Verfügbare Aktionsgruppen werden nach dem Laden angezeigt." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                    <TextBlock x:Name="StreamerBotAlertControlStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
-            <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="Alert Queue" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                        <TextBlock x:Name="AlertQueueStatusText" Text="Bereit · Queue: 0" Foreground="{DynamicResource MutedBrush}" Margin="0,6,0,0"/>
-                    </StackPanel>
-                    <Button x:Name="StopCurrentAlertButton" Grid.Column="1" Content="Aktuellen stoppen" Background="#7A3838"/>
-                    <Button x:Name="ClearAlertQueueButton" Grid.Column="2" Content="Queue leeren"/>
-                </Grid>
-            </Border>
-            <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
-                <StackPanel>
-                    <TextBlock Text="OBS Alert Quellen" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Alert-Szene" VerticalAlignment="Center"/>
-                        <TextBox x:Name="AlertObsSceneBox" Grid.Column="1"/>
-                        <TextBlock Text="Medienquelle" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBox x:Name="AlertObsMediaSourceBox" Grid.Column="3"/>
-                    </Grid>
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Textquelle" VerticalAlignment="Center"/>
-                        <TextBox x:Name="AlertObsTextSourceBox" Grid.Column="1"/>
-                        <TextBlock Text="Zwischenpause (ms)" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBox x:Name="AlertInterDelayBox" Grid.Column="3"/>
-                    </Grid>
-                    <Button x:Name="InstallObsAlertSceneButton" Content="IN OBS ALS SZENE HINZUFÜGEN" Background="#416B3C" HorizontalAlignment="Left" Margin="0,14,0,0"/>
-                    <TextBlock x:Name="InstallObsAlertSceneStatusText" Text="Die Alert-Szene wird nicht automatisch angelegt. Bitte nach dem Alert-Setup manuell in OBS hinzufügen." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                    <TextBlock Text="Die Alert-Engine verwendet native OBS-Medien- und Textquellen. Es werden keine Browser-Videos verwendet." Foreground="#5CE06E" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
+            <alertsview:AlertRuntimeView x:Name="AlertRuntimeViewHost"/>
         </StackPanel>
     </ScrollViewer>
                 </Grid>
@@ -3409,12 +3121,12 @@
                                 <Grid Margin="0,10,0,0">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="Alerts deaktivieren" VerticalAlignment="Center"/>
-                                    <ComboBox x:Name="SettingsStreamerBotDisableAlertsActionBox" Grid.Column="1" IsEditable="True" DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
+                                    <ComboBox x:Name="SettingsStreamerBotDisableAlertsActionBox" Grid.Column="1" IsEditable="True" DisplayMemberPath="DisplayName" SelectedValuePath="Id" Text="{Binding DataContext.DisableActionName, ElementName=AlertRuntimeViewHost, UpdateSourceTrigger=PropertyChanged}" SelectedValue="{Binding DataContext.DisableActionId, ElementName=AlertRuntimeViewHost, UpdateSourceTrigger=PropertyChanged}"/>
                                 </Grid>
                                 <Grid Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="Alerts aktivieren" VerticalAlignment="Center"/>
-                                    <ComboBox x:Name="SettingsStreamerBotEnableAlertsActionBox" Grid.Column="1" IsEditable="True" DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
+                                    <ComboBox x:Name="SettingsStreamerBotEnableAlertsActionBox" Grid.Column="1" IsEditable="True" DisplayMemberPath="DisplayName" SelectedValuePath="Id" Text="{Binding DataContext.EnableActionName, ElementName=AlertRuntimeViewHost, UpdateSourceTrigger=PropertyChanged}" SelectedValue="{Binding DataContext.EnableActionId, ElementName=AlertRuntimeViewHost, UpdateSourceTrigger=PropertyChanged}"/>
                                 </Grid>
                                 <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
                                     <StackPanel>
@@ -3513,30 +3225,7 @@
                 </UniformGrid>
                 <TabControl x:Name="WorkflowTabControl" Grid.Row="2" Background="{DynamicResource SettingsTabBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}">
                     <TabItem Header="Session">
-                        <Grid Margin="12" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,0,8,0">
-                                <StackPanel>
-                                    <TextBlock Text="Aktuelle Session" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="17"/>
-                                    <TextBlock Text="Phase" Foreground="{DynamicResource MutedBrush}" Margin="0,16,0,0"/><TextBlock x:Name="WorkflowPhaseText" Text="Idle" FontSize="24" FontWeight="Bold"/>
-                                    <TextBlock Text="Countdown" Foreground="{DynamicResource MutedBrush}" Margin="0,16,0,0"/><TextBlock x:Name="WorkflowCountdownText" Text="00:00" FontSize="34" FontWeight="Bold"/>
-                                    <TextBlock Text="Aktuelle Szene" Foreground="{DynamicResource MutedBrush}" Margin="0,16,0,0"/><TextBlock x:Name="WorkflowSceneText" Text="-" FontSize="20" FontWeight="Bold"/>
-                                    <Button x:Name="ResetWorkflowButton" Content="Session zurücksetzen" HorizontalAlignment="Left" Margin="0,20,0,0"/>
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="1" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="8,0,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="Session-Statistik" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="17"/>
-                                    <UniformGrid Columns="2" Margin="0,14,0,0">
-                                        <Border Background="{DynamicResource InputAltBackgroundBrush}" Padding="12" Margin="4"><StackPanel><TextBlock Text="Peak Viewer" Foreground="{DynamicResource MutedBrush}"/><TextBlock x:Name="WorkflowPeakViewersText" Text="0" FontSize="26" FontWeight="Bold"/></StackPanel></Border>
-                                        <Border Background="{DynamicResource InputAltBackgroundBrush}" Padding="12" Margin="4"><StackPanel><TextBlock Text="Ø Viewer" Foreground="{DynamicResource MutedBrush}"/><TextBlock x:Name="WorkflowAverageViewersText" Text="0,0" FontSize="26" FontWeight="Bold"/></StackPanel></Border>
-                                        <Border Background="{DynamicResource InputAltBackgroundBrush}" Padding="12" Margin="4"><StackPanel><TextBlock Text="Neue Follower" Foreground="{DynamicResource MutedBrush}"/><TextBlock x:Name="WorkflowFollowersText" Text="0" FontSize="26" FontWeight="Bold"/></StackPanel></Border>
-                                        <Border Background="{DynamicResource InputAltBackgroundBrush}" Padding="12" Margin="4"><StackPanel><TextBlock Text="Chat / Alerts" Foreground="{DynamicResource MutedBrush}"/><TextBlock x:Name="WorkflowChatAlertsText" Text="0 / 0" FontSize="26" FontWeight="Bold"/></StackPanel></Border>
-                                    </UniformGrid>
-                                    <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="WorkflowViewerSampleBox" Text="0"/><Button x:Name="AddViewerSampleButton" Grid.Column="1" Content="Viewer-Sample hinzufügen"/></Grid>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
+                        <workflow:WorkflowSessionView x:Name="WorkflowSessionViewHost"/>
                     </TabItem>
                     <TabItem Header="Regieplan">
                         <Grid Margin="12" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
@@ -4197,7 +3886,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <StackPanel>
-                    <TextBlock Text="Multi-PC" FontSize="30" FontWeight="Bold"/>
+                    <TextBlock Text="Multi-PC (Alpha)" FontSize="30" FontWeight="Bold"/>
                     <TextBlock Text="Geräte im lokalen Streaming-Netz verwalten, koppeln und überwachen." Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
                 </StackPanel>
                 <UniformGrid Grid.Row="1" Columns="4" Margin="0,18,0,14">

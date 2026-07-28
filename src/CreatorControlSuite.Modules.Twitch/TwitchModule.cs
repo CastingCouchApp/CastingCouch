@@ -209,7 +209,6 @@ public sealed class TwitchModule(
 
         return _apiClient.GetFollowerCountAsync(
             _channel.BroadcasterId,
-            _currentUser.Id,
             cancellationToken);
     }
 

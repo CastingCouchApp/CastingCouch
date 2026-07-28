@@ -96,6 +96,9 @@ public sealed partial class TwitchApiClient
     {
         [JsonPropertyName("data")]
         public ChatterData[] Data { get; set; } = [];
+
+        [JsonPropertyName("pagination")]
+        public PaginationData? Pagination { get; set; }
     }
 
     private sealed class ChatterData

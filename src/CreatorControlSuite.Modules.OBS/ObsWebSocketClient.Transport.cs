@@ -86,7 +86,7 @@ public sealed partial class ObsWebSocketClient
                      ?? throw new InvalidOperationException(
                          "OBS WebSocket ist nicht initialisiert.");
 
-        string json = JsonSerializer.Serialize(payload, JsonOptions);
+        string json = ObsProtocolCodec.Encode(payload);
         byte[] bytes = Encoding.UTF8.GetBytes(json);
 
         await _sendLock.WaitAsync(cancellationToken);
@@ -141,7 +141,7 @@ public sealed partial class ObsWebSocketClient
                         }
 
                     case EventOp:
-                        HandleEvent(envelope.Data);
+                        ProcessEvent(envelope.Data);
                         break;
                 }
             }
@@ -162,7 +162,7 @@ public sealed partial class ObsWebSocketClient
         }
     }
 
-    private void HandleEvent(JsonElement data)
+    internal void ProcessEvent(JsonElement data)
     {
         if (!data.TryGetProperty("eventType", out JsonElement eventTypeElement) ||
             !data.TryGetProperty("eventData", out JsonElement eventData))
@@ -270,38 +270,22 @@ public sealed partial class ObsWebSocketClient
                     "OBS hat die WebSocket-Verbindung geschlossen.");
             }
 
+            if (stream.Length + result.Count >
+                ObsProtocolCodec.MaxPayloadBytes)
+            {
+                throw new InvalidDataException(
+                    "OBS-Nachricht überschreitet das Größenlimit.");
+            }
+
             stream.Write(buffer, 0, result.Count);
 
             if (result.EndOfMessage)
             {
                 break;
             }
-
-            if (stream.Length > 4 * 1024 * 1024)
-            {
-                throw new InvalidOperationException(
-                    "OBS-Nachricht überschreitet das Größenlimit.");
-            }
         }
 
-        stream.Position = 0;
-
-        using JsonDocument document = await JsonDocument.ParseAsync(
-            stream,
-            cancellationToken: cancellationToken);
-
-        JsonElement root = document.RootElement;
-
-        if (!root.TryGetProperty("op", out JsonElement opElement) ||
-            !root.TryGetProperty("d", out JsonElement dataElement))
-        {
-            throw new InvalidOperationException(
-                "Ungültige OBS-WebSocket-Nachricht.");
-        }
-
-        return new ObsReceivedEnvelope(
-            opElement.GetInt32(),
-            dataElement.Clone());
+        return ObsProtocolCodec.Decode(stream.ToArray());
     }
 
     private static string GetString(
@@ -351,7 +335,4 @@ public sealed partial class ObsWebSocketClient
                property.ValueKind is JsonValueKind.True or JsonValueKind.False && property.GetBoolean();
     }
 
-    private sealed record ObsReceivedEnvelope(
-        int Op,
-        JsonElement Data);
 }

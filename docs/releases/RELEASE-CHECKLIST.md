@@ -16,7 +16,8 @@
 ## Recht
 - [ ] EULA juristisch geprüft
 - [ ] Datenschutzhinweise juristisch geprüft
-- [ ] Spotify-Nutzungsmodell geprüft
+- [ ] Spotify-Nutzungsmodell, Attribution und kommerzielle Freigabe schriftlich geprüft
+- [ ] Spotify-Development-/Extended-Quota-Modus und aktuelle API-Grenzen geprüft
 
 ## End-to-End
 - [ ] OBS/Twitch/Spotify verbunden

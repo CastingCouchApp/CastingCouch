@@ -60,7 +60,6 @@ public interface ITwitchApiClient
 
     Task<int> GetFollowerCountAsync(
         string broadcasterId,
-        string moderatorId,
         CancellationToken cancellationToken = default);
 
     Task<int> GetActiveSubscriptionCountAsync(

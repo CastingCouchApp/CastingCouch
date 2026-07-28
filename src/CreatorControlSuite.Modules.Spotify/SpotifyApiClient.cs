@@ -8,7 +8,7 @@ using CreatorControlSuite.Modules.Spotify.Models;
 
 namespace CreatorControlSuite.Modules.Spotify;
 
-public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) : ISpotifyApiClient
+public sealed partial class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) : ISpotifyApiClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -104,18 +104,32 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
                 ContextUri: "");
         }
 
+        TrackResponse? currentTrack = state.Item is not null &&
+            (string.Equals(
+                 state.CurrentlyPlayingType,
+                 "track",
+                 StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(
+                 state.Item.Type,
+                 "track",
+                 StringComparison.OrdinalIgnoreCase) ||
+             (string.IsNullOrWhiteSpace(state.CurrentlyPlayingType) &&
+              string.IsNullOrWhiteSpace(state.Item.Type)))
+            ? state.Item
+            : null;
+
         return new SpotifyPlaybackState(
             HasPlayback: state.Item is not null,
             IsPlaying: state.IsPlaying,
             ShuffleEnabled: state.ShuffleState,
             RepeatMode: string.IsNullOrWhiteSpace(state.RepeatState) ? "off" : state.RepeatState,
-            ProgressMs: state.ProgressMs,
+            ProgressMs: state.ProgressMs ?? 0,
             Device: state.Device is null
                 ? null
                 : ToDevice(state.Device),
-            Track: state.Item is null
+            Track: currentTrack is null
                 ? null
-                : ToTrack(state.Item),
+                : ToTrack(currentTrack),
             ContextUri: state.Context?.Uri ?? "");
     }
 
@@ -216,22 +230,25 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
 
     public async Task<bool> IsTrackSavedAsync(string trackId, CancellationToken cancellationToken = default)
     {
+        string trackUri = ToTrackUri(trackId);
         using HttpResponseMessage response = await SendAsync(HttpMethod.Get,
-            "me/tracks/contains?ids=" + Uri.EscapeDataString(trackId), null, cancellationToken);
+            "me/library/contains?uris=" + Uri.EscapeDataString(trackUri), null, cancellationToken);
         bool[] result = await response.Content.ReadFromJsonAsync<bool[]>(JsonOptions, cancellationToken) ?? [];
         return result.FirstOrDefault();
     }
 
     public async Task SaveTrackAsync(string trackId, CancellationToken cancellationToken = default)
     {
+        string trackUri = ToTrackUri(trackId);
         using HttpResponseMessage response = await SendAsync(HttpMethod.Put,
-            "me/tracks?ids=" + Uri.EscapeDataString(trackId), null, cancellationToken, allowNoContent: true);
+            "me/library?uris=" + Uri.EscapeDataString(trackUri), null, cancellationToken, allowNoContent: true);
     }
 
     public async Task RemoveSavedTrackAsync(string trackId, CancellationToken cancellationToken = default)
     {
+        string trackUri = ToTrackUri(trackId);
         using HttpResponseMessage response = await SendAsync(HttpMethod.Delete,
-            "me/tracks?ids=" + Uri.EscapeDataString(trackId), null, cancellationToken, allowNoContent: true);
+            "me/library?uris=" + Uri.EscapeDataString(trackUri), null, cancellationToken, allowNoContent: true);
     }
 
     public async Task AddToQueueAsync(
@@ -279,7 +296,7 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
                 playlist.Id, playlist.Uri, playlist.Name,
                 playlist.Owner?.DisplayName ?? playlist.Owner?.Id ?? "",
                 playlist.Images.FirstOrDefault()?.Url ?? "",
-                playlist.Tracks?.Total ?? 0)));
+                playlist.Items?.Total ?? playlist.Tracks?.Total ?? 0)));
 
             if (string.IsNullOrWhiteSpace(result.Next) || result.Items.Length == 0)
             {
@@ -314,15 +331,21 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
             int pageSize = Math.Min(50, requestedLimit - tracks.Count);
             using HttpResponseMessage response = await SendAsync(
                 HttpMethod.Get,
-                $"playlists/{Uri.EscapeDataString(playlistId.Trim())}/tracks?limit={pageSize}&offset={offset}",
+                $"playlists/{Uri.EscapeDataString(playlistId.Trim())}/items?limit={pageSize}&offset={offset}",
                 body: null,
                 cancellationToken);
 
             PlaylistTracksResponse result = await response.Content.ReadFromJsonAsync<PlaylistTracksResponse>(
                 JsonOptions, cancellationToken) ?? new PlaylistTracksResponse();
             tracks.AddRange(result.Items
-                .Where(item => item.Track is not null)
-                .Select(item => ToTrack(item.Track!)));
+                .Select(item => item.Item ?? item.Track)
+                .Where(track => track is not null &&
+                    (string.IsNullOrWhiteSpace(track.Type) ||
+                     string.Equals(
+                         track.Type,
+                         "track",
+                         StringComparison.OrdinalIgnoreCase)))
+                .Select(track => ToTrack(track!)));
 
             if (string.IsNullOrWhiteSpace(result.Next) || result.Items.Length == 0)
             {
@@ -698,33 +721,6 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
         };
     }
 
-    private static SpotifyDevice ToDevice(DeviceResponse device)
-    {
-        return new SpotifyDevice(
-            device.Id ?? "",
-            device.Name,
-            device.Type,
-            device.IsActive,
-            device.IsPrivateSession,
-            device.IsRestricted,
-            device.VolumePercent ?? 0,
-            device.SupportsVolume);
-    }
-
-    private static SpotifyTrack ToTrack(TrackResponse track)
-    {
-        return new SpotifyTrack(
-            track.Id,
-            track.Uri,
-            track.Name,
-            string.Join(
-                ", ",
-                track.Artists.Select(artist => artist.Name)),
-            track.Album?.Name ?? "",
-            track.Album?.Images.FirstOrDefault()?.Url ?? "",
-            track.DurationMs);
-    }
-
     private sealed class UserResponse
     {
         [JsonPropertyName("id")]
@@ -808,6 +804,9 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
 
     private sealed class PlaylistTrackItemResponse
     {
+        [JsonPropertyName("item")]
+        public TrackResponse? Item { get; set; }
+
         [JsonPropertyName("track")]
         public TrackResponse? Track { get; set; }
     }
@@ -839,10 +838,13 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
         public DeviceResponse? Device { get; set; }
 
         [JsonPropertyName("progress_ms")]
-        public int ProgressMs { get; set; }
+        public int? ProgressMs { get; set; }
 
         [JsonPropertyName("is_playing")]
         public bool IsPlaying { get; set; }
+
+        [JsonPropertyName("currently_playing_type")]
+        public string CurrentlyPlayingType { get; set; } = "";
 
         [JsonPropertyName("shuffle_state")]
         public bool ShuffleState { get; set; }
@@ -876,6 +878,9 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
 
         [JsonPropertyName("duration_ms")]
         public int DurationMs { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = "";
 
         [JsonPropertyName("artists")]
         public ArtistResponse[] Artists { get; set; } = [];
@@ -933,6 +938,9 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
 
         [JsonPropertyName("tracks")]
         public TracksResponse? Tracks { get; set; }
+
+        [JsonPropertyName("items")]
+        public TracksResponse? Items { get; set; }
     }
 
     private sealed class OwnerResponse
@@ -941,7 +949,7 @@ public sealed class SpotifyApiClient(HttpClient httpClient, IAppLogger logger) :
         public string Id { get; set; } = "";
 
         [JsonPropertyName("display_name")]
-        public string DisplayName { get; set; } = "";
+        public string? DisplayName { get; set; }
     }
 
     private sealed class TracksResponse

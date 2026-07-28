@@ -6,8 +6,8 @@ using System.Text.Json;
 using CreatorControlSuite.Agent.Security;
 using CreatorControlSuite.Modules.OBS;
 using CreatorControlSuite.Modules.OBS.Models;
-using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 
 internal static class AgentUtilities
 {

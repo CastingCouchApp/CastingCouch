@@ -106,6 +106,12 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<IWorkflowMusicCapability, WorkflowMusicCapability>();
         services.AddSingleton<IWorkflowAlertCapability, WorkflowAlertCapability>();
         services.AddSingleton<IWorkflowOverlayCapability, WorkflowOverlayCapability>();
+        services.AddSingleton<
+            IOverlayCanvasApplicationService,
+            OverlayCanvasApplicationService>();
+        services.AddSingleton<
+            IAlertDefinitionApplicationService,
+            AlertDefinitionApplicationService>();
         services.AddSingleton<IEventBus, EventBus>();
         services.AddSingleton<IAutomationRuleEngine, AutomationRuleEngine>();
         services.AddSingleton<IMultiPcAgentClient, MultiPcAgentClient>();
@@ -136,6 +142,15 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<MigrationPageViewModel>();
         services.AddSingleton<LegalPageViewModel>();
         services.AddSingleton<GeneralSettingsPageViewModel>();
+        services.AddSingleton<TwitchGoalsPageViewModel>();
+        services.AddSingleton<SpotifyAutomationPageViewModel>();
+        services.AddSingleton<WorkflowSessionPageViewModel>();
+        services.AddSingleton<OverlayConnectionSettingsPageViewModel>();
+        services.AddSingleton<OverlayCanvasPageViewModel>();
+        services.AddSingleton<OverlayExtensionPacksPageViewModel>();
+        services.AddSingleton<AlertLibraryPageViewModel>();
+        services.AddSingleton<AlertDefinitionEditorViewModel>();
+        services.AddSingleton<AlertRuntimePageViewModel>();
         services.AddSingleton<CreatorIntelligenceSectionViewModel>();
         services.AddSingleton<PageNavigationCoordinator>();
         services.AddSingleton<TimedAutomationTickPublisher>();

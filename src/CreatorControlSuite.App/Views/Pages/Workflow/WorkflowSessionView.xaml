@@ -1,0 +1,117 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Workflow.WorkflowSessionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="12"
+          TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Border Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="18"
+                Margin="0,0,8,0">
+            <StackPanel>
+                <TextBlock Text="Aktuelle Session"
+                           Foreground="{DynamicResource AccentBrush}"
+                           FontWeight="Bold"
+                           FontSize="17"/>
+                <TextBlock Text="Phase"
+                           Foreground="{DynamicResource MutedBrush}"
+                           Margin="0,16,0,0"/>
+                <TextBlock Text="{Binding Phase}"
+                           FontSize="24"
+                           FontWeight="Bold"/>
+                <TextBlock Text="Countdown"
+                           Foreground="{DynamicResource MutedBrush}"
+                           Margin="0,16,0,0"/>
+                <TextBlock Text="{Binding Countdown}"
+                           FontSize="34"
+                           FontWeight="Bold"/>
+                <TextBlock Text="Aktuelle Szene"
+                           Foreground="{DynamicResource MutedBrush}"
+                           Margin="0,16,0,0"/>
+                <TextBlock Text="{Binding Scene}"
+                           FontSize="20"
+                           FontWeight="Bold"/>
+                <Button Content="Session zurücksetzen"
+                        Command="{Binding ResetCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,20,0,0"/>
+            </StackPanel>
+        </Border>
+        <Border Grid.Column="1"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="18"
+                Margin="8,0,0,0">
+            <StackPanel>
+                <TextBlock Text="Session-Statistik"
+                           Foreground="{DynamicResource AccentBrush}"
+                           FontWeight="Bold"
+                           FontSize="17"/>
+                <UniformGrid Columns="2"
+                             Margin="0,14,0,0">
+                    <Border Background="{DynamicResource InputAltBackgroundBrush}"
+                            Padding="12"
+                            Margin="4">
+                        <StackPanel>
+                            <TextBlock Text="Peak Viewer"
+                                       Foreground="{DynamicResource MutedBrush}"/>
+                            <TextBlock Text="{Binding PeakViewers}"
+                                       FontSize="26"
+                                       FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource InputAltBackgroundBrush}"
+                            Padding="12"
+                            Margin="4">
+                        <StackPanel>
+                            <TextBlock Text="Ø Viewer"
+                                       Foreground="{DynamicResource MutedBrush}"/>
+                            <TextBlock Text="{Binding AverageViewers}"
+                                       FontSize="26"
+                                       FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource InputAltBackgroundBrush}"
+                            Padding="12"
+                            Margin="4">
+                        <StackPanel>
+                            <TextBlock Text="Neue Follower"
+                                       Foreground="{DynamicResource MutedBrush}"/>
+                            <TextBlock Text="{Binding Followers}"
+                                       FontSize="26"
+                                       FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource InputAltBackgroundBrush}"
+                            Padding="12"
+                            Margin="4">
+                        <StackPanel>
+                            <TextBlock Text="Chat / Alerts"
+                                       Foreground="{DynamicResource MutedBrush}"/>
+                            <TextBlock Text="{Binding ChatAlerts}"
+                                       FontSize="26"
+                                       FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+                <Grid Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding ViewerSample}"/>
+                    <Button Grid.Column="1"
+                            Content="Viewer-Sample hinzufügen"
+                            Command="{Binding AddViewerSampleCommand}"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

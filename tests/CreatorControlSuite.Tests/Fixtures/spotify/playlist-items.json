@@ -1,0 +1,24 @@
+{
+  "next": null,
+  "items": [
+    {
+      "item": {
+        "id": "track-new",
+        "uri": "spotify:track:track-new",
+        "name": "New Contract Track",
+        "duration_ms": 210000,
+        "type": "track",
+        "artists": [
+          { "name": "New Artist" }
+        ],
+        "album": {
+          "name": "New Album",
+          "images": []
+        }
+      }
+    },
+    {
+      "item": null
+    }
+  ]
+}

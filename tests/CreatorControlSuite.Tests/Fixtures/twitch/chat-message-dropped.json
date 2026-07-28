@@ -1,0 +1,12 @@
+{
+  "data": [
+    {
+      "message_id": "",
+      "is_sent": false,
+      "drop_reason": {
+        "code": "automod_held",
+        "message": "Your message has been held for review by Automod."
+      }
+    }
+  ]
+}

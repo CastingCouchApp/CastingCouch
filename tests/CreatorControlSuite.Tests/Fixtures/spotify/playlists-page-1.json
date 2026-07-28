@@ -1,0 +1,33 @@
+{
+  "next": "https://api.spotify.com/v1/me/playlists?limit=50&offset=2",
+  "items": [
+    {
+      "id": "playlist-z",
+      "uri": "spotify:playlist:z",
+      "name": "Zeta",
+      "owner": {
+        "id": "owner-z",
+        "display_name": null
+      },
+      "images": [],
+      "items": {
+        "total": 7
+      }
+    },
+    {
+      "id": "playlist-a",
+      "uri": "spotify:playlist:a",
+      "name": "Alpha",
+      "owner": {
+        "id": "owner-a",
+        "display_name": "Alice"
+      },
+      "images": [
+        { "url": "https://i.scdn.co/image/alpha" }
+      ],
+      "items": {
+        "total": 12
+      }
+    }
+  ]
+}

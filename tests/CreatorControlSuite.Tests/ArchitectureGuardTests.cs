@@ -7,8 +7,8 @@ public sealed class ArchitectureGuardTests
     private static readonly IReadOnlyDictionary<string, int> OversizedFileBaseline =
         new Dictionary<string, int>(StringComparer.Ordinal)
         {
-            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml.cs"] = 24_606,
-            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml"] = 4_308
+            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml.cs"] = 23_808,
+            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml"] = 3_997
         };
 
     [Fact]

@@ -2,7 +2,7 @@
 
 Windows-Desktop-Suite für Creator-Workflows: Live-Dashboard, OBS, Twitch, Spotify, Alerts, Overlays, Stream Deck und Automatisierung — gebündelt in einer WPF-App.
 
-Aktuelle Version: **8.0.0-alpha101** (siehe `Directory.Build.props`).
+Aktuelle Version: **8.0.0-alpha102** (siehe `Directory.Build.props`).
 
 ## Features
 
@@ -11,7 +11,7 @@ Aktuelle Version: **8.0.0-alpha101** (siehe `Directory.Build.props`).
 - Spotify-Steuerung inkl. Cover/Titel
 - OBS-Szenen, Audio und Stream-Steuerung
 - Alerts, Overlays, Workflows und Stream-Deck-Anbindung
-- Multi-PC-Agent, Updater und WiX-Installer
+- Multi-PC-Agent (Alpha), Updater und WiX-Installer
 
 ## Voraussetzungen
 

@@ -1,5 +1,5 @@
-using CreatorControlSuite.Core.Configuration;
 using System.Text.Json;
+using CreatorControlSuite.Core.Configuration;
 
 namespace CreatorControlSuite.Tests;
 

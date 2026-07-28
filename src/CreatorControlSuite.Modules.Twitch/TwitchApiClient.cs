@@ -337,15 +337,12 @@ public sealed partial class TwitchApiClient(HttpClient httpClient) : ITwitchApiC
 
     public async Task<int> GetFollowerCountAsync(
         string broadcasterId,
-        string moderatorId,
         CancellationToken cancellationToken = default)
     {
         FollowersResponse response = await SendAsync<FollowersResponse>(
             HttpMethod.Get,
             "channels/followers?broadcaster_id=" +
             Uri.EscapeDataString(broadcasterId) +
-            "&moderator_id=" +
-            Uri.EscapeDataString(moderatorId) +
             "&first=1",
             body: null,
             cancellationToken);
@@ -373,17 +370,39 @@ public sealed partial class TwitchApiClient(HttpClient httpClient) : ITwitchApiC
         string moderatorId,
         CancellationToken cancellationToken = default)
     {
-        ChattersResponse response = await SendAsync<ChattersResponse>(
-            HttpMethod.Get,
-            "chat/chatters?broadcaster_id=" + Uri.EscapeDataString(broadcasterId) +
-            "&moderator_id=" + Uri.EscapeDataString(moderatorId) +
-            "&first=1000",
-            body: null,
-            cancellationToken);
+        var results = new List<ChatterData>();
+        var seenCursors = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
 
-        return [.. response.Data
+        do
+        {
+            string url =
+                "chat/chatters?broadcaster_id=" +
+                Uri.EscapeDataString(broadcasterId) +
+                "&moderator_id=" +
+                Uri.EscapeDataString(moderatorId) +
+                "&first=1000";
+            if (!string.IsNullOrWhiteSpace(cursor))
+            {
+                url += "&after=" + Uri.EscapeDataString(cursor);
+            }
+
+            ChattersResponse response = await SendAsync<ChattersResponse>(
+                HttpMethod.Get,
+                url,
+                body: null,
+                cancellationToken);
+            results.AddRange(response.Data);
+            cursor = response.Pagination?.Cursor;
+        }
+        while (!string.IsNullOrWhiteSpace(cursor) &&
+               seenCursors.Add(cursor) &&
+               results.Count < 10_000);
+
+        return [.. results
             .Select(item => string.IsNullOrWhiteSpace(item.UserName) ? item.UserLogin : item.UserName)
             .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)];
     }
 

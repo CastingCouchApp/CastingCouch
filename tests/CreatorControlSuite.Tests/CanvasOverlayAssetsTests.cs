@@ -677,13 +677,21 @@ public sealed class CanvasOverlayAssetsTests
     }
 
     [Fact]
-    public void EditorHtml_CanvasSizeSectionCollapsedByDefault()
+    public void EditorHtml_CanvasSizeModalClosedByDefault()
     {
         Assert.True(CanvasOverlayAssets.TryGet("editor/index.html", out string html, out _));
-        Assert.Contains("<details class=\"ccs-palette-section\" id=\"canvasSizeSection\">", html);
+        Assert.Contains(
+            "id=\"btnCanvasSize\" class=\"ccs-toolbar-size\"",
+            html);
+        Assert.Contains(
+            "aria-controls=\"canvasSizeModal\"",
+            html);
+        Assert.Contains(
+            "<dialog id=\"canvasSizeModal\" class=\"ccs-modal\"",
+            html);
         Assert.Contains("Fenstergröße", html);
         Assert.Contains("id=\"canvasSizePreset\"", html);
-        Assert.DoesNotContain("id=\"canvasSizeSection\" open", html);
+        Assert.DoesNotContain("<dialog id=\"canvasSizeModal\" open", html);
     }
 
     [Fact]

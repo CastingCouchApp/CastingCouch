@@ -1,0 +1,11 @@
+{
+  "total": 3,
+  "data": [
+    {
+      "user_id": "3",
+      "user_login": "beta",
+      "user_name": "Beta"
+    }
+  ],
+  "pagination": {}
+}

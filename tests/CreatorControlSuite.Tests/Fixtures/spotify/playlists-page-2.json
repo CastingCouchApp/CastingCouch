@@ -1,0 +1,29 @@
+{
+  "next": null,
+  "items": [
+    {
+      "id": "playlist-a",
+      "uri": "spotify:playlist:a",
+      "name": "Alpha duplicate",
+      "owner": {
+        "id": "owner-a",
+        "display_name": "Alice"
+      },
+      "images": [],
+      "items": {
+        "total": 12
+      }
+    },
+    {
+      "id": "playlist-b",
+      "uri": "spotify:playlist:b",
+      "name": "Beta",
+      "owner": {
+        "id": "owner-b",
+        "display_name": "Bob"
+      },
+      "images": [],
+      "items": null
+    }
+  ]
+}

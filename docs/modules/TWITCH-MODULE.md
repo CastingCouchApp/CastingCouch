@@ -1,4 +1,4 @@
-# Twitch-Modul – 2.0.81
+# Twitch-Modul
 
 ## Authentifizierung
 
@@ -25,6 +25,16 @@ Implementiert:
 - Kategorie ändern
 - Chatnachricht über Helix senden
 - EventSub-Subscriptions erstellen
+- Follower- und Subscription-Zahlen
+- cursor-basiert paginierte Chatter- und Followed-Channel-Listen
+- Raids, Moderation, Channel Points, Polls und Predictions
+
+Fixture-basierte Contract-Tests prüfen den aktuellen Helix-Vertrag für
+Benutzer, Pflicht-Header, URL-Encoding, Follower-Zahlen, Chatter-Paging,
+abgelehnte Chatnachrichten und strukturierte HTTP-Fehler. Der
+Follower-Endpunkt sendet ausschließlich die von Helix dokumentierten
+Query-Parameter; die Moderatoridentität wird über das Benutzer-Token und nicht
+als `moderator_id` übertragen.
 
 ## EventSub WebSocket
 
@@ -79,12 +89,8 @@ Der Web-Login ist eine eigene Browser-Session und unabhängig von der Device-Cod
 
 `EnableChat` steuert weiterhin die EventSub-Chat-Subscription (Stats, Workflow, Dashboard-Chat).
 
-## Nächste Erweiterungen
+## Offene Betriebsnachweise
 
-- EventSub-Wiederverbindung mit lückenloser Übergabe
-- Channel Points
-- Moderation
-- Viewer-/Chatterliste
-- Raidzentrale
-- Polls und Predictions
-- Follower- und Sub-Statistiken
+- EventSub-Reconnect und Session-Übergabe im 24-Stunden-Soak-Test
+- Token-/Scope-Fehler mit realem Twitch-Testkonto
+- Rate-Limit- und Revocation-Verhalten unter längerer Last

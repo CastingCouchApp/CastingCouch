@@ -1,0 +1,148 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Spotify.SpotifyAutomationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <TextBlock Text="Spotify-Automatik"
+                   Foreground="{DynamicResource TextPrimaryBrush}"
+                   FontWeight="SemiBold"
+                   FontSize="16"/>
+        <TextBlock Text="Startplaylist" Margin="0,12,0,5"/>
+        <ComboBox ItemsSource="{Binding Playlists}"
+                  SelectedItem="{Binding SelectedPlaylist}"
+                  DisplayMemberPath="Name"
+                  Foreground="{DynamicResource TextPrimaryBrush}"
+                  Background="{DynamicResource TextMutedBrush}"
+                  MinWidth="360"
+                  HorizontalAlignment="Left"
+                  SelectionChanged="AutoSave_OnChanged"/>
+        <CheckBox IsChecked="{Binding AutoStartOnStream}"
+                  Content="Startplaylist beim Streamstart automatisch starten"
+                  Foreground="#FFFFFF"
+                  Margin="0,10,0,0"
+                  Click="AutoSave_OnChanged"/>
+        <CheckBox IsChecked="{Binding PlayEndMusic}"
+                  Content="Startplaylist auch beim Wechsel in die Endszene starten"
+                  Foreground="#FFFFFF"
+                  Margin="0,7,0,0"
+                  Click="AutoSave_OnChanged"/>
+        <CheckBox IsChecked="{Binding PauseOnStreamEnd}"
+                  Content="Spotify nach dem tatsächlichen Streamende pausieren"
+                  Foreground="#FFFFFF"
+                  Margin="0,7,0,0"
+                  Click="AutoSave_OnChanged"/>
+        <TextBlock Text="Die Endmusik startet vor dem Endszene-Countdown. Nach dem Stoppen des OBS-Streams kann Spotify automatisch pausiert werden."
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   TextWrapping="Wrap"
+                   Margin="22,5,0,0"/>
+        <Separator Margin="0,14,0,12"/>
+        <TextBlock Text="Beim Wechsel Start → Game"
+                   Foreground="#FFFFFF"
+                   FontWeight="SemiBold"/>
+        <CheckBox IsChecked="{Binding SetLiveVolume}"
+                  Content="Spotify-Lautstärke automatisch setzen"
+                  Foreground="#FFFFFF"
+                  Margin="0,9,0,0"
+                  Click="AutoSave_OnChanged"/>
+        <WrapPanel Margin="22,8,0,0">
+            <TextBlock Text="Lautstärke"
+                       Foreground="#FFFFFF"
+                       VerticalAlignment="Center"/>
+            <TextBox Text="{Binding LiveVolume, UpdateSourceTrigger=PropertyChanged}"
+                     Width="70"
+                     Margin="8,0,4,0"
+                     LostFocus="AutoSave_OnChanged"/>
+            <TextBlock Text="%"
+                       Foreground="#FFFFFF"
+                       VerticalAlignment="Center"/>
+        </WrapPanel>
+        <Separator Margin="0,14,0,12"/>
+        <TextBlock Text="Während Alerts"
+                   Foreground="#FFFFFF"
+                   FontWeight="SemiBold"/>
+        <CheckBox IsChecked="{Binding MuteDuringAlerts}"
+                  Content="Spotify während Alerts automatisch leiser machen"
+                  Foreground="#FFFFFF"
+                  Margin="0,9,0,0"
+                  Click="AutoSave_OnChanged"/>
+        <Grid Margin="22,9,0,0"
+              Width="430"
+              HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="190"/>
+                <ColumnDefinition Width="80"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Lautstärke während Alert"
+                       Foreground="#FFFFFF"
+                       VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1"
+                     Text="{Binding AlertVolume, UpdateSourceTrigger=PropertyChanged}"
+                     Width="70"
+                     LostFocus="AutoSave_OnChanged"/>
+            <TextBlock Grid.Column="2"
+                       Text="%"
+                       Foreground="#FFFFFF"
+                       VerticalAlignment="Center"
+                       Margin="5,0,0,0"/>
+        </Grid>
+        <Grid Margin="22,8,0,0"
+              Width="430"
+              HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="190"/>
+                <ColumnDefinition Width="80"/>
+                <ColumnDefinition Width="90"/>
+                <ColumnDefinition Width="80"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Absenken in"
+                       Foreground="#FFFFFF"
+                       VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1"
+                     Text="{Binding AlertFadeOutMilliseconds, UpdateSourceTrigger=PropertyChanged}"
+                     Width="70"
+                     LostFocus="AutoSave_OnChanged"/>
+            <TextBlock Grid.Column="2"
+                       Text="ms · zurück in"
+                       Foreground="#FFFFFF"
+                       VerticalAlignment="Center"/>
+            <TextBox Grid.Column="3"
+                     Text="{Binding AlertFadeInMilliseconds, UpdateSourceTrigger=PropertyChanged}"
+                     Width="70"
+                     LostFocus="AutoSave_OnChanged"/>
+        </Grid>
+        <TextBlock Text="Nach dem letzten Alert wird die Lautstärke auf den Wert vor dem Alert zurückgestellt. Pausierte Musik bleibt unverändert."
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   TextWrapping="Wrap"
+                   Margin="22,6,0,0"/>
+        <TextBlock Text="{Binding AlertStatusText}"
+                   Margin="22,8,0,0">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource TextSecondaryBrush}"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding AlertStatusState}"
+                                     Value="Warning">
+                            <Setter Property="Foreground" Value="Orange"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding AlertStatusState}"
+                                     Value="Error">
+                            <Setter Property="Foreground" Value="IndianRed"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding AlertStatusState}"
+                                     Value="Success">
+                            <Setter Property="Foreground" Value="LightGreen"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        <Button Content="SPOTIFY-AUTOMATIK SPEICHERN"
+                Command="{Binding SaveCommand}"
+                HorizontalAlignment="Left"
+                Margin="0,14,0,0"/>
+        <TextBlock Text="{Binding AutomationStatusText}"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   Margin="0,7,0,0"/>
+    </StackPanel>
+</UserControl>

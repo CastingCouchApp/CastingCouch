@@ -1,0 +1,57 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Alerts.AlertLibraryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Background="{DynamicResource InputAltBackgroundBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12"
+            Margin="0,0,0,16">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Alert-Bibliothek"
+                           Foreground="{DynamicResource AccentBrush}"
+                           FontWeight="Bold"
+                           FontSize="17"/>
+                <TextBlock Text="Gespeicherte Alerts auswählen, aktivieren, duplizieren oder löschen."
+                           Foreground="{DynamicResource MutedBrush}"
+                           Margin="0,4,0,8"/>
+                <ListBox ItemsSource="{Binding Items}"
+                         SelectedItem="{Binding SelectedItem}"
+                         MinHeight="120"
+                         MaxHeight="220"
+                         Background="{DynamicResource SidebarBackgroundBrush}"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         BorderBrush="{DynamicResource SubtleBorderBrush}"
+                         DisplayMemberPath="DisplayName"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1"
+                        Margin="12,24,0,0"
+                        MinWidth="190">
+                <Button Content="NEUER ALERT"
+                        Command="{Binding CreateCommand}"
+                        Background="{DynamicResource AccentBrush}"
+                        Foreground="{DynamicResource TextOnAccentBrush}"
+                        FontWeight="Bold"/>
+                <Button Content="DUPLIZIEREN"
+                        Command="{Binding DuplicateCommand}"
+                        Margin="0,8,0,0"/>
+                <Button Content="AKTIV / INAKTIV"
+                        Command="{Binding ToggleCommand}"
+                        Margin="0,8,0,0"/>
+                <Button Content="LÖSCHEN"
+                        Command="{Binding DeleteCommand}"
+                        Background="#7A3838"
+                        Margin="0,8,0,0"/>
+                <TextBlock Text="{Binding Status}"
+                           Foreground="{DynamicResource MutedBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,10,0,0"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

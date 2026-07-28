@@ -1,0 +1,18 @@
+{
+  "total": 3,
+  "data": [
+    {
+      "user_id": "1",
+      "user_login": "zeta",
+      "user_name": "Zeta"
+    },
+    {
+      "user_id": "2",
+      "user_login": "alpha",
+      "user_name": ""
+    }
+  ],
+  "pagination": {
+    "cursor": "next/+=="
+  }
+}

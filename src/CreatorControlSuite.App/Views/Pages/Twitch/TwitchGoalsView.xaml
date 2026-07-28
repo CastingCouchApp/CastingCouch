@@ -1,0 +1,54 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Twitch.TwitchGoalsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <TextBlock Text="Stream-Ziele &amp; Overlay-Content"
+                   Foreground="{DynamicResource TextPrimaryBrush}"
+                   FontWeight="SemiBold"
+                   FontSize="18"/>
+        <TextBlock Text="Hier legst du die Ziele fest. Aktuelle Follower- und Sub-Zahlen werden nach der Twitch-Verbindung automatisch aktualisiert."
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   TextWrapping="Wrap"
+                   Margin="0,6,0,12"/>
+        <StackPanel Margin="0,0,0,12">
+            <TextBlock Text="OBS-Szene für Ziele &amp; Overlay-Daten"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <TextBox Text="{Binding OverlayScene}" Width="280"/>
+        </StackPanel>
+        <TextBlock Text="Follower-Ziel"
+                   FontWeight="SemiBold"
+                   Margin="0,4,0,5"/>
+        <WrapPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerTitle}" Width="150"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerCurrent}" Width="80" ToolTip="Wird bei Twitch-Verbindung automatisch aktualisiert"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerTarget}" Width="80"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerFontFace}" Width="150"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerFontSize}" Width="70"/></StackPanel>
+        </WrapPanel>
+        <TextBlock Text="Sub-Ziel"
+                   FontWeight="SemiBold"
+                   Margin="0,8,0,5"/>
+        <WrapPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionTitle}" Width="150"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionCurrent}" Width="80" ToolTip="Wird bei Twitch-Verbindung automatisch aktualisiert"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionTarget}" Width="80"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionFontFace}" Width="150"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionFontSize}" Width="70"/></StackPanel>
+        </WrapPanel>
+        <TextBlock Text="Donation-Ziel"
+                   FontWeight="SemiBold"
+                   Margin="0,8,0,5"/>
+        <WrapPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationTitle}" Width="150"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationCurrent}" Width="80"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationTarget}" Width="80"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Währung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationCurrency}" Width="70"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationFontFace}" Width="150"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationFontSize}" Width="70"/></StackPanel>
+        </WrapPanel>
+        <Button Content="ZIELE SPEICHERN &amp; OVERLAY-DATEN AKTUALISIEREN"
+                Command="{Binding SaveCommand}"
+                HorizontalAlignment="Left"
+                Margin="0,10,0,0"/>
+    </StackPanel>
+</UserControl>

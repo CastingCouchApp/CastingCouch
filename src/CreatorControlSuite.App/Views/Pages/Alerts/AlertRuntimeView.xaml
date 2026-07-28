@@ -1,0 +1,83 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Alerts.AlertRuntimeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+            <StackPanel>
+                <TextBlock Text="Alert-Quelle" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="17"/>
+                <CheckBox Content="Eigene Alerts der Creator Control Suite verwenden" IsChecked="{Binding Enabled}" Margin="0,10,0,0"/>
+                <TextBlock Text="Die Alert-Bibliothek und der Designer bleiben vollständig nutzbar. Jeder Alert kann einzeln aktiviert oder deaktiviert werden." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="24,4,0,0"/>
+                <CheckBox Content="Streamer.bot-Alertaktionen deaktivieren, solange Suite-Alerts aktiv sind" IsChecked="{Binding SuppressStreamerBotAlerts}" Command="{Binding ApplySuppressionCommand}" Margin="0,14,0,0"/>
+                <TextBlock Text="Die Suite ruft dafür zwei frei benennbare Aktionen in Streamer.bot auf. Diese Aktionen können dort z. B. die Alert-Aktionsgruppe deaktivieren bzw. wieder aktivieren." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="24,4,0,0"/>
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Aktion zum Deaktivieren" VerticalAlignment="Center"/>
+                    <ComboBox Grid.Column="1" IsEditable="True" ItemsSource="{Binding Actions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" Text="{Binding DisableActionName, UpdateSourceTrigger=PropertyChanged}" SelectedValue="{Binding DisableActionId, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Text="Aktion zum Aktivieren" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    <ComboBox Grid.Column="3" IsEditable="True" ItemsSource="{Binding Actions}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" Text="{Binding EnableActionName, UpdateSourceTrigger=PropertyChanged}" SelectedValue="{Binding EnableActionId, UpdateSourceTrigger=PropertyChanged}"/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <Button Content="AKTIONEN AUS STREAMER.BOT LADEN" Command="{Binding RefreshActionsCommand}"/>
+                    <Button Margin="8,0,0,0" Content="STREAMER.BOT-ALERTS JETZT DEAKTIVIEREN" Command="{Binding DisableStreamerBotAlertsCommand}"/>
+                    <Button Content="WIEDER AKTIVIEREN" Margin="8,0,0,0" Command="{Binding EnableStreamerBotAlertsCommand}"/>
+                </StackPanel>
+                <TextBlock Text="{Binding StreamerBotGroups}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                <TextBlock Text="{Binding StreamerBotStatus}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Alert Queue" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding QueueStatus}" Foreground="{DynamicResource MutedBrush}" Margin="0,6,0,0"/>
+                </StackPanel>
+                <Button Grid.Column="1" Content="Aktuellen stoppen" Background="#7A3838" Command="{Binding StopCurrentAlertCommand}"/>
+                <Button Grid.Column="2" Content="Queue leeren" Command="{Binding ClearAlertQueueCommand}"/>
+            </Grid>
+        </Border>
+
+        <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+            <StackPanel>
+                <TextBlock Text="OBS Alert Quellen" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Alert-Szene" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="1" Text="{Binding ObsSceneName, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Text="Medienquelle" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    <TextBox Grid.Column="3" Text="{Binding ObsMediaSourceName, UpdateSourceTrigger=PropertyChanged}"/>
+                </Grid>
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Textquelle" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="1" Text="{Binding ObsTextSourceName, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Text="Zwischenpause (ms)" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    <TextBox Grid.Column="3" Text="{Binding InterAlertDelayMilliseconds, UpdateSourceTrigger=PropertyChanged}"/>
+                </Grid>
+                <Button Content="IN OBS ALS SZENE HINZUFÜGEN" Background="#416B3C" HorizontalAlignment="Left" Margin="0,14,0,0" Command="{Binding InstallObsSourcesCommand}"/>
+                <TextBlock Text="{Binding InstallStatus}" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                <TextBlock Text="Die Alert-Engine verwendet native OBS-Medien- und Textquellen. Es werden keine Browser-Videos verwendet." Foreground="#5CE06E" TextWrapping="Wrap" Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

@@ -28,9 +28,9 @@ using CreatorControlSuite.App.ViewModels;
 using CreatorControlSuite.App.ViewModels.Pages;
 using CreatorControlSuite.App.Views.Dialogs;
 using CreatorControlSuite.Core.Automation;
-using CreatorControlSuite.Core.Eventing;
 using CreatorControlSuite.Core.Configuration;
 using CreatorControlSuite.Core.Diagnostics;
+using CreatorControlSuite.Core.Eventing;
 using CreatorControlSuite.Core.Ipc;
 using CreatorControlSuite.Core.Logging;
 using CreatorControlSuite.Core.Music;
@@ -101,6 +101,18 @@ public partial class MainWindow : Window
     private readonly UpdatePageViewModel _updatePageViewModel;
     private readonly MigrationPageViewModel _migrationPageViewModel;
     private readonly GeneralSettingsPageViewModel _generalSettingsPageViewModel;
+    private readonly TwitchGoalsPageViewModel _twitchGoalsPageViewModel;
+    private readonly SpotifyAutomationPageViewModel _spotifyAutomationPageViewModel;
+    private readonly WorkflowSessionPageViewModel _workflowSessionPageViewModel;
+    private readonly OverlayConnectionSettingsPageViewModel
+        _overlayConnectionSettingsPageViewModel;
+    private readonly OverlayCanvasPageViewModel _overlayCanvasPageViewModel;
+    private readonly OverlayExtensionPacksPageViewModel
+        _overlayExtensionPacksPageViewModel;
+    private readonly AlertLibraryPageViewModel _alertLibraryPageViewModel;
+    private readonly AlertDefinitionEditorViewModel
+        _alertDefinitionEditorViewModel;
+    private readonly AlertRuntimePageViewModel _alertRuntimePageViewModel;
     private readonly CreatorIntelligenceService _creatorIntelligence;
     private readonly AlertsModule _alertsModule;
     private readonly OverlayModule _overlayModule;
@@ -296,7 +308,6 @@ public partial class MainWindow : Window
     private bool? _lastOverlayPublishedCountdownRunning;
     private string? _lastOverlayPublishedScene;
     private string? _lastOverlayPublishedSpotifyTrack;
-    private List<OverlayExtensionPackSummary> _overlayExtensionPacksCache = [];
     private int? _spotifyVolumeBeforeAlert;
     private bool _spotifyWasPlayingBeforeAlert;
     private bool _spotifyAlertMuteActive;
@@ -437,6 +448,15 @@ public partial class MainWindow : Window
         MigrationPageViewModel migrationPageViewModel,
         LegalPageViewModel legalPageViewModel,
         GeneralSettingsPageViewModel generalSettingsPageViewModel,
+        TwitchGoalsPageViewModel twitchGoalsPageViewModel,
+        SpotifyAutomationPageViewModel spotifyAutomationPageViewModel,
+        WorkflowSessionPageViewModel workflowSessionPageViewModel,
+        OverlayConnectionSettingsPageViewModel overlayConnectionSettingsPageViewModel,
+        OverlayCanvasPageViewModel overlayCanvasPageViewModel,
+        OverlayExtensionPacksPageViewModel overlayExtensionPacksPageViewModel,
+        AlertLibraryPageViewModel alertLibraryPageViewModel,
+        AlertDefinitionEditorViewModel alertDefinitionEditorViewModel,
+        AlertRuntimePageViewModel alertRuntimePageViewModel,
         CreatorIntelligenceService creatorIntelligence,
         IEventBus eventBus)
     {
@@ -462,6 +482,17 @@ public partial class MainWindow : Window
         _updatePageViewModel = updatePageViewModel;
         _migrationPageViewModel = migrationPageViewModel;
         _generalSettingsPageViewModel = generalSettingsPageViewModel;
+        _twitchGoalsPageViewModel = twitchGoalsPageViewModel;
+        _spotifyAutomationPageViewModel = spotifyAutomationPageViewModel;
+        _workflowSessionPageViewModel = workflowSessionPageViewModel;
+        _overlayConnectionSettingsPageViewModel =
+            overlayConnectionSettingsPageViewModel;
+        _overlayCanvasPageViewModel = overlayCanvasPageViewModel;
+        _overlayExtensionPacksPageViewModel =
+            overlayExtensionPacksPageViewModel;
+        _alertLibraryPageViewModel = alertLibraryPageViewModel;
+        _alertDefinitionEditorViewModel = alertDefinitionEditorViewModel;
+        _alertRuntimePageViewModel = alertRuntimePageViewModel;
         _creatorIntelligence = creatorIntelligence;
         _eventBus = eventBus;
         DiagnosticsModuleView.DataContext = _diagnosticsPageViewModel;
@@ -471,6 +502,96 @@ public partial class MainWindow : Window
         MigrationSettingsViewHost.DataContext = _migrationPageViewModel;
         LegalSettingsViewHost.DataContext = legalPageViewModel;
         GeneralSettingsViewHost.DataContext = _generalSettingsPageViewModel;
+        TwitchGoalsViewHost.DataContext = _twitchGoalsPageViewModel;
+        _twitchGoalsPageViewModel.SaveRequestedAsync = SaveTwitchGoalsAsync;
+        SpotifyAutomationViewHost.DataContext = _spotifyAutomationPageViewModel;
+        _spotifyAutomationPageViewModel.SaveRequestedAsync =
+            SaveSpotifyAutomationSettingsAsync;
+        WorkflowSessionViewHost.DataContext = _workflowSessionPageViewModel;
+        OverlayConnectionSettingsViewHost.DataContext =
+            _overlayConnectionSettingsPageViewModel;
+        OverlayCanvasViewHost.DataContext = _overlayCanvasPageViewModel;
+        OverlayExtensionPacksViewHost.DataContext =
+            _overlayExtensionPacksPageViewModel;
+        AlertLibraryViewHost.DataContext = _alertLibraryPageViewModel;
+        AlertDesignerPanel.DataContext = _alertDefinitionEditorViewModel;
+        AlertsContentPanel.DataContext = _alertRuntimePageViewModel;
+        AlertTypeBox.ItemsSource = _alertLibraryPageViewModel.Types;
+        _overlayConnectionSettingsPageViewModel.CopyTextRequested =
+            text => Clipboard.SetText(text);
+        _overlayConnectionSettingsPageViewModel.BrowseBackgroundRequestedAsync =
+            BrowseOverlayChatBackgroundImageAsync;
+        _overlayCanvasPageViewModel.CopyTextRequested =
+            text => Clipboard.SetText(text);
+        _overlayCanvasPageViewModel.PromptNameRequestedAsync =
+            PromptOverlayCanvasNameAsync;
+        _overlayCanvasPageViewModel.ConfirmDeleteRequestedAsync =
+            ConfirmOverlayCanvasDeleteAsync;
+        _overlayCanvasPageViewModel.OpenEditorRequestedAsync =
+            OpenOverlayEditorAsync;
+        _overlayCanvasPageViewModel.ErrorRequested =
+            message => MessageBox.Show(
+                this,
+                message,
+                "Overlay Canvas",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        _overlayExtensionPacksPageViewModel.OpenPackRequestedAsync =
+            OpenOverlayExtensionPackAsync;
+        _overlayExtensionPacksPageViewModel.ConfirmUninstallRequestedAsync =
+            ConfirmOverlayExtensionPackUninstallAsync;
+        _overlayExtensionPacksPageViewModel.ErrorRequested =
+            (message, validationError) => MessageBox.Show(
+                this,
+                message,
+                "Extension Pack importieren",
+                MessageBoxButton.OK,
+                    validationError
+                        ? MessageBoxImage.Warning
+                        : MessageBoxImage.Error);
+        _alertLibraryPageViewModel.BeforeDuplicateRequestedAsync =
+            () =>
+            {
+                SaveAlertDefinitionToSettings();
+                return Task.CompletedTask;
+            };
+        _alertLibraryPageViewModel.SelectionChangedAsync =
+            async type =>
+            {
+                if (!Equals(AlertTypeBox.SelectedItem, type))
+                {
+                    AlertTypeBox.SelectedItem = type;
+                }
+
+                await LoadSelectedAlertDefinitionAsync();
+            };
+        _alertLibraryPageViewModel.ConfirmDeleteRequestedAsync =
+            type => Task.FromResult(
+                MessageBox.Show(
+                    this,
+                    $"Alert '{type}' wirklich löschen?",
+                    "Alert löschen",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning) == MessageBoxResult.Yes);
+        _alertLibraryPageViewModel.ErrorRequested =
+            message =>
+            {
+                AlertPreviewStatusText.Text = message;
+                AlertPreviewStatusText.Foreground = Brushes.IndianRed;
+            };
+        _alertRuntimePageViewModel.SetActions(_streamerBotActions);
+        _alertRuntimePageViewModel.RefreshActionsRequestedAsync =
+            () => RefreshStreamerBotActionsAsync(true);
+        _alertRuntimePageViewModel.ApplySuppressionRequestedAsync =
+            ApplyStreamerBotAlertSuppressionAsync;
+        _alertRuntimePageViewModel.SetStreamerBotAlertsRequestedAsync =
+            enabled => SetStreamerBotAlertsEnabledAsync(enabled);
+        _alertRuntimePageViewModel.StopCurrentAlertRequestedAsync =
+            () => alertsModule.StopCurrentAsync();
+        _alertRuntimePageViewModel.ClearAlertQueueRequestedAsync =
+            () => alertsModule.ClearQueueAsync();
+        _alertRuntimePageViewModel.InstallObsSourcesRequestedAsync =
+            InstallObsAlertSceneAsync;
         _updatePageViewModel.ConfirmRestoreAsync = ConfirmUpdateRestoreAsync;
         _updatePageViewModel.AfterRestoreAsync = LoadSettingsAsync;
         _migrationPageViewModel.AfterImportAsync = LoadSettingsAsync;
@@ -500,6 +621,15 @@ public partial class MainWindow : Window
         _chatBadgeCatalog = chatBadgeCatalog;
         _twitchApiClient = twitchApiClient;
         _workflowModule = workflowModule;
+        _workflowSessionPageViewModel.ResetRequestedAsync =
+            () => ExecuteWorkflowAsync(
+                () => _workflowModule.Service.ResetAsync());
+        _workflowSessionPageViewModel.AddViewerSampleRequestedAsync =
+            async viewers =>
+            {
+                await _workflowModule.Service.AddViewerSampleAsync(viewers);
+                RefreshWorkflowUi(_workflowModule.Service.State);
+            };
         _profileService = profileService;
         _streamDeckModule = streamDeckModule;
         _appLogger = appLogger;
@@ -1919,14 +2049,6 @@ public partial class MainWindow : Window
                     RefreshSpotifyUi();
                 });
         };
-        ServicesSpotifyStartPlaylistBox.SelectionChanged += async (_, _) =>
-        {
-            if (ServicesSpotifyStartPlaylistBox.SelectedItem is SpotifyPlaylist playlist)
-            {
-                _settings.Spotify.StartPlaylistUri = playlist.Uri;
-                await _settingsStore.SaveAsync(_settings);
-            }
-        };
         ServicesSpotifyResetStatisticsButton.Click += (_, _) =>
         {
             if (MessageBox.Show("Spotify-Statistik wirklich zurücksetzen?", "Spotify-Statistik", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
@@ -2168,21 +2290,6 @@ public partial class MainWindow : Window
         ServicesSpotifySyncOverlayButton.Click += async (_, _) => await WriteSpotifyDataJsonNowAsync();
         ServicesSpotifyReloadOverlayButton.Click += (_, _) => OpenSpotifyDataJsonFolder();
         ServicesSpotifyPreviewOverlayButton.Click += (_, _) => OpenSpotifyDataJsonFile();
-        ServicesSpotifySaveAutomationButton.Click += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyAutoStartOnStreamBox.Checked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyAutoStartOnStreamBox.Unchecked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyEndMusicBox.Checked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyEndMusicBox.Unchecked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyPauseOnStreamEndBox.Checked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyPauseOnStreamEndBox.Unchecked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifySetLiveVolumeBox.Checked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifySetLiveVolumeBox.Unchecked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyLiveVolumeBox.LostFocus += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyMuteDuringAlertsBox.Checked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyMuteDuringAlertsBox.Unchecked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyAlertVolumeBox.LostFocus += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyAlertFadeOutMsBox.LostFocus += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
-        ServicesSpotifyAlertFadeInMsBox.LostFocus += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
         ServicesSpotifyVolumeSlider.ValueChanged += async (_, _) =>
         {
             int volume = (int)Math.Round(ServicesSpotifyVolumeSlider.Value);
@@ -2196,7 +2303,6 @@ public partial class MainWindow : Window
             }
         };
         ServicesTwitchSaveEndSettingsButton.Click += async (_, _) => await SaveTwitchEndSettingsAsync();
-        SaveTwitchGoalsButton.Click += async (_, _) => await SaveTwitchGoalsAsync();
         ServicesStreamerBotLaunchButton.Click += (_, _) => LaunchConfiguredExecutable(_settings.StreamerBot.ExecutablePath, "Streamer.bot");
         ServicesStreamerBotConnectButton.Click += async (_, _) => await ConnectStreamerBotAsync();
         ServicesStreamerBotDisconnectButton.Click += async (_, _) => await DisconnectStreamerBotAsync();
@@ -2227,11 +2333,6 @@ public partial class MainWindow : Window
             _streamerBotExecutionHistory.Clear();
             ServicesStreamerBotActionResultText.Text = "Ausführungshistorie wurde geleert.";
         };
-        RefreshStreamerBotAlertActionsButton.Click += async (_, _) => await RefreshStreamerBotActionsAsync(true);
-        DisableStreamerBotAlertsNowButton.Click += async (_, _) => await SetStreamerBotAlertsEnabledAsync(false);
-        EnableStreamerBotAlertsNowButton.Click += async (_, _) => await SetStreamerBotAlertsEnabledAsync(true);
-        SuppressStreamerBotAlertsBox.Checked += async (_, _) => await ApplyStreamerBotAlertSuppressionAsync();
-        SuppressStreamerBotAlertsBox.Unchecked += async (_, _) => await ApplyStreamerBotAlertSuppressionAsync();
         BrowseObsExecutableButton.Click += (_, _) => BrowseExecutable(ObsExecutablePathBox, "OBS|obs64.exe;obs32.exe|Programme|*.exe");
         BrowseSpotifyExecutableButton.Click += (_, _) => BrowseExecutable(SpotifyExecutablePathBox, "Spotify|Spotify.exe|Programme|*.exe");
         OpenSpotifyFromSettingsButton.Click += (_, _) =>
@@ -2280,24 +2381,11 @@ public partial class MainWindow : Window
 
         AlertTypeBox.SelectionChanged += async (_, _) =>
         {
-            SyncAlertLibrarySelection();
-            await LoadSelectedAlertDefinitionAsync();
-        };
-
-        AlertLibraryList.SelectionChanged += async (_, _) =>
-        {
-            if (AlertLibraryList.SelectedItem is AlertLibraryItem item &&
-                !Equals(AlertTypeBox.SelectedItem, item.Type))
+            if (AlertTypeBox.SelectedItem is string type)
             {
-                AlertTypeBox.SelectedItem = item.Type;
-                await LoadSelectedAlertDefinitionAsync();
+                _alertLibraryPageViewModel.Select(type);
             }
         };
-
-        NewAlertDefinitionButton.Click += async (_, _) => await CreateAlertDefinitionAsync();
-        DuplicateAlertDefinitionButton.Click += async (_, _) => await DuplicateAlertDefinitionAsync();
-        ToggleAlertDefinitionButton.Click += async (_, _) => await ToggleAlertDefinitionAsync();
-        DeleteAlertDefinitionButton.Click += async (_, _) => await DeleteAlertDefinitionAsync();
 
         SaveAlertDefinitionButton.Click += async (_, _) =>
             await SaveSelectedAlertDefinitionAsync();
@@ -2308,22 +2396,11 @@ public partial class MainWindow : Window
         TestAlertInObsButton.Click += async (_, _) =>
             await TestAlertInObsAsync();
 
-        InstallObsAlertSceneButton.Click += async (_, _) =>
-            await InstallObsAlertSceneAsync();
-
-        StopCurrentAlertButton.Click += async (_, _) =>
-            await _alertsModule.StopCurrentAsync();
-
-        ClearAlertQueueButton.Click += async (_, _) =>
-            await _alertsModule.ClearQueueAsync();
-
         _alertsModule.StateChanged += async (_, state) =>
         {
             Dispatcher.Invoke(() =>
             {
-                AlertQueueStatusText.Text = state.IsRunning
-                    ? $"{state.Current?.Type} läuft · Queue: {state.QueueLength}"
-                    : $"Bereit · Queue: {state.QueueLength}";
+                _alertRuntimePageViewModel.UpdateQueueState(state);
 
                 AlertsDashboardStatus.Text = state.IsRunning
                     ? "AKTIV"
@@ -2351,48 +2428,6 @@ public partial class MainWindow : Window
                 await PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppAlert(alertType, user));
             }
         };
-
-        CopyOverlayViewUrlButton.Click += (_, _) => CopySelectedOverlayViewUrl();
-        CopyOverlayWidgetUrlButton.Click += (_, _) => CopySelectedOverlayWidgetUrl();
-        OpenOverlayEditorButton.Click += (_, _) => OpenSelectedOverlayEditor();
-        NewOverlayCanvasButton.Click += async (_, _) => await CreateOverlayCanvasAsync();
-        RenameOverlayCanvasButton.Click += async (_, _) => await RenameOverlayCanvasAsync();
-        DuplicateOverlayCanvasButton.Click += async (_, _) => await DuplicateOverlayCanvasAsync();
-        DeleteOverlayCanvasButton.Click += async (_, _) => await DeleteOverlayCanvasAsync();
-        OverlayCanvasCombo.SelectionChanged += async (_, _) => await OnOverlayCanvasSelectionChangedAsync();
-        ImportOverlayExtensionPackButton.Click += async (_, _) => await ImportOverlayExtensionPackAsync();
-        UninstallOverlayExtensionPackButton.Click += async (_, _) => await UninstallSelectedOverlayExtensionPackAsync();
-        CopyOverlayWebServerUrlButton.Click += (_, _) =>
-        {
-            string url = string.IsNullOrWhiteSpace(OverlayWebServerUrlBox.Text)
-                ? _settings.Overlay.GetBaseUrl()
-                : OverlayWebServerUrlBox.Text.Trim();
-            try
-            {
-                Clipboard.SetText(url);
-                OverlayWebServerStatusText.Text = "Base-URL kopiert: " + url + " · WS: " + url.Replace("http://", "ws://", StringComparison.OrdinalIgnoreCase) + "/ws";
-            }
-            catch (Exception exception)
-            {
-                OverlayWebServerStatusText.Text = "URL konnte nicht kopiert werden: " + exception.Message;
-            }
-        };
-        CopyOverlayChatUrlButton.Click += (_, _) =>
-        {
-            string url = string.IsNullOrWhiteSpace(OverlayChatUrlBox.Text)
-                ? _settings.Overlay.GetOverlayUrl("chat")
-                : OverlayChatUrlBox.Text.Trim();
-            try
-            {
-                Clipboard.SetText(url);
-                OverlayWebServerStatusText.Text = "Chat-URL kopiert: " + url;
-            }
-            catch (Exception exception)
-            {
-                OverlayWebServerStatusText.Text = "Chat-URL konnte nicht kopiert werden: " + exception.Message;
-            }
-        };
-        BrowseOverlayChatBackgroundButton.Click += (_, _) => BrowseOverlayChatBackgroundImage();
 
         DashboardPrepareStreamButton.Click += async (_, _) =>
             await ExecuteDashboardActionAsync(
@@ -2437,12 +2472,6 @@ public partial class MainWindow : Window
             await ExecuteWorkflowAsync(() => _workflowModule.Service.EndAsync());
             await ResetTimedAutomationsAtStreamEndAsync();
         };
-
-        ResetWorkflowButton.Click += async (_, _) =>
-            await ExecuteWorkflowAsync(() => _workflowModule.Service.ResetAsync());
-
-        AddViewerSampleButton.Click += async (_, _) =>
-            await AddViewerSampleAsync();
 
         RunOfShowStepsList.ItemsSource = _runOfShowSteps;
         RunOfShowPlanBox.SelectionChanged += async (_, _) => await SwitchRunOfShowPlanAsync();
@@ -3604,12 +3633,9 @@ public partial class MainWindow : Window
         StreamerBotAutoConnectBox.IsChecked = _settings.StreamerBot.AutoConnect;
         StreamerBotConnectOnPrepareBox.IsChecked = _settings.StreamerBot.ConnectOnPrepare;
         StreamerBotExecutablePathBox.Text = _settings.StreamerBot.ExecutablePath;
-        SuiteAlertsEnabledBox.IsChecked = _settings.Alerts.Enabled;
-        SuppressStreamerBotAlertsBox.IsChecked = _settings.StreamerBot.SuppressAlertActionsWhenSuiteAlertsEnabled;
-        StreamerBotDisableAlertsActionBox.Text = _settings.StreamerBot.DisableAlertsActionName;
-        StreamerBotEnableAlertsActionBox.Text = _settings.StreamerBot.EnableAlertsActionName;
-        SettingsStreamerBotDisableAlertsActionBox.Text = _settings.StreamerBot.DisableAlertsActionName;
-        SettingsStreamerBotEnableAlertsActionBox.Text = _settings.StreamerBot.EnableAlertsActionName;
+        _alertRuntimePageViewModel.Load(
+            _settings.Alerts,
+            _settings.StreamerBot);
         BindStreamerBotActionSelectors();
         SpotifyVolumeBox.Text = _settings.Spotify.StartVolumePercent.ToString();
         SpotifyFadeOutBox.IsChecked = _settings.Spotify.FadeOutEnabled;
@@ -3634,15 +3660,10 @@ public partial class MainWindow : Window
         ServicesSpotifyOverlaySourceBox.Text = string.IsNullOrWhiteSpace(_settings.Spotify.OverlayObsSource) ? "ccs_spotify" : _settings.Spotify.OverlayObsSource;
         ServicesSpotifyOverlaySceneBox.Text = _settings.Spotify.OverlayObsScene;
         ServicesSpotifyShufflePlaylistBox.IsChecked = _settings.Spotify.ShuffleSelectedPlaylist;
-        ServicesSpotifyAutoStartOnStreamBox.IsChecked = _settings.Workflow.AutoStartSpotifyPlaylist;
-        ServicesSpotifyEndMusicBox.IsChecked = _settings.Workflow.AutoPlayEndMusic;
-        ServicesSpotifyPauseOnStreamEndBox.IsChecked = _settings.Workflow.PauseSpotifyOnStreamEnd;
-        ServicesSpotifySetLiveVolumeBox.IsChecked = _settings.Spotify.SetVolumeOnLiveTransition;
-        ServicesSpotifyLiveVolumeBox.Text = _settings.Spotify.LiveVolumePercent.ToString();
-        ServicesSpotifyMuteDuringAlertsBox.IsChecked = _settings.Spotify.MuteDuringAlerts;
-        ServicesSpotifyAlertVolumeBox.Text = _settings.Spotify.AlertMuteVolumePercent.ToString();
-        ServicesSpotifyAlertFadeOutMsBox.Text = _settings.Spotify.AlertFadeOutMilliseconds.ToString();
-        ServicesSpotifyAlertFadeInMsBox.Text = _settings.Spotify.AlertFadeInMilliseconds.ToString();
+        _spotifyAutomationPageViewModel.Load(
+            _settings.Workflow,
+            _settings.Spotify,
+            _spotifyModule.GetSnapshot().Playlists);
         ServicesTwitchRaidEnabledBox.IsChecked = _settings.Twitch.RaidOnStreamEnd;
         ServicesTwitchRaidCountdownSecondsBox.Text = Math.Max(1, _settings.Twitch.RaidCountdownSeconds).ToString();
         ServicesTwitchRaidStartTimeoutSecondsBox.Text = RaidStartPolicy
@@ -3676,68 +3697,22 @@ public partial class MainWindow : Window
         UpdateDashboardRaidControlsVisibility();
         UpdateDashboardStreamEndModuleVisibility();
 
-        GoalOverlaySceneBox.Text = _settings.Obs.GoalOverlayScene;
-        FollowerGoalTitleBox.Text = _settings.Twitch.FollowerGoal.Title;
-        FollowerGoalCurrentBox.Text = _settings.Twitch.FollowerGoal.Current.ToString("0");
-        FollowerGoalTargetBox.Text = _settings.Twitch.FollowerGoal.Target.ToString("0");
-        FollowerGoalFontBox.Text = _settings.Twitch.FollowerGoal.FontFace;
-        FollowerGoalFontSizeBox.Text = _settings.Twitch.FollowerGoal.FontSize.ToString();
-        SubGoalTitleBox.Text = _settings.Twitch.SubGoal.Title;
-        SubGoalCurrentBox.Text = _settings.Twitch.SubGoal.Current.ToString("0");
-        SubGoalTargetBox.Text = _settings.Twitch.SubGoal.Target.ToString("0");
-        SubGoalFontBox.Text = _settings.Twitch.SubGoal.FontFace;
-        SubGoalFontSizeBox.Text = _settings.Twitch.SubGoal.FontSize.ToString();
-        DonationGoalTitleBox.Text = _settings.Twitch.DonationGoal.Title;
-        DonationGoalCurrentBox.Text = _settings.Twitch.DonationGoal.Current.ToString("0.##");
-        DonationGoalTargetBox.Text = _settings.Twitch.DonationGoal.Target.ToString("0.##");
-        DonationGoalCurrencyBox.Text = _settings.Twitch.DonationGoal.Currency;
-        DonationGoalFontBox.Text = _settings.Twitch.DonationGoal.FontFace;
-        DonationGoalFontSizeBox.Text = _settings.Twitch.DonationGoal.FontSize.ToString();
+        _twitchGoalsPageViewModel.Load(
+            _settings.Obs,
+            _settings.Twitch,
+            _currentFollowerCount,
+            _currentActiveSubscriptionCount);
 
-        RefreshAlertLibrary();
-
+        _alertLibraryPageViewModel.Load(_settings);
         AlertTypeBox.SelectedItem =
-            _settings.Alerts.Definitions.ContainsKey("Follow")
-                ? "Follow"
-                : _settings.Alerts.Definitions.Keys.FirstOrDefault();
-
-        AlertObsSceneBox.Text =
-            _settings.Alerts.ObsSceneName;
-
-        AlertObsMediaSourceBox.Text =
-            _settings.Alerts.ObsMediaSourceName;
-
-        AlertObsTextSourceBox.Text =
-            _settings.Alerts.ObsTextSourceName;
-
-        AlertInterDelayBox.Text =
-            _settings.Alerts.InterAlertDelayMilliseconds.ToString();
+            _alertLibraryPageViewModel.SelectedType;
 
         await LoadSelectedAlertDefinitionAsync();
 
-        OverlayWebServerEnabledBox.IsChecked = _settings.Overlay.WebServerEnabled;
-        OverlayWebServerPortBox.Text = _settings.Overlay.WebServerPort.ToString();
-        OverlayWebServerUrlBox.Text = _settings.Overlay.GetBaseUrl();
-        OverlayChatEnabledBox.IsChecked = _settings.Overlay.Chat.Enabled;
-        OverlayChatShowEventsBox.IsChecked = _settings.Overlay.Chat.ShowTwitchEvents;
-        OverlayChatBttvBox.IsChecked = _settings.Overlay.Chat.EnableBttv;
-        OverlayChatFfzBox.IsChecked = _settings.Overlay.Chat.EnableFfz;
-        OverlayChatSevenTvBox.IsChecked = _settings.Overlay.Chat.EnableSevenTv;
-        _settings.Overlay.Chat.NormalizeAppearance();
-        SelectOverlayChatBackgroundType(_settings.Overlay.Chat.BackgroundType);
-        OverlayChatBackgroundColorBox.Text = _settings.Overlay.Chat.BackgroundColor;
-        OverlayChatBackgroundImageBox.Text = _settings.Overlay.Chat.BackgroundImagePath;
-        OverlayChatBackgroundOpacityBox.Text = ((int)Math.Round(_settings.Overlay.Chat.BackgroundOpacity * 100)).ToString();
-        OverlayChatPaddingBox.Text = _settings.Overlay.Chat.PaddingPx.ToString();
-        OverlayChatRadiusBox.Text = _settings.Overlay.Chat.BorderRadiusPx.ToString();
-        OverlayChatGapBox.Text = _settings.Overlay.Chat.GapPx.ToString();
-        OverlayChatFontSizeBox.Text = _settings.Overlay.Chat.FontSizePx.ToString();
-        OverlayChatFontFamilyBox.Text = _settings.Overlay.Chat.FontFamily;
-        OverlayChatUrlBox.Text = _settings.Overlay.GetOverlayUrl("chat");
-        RefreshOverlayCanvasCombo();
-        RefreshOverlayCanvasUrls();
+        _overlayConnectionSettingsPageViewModel.Load(_settings.Overlay);
+        _overlayCanvasPageViewModel.Load(_settings);
         RefreshOverlayWebServerStatusUi();
-        RefreshOverlayExtensionPacksList();
+        _overlayExtensionPacksPageViewModel.Refresh();
 
         StartSceneBox.Text = _settings.Obs.StartScene;
         LiveSceneBox.Text = _settings.Obs.LiveScene;
@@ -3924,12 +3899,14 @@ public partial class MainWindow : Window
             _settings.StreamerBot.AutoConnect = StreamerBotAutoConnectBox.IsChecked == true;
             _settings.StreamerBot.ConnectOnPrepare = StreamerBotConnectOnPrepareBox.IsChecked == true;
             _settings.StreamerBot.ExecutablePath = StreamerBotExecutablePathBox.Text.Trim();
-            _settings.Alerts.Enabled = SuiteAlertsEnabledBox.IsChecked == true;
-            _settings.StreamerBot.SuppressAlertActionsWhenSuiteAlertsEnabled = SuppressStreamerBotAlertsBox.IsChecked == true;
-            _settings.StreamerBot.DisableAlertsActionName = GetStreamerBotActionName(StreamerBotDisableAlertsActionBox, SettingsStreamerBotDisableAlertsActionBox, "CCS Alerts deaktivieren");
-            _settings.StreamerBot.EnableAlertsActionName = GetStreamerBotActionName(StreamerBotEnableAlertsActionBox, SettingsStreamerBotEnableAlertsActionBox, "CCS Alerts aktivieren");
-            _settings.StreamerBot.DisableAlertsActionId = GetStreamerBotActionId(StreamerBotDisableAlertsActionBox, SettingsStreamerBotDisableAlertsActionBox);
-            _settings.StreamerBot.EnableAlertsActionId = GetStreamerBotActionId(StreamerBotEnableAlertsActionBox, SettingsStreamerBotEnableAlertsActionBox);
+            if (!_alertRuntimePageViewModel.TryApplyTo(
+                    _settings.Alerts,
+                    _settings.StreamerBot,
+                    out string alertRuntimeSettingsError))
+            {
+                throw new InvalidOperationException(
+                    alertRuntimeSettingsError);
+            }
             SyncStreamerBotActionSelectorText();
             _settings.Spotify.StartVolumePercent = int.Parse(SpotifyVolumeBox.Text.Trim());
             _settings.Spotify.FadeOutEnabled = SpotifyFadeOutBox.IsChecked == true;
@@ -3946,9 +3923,15 @@ public partial class MainWindow : Window
             _settings.Spotify.OverlayMuteDetectionSpotifyVolume = ServicesSpotifyDetectVolumeMuteBox.IsChecked == true;
             _settings.Spotify.OverlayObsAudioSource = ServicesSpotifyObsAudioSourceBox.Text?.Trim() ?? "Spotify";
             _settings.Spotify.OverlayEnabled = true;
-            ApplySpotifyAutomationFieldsToSettings();
+            _spotifyAutomationPageViewModel.ApplyTo(
+                _settings.Workflow,
+                _settings.Spotify);
+            _settings.Spotify.ShuffleSelectedPlaylist =
+                ServicesSpotifyShufflePlaylistBox.IsChecked == true;
             ApplyTwitchEndFieldsToSettings();
-            ApplyTwitchGoalFieldsToSettings();
+            _twitchGoalsPageViewModel.ApplyTo(
+                _settings.Obs,
+                _settings.Twitch);
 
             if (SpotifyDeviceBox.SelectedItem is SpotifyDevice selectedDevice)
             {
@@ -3960,81 +3943,18 @@ public partial class MainWindow : Window
                 _settings.Spotify.StartPlaylistUri = selectedPlaylist.Uri;
             }
 
-            _settings.Alerts.ObsSceneName =
-                AlertObsSceneBox.Text.Trim();
-
-            _settings.Alerts.ObsMediaSourceName =
-                AlertObsMediaSourceBox.Text.Trim();
-
-            _settings.Alerts.ObsTextSourceName =
-                AlertObsTextSourceBox.Text.Trim();
-
-            _settings.Alerts.InterAlertDelayMilliseconds =
-                int.Parse(AlertInterDelayBox.Text.Trim());
-
             SaveAlertDefinitionToSettings();
 
-            _settings.Overlay.WebServerEnabled = OverlayWebServerEnabledBox.IsChecked == true;
-            if (!int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int overlayPort) || overlayPort is <= 0 or > 65535)
+            if (!_overlayConnectionSettingsPageViewModel.TryApplyTo(
+                    _settings.Overlay,
+                    out string overlaySettingsError))
             {
-                throw new InvalidOperationException("Ungültiger Overlay-Webserver-Port.");
-            }
-
-            _settings.Overlay.WebServerPort = overlayPort;
-            _settings.Overlay.Chat ??= new OverlayChatSettings();
-            _settings.Overlay.Chat.Enabled = OverlayChatEnabledBox.IsChecked == true;
-            _settings.Overlay.Chat.ShowTwitchEvents = OverlayChatShowEventsBox.IsChecked == true;
-            _settings.Overlay.Chat.EnableBttv = OverlayChatBttvBox.IsChecked == true;
-            _settings.Overlay.Chat.EnableFfz = OverlayChatFfzBox.IsChecked == true;
-            _settings.Overlay.Chat.EnableSevenTv = OverlayChatSevenTvBox.IsChecked == true;
-            _settings.Overlay.Chat.BackgroundType = GetOverlayChatBackgroundType();
-            _settings.Overlay.Chat.BackgroundColor = OverlayChatBackgroundColorBox.Text.Trim();
-            _settings.Overlay.Chat.BackgroundImagePath = OverlayChatBackgroundImageBox.Text.Trim();
-            if (int.TryParse(OverlayChatBackgroundOpacityBox.Text.Trim(), out int opacityPercent))
-            {
-                _settings.Overlay.Chat.BackgroundOpacity = opacityPercent / 100.0;
-            }
-
-            if (int.TryParse(OverlayChatPaddingBox.Text.Trim(), out int paddingPx))
-            {
-                _settings.Overlay.Chat.PaddingPx = paddingPx;
-            }
-
-            if (int.TryParse(OverlayChatRadiusBox.Text.Trim(), out int radiusPx))
-            {
-                _settings.Overlay.Chat.BorderRadiusPx = radiusPx;
-            }
-
-            if (int.TryParse(OverlayChatGapBox.Text.Trim(), out int gapPx))
-            {
-                _settings.Overlay.Chat.GapPx = gapPx;
-            }
-
-            if (int.TryParse(OverlayChatFontSizeBox.Text.Trim(), out int fontSizePx))
-            {
-                _settings.Overlay.Chat.FontSizePx = fontSizePx;
-            }
-
-            _settings.Overlay.Chat.FontFamily = OverlayChatFontFamilyBox.Text.Trim();
-
-            _settings.Overlay.Chat.NormalizeAppearance();
-            SelectOverlayChatBackgroundType(_settings.Overlay.Chat.BackgroundType);
-            OverlayChatBackgroundColorBox.Text = _settings.Overlay.Chat.BackgroundColor;
-            OverlayChatBackgroundOpacityBox.Text = ((int)Math.Round(_settings.Overlay.Chat.BackgroundOpacity * 100)).ToString();
-            OverlayChatPaddingBox.Text = _settings.Overlay.Chat.PaddingPx.ToString();
-            OverlayChatRadiusBox.Text = _settings.Overlay.Chat.BorderRadiusPx.ToString();
-            OverlayChatGapBox.Text = _settings.Overlay.Chat.GapPx.ToString();
-            OverlayChatFontSizeBox.Text = _settings.Overlay.Chat.FontSizePx.ToString();
-            OverlayChatFontFamilyBox.Text = _settings.Overlay.Chat.FontFamily;
-            OverlayWebServerUrlBox.Text = _settings.Overlay.GetBaseUrl();
-            OverlayChatUrlBox.Text = _settings.Overlay.GetOverlayUrl("chat");
-            if (OverlayCanvasCombo.SelectedItem is OverlayCanvasSettings selectedCanvas)
-            {
-                _settings.Overlay.SelectedCanvasId = selectedCanvas.Id;
+                throw new InvalidOperationException(overlaySettingsError);
             }
 
             _settings.Overlay.EnsureCanvasesMigrated();
-            RefreshOverlayCanvasUrls();
+            _overlayCanvasPageViewModel.UpdatePort(
+                _settings.Overlay.WebServerPort);
             _overlayRealtimeHub.ConfigureChatBuffer(_settings.Overlay.Chat.MaxBufferedMessages);
             await RefreshChatEmoteCatalogFromSettingsAsync();
 
@@ -7448,10 +7368,9 @@ public partial class MainWindow : Window
             _settings.Twitch.SubGoal.Current =
                 _currentActiveSubscriptionCount;
 
-            FollowerGoalCurrentBox.Text =
-                _currentFollowerCount.ToString();
-            SubGoalCurrentBox.Text =
-                _currentActiveSubscriptionCount.ToString();
+            _twitchGoalsPageViewModel.UpdateLiveCounts(
+                _currentFollowerCount,
+                _currentActiveSubscriptionCount);
 
             DashboardFollowerTotalText.Text =
                 $"Gesamt: {_currentFollowerCount}";
@@ -8104,33 +8023,6 @@ public partial class MainWindow : Window
         await RefreshRaidTargetStatusAsync(_settings.Twitch.SelectedRaidChannel);
     }
 
-    private void ApplySpotifyAutomationFieldsToSettings()
-    {
-        _settings.Workflow.AutoStartSpotifyPlaylist = ServicesSpotifyAutoStartOnStreamBox.IsChecked == true;
-        _settings.Workflow.AutoPlayEndMusic = ServicesSpotifyEndMusicBox.IsChecked == true;
-        _settings.Workflow.PauseSpotifyOnStreamEnd = ServicesSpotifyPauseOnStreamEndBox.IsChecked == true;
-        _settings.Spotify.SetVolumeOnLiveTransition = ServicesSpotifySetLiveVolumeBox.IsChecked == true;
-        _settings.Spotify.LiveVolumePercent = int.TryParse(ServicesSpotifyLiveVolumeBox.Text, out int liveVolume)
-            ? Math.Clamp(liveVolume, 0, 100)
-            : 75;
-        _settings.Spotify.MuteDuringAlerts = ServicesSpotifyMuteDuringAlertsBox.IsChecked == true;
-        _settings.Spotify.AlertDuckingMode = _settings.Spotify.MuteDuringAlerts ? "Reduce" : "None";
-        _settings.Spotify.AlertMuteVolumePercent = int.TryParse(ServicesSpotifyAlertVolumeBox.Text, out int alertVolume)
-            ? Math.Clamp(alertVolume, 0, 100)
-            : 50;
-        _settings.Spotify.AlertFadeOutMilliseconds = int.TryParse(ServicesSpotifyAlertFadeOutMsBox.Text, out int fadeOutMs)
-            ? Math.Clamp(fadeOutMs, 0, 10000)
-            : 500;
-        _settings.Spotify.AlertFadeInMilliseconds = int.TryParse(ServicesSpotifyAlertFadeInMsBox.Text, out int fadeInMs)
-            ? Math.Clamp(fadeInMs, 0, 10000)
-            : 500;
-        _settings.Spotify.ShuffleSelectedPlaylist = ServicesSpotifyShufflePlaylistBox.IsChecked == true;
-        if (ServicesSpotifyStartPlaylistBox.SelectedItem is SpotifyPlaylist playlist)
-        {
-            _settings.Spotify.StartPlaylistUri = playlist.Uri;
-        }
-    }
-
     private async Task SaveSpotifyAutomationSettingsAsync()
     {
         if (_loadingSettingsIntoUi)
@@ -8138,9 +8030,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        ApplySpotifyAutomationFieldsToSettings();
+        _spotifyAutomationPageViewModel.ApplyTo(
+            _settings.Workflow,
+            _settings.Spotify);
+        _settings.Spotify.ShuffleSelectedPlaylist =
+            ServicesSpotifyShufflePlaylistBox.IsChecked == true;
         await _settingsStore.SaveAsync(_settings);
-        ServicesSpotifyAutomationStatusText.Text = "Spotify-Automatik gespeichert.";
+        _spotifyAutomationPageViewModel.AutomationStatusText =
+            "Spotify-Automatik gespeichert.";
     }
 
     private void ApplyTwitchEndFieldsToSettings()
@@ -8179,7 +8076,8 @@ public partial class MainWindow : Window
         }
 
         // Beide Eingabefelder bearbeiten denselben Zielwert.
-        FollowerGoalTargetBox.Text = _settings.Twitch.FollowerGoal.Target.ToString("0");
+        _twitchGoalsPageViewModel.FollowerTarget =
+            _settings.Twitch.FollowerGoal.Target.ToString("0");
         ServicesTwitchEndFollowerGoalTargetBox.Text = _settings.Twitch.FollowerGoal.Target.ToString("0");
     }
 
@@ -8405,8 +8303,8 @@ public partial class MainWindow : Window
                 "Overlay",
                 "Overlay-Webserver konnte nicht neu gestartet werden: " + exception.Message,
                 exception);
-            OverlayWebServerStatusText.Text = "Webserver-Fehler: " + exception.Message;
-            OverlayWebServerStatusText.Foreground = Brushes.IndianRed;
+            _overlayConnectionSettingsPageViewModel.UpdateServerStatus(
+                "Webserver-Fehler: " + exception.Message);
             return;
         }
 
@@ -8415,25 +8313,24 @@ public partial class MainWindow : Window
 
     private void RefreshOverlayWebServerStatusUi()
     {
-        OverlayWebServerUrlBox.Text = _settings.Overlay.GetBaseUrl();
+        _overlayConnectionSettingsPageViewModel.Load(_settings.Overlay);
         if (!_settings.Overlay.WebServerEnabled)
         {
-            OverlayWebServerStatusText.Text = "Webserver deaktiviert – OBS nutzt lokale Dateien.";
-            OverlayWebServerStatusText.Foreground = Brushes.Gray;
+            _overlayConnectionSettingsPageViewModel.UpdateServerStatus(
+                "Webserver deaktiviert – OBS nutzt lokale Dateien.");
             return;
         }
 
         if (_overlayModule.WebServer.IsRunning)
         {
             string baseUrl = _overlayModule.WebServer.BaseUrl ?? _settings.Overlay.GetBaseUrl();
-            OverlayWebServerStatusText.Text =
-                $"Läuft auf {baseUrl} · Chat: {baseUrl}/chat · WS: {baseUrl.Replace("http://", "ws://", StringComparison.Ordinal)}/ws";
-            OverlayWebServerStatusText.Foreground = Brushes.LightGreen;
+            _overlayConnectionSettingsPageViewModel.UpdateServerStatus(
+                $"Läuft auf {baseUrl} · Chat: {baseUrl}/chat · WS: {baseUrl.Replace("http://", "ws://", StringComparison.Ordinal)}/ws");
             return;
         }
 
-        OverlayWebServerStatusText.Text = "Webserver aktiviert, aber nicht erreichbar.";
-        OverlayWebServerStatusText.Foreground = Brushes.Orange;
+        _overlayConnectionSettingsPageViewModel.UpdateServerStatus(
+            "Webserver aktiviert, aber nicht erreichbar.");
     }
 
     private async Task OpenOverlayFolderAsync()
@@ -8584,17 +8481,6 @@ public partial class MainWindow : Window
             : _settings.Workflow.CountdownLabel;
     }
 
-    private async Task AddViewerSampleAsync()
-    {
-        if (!int.TryParse(WorkflowViewerSampleBox.Text.Trim(), out int viewers))
-        {
-            return;
-        }
-
-        await _workflowModule.Service.AddViewerSampleAsync(viewers);
-        RefreshWorkflowUi(_workflowModule.Service.State);
-    }
-
     private void RefreshWorkflowUi(WorkflowState state)
     {
         // Workflow- und Twitch-Ereignisse können aus Hintergrundthreads kommen.
@@ -8606,29 +8492,17 @@ public partial class MainWindow : Window
         }
 
         WorkflowStatusText.Text = state.Phase + " · " + state.Detail;
-        WorkflowPhaseText.Text = state.Phase.ToString();
-        WorkflowSceneText.Text = string.IsNullOrWhiteSpace(state.CurrentScene)
-            ? "-"
-            : state.CurrentScene;
-
-        WorkflowCountdownText.Text =
-            TimeSpan.FromSeconds(Math.Max(0, state.CountdownRemainingSeconds))
-                .ToString(@"mm\:ss");
+        StreamSessionStats stats = _workflowModule.Service.SessionStats;
+        _workflowSessionPageViewModel.Update(state, stats);
         if (state.Phase == StreamPhase.Countdown)
         {
-            DashboardCountdownRemainingText.Text = WorkflowCountdownText.Text;
+            DashboardCountdownRemainingText.Text =
+                _workflowSessionPageViewModel.Countdown;
         }
         else
         {
             RefreshDashboardCountdownIdleDisplay();
         }
-
-        StreamSessionStats stats = _workflowModule.Service.SessionStats;
-        WorkflowPeakViewersText.Text = stats.PeakViewers.ToString();
-        WorkflowAverageViewersText.Text = stats.AverageViewers.ToString("0.0");
-        WorkflowFollowersText.Text = stats.FollowersGained.ToString();
-        WorkflowChatAlertsText.Text =
-            stats.ChatMessages + " / " + stats.AlertsPlayed;
 
         // The dashboard must reflect the actual OBS output as well as streams
         // started through the suite workflow. Otherwise a stream started
@@ -9111,153 +8985,6 @@ public partial class MainWindow : Window
         UpdateAlertAudioTrimLabels();
     }
 
-    private sealed record AlertLibraryItem(string Type, bool Enabled)
-    {
-        public string DisplayName => $"{(Enabled ? "●" : "○")} {Type}";
-    }
-
-    private void RefreshAlertLibrary(string? selectType = null)
-    {
-        // During InitializeComponent the alert controls may not have been created yet.
-        // ValueChanged/SelectionChanged handlers can call this method while XAML is still loading.
-        if (AlertTypeBox is null || AlertLibraryList is null)
-        {
-            return;
-        }
-
-        selectType ??= AlertTypeBox.SelectedItem as string;
-        var keys = _settings.Alerts.Definitions.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
-        AlertTypeBox.ItemsSource = keys;
-        AlertLibraryList.ItemsSource = keys.Select(key => new AlertLibraryItem(key, _settings.Alerts.Definitions[key].Enabled)).ToList();
-        if (!string.IsNullOrWhiteSpace(selectType) && _settings.Alerts.Definitions.ContainsKey(selectType))
-        {
-            AlertTypeBox.SelectedItem = selectType;
-        }
-        else if (keys.Count > 0)
-        {
-            AlertTypeBox.SelectedIndex = 0;
-        }
-
-        SyncAlertLibrarySelection();
-    }
-
-    private void SyncAlertLibrarySelection()
-    {
-        if (AlertLibraryList is null || AlertTypeBox?.SelectedItem is not string type)
-        {
-            return;
-        }
-
-        AlertLibraryList.SelectedItem = AlertLibraryList.Items.Cast<AlertLibraryItem>()
-            .FirstOrDefault(item => string.Equals(item.Type, type, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private string CreateUniqueAlertType(string baseName)
-    {
-        string cleaned = string.IsNullOrWhiteSpace(baseName) ? "Eigener Alert" : baseName.Trim();
-        if (!_settings.Alerts.Definitions.ContainsKey(cleaned))
-        {
-            return cleaned;
-        }
-
-        for (int i = 2; i < 1000; i++)
-        {
-            string candidate = $"{cleaned} {i}";
-            if (!_settings.Alerts.Definitions.ContainsKey(candidate))
-            {
-                return candidate;
-            }
-        }
-        return cleaned + " " + Guid.NewGuid().ToString("N")[..6];
-    }
-
-    private async Task CreateAlertDefinitionAsync()
-    {
-        string type = CreateUniqueAlertType("Eigener Alert");
-        _settings.Alerts.Definitions[type] = new AlertDefinitionSettings
-        {
-            Type = type,
-            Enabled = true,
-            TextTemplate = "{user} hat einen Alert ausgelöst!"
-        };
-        await _settingsStore.SaveAsync(_settings);
-        RefreshAlertLibrary(type);
-        AlertLibraryStatusText.Text = $"{type} wurde angelegt.";
-    }
-
-    private async Task DuplicateAlertDefinitionAsync()
-    {
-        if (AlertTypeBox.SelectedItem is not string sourceType || !_settings.Alerts.Definitions.TryGetValue(sourceType, out AlertDefinitionSettings? source))
-        {
-            return;
-        }
-
-        SaveAlertDefinitionToSettings();
-        string type = CreateUniqueAlertType(sourceType + " Kopie");
-        _settings.Alerts.Definitions[type] = new AlertDefinitionSettings
-        {
-            Type = type,
-            Enabled = source.Enabled,
-            TextTemplate = source.TextTemplate,
-            MediaPath = source.MediaPath,
-            SoundPath = source.SoundPath,
-            DurationSeconds = source.DurationSeconds,
-            Priority = source.Priority,
-            FontFace = source.FontFace,
-            FontSize = source.FontSize,
-            FontColor = source.FontColor,
-            Animation = source.Animation,
-            X = source.X,
-            Y = source.Y,
-            Width = source.Width,
-            Height = source.Height,
-            VolumePercent = source.VolumePercent,
-            SoundStartSeconds = source.SoundStartSeconds,
-            SoundEndSeconds = source.SoundEndSeconds,
-            AudioOutputDeviceId = source.AudioOutputDeviceId
-        };
-        await _settingsStore.SaveAsync(_settings);
-        RefreshAlertLibrary(type);
-        AlertLibraryStatusText.Text = $"{type} wurde erstellt.";
-    }
-
-    private async Task ToggleAlertDefinitionAsync()
-    {
-        if (AlertTypeBox.SelectedItem is not string type || !_settings.Alerts.Definitions.TryGetValue(type, out AlertDefinitionSettings? definition))
-        {
-            return;
-        }
-
-        definition.Enabled = !definition.Enabled;
-        await _settingsStore.SaveAsync(_settings);
-        RefreshAlertLibrary(type);
-        AlertLibraryStatusText.Text = definition.Enabled ? "Alert ist aktiv." : "Alert ist deaktiviert.";
-    }
-
-    private async Task DeleteAlertDefinitionAsync()
-    {
-        if (AlertTypeBox.SelectedItem is not string type)
-        {
-            return;
-        }
-
-        if (_settings.Alerts.Definitions.Count <= 1)
-        {
-            AlertLibraryStatusText.Text = "Mindestens ein Alert muss erhalten bleiben.";
-            return;
-        }
-        MessageBoxResult answer = MessageBox.Show($"Alert '{type}' wirklich löschen?", "Alert löschen", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (answer != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        _settings.Alerts.Definitions.Remove(type);
-        await _settingsStore.SaveAsync(_settings);
-        RefreshAlertLibrary();
-        AlertLibraryStatusText.Text = "Alert wurde gelöscht.";
-    }
-
     private async Task LoadSelectedAlertDefinitionAsync()
     {
         if (AlertTypeBox.SelectedItem is not string type ||
@@ -9268,51 +8995,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        AlertTextTemplateBox.Text =
-            definition.TextTemplate;
-
-        AlertMediaPathBox.Text =
-            definition.MediaPath;
-
-        AlertSoundPathBox.Text =
-            definition.SoundPath;
-
+        _alertDefinitionEditorViewModel.Load(definition);
         LoadAlertAudioOutputDevices();
-        AlertAudioOutputDeviceBox.SelectedValue = definition.AudioOutputDeviceId;
         LoadAlertAudioPreviewSource();
-        AlertAudioStartSlider.Value = Math.Max(0, definition.SoundStartSeconds);
-        if (definition.SoundEndSeconds > 0)
-        {
-            AlertAudioEndSlider.Value = definition.SoundEndSeconds;
-        }
-
-        AlertDurationBox.Text =
-            definition.DurationSeconds.ToString();
-
-        AlertPriorityBox.Text =
-            definition.Priority.ToString();
-
-        AlertFontFaceBox.Text =
-            definition.FontFace;
-
-        AlertFontSizeBox.Text =
-            definition.FontSize.ToString();
-
-        AlertFontColorBox.Text =
-            definition.FontColor;
-
-        foreach (object? item in AlertAnimationBox.Items)
-        {
-            if (item is System.Windows.Controls.ComboBoxItem comboItem &&
-                string.Equals(
-                    comboItem.Content?.ToString(),
-                    definition.Animation,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                AlertAnimationBox.SelectedItem = comboItem;
-                break;
-            }
-        }
 
         await PreviewAlertAsync();
     }
@@ -9325,7 +9010,11 @@ public partial class MainWindow : Window
 
             await _settingsStore.SaveAsync(_settings);
 
-            RefreshAlertLibrary(AlertTypeBox.SelectedItem as string);
+            _alertLibraryPageViewModel.Load(
+                _settings,
+                AlertTypeBox.SelectedItem as string);
+            AlertTypeBox.SelectedItem =
+                _alertLibraryPageViewModel.SelectedType;
             AlertPreviewStatusText.Text =
                 "Alert gespeichert.";
 
@@ -9352,40 +9041,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        definition.TextTemplate =
-            AlertTextTemplateBox.Text.Trim();
-
-        definition.MediaPath =
-            AlertMediaPathBox.Text.Trim();
-
-        definition.SoundPath =
-            AlertSoundPathBox.Text.Trim();
-
-        definition.AudioOutputDeviceId = AlertAudioOutputDeviceBox.SelectedValue?.ToString() ?? "";
-        definition.SoundStartSeconds = AlertAudioStartSlider.Value;
-        definition.SoundEndSeconds = AlertAudioEndSlider.Value;
-
-        definition.DurationSeconds =
-            int.Parse(AlertDurationBox.Text.Trim());
-
-        definition.Priority =
-            int.Parse(AlertPriorityBox.Text.Trim());
-
-        definition.FontFace =
-            AlertFontFaceBox.Text.Trim();
-
-        definition.FontSize =
-            int.Parse(AlertFontSizeBox.Text.Trim());
-
-        definition.FontColor =
-            AlertFontColorBox.Text.Trim();
-
-        definition.Animation =
-            (AlertAnimationBox.SelectedItem
-                as System.Windows.Controls.ComboBoxItem)
-                ?.Content
-                ?.ToString()
-            ?? "Fade";
+        if (!_alertDefinitionEditorViewModel.TryApplyTo(
+                definition,
+                out string error))
+        {
+            throw new InvalidOperationException(error);
+        }
     }
 
     private async Task PreviewAlertAsync()
@@ -9520,12 +9181,13 @@ public partial class MainWindow : Window
         try
         {
             SaveAlertDefinitionToSettings();
-            _settings.Alerts.ObsSceneName =
-                AlertObsSceneBox.Text.Trim();
-            _settings.Alerts.ObsMediaSourceName =
-                AlertObsMediaSourceBox.Text.Trim();
-            _settings.Alerts.ObsTextSourceName =
-                AlertObsTextSourceBox.Text.Trim();
+            if (!_alertRuntimePageViewModel.TryApplyTo(
+                    _settings.Alerts,
+                    _settings.StreamerBot,
+                    out string settingsError))
+            {
+                throw new InvalidOperationException(settingsError);
+            }
             await _settingsStore.SaveAsync(_settings);
 
             IReadOnlyDictionary<string, string> variables = CreateAlertTestVariables(type);
@@ -9538,10 +9200,8 @@ public partial class MainWindow : Window
                 user,
                 variables);
 
-            InstallObsAlertSceneStatusText.Text =
-                $"OBS-Szene '{_settings.Alerts.ObsSceneName}' mit Text- und Medienquelle angelegt.";
-            InstallObsAlertSceneStatusText.Foreground =
-                System.Windows.Media.Brushes.LightGreen;
+            _alertRuntimePageViewModel.SetInstallStatus(
+                $"OBS-Szene '{_settings.Alerts.ObsSceneName}' mit Text- und Medienquelle angelegt.");
 
             MessageBox.Show(
                 $"Die Szene '{_settings.Alerts.ObsSceneName}' wurde in OBS angelegt " +
@@ -9552,10 +9212,8 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            InstallObsAlertSceneStatusText.Text =
-                exception.Message;
-            InstallObsAlertSceneStatusText.Foreground =
-                System.Windows.Media.Brushes.IndianRed;
+            _alertRuntimePageViewModel.SetInstallStatus(
+                exception.Message);
 
             MessageBox.Show(
                 exception.Message,
@@ -9737,7 +9395,8 @@ public partial class MainWindow : Window
                 if (!snapshot.Authenticated || !playback.IsPlaying || playback.Device is null)
                 {
                     Dispatcher.Invoke(() =>
-                        ServicesSpotifyAlertMuteStatusText.Text = "Kein laufender Spotify-Titel – keine Lautstärkeabsenkung nötig.");
+                        _spotifyAutomationPageViewModel.SetAlertStatus(
+                            "Kein laufender Spotify-Titel – keine Lautstärkeabsenkung nötig."));
                     return;
                 }
 
@@ -9750,9 +9409,9 @@ public partial class MainWindow : Window
 
                 Dispatcher.Invoke(() =>
                 {
-                    ServicesSpotifyAlertMuteStatusText.Text =
-                        $"Alert läuft: Spotify {_spotifyVolumeBeforeAlert}% → {alertVolume}%";
-                    ServicesSpotifyAlertMuteStatusText.Foreground = Brushes.Orange;
+                    _spotifyAutomationPageViewModel.SetAlertStatus(
+                        $"Alert läuft: Spotify {_spotifyVolumeBeforeAlert}% → {alertVolume}%",
+                        "Warning");
                 });
                 return;
             }
@@ -9770,8 +9429,9 @@ public partial class MainWindow : Window
             _appLogger.Write(AppLogLevel.Warning, "Spotify", "Spotify konnte für den Alert nicht automatisch geregelt werden.", ex);
             Dispatcher.Invoke(() =>
             {
-                ServicesSpotifyAlertMuteStatusText.Text = "Spotify-Alert-Ducking fehlgeschlagen: " + ex.Message;
-                ServicesSpotifyAlertMuteStatusText.Foreground = Brushes.IndianRed;
+                _spotifyAutomationPageViewModel.SetAlertStatus(
+                    "Spotify-Alert-Ducking fehlgeschlagen: " + ex.Message,
+                    "Error");
             });
         }
         finally
@@ -9799,9 +9459,9 @@ public partial class MainWindow : Window
 
         Dispatcher.Invoke(() =>
         {
-            ServicesSpotifyAlertMuteStatusText.Text =
-                $"Alert beendet: Spotify auf {restoreVolume.Value}% zurückgestellt.";
-            ServicesSpotifyAlertMuteStatusText.Foreground = Brushes.LightGreen;
+            _spotifyAutomationPageViewModel.SetAlertStatus(
+                $"Alert beendet: Spotify auf {restoreVolume.Value}% zurückgestellt.",
+                "Success");
         });
     }
 
@@ -10090,40 +9750,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RefreshOverlayCanvasCombo()
-    {
-        bool previousLoading = _loadingSettingsIntoUi;
-        _loadingSettingsIntoUi = true;
-        try
-        {
-            _settings.Overlay.EnsureCanvasesMigrated();
-            OverlayCanvasCombo.ItemsSource = null;
-            OverlayCanvasCombo.ItemsSource = _settings.Overlay.Canvases.ToList();
-            OverlayCanvasCombo.DisplayMemberPath = nameof(OverlayCanvasSettings.Name);
-            OverlayCanvasSettings selected = _settings.Overlay.GetSelectedCanvas();
-            OverlayCanvasCombo.SelectedItem = _settings.Overlay.Canvases.FirstOrDefault(c =>
-                string.Equals(c.Id, selected.Id, StringComparison.OrdinalIgnoreCase));
-        }
-        finally
-        {
-            _loadingSettingsIntoUi = previousLoading;
-        }
-    }
-
-    private void RefreshOverlayExtensionPacksList()
-    {
-        _overlayExtensionPacksCache = _overlayModule.ExtensionStore.ListCatalog().ToList();
-        OverlayExtensionPacksList.ItemsSource = null;
-        OverlayExtensionPacksList.ItemsSource = _overlayExtensionPacksCache
-            .Select(pack => $"{pack.Name} ({pack.Id}) · v{pack.Version} · {pack.Widgets.Count} Widget(s), {pack.Effects.Count} Effekt(e), {pack.Fonts.Count} Font(s)")
-            .ToList();
-
-        OverlayExtensionPacksStatusText.Text = _overlayExtensionPacksCache.Count == 0
-            ? "Keine Extension Packs installiert."
-            : $"{_overlayExtensionPacksCache.Count} Extension Pack(s) installiert.";
-    }
-
-    private async Task ImportOverlayExtensionPackAsync()
+    private Task<Stream?> OpenOverlayExtensionPackAsync()
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
@@ -10133,507 +9760,121 @@ public partial class MainWindow : Window
             Multiselect = false
         };
 
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        try
-        {
-            await using FileStream zipStream = File.OpenRead(dialog.FileName);
-            OverlayExtensionPackSummary summary = await _overlayModule.ExtensionStore.InstallFromZipAsync(zipStream);
-            RefreshOverlayExtensionPacksList();
-            OverlayExtensionPacksStatusText.Text = $"Extension Pack „{summary.Name}“ ({summary.Id}) installiert.";
-            OverlayExtensionPacksStatusText.Foreground = Brushes.LightGreen;
-        }
-        catch (OverlayExtensionValidationException exception)
-        {
-            OverlayExtensionPacksStatusText.Text = "Import fehlgeschlagen: " + exception.Message;
-            OverlayExtensionPacksStatusText.Foreground = Brushes.OrangeRed;
-            MessageBox.Show(this, exception.Message, "Extension Pack importieren", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-        catch (Exception exception)
-        {
-            OverlayExtensionPacksStatusText.Text = "Import fehlgeschlagen: " + exception.Message;
-            OverlayExtensionPacksStatusText.Foreground = Brushes.OrangeRed;
-            MessageBox.Show(this, exception.Message, "Extension Pack importieren", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+        return Task.FromResult<Stream?>(
+            dialog.ShowDialog(this) == true
+                ? File.OpenRead(dialog.FileName)
+                : null);
     }
 
-    private async Task UninstallSelectedOverlayExtensionPackAsync()
-    {
-        int index = OverlayExtensionPacksList.SelectedIndex;
-        if (index < 0 || index >= _overlayExtensionPacksCache.Count)
-        {
-            OverlayExtensionPacksStatusText.Text = "Bitte zuerst ein Extension Pack auswählen.";
-            return;
-        }
-
-        OverlayExtensionPackSummary pack = _overlayExtensionPacksCache[index];
-        if (MessageBox.Show(
+    private Task<bool> ConfirmOverlayExtensionPackUninstallAsync(
+        OverlayExtensionPackSummary pack) =>
+        Task.FromResult(
+            MessageBox.Show(
                 this,
                 $"Extension Pack „{pack.Name}“ ({pack.Id}) wirklich deinstallieren?",
                 "Extension Pack deinstallieren",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Question) != MessageBoxResult.Yes)
-        {
-            return;
-        }
+                MessageBoxImage.Question) == MessageBoxResult.Yes);
 
-        try
-        {
-            await _overlayModule.ExtensionStore.UninstallAsync(pack.Id);
-            RefreshOverlayExtensionPacksList();
-            OverlayExtensionPacksStatusText.Text = $"Extension Pack „{pack.Name}“ deinstalliert.";
-            OverlayExtensionPacksStatusText.Foreground = Brushes.LightGreen;
-        }
-        catch (Exception exception)
-        {
-            OverlayExtensionPacksStatusText.Text = "Deinstallation fehlgeschlagen: " + exception.Message;
-            OverlayExtensionPacksStatusText.Foreground = Brushes.OrangeRed;
-        }
-    }
-
-    private OverlayCanvasSettings? GetUiSelectedOverlayCanvas()
+    private Task<string?> PromptOverlayCanvasNameAsync(
+        OverlayCanvasNameRequest request)
     {
-        if (OverlayCanvasCombo.SelectedItem is OverlayCanvasSettings selected)
-        {
-            return selected;
-        }
-
-        _settings.Overlay.EnsureCanvasesMigrated();
-        return _settings.Overlay.GetSelectedCanvas();
-    }
-
-    private void RefreshOverlayCanvasUrls()
-    {
-        if (int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int port) && port is > 0 and <= 65535)
-        {
-            _settings.Overlay.WebServerPort = port;
-        }
-
-        OverlayCanvasSettings canvas = GetUiSelectedOverlayCanvas() ?? _settings.Overlay.GetSelectedCanvas();
-        OverlayViewUrlBox.Text = _settings.Overlay.GetViewUrl(canvas.Id);
-        OverlayEditorUrlBox.Text = _settings.Overlay.GetEditorUrl(canvas.Id);
-        EnsureOverlayWidgetUrlCombo();
-    }
-
-    private async Task OnOverlayCanvasSelectionChangedAsync()
-    {
-        if (_loadingSettingsIntoUi)
-        {
-            RefreshOverlayCanvasUrls();
-            return;
-        }
-
-        if (OverlayCanvasCombo.SelectedItem is not OverlayCanvasSettings selected)
-        {
-            RefreshOverlayCanvasUrls();
-            return;
-        }
-
-        if (string.Equals(_settings.Overlay.SelectedCanvasId, selected.Id, StringComparison.OrdinalIgnoreCase))
-        {
-            RefreshOverlayCanvasUrls();
-            return;
-        }
-
-        _settings.Overlay.SelectedCanvasId = selected.Id;
-        RefreshOverlayCanvasUrls();
-        try
-        {
-            await _settingsStore.SaveAsync(_settings);
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = "Canvas-Auswahl konnte nicht gespeichert werden: " + exception.Message;
-        }
-    }
-
-    private async Task PersistOverlayCanvasesAsync(string statusMessage)
-    {
-        _settings.Overlay.EnsureCanvasesMigrated();
-        await _settingsStore.SaveAsync(_settings);
-        RefreshOverlayCanvasCombo();
-        RefreshOverlayCanvasUrls();
-        try
-        {
-            if (_overlayModule.WebServer.IsRunning)
-            {
-                await _overlayModule.WebServer.RefreshMountedCanvasesAsync();
-            }
-        }
-        catch (Exception exception)
-        {
-            _appLogger.Write(
-                AppLogLevel.Warning,
-                "Overlay",
-                "Canvas-Liste im Webserver konnte nicht aktualisiert werden: " + exception.Message,
-                exception);
-        }
-
-        OverlayStatusText.Text = statusMessage;
-    }
-
-    private bool TryPromptOverlayCanvasName(string title, string prompt, string initialValue, out string name)
-    {
-        name = "";
-        var dialog = new TextPromptWindow(title, prompt, initialValue)
+        var dialog = new TextPromptWindow(
+            request.Title,
+            request.Prompt,
+            request.InitialValue)
         {
             Owner = this
         };
-        if (dialog.ShowDialog() != true)
-        {
-            return false;
-        }
 
-        name = dialog.Value;
-        return !string.IsNullOrWhiteSpace(name);
+        return Task.FromResult(
+            dialog.ShowDialog() == true
+                ? dialog.Value
+                : null);
     }
 
-    private async Task CreateOverlayCanvasAsync()
+    private Task<bool> ConfirmOverlayCanvasDeleteAsync(
+        OverlayCanvasSettings canvas)
     {
-        try
+        if (_settings.Overlay.Canvases.Count <= 1)
         {
-            if (!TryPromptOverlayCanvasName(
-                    "Neues Canvas",
-                    "Name für das neue Overlay-Canvas:",
-                    "",
-                    out string name))
-            {
-                return;
-            }
-
-            _settings.Overlay.EnsureCanvasesMigrated();
-            string id = OverlaySettings.CreateCanvasId(
-                name,
-                _settings.Overlay.Canvases.Select(c => c.Id));
-            var canvas = new OverlayCanvasSettings { Id = id, Name = name };
-            var layout = OverlayLayout.CreateDefault();
-            layout.Name = name;
-            await _overlayModule.LayoutStore.SaveAsync(id, layout);
-            _settings.Overlay.Canvases.Add(canvas);
-            _settings.Overlay.SelectedCanvasId = id;
-            await PersistOverlayCanvasesAsync($"Canvas „{name}“ angelegt.");
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = "Canvas konnte nicht angelegt werden: " + exception.Message;
-            MessageBox.Show(this, exception.Message, "Neues Canvas", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private async Task RenameOverlayCanvasAsync()
-    {
-        try
-        {
-            OverlayCanvasSettings? canvas = GetUiSelectedOverlayCanvas();
-            if (canvas is null)
-            {
-                return;
-            }
-
-            if (!TryPromptOverlayCanvasName(
-                    "Canvas umbenennen",
-                    "Neuer Anzeigename (URL/Id bleibt gleich):",
-                    canvas.Name,
-                    out string name))
-            {
-                return;
-            }
-
-            canvas.Name = name;
-            OverlayLayout layout = await _overlayModule.LayoutStore.LoadAsync(canvas.Id);
-            layout.Name = name;
-            await _overlayModule.LayoutStore.SaveAsync(canvas.Id, layout);
-            _settings.Overlay.SelectedCanvasId = canvas.Id;
-            await PersistOverlayCanvasesAsync($"Canvas umbenannt in „{name}“.");
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = "Canvas konnte nicht umbenannt werden: " + exception.Message;
-            MessageBox.Show(this, exception.Message, "Canvas umbenennen", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private async Task DuplicateOverlayCanvasAsync()
-    {
-        try
-        {
-            OverlayCanvasSettings? source = GetUiSelectedOverlayCanvas();
-            if (source is null)
-            {
-                return;
-            }
-
-            string suggestedName = source.Name.EndsWith(" (Kopie)", StringComparison.Ordinal)
-                ? source.Name
-                : source.Name + " (Kopie)";
-            if (!TryPromptOverlayCanvasName(
-                    "Canvas duplizieren",
-                    "Name für die Kopie:",
-                    suggestedName,
-                    out string name))
-            {
-                return;
-            }
-
-            _settings.Overlay.EnsureCanvasesMigrated();
-            string id = OverlaySettings.CreateCanvasId(
-                name,
-                _settings.Overlay.Canvases.Select(c => c.Id));
-            await _overlayModule.LayoutStore.DuplicateAsync(source.Id, id);
-            OverlayLayout layout = await _overlayModule.LayoutStore.LoadAsync(id);
-            layout.Name = name;
-            await _overlayModule.LayoutStore.SaveAsync(id, layout);
-            _settings.Overlay.Canvases.Add(new OverlayCanvasSettings { Id = id, Name = name });
-            _settings.Overlay.SelectedCanvasId = id;
-            await PersistOverlayCanvasesAsync($"Canvas „{name}“ dupliziert.");
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = "Canvas konnte nicht dupliziert werden: " + exception.Message;
-            MessageBox.Show(this, exception.Message, "Canvas duplizieren", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private async Task DeleteOverlayCanvasAsync()
-    {
-        try
-        {
-            _settings.Overlay.EnsureCanvasesMigrated();
-            OverlayCanvasSettings? canvas = GetUiSelectedOverlayCanvas();
-            if (canvas is null)
-            {
-                return;
-            }
-
-            if (_settings.Overlay.Canvases.Count <= 1)
-            {
-                MessageBox.Show(
-                    this,
-                    "Das letzte Canvas kann nicht gelöscht werden.",
-                    "Canvas löschen",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            MessageBoxResult confirm = MessageBox.Show(
+            MessageBox.Show(
                 this,
-                $"Canvas „{canvas.Name}“ wirklich löschen?\nLayout-Datei und OBS-URL /view/{canvas.Id} entfallen.",
+                "Das letzte Canvas kann nicht gelöscht werden.",
+                "Canvas löschen",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(
+            MessageBox.Show(
+                this,
+                $"Canvas „{canvas.Name}“ wirklich löschen?\n" +
+                $"Layout-Datei und OBS-URL /view/{canvas.Id} entfallen.",
                 "Canvas löschen",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-            if (confirm != MessageBoxResult.Yes)
-            {
-                return;
-            }
-
-            await _overlayModule.LayoutStore.DeleteAsync(canvas.Id);
-            _settings.Overlay.Canvases.RemoveAll(c =>
-                string.Equals(c.Id, canvas.Id, StringComparison.OrdinalIgnoreCase));
-            _settings.Overlay.EnsureCanvasesMigrated();
-            await PersistOverlayCanvasesAsync($"Canvas „{canvas.Name}“ gelöscht.");
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = "Canvas konnte nicht gelöscht werden: " + exception.Message;
-            MessageBox.Show(this, exception.Message, "Canvas löschen", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+                MessageBoxImage.Warning) == MessageBoxResult.Yes);
     }
 
-    private void EnsureOverlayWidgetUrlCombo()
-    {
-        if (OverlayWidgetUrlCombo.Items.Count > 0)
-        {
-            return;
-        }
-
-        var entries = new List<(string Label, string Path)>
-        {
-            ("Widget: Online + Zeit", "online"),
-            ("Widget: Alert", "alert"),
-            ("Widget: Music Player", "music"),
-            ("Widget: Music Player (Legacy Spotify-URL)", "spotify"),
-            ("Widget: Chat", "chat"),
-            ("Widget: Ending Stats", "ending-stats"),
-            ("Widget: Text", "text"),
-            ("Widget: Image", "image"),
-            ("Widget: Countdown", "countdown"),
-            ("Widget: Socials", "socials"),
-            ("Widget: Partner Roulette", "partner-roulette"),
-            ("Widget: Goal Bar", "goal-bar"),
-            ("Widget: Event Ticker", "event-ticker"),
-            ("Widget: Viewer Count", "viewer-count"),
-            ("Widget: Lower Third", "lower-third"),
-            ("Widget: QR Code", "qr-code"),
-            ("Widget: BRB Panel", "brb-panel"),
-            ("Widget: Announcement Bar", "announcement-bar"),
-            ("Widget: Animated Background", "animated-background"),
-            ("Shape: Frame", "shape/frame"),
-            ("Shape: Card Frame", "shape/frame.card"),
-            ("Shape: Vignette", "shape/shape.vignette"),
-            ("Shape: Cutout", "shape/shape.cutout"),
-            ("Shape: Starting Hintergrund", "shape/shape.scene-bg"),
-            ("Shape: Divider", "shape/shape.divider"),
-            ("Shape: Cam Ring", "shape/shape.cam-ring"),
-            ("Shape: Sticker", "shape/shape.sticker")
-        };
-
-        foreach ((string label, string path) in entries)
-        {
-            OverlayWidgetUrlCombo.Items.Add(new OverlayWidgetUrlItem(label, path));
-        }
-
-        OverlayWidgetUrlCombo.DisplayMemberPath = nameof(OverlayWidgetUrlItem.Label);
-        OverlayWidgetUrlCombo.SelectedIndex = 0;
-    }
-
-    private sealed record OverlayWidgetUrlItem(string Label, string Path);
-
-    private void CopySelectedOverlayViewUrl()
-    {
-        RefreshOverlayCanvasUrls();
-        string url = OverlayViewUrlBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            OverlayStatusText.Text = "Keine View-URL.";
-            return;
-        }
-
-        try
-        {
-            Clipboard.SetText(url);
-            OverlayStatusText.Text = "Canvas-View-URL kopiert: " + url;
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = "URL konnte nicht kopiert werden: " + exception.Message;
-        }
-    }
-
-    private void CopySelectedOverlayWidgetUrl()
-    {
-        EnsureOverlayWidgetUrlCombo();
-        if (int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int port) && port is > 0 and <= 65535)
-        {
-            _settings.Overlay.WebServerPort = port;
-        }
-
-        string path = OverlayWidgetUrlCombo.SelectedItem is OverlayWidgetUrlItem item
-            ? item.Path
-            : "music";
-        string url = _settings.Overlay.GetWidgetUrl(path);
-        try
-        {
-            Clipboard.SetText(url);
-            OverlayStatusText.Text = "Widget-URL kopiert: " + url;
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = "URL konnte nicht kopiert werden: " + exception.Message;
-        }
-    }
-
-    private void OpenSelectedOverlayEditor()
+    private async Task OpenOverlayEditorAsync(
+        string url,
+        string canvasName)
     {
         try
         {
-            _settings.Overlay.EnsureCanvasesMigrated();
-            OverlayCanvasSettings canvas = GetUiSelectedOverlayCanvas() ?? _settings.Overlay.GetSelectedCanvas();
-            _settings.Overlay.SelectedCanvasId = canvas.Id;
-            if (int.TryParse(OverlayWebServerPortBox.Text.Trim(), out int port) && port is > 0 and <= 65535)
-            {
-                _settings.Overlay.WebServerPort = port;
-            }
-
-            string url = _settings.Overlay.GetEditorUrl(canvas.Id);
-            OverlayEditorUrlBox.Text = url;
-            OverlayViewUrlBox.Text = _settings.Overlay.GetViewUrl(canvas.Id);
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                OverlayStatusText.Text = "Keine Editor-URL.";
-                return;
-            }
-
             if (!_overlayModule.WebServer.IsRunning)
             {
-                if (_settings.Overlay.WebServerEnabled)
+                if (!_settings.Overlay.WebServerEnabled)
                 {
-                    OverlayStatusText.Text = "Overlay-Webserver startet…";
-                    _ = EnsureOverlayWebServerRunningForEditorAsync(url);
+                    _overlayCanvasPageViewModel.UpdateStatus(
+                        "Overlay-Webserver läuft nicht. Bitte aktivieren und speichern.");
+                    MessageBox.Show(
+                        this,
+                        "Der Overlay-Webserver ist deaktiviert.\n" +
+                        "Bitte unter Overlay → Webserver aktivieren und speichern.",
+                        "Overlay Editor",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
                     return;
                 }
 
-                OverlayStatusText.Text = "Overlay-Webserver läuft nicht. Bitte aktivieren und speichern.";
-                MessageBox.Show(
-                    this,
-                    "Der Overlay-Webserver ist deaktiviert.\nBitte unter Overlay → Webserver aktivieren und speichern.",
-                    "Overlay Editor",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
+                _overlayCanvasPageViewModel.UpdateStatus(
+                    "Overlay-Webserver startet…");
+                await _overlayModule.WebServer.RestartAsync();
+                if (!_overlayModule.WebServer.IsRunning)
+                {
+                    throw new InvalidOperationException(
+                        "Overlay-Webserver konnte nicht gestartet werden.");
+                }
+
+                RefreshOverlayWebServerStatusUi();
             }
 
-            ShowOverlayEditorWindow(url);
-        }
-        catch (Exception exception)
-        {
-            OverlayStatusText.Text = "Editor konnte nicht geöffnet werden: " + exception.Message;
-            MessageBox.Show(
-                this,
-                "Editor konnte nicht geöffnet werden:\n" + exception.Message,
-                "Overlay Editor",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-        }
-    }
-
-    private async Task EnsureOverlayWebServerRunningForEditorAsync(string url)
-    {
-        try
-        {
-            await _overlayModule.WebServer.RestartAsync();
-            if (!_overlayModule.WebServer.IsRunning)
+            var window = new OverlayEditorWindow(url, canvasName)
             {
-                OverlayStatusText.Text = "Overlay-Webserver konnte nicht gestartet werden.";
-                MessageBox.Show(
-                    this,
-                    "Overlay-Webserver konnte nicht gestartet werden.\nEinstellungen speichern und erneut versuchen.",
-                    "Overlay Editor",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-
-            RefreshOverlayWebServerStatusUi();
-            ShowOverlayEditorWindow(url);
+                Owner = this
+            };
+            window.Show();
+            _overlayCanvasPageViewModel.UpdateStatus(
+                "Editor geöffnet: " + url);
         }
         catch (Exception exception)
         {
-            OverlayStatusText.Text = "Webserver-Start fehlgeschlagen: " + exception.Message;
+            _overlayCanvasPageViewModel.UpdateStatus(
+                "Editor konnte nicht geöffnet werden: " +
+                exception.Message);
             MessageBox.Show(
                 this,
-                "Webserver-Start fehlgeschlagen:\n" + exception.Message,
+                "Editor konnte nicht geöffnet werden:\n" +
+                exception.Message,
                 "Overlay Editor",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
     }
 
-    private void ShowOverlayEditorWindow(string url)
-    {
-        OverlayCanvasSettings canvas = GetUiSelectedOverlayCanvas() ?? _settings.Overlay.GetSelectedCanvas();
-        var window = new OverlayEditorWindow(url, canvas.Name)
-        {
-            Owner = this
-        };
-        window.Show();
-        OverlayStatusText.Text = "Editor geöffnet: " + url;
-    }
-
-    private void BrowseOverlayChatBackgroundImage()
+    private Task<string?> BrowseOverlayChatBackgroundImageAsync()
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
@@ -10643,7 +9884,8 @@ public partial class MainWindow : Window
             Multiselect = false
         };
 
-        string currentPath = OverlayChatBackgroundImageBox.Text.Trim();
+        string currentPath =
+            _overlayConnectionSettingsPageViewModel.BackgroundImagePath.Trim();
         if (!string.IsNullOrWhiteSpace(currentPath))
         {
             try
@@ -10662,37 +9904,10 @@ public partial class MainWindow : Window
 
         if (dialog.ShowDialog(this) == true)
         {
-            OverlayChatBackgroundImageBox.Text = dialog.FileName;
-            SelectOverlayChatBackgroundType("Image");
-        }
-    }
-
-    private void SelectOverlayChatBackgroundType(string type)
-    {
-        string normalized = string.IsNullOrWhiteSpace(type) ? "None" : type.Trim();
-        foreach (object item in OverlayChatBackgroundTypeBox.Items)
-        {
-            if (item is System.Windows.Controls.ComboBoxItem combo &&
-                string.Equals(Convert.ToString(combo.Tag), normalized, StringComparison.OrdinalIgnoreCase))
-            {
-                OverlayChatBackgroundTypeBox.SelectedItem = combo;
-                return;
-            }
+            return Task.FromResult<string?>(dialog.FileName);
         }
 
-        OverlayChatBackgroundTypeBox.SelectedIndex = 0;
-    }
-
-    private string GetOverlayChatBackgroundType()
-    {
-        if (OverlayChatBackgroundTypeBox.SelectedItem is System.Windows.Controls.ComboBoxItem combo &&
-            combo.Tag is string tag &&
-            !string.IsNullOrWhiteSpace(tag))
-        {
-            return tag;
-        }
-
-        return "None";
+        return Task.FromResult<string?>(null);
     }
 
     private string ResolveConfiguredOverlayRoot()
@@ -11964,7 +11179,7 @@ public partial class MainWindow : Window
         SpotifyPlaylistBox.ItemsSource = snapshot.Playlists;
         ServicesSpotifyDeviceBox.ItemsSource = snapshot.Devices;
         ApplySpotifyPlaylistFilter();
-        ServicesSpotifyStartPlaylistBox.ItemsSource = snapshot.Playlists;
+        _spotifyAutomationPageViewModel.UpdatePlaylists(snapshot.Playlists);
         DashboardSpotifyPlaylistBox.ItemsSource = snapshot.Playlists;
         RefreshSpotifyQuickPlaylists();
         UpdateSpotifyFavoriteButton();
@@ -12083,7 +11298,8 @@ public partial class MainWindow : Window
                         playlist.Uri ==
                         _settings.Spotify.StartPlaylistUri);
             ServicesSpotifyPlaylistBox.SelectedItem = SpotifyPlaylistBox.SelectedItem;
-            ServicesSpotifyStartPlaylistBox.SelectedItem = SpotifyPlaylistBox.SelectedItem;
+            _spotifyAutomationPageViewModel.SelectedPlaylist =
+                SpotifyPlaylistBox.SelectedItem as SpotifyPlaylist;
             DashboardSpotifyPlaylistBox.SelectedItem = SpotifyPlaylistBox.SelectedItem;
         }
 
@@ -17872,40 +17088,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ApplyTwitchGoalFieldsToSettings()
-    {
-        static double D(string text, double fallback) => double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value) ? value : fallback;
-        static int I(string text, int fallback) => int.TryParse(text, out int value) ? value : fallback;
-        _settings.Obs.GoalOverlayScene = string.IsNullOrWhiteSpace(GoalOverlaySceneBox.Text)
-            ? "CCS Ziele & Overlay-Daten"
-            : GoalOverlaySceneBox.Text.Trim();
-        _settings.Twitch.FollowerGoal.Title = string.IsNullOrWhiteSpace(FollowerGoalTitleBox.Text) ? "Follower-Ziel" : FollowerGoalTitleBox.Text.Trim();
-        _settings.Twitch.FollowerGoal.Current =
-            _currentFollowerCount > 0
-                ? _currentFollowerCount
-                : D(FollowerGoalCurrentBox.Text, _settings.Twitch.FollowerGoal.Current);
-        _settings.Twitch.FollowerGoal.Target = D(FollowerGoalTargetBox.Text, _settings.Twitch.FollowerGoal.Target);
-        _settings.Twitch.FollowerGoal.FontFace = FollowerGoalFontBox.Text.Trim();
-        _settings.Twitch.FollowerGoal.FontSize = I(FollowerGoalFontSizeBox.Text, 36);
-        _settings.Twitch.SubGoal.Title = string.IsNullOrWhiteSpace(SubGoalTitleBox.Text) ? "Sub-Ziel" : SubGoalTitleBox.Text.Trim();
-        _settings.Twitch.SubGoal.Current =
-            _currentActiveSubscriptionCount > 0
-                ? _currentActiveSubscriptionCount
-                : D(SubGoalCurrentBox.Text, _settings.Twitch.SubGoal.Current);
-        _settings.Twitch.SubGoal.Target = D(SubGoalTargetBox.Text, _settings.Twitch.SubGoal.Target);
-        _settings.Twitch.SubGoal.FontFace = SubGoalFontBox.Text.Trim();
-        _settings.Twitch.SubGoal.FontSize = I(SubGoalFontSizeBox.Text, 36);
-        _settings.Twitch.DonationGoal.Title = string.IsNullOrWhiteSpace(DonationGoalTitleBox.Text) ? "Donation-Ziel" : DonationGoalTitleBox.Text.Trim();
-        _settings.Twitch.DonationGoal.Current = D(DonationGoalCurrentBox.Text, _settings.Twitch.DonationGoal.Current);
-        _settings.Twitch.DonationGoal.Target = D(DonationGoalTargetBox.Text, _settings.Twitch.DonationGoal.Target);
-        _settings.Twitch.DonationGoal.Currency = DonationGoalCurrencyBox.Text.Trim();
-        _settings.Twitch.DonationGoal.FontFace = DonationGoalFontBox.Text.Trim();
-        _settings.Twitch.DonationGoal.FontSize = I(DonationGoalFontSizeBox.Text, 36);
-    }
-
     private async Task SaveTwitchGoalsAsync()
     {
-        ApplyTwitchGoalFieldsToSettings();
+        _twitchGoalsPageViewModel.ApplyTo(
+            _settings.Obs,
+            _settings.Twitch);
         await _settingsStore.SaveAsync(_settings);
         await _overlayModule.Service.UpdateAsync(data =>
         {
@@ -18063,29 +17250,22 @@ public partial class MainWindow : Window
         }
     }
 
-    private static string FirstNonEmpty(params string[] values)
-    {
-        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
-    }
-
     private async Task ApplyStreamerBotAlertSuppressionAsync()
     {
         if (!_streamerBotClient.IsConnected)
         {
-            StreamerBotAlertControlStatusText.Text =
-                "Streamer.bot ist nicht verbunden. Die Einstellung wird beim nächsten Verbindungsaufbau angewendet.";
+            _alertRuntimePageViewModel.SetStreamerBotStatus(
+                "Streamer.bot ist nicht verbunden. Die Einstellung wird beim nächsten Verbindungsaufbau angewendet.");
             return;
         }
 
-        bool suppress = SuiteAlertsEnabledBox.IsChecked == true &&
-                       SuppressStreamerBotAlertsBox.IsChecked == true;
+        bool suppress = _alertRuntimePageViewModel.Enabled &&
+                        _alertRuntimePageViewModel.SuppressStreamerBotAlerts;
         await SetStreamerBotAlertsEnabledAsync(!suppress, showSuccess: false);
     }
 
     private void BindStreamerBotActionSelectors()
     {
-        StreamerBotDisableAlertsActionBox.ItemsSource = _streamerBotActions;
-        StreamerBotEnableAlertsActionBox.ItemsSource = _streamerBotActions;
         SettingsStreamerBotDisableAlertsActionBox.ItemsSource = _streamerBotActions;
         SettingsStreamerBotEnableAlertsActionBox.ItemsSource = _streamerBotActions;
         RunOfShowStreamerBotActionBox.ItemsSource = _streamerBotActions;
@@ -18116,25 +17296,21 @@ public partial class MainWindow : Window
         return string.Empty;
     }
 
-    private static string GetStreamerBotActionId(params System.Windows.Controls.ComboBox[] boxes)
-    {
-        return boxes.Select(box => box.SelectedItem as StreamerBotActionOption)
-            .FirstOrDefault(option => option is not null)?.Id ?? string.Empty;
-    }
-
     private void SyncStreamerBotActionSelectorText()
     {
-        StreamerBotDisableAlertsActionBox.Text = _settings.StreamerBot.DisableAlertsActionName;
-        StreamerBotEnableAlertsActionBox.Text = _settings.StreamerBot.EnableAlertsActionName;
-        SettingsStreamerBotDisableAlertsActionBox.Text = _settings.StreamerBot.DisableAlertsActionName;
-        SettingsStreamerBotEnableAlertsActionBox.Text = _settings.StreamerBot.EnableAlertsActionName;
+        _alertRuntimePageViewModel.SelectActions(
+            _settings.StreamerBot.DisableAlertsActionId,
+            _settings.StreamerBot.DisableAlertsActionName,
+            _settings.StreamerBot.EnableAlertsActionId,
+            _settings.StreamerBot.EnableAlertsActionName);
     }
 
     private async Task RefreshStreamerBotActionsAsync(bool showStatus)
     {
         if (!_streamerBotClient.IsConnected)
         {
-            StreamerBotAlertControlStatusText.Text = "Streamer.bot ist nicht verbunden.";
+            _alertRuntimePageViewModel.SetStreamerBotStatus(
+                "Streamer.bot ist nicht verbunden.");
             return;
         }
 
@@ -18170,27 +17346,31 @@ public partial class MainWindow : Window
 
             ApplyStreamerBotActionFilter();
 
-            SelectStreamerBotAction(StreamerBotDisableAlertsActionBox, _settings.StreamerBot.DisableAlertsActionId, previousDisable);
             SelectStreamerBotAction(SettingsStreamerBotDisableAlertsActionBox, _settings.StreamerBot.DisableAlertsActionId, previousDisable);
-            SelectStreamerBotAction(StreamerBotEnableAlertsActionBox, _settings.StreamerBot.EnableAlertsActionId, previousEnable);
             SelectStreamerBotAction(SettingsStreamerBotEnableAlertsActionBox, _settings.StreamerBot.EnableAlertsActionId, previousEnable);
+            _alertRuntimePageViewModel.SelectActions(
+                _settings.StreamerBot.DisableAlertsActionId,
+                previousDisable,
+                _settings.StreamerBot.EnableAlertsActionId,
+                previousEnable);
             if (RunOfShowStepsList.SelectedItem is RunOfShowStepSettings selectedRunOfShowStep)
             {
                 SelectStreamerBotAction(RunOfShowStreamerBotActionBox, selectedRunOfShowStep.StreamerBotActionId, selectedRunOfShowStep.StreamerBotActionName);
             }
 
             var groups = ordered.Select(x => x.Group).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            StreamerBotAlertGroupsText.Text = groups.Count == 0
-                ? "Keine Aktionsgruppen gefunden."
-                : "Gefundene Aktionsgruppen: " + string.Join(", ", groups);
+            _alertRuntimePageViewModel.SetStreamerBotGroups(groups);
             if (showStatus)
             {
-                StreamerBotAlertControlStatusText.Text = $"{ordered.Count} Streamer.bot-Aktionen geladen. Wähle je eine Hilfsaktion zum Deaktivieren und Aktivieren aus.";
+                _alertRuntimePageViewModel.SetStreamerBotStatus(
+                    $"{ordered.Count} Streamer.bot-Aktionen geladen. Wähle je eine Hilfsaktion zum Deaktivieren und Aktivieren aus.");
             }
         }
         catch (Exception ex)
         {
-            StreamerBotAlertControlStatusText.Text = "Streamer.bot-Aktionen konnten nicht geladen werden: " + ex.Message;
+            _alertRuntimePageViewModel.SetStreamerBotStatus(
+                "Streamer.bot-Aktionen konnten nicht geladen werden: " +
+                ex.Message);
         }
     }
 
@@ -18552,18 +17732,35 @@ public partial class MainWindow : Window
     {
         if (!_streamerBotClient.IsConnected)
         {
-            StreamerBotAlertControlStatusText.Text = "Streamer.bot ist nicht verbunden.";
+            _alertRuntimePageViewModel.SetStreamerBotStatus(
+                "Streamer.bot ist nicht verbunden.");
             return;
         }
 
-        ComboBox primaryBox = enabled ? StreamerBotEnableAlertsActionBox : StreamerBotDisableAlertsActionBox;
         ComboBox settingsBox = enabled ? SettingsStreamerBotEnableAlertsActionBox : SettingsStreamerBotDisableAlertsActionBox;
-        StreamerBotActionOption? selected = primaryBox.SelectedItem as StreamerBotActionOption ?? settingsBox.SelectedItem as StreamerBotActionOption;
-        string actionName = selected?.Name ?? GetStreamerBotActionName(primaryBox, settingsBox, enabled ? _settings.StreamerBot.EnableAlertsActionName : _settings.StreamerBot.DisableAlertsActionName);
-        string actionId = selected?.Id ?? (enabled ? _settings.StreamerBot.EnableAlertsActionId : _settings.StreamerBot.DisableAlertsActionId);
+        string selectedId = enabled
+            ? _alertRuntimePageViewModel.EnableActionId
+            : _alertRuntimePageViewModel.DisableActionId;
+        string selectedName = enabled
+            ? _alertRuntimePageViewModel.EnableActionName
+            : _alertRuntimePageViewModel.DisableActionName;
+        StreamerBotActionOption? selected = _streamerBotActions.FirstOrDefault(
+            action => string.Equals(
+                action.Id,
+                selectedId,
+                StringComparison.OrdinalIgnoreCase))
+            ?? settingsBox.SelectedItem as StreamerBotActionOption;
+        string actionName = selected?.Name ?? GetStreamerBotActionName(
+            selectedName,
+            settingsBox,
+            enabled
+                ? _settings.StreamerBot.EnableAlertsActionName
+                : _settings.StreamerBot.DisableAlertsActionName);
+        string actionId = selected?.Id ?? selectedId;
         if (string.IsNullOrWhiteSpace(actionName) && string.IsNullOrWhiteSpace(actionId))
         {
-            StreamerBotAlertControlStatusText.Text = "Bitte zuerst eine vorhandene Streamer.bot-Hilfsaktion auswählen.";
+            _alertRuntimePageViewModel.SetStreamerBotStatus(
+                "Bitte zuerst eine vorhandene Streamer.bot-Hilfsaktion auswählen.");
             return;
         }
 
@@ -18592,13 +17789,22 @@ public partial class MainWindow : Window
                 _settings.StreamerBot.DisableAlertsActionName = actionName;
                 _settings.StreamerBot.DisableAlertsActionId = actionId;
             }
-            StreamerBotAlertControlStatusText.Text = showSuccess
-                ? $"Streamer.bot hat die Aktion „{actionName}“ bestätigt."
-                : enabled ? "Streamer.bot-Alerts bleiben aktiv." : "Suite-Alerts aktiv: Deaktivierungsaktion wurde von Streamer.bot bestätigt.";
+            _alertRuntimePageViewModel.SelectActions(
+                _settings.StreamerBot.DisableAlertsActionId,
+                _settings.StreamerBot.DisableAlertsActionName,
+                _settings.StreamerBot.EnableAlertsActionId,
+                _settings.StreamerBot.EnableAlertsActionName);
+            _alertRuntimePageViewModel.SetStreamerBotStatus(
+                showSuccess
+                    ? $"Streamer.bot hat die Aktion „{actionName}“ bestätigt."
+                    : enabled
+                        ? "Streamer.bot-Alerts bleiben aktiv."
+                        : "Suite-Alerts aktiv: Deaktivierungsaktion wurde von Streamer.bot bestätigt.");
         }
         catch (Exception ex)
         {
-            StreamerBotAlertControlStatusText.Text = "Streamer.bot-Alertsteuerung fehlgeschlagen: " + ex.Message;
+            _alertRuntimePageViewModel.SetStreamerBotStatus(
+                "Streamer.bot-Alertsteuerung fehlgeschlagen: " + ex.Message);
         }
     }
 
@@ -18712,8 +17918,9 @@ public partial class MainWindow : Window
                 _ = PulseExternalAlertAsync("Streamer.bot", id, TimeSpan.FromSeconds(8));
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    ServicesSpotifyAlertMuteStatusText.Text = $"Streamer.bot-Alert erkannt: {type}";
-                    ServicesSpotifyAlertMuteStatusText.Foreground = Brushes.Orange;
+                    _spotifyAutomationPageViewModel.SetAlertStatus(
+                        $"Streamer.bot-Alert erkannt: {type}",
+                        "Warning");
                 });
             }
         }
@@ -23678,11 +22885,6 @@ public partial class MainWindow : Window
         public int Version { get; set; } = 1;
         public DateTimeOffset ExportedAt { get; set; }
         public List<TimedAutomationRuleSettings> Rules { get; set; } = [];
-    }
-
-    private sealed record StreamerBotActionOption(string Id, string Name, string Group, bool Enabled)
-    {
-        public string DisplayName => $"{(Enabled ? "" : "[DEAKTIVIERT] ")}{Group} · {Name}";
     }
 
     private sealed record StreamerBotExecutionHistoryItem(DateTimeOffset Timestamp, string ActionName, bool Success, string Detail, string ArgumentsJson, string ResponseJson)

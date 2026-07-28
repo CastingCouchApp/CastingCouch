@@ -10,8 +10,8 @@ using CreatorControlSuite.Core.Security;
 using CreatorControlSuite.Core.Updates;
 using CreatorControlSuite.Modules.OBS;
 using CreatorControlSuite.Modules.OBS.Models;
-using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.Extensions.Primitives;
 using static AgentUtilities;
 

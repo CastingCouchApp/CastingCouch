@@ -10,7 +10,6 @@ namespace CreatorControlSuite.Modules.OBS;
 public sealed partial class ObsWebSocketClient : IObsWebSocketClient
 {
     private const int HelloOp = 0;
-    private const int IdentifyOp = 1;
     private const int IdentifiedOp = 2;
     private const int EventOp = 5;
     private const int RequestOp = 6;
@@ -70,32 +69,9 @@ public sealed partial class ObsWebSocketClient : IObsWebSocketClient
                     ?? throw new InvalidOperationException(
                         "OBS Hello konnte nicht gelesen werden.");
 
-        string? authentication = null;
-
-        if (hello.Authentication is not null)
-        {
-            if (string.IsNullOrWhiteSpace(options.Password))
-            {
-                throw new InvalidOperationException(
-                    "OBS verlangt ein WebSocket-Passwort.");
-            }
-
-            authentication = ObsAuthentication.CreateResponse(
-                options.Password,
-                hello.Authentication.Salt,
-                hello.Authentication.Challenge);
-        }
-
-        var identifyEnvelope = new ObsEnvelope
-        {
-            Op = IdentifyOp,
-            Data = new ObsIdentify
-            {
-                RpcVersion = Math.Min(hello.RpcVersion, 1),
-                Authentication = authentication,
-                EventSubscriptions = 66031
-            }
-        };
+        ObsEnvelope identifyEnvelope = ObsHandshake.CreateIdentify(
+            hello,
+            options.Password);
 
         await SendJsonAsync(identifyEnvelope, timeout.Token);
 
