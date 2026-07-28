@@ -1,0 +1,806 @@
+/* Animated Background — full-bleed themed motion layers */
+
+.ccs-animated-bg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--ccs-abg-radius, 0);
+  isolation: isolate;
+  --ccs-abg-c1: #00f0ff;
+  --ccs-abg-c2: #ff00aa;
+  --ccs-abg-c3: #7a00ff;
+  --ccs-abg-speed: 1;
+  --ccs-abg-intensity: 0.85;
+  --ccs-abg-opacity: 1;
+  --ccs-abg-density: 1;
+  --ccs-abg-dur: calc(12s / var(--ccs-abg-speed));
+  --ccs-abg-dur-fast: calc(6s / var(--ccs-abg-speed));
+  --ccs-abg-dur-slow: calc(22s / var(--ccs-abg-speed));
+  background: #050505;
+  pointer-events: none;
+}
+
+.ccs-abg-base,
+.ccs-abg-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ccs-abg-base {
+  z-index: 0;
+}
+
+.ccs-abg-a { z-index: 1; opacity: var(--ccs-abg-intensity); }
+.ccs-abg-b { z-index: 2; opacity: calc(var(--ccs-abg-intensity) * 0.85); }
+.ccs-abg-fx { z-index: 3; }
+
+.ccs-animated-bg.has-vignette .ccs-abg-fx::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.55) 100%);
+  pointer-events: none;
+}
+
+.ccs-animated-bg.is-paused,
+.ccs-animated-bg.is-paused .ccs-abg-base,
+.ccs-animated-bg.is-paused .ccs-abg-layer,
+.ccs-animated-bg.is-paused .ccs-abg-layer::before,
+.ccs-animated-bg.is-paused .ccs-abg-layer::after {
+  animation-play-state: paused !important;
+}
+
+/* ---- Shared keyframes ---- */
+@keyframes ccs-abg-drift-x {
+  from { transform: translate3d(-6%, 0, 0); }
+  to { transform: translate3d(6%, 0, 0); }
+}
+@keyframes ccs-abg-drift-y {
+  from { transform: translate3d(0, -8%, 0); }
+  to { transform: translate3d(0, 8%, 0); }
+}
+@keyframes ccs-abg-pan {
+  from { background-position: 0 0; }
+  to { background-position: 240px 160px; }
+}
+@keyframes ccs-abg-fall {
+  from { background-position: 0 -120%; }
+  to { background-position: 0 120%; }
+}
+@keyframes ccs-abg-rise {
+  from { background-position: 0 120%; }
+  to { background-position: 0 -40%; }
+}
+@keyframes ccs-abg-spin {
+  from { transform: rotate(0deg) scale(1.2); }
+  to { transform: rotate(360deg) scale(1.2); }
+}
+@keyframes ccs-abg-pulse {
+  0%, 100% { opacity: calc(var(--ccs-abg-intensity) * 0.55); transform: scale(1); }
+  50% { opacity: var(--ccs-abg-intensity); transform: scale(1.08); }
+}
+@keyframes ccs-abg-hue {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+@keyframes ccs-abg-glitch-shift {
+  0%, 100% { transform: translate(0, 0); clip-path: inset(0 0 0 0); }
+  20% { transform: translate(-2%, 1%); clip-path: inset(12% 0 55% 0); }
+  40% { transform: translate(2%, -1%); clip-path: inset(40% 0 20% 0); }
+  60% { transform: translate(-1%, 2%); clip-path: inset(70% 0 5% 0); }
+  80% { transform: translate(1%, -2%); clip-path: inset(5% 0 70% 0); }
+}
+@keyframes ccs-abg-scan {
+  from { background-position: 0 -40%; }
+  to { background-position: 0 140%; }
+}
+@keyframes ccs-abg-wave {
+  0% { transform: translate3d(-5%, 0, 0) scaleY(1); }
+  50% { transform: translate3d(5%, 0, 0) scaleY(1.08); }
+  100% { transform: translate3d(-5%, 0, 0) scaleY(1); }
+}
+@keyframes ccs-abg-blob {
+  0%, 100% { border-radius: 42% 58% 55% 45% / 48% 42% 58% 52%; transform: translate(-8%, -4%) rotate(0deg); }
+  33% { border-radius: 55% 45% 42% 58% / 55% 48% 52% 45%; transform: translate(6%, 4%) rotate(40deg); }
+  66% { border-radius: 48% 52% 60% 40% / 42% 58% 42% 58%; transform: translate(2%, -6%) rotate(-25deg); }
+}
+@keyframes ccs-abg-checker {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 64px 64px, -64px 64px; }
+}
+@keyframes ccs-abg-sparkle {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+/* ========== STYLE VARIANTS ========== */
+
+/* Hacker / Matrix Rain — JS canvas owns the look */
+.ccs-animated-bg-v-hacker {
+  background: #010805;
+}
+.ccs-animated-bg.is-matrix .ccs-abg-base,
+.ccs-animated-bg.is-matrix .ccs-abg-a,
+.ccs-animated-bg.is-matrix .ccs-abg-b {
+  display: none;
+}
+.ccs-abg-matrix {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.ccs-abg-matrix[hidden] {
+  display: none !important;
+}
+.ccs-animated-bg.is-matrix.has-vignette .ccs-abg-fx {
+  z-index: 5;
+  background: transparent;
+}
+
+/* Cyber Neon */
+.ccs-animated-bg-v-cyber .ccs-abg-base {
+  background: linear-gradient(160deg, #050018 0%, #0a0520 40%, #001018 100%);
+}
+.ccs-animated-bg-v-cyber .ccs-abg-a {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--ccs-abg-c1) 35%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ccs-abg-c1) 35%, transparent) 1px, transparent 1px);
+  background-size: calc(48px / var(--ccs-abg-density)) calc(48px / var(--ccs-abg-density));
+  transform-origin: 50% 100%;
+  transform: perspective(500px) rotateX(58deg) scale(1.8) translateY(-10%);
+  animation: ccs-abg-pan var(--ccs-abg-dur) linear infinite;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 35%, #000 100%);
+}
+.ccs-animated-bg-v-cyber .ccs-abg-b {
+  background:
+    radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--ccs-abg-c2) 45%, transparent), transparent 35%),
+    radial-gradient(circle at 85% 25%, color-mix(in srgb, var(--ccs-abg-c3) 40%, transparent), transparent 38%),
+    radial-gradient(circle at 50% 80%, color-mix(in srgb, var(--ccs-abg-c1) 30%, transparent), transparent 45%);
+  animation: ccs-abg-drift-x var(--ccs-abg-dur-slow) ease-in-out infinite alternate;
+  filter: blur(2px);
+}
+
+/* Retro CRT */
+.ccs-animated-bg-v-retro .ccs-abg-base {
+  background: radial-gradient(ellipse at center, #1a1030 0%, #0a0618 70%, #05030c 100%);
+}
+.ccs-animated-bg-v-retro .ccs-abg-a {
+  background:
+    linear-gradient(115deg, var(--ccs-abg-c1), var(--ccs-abg-c2) 45%, var(--ccs-abg-c3));
+  opacity: calc(var(--ccs-abg-intensity) * 0.35);
+  animation: ccs-abg-hue var(--ccs-abg-dur-slow) linear infinite;
+  mix-blend-mode: screen;
+}
+.ccs-animated-bg-v-retro .ccs-abg-b {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(0, 0, 0, 0.35) 3px 4px),
+    radial-gradient(circle at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  animation: ccs-abg-scan calc(var(--ccs-abg-dur-fast) * 0.7) linear infinite;
+}
+.ccs-animated-bg-v-retro .ccs-abg-fx {
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.65);
+}
+
+/* Vaporwave */
+.ccs-animated-bg-v-vaporwave .ccs-abg-base {
+  background: linear-gradient(180deg, #1a0a2e 0%, #3b1260 35%, #ff71ce55 70%, #01cdfe88 100%);
+}
+.ccs-animated-bg-v-vaporwave .ccs-abg-a {
+  background:
+    radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--ccs-abg-c1) 50%, transparent), transparent 55%),
+    radial-gradient(ellipse at 20% 40%, color-mix(in srgb, var(--ccs-abg-c2) 40%, transparent), transparent 40%),
+    radial-gradient(ellipse at 80% 35%, color-mix(in srgb, var(--ccs-abg-c3) 45%, transparent), transparent 42%);
+  animation: ccs-abg-pulse var(--ccs-abg-dur) ease-in-out infinite;
+}
+.ccs-animated-bg-v-vaporwave .ccs-abg-b {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--ccs-abg-c2) 50%, transparent) 2px, transparent 2px);
+  background-size: 100% calc(28px / var(--ccs-abg-density));
+  transform: perspective(420px) rotateX(62deg) scale(1.6) translateY(20%);
+  mask-image: linear-gradient(180deg, transparent, #000 40%);
+  animation: ccs-abg-pan var(--ccs-abg-dur) linear infinite;
+}
+
+/* Meme Chaos */
+.ccs-animated-bg-v-meme .ccs-abg-base {
+  background: #111;
+}
+.ccs-animated-bg-v-meme .ccs-abg-a {
+  background-image:
+    linear-gradient(45deg, var(--ccs-abg-c1) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--ccs-abg-c2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--ccs-abg-c3) 75%),
+    linear-gradient(-45deg, transparent 75%, #fff 75%);
+  background-size: calc(48px / var(--ccs-abg-density)) calc(48px / var(--ccs-abg-density));
+  background-position: 0 0, 0 24px, 24px -24px, -24px 0;
+  animation: ccs-abg-checker var(--ccs-abg-dur-fast) steps(8) infinite;
+  opacity: calc(var(--ccs-abg-intensity) * 0.55);
+}
+.ccs-animated-bg-v-meme .ccs-abg-b {
+  background: conic-gradient(from 0deg, var(--ccs-abg-c1), var(--ccs-abg-c2), var(--ccs-abg-c3), #fff, var(--ccs-abg-c1));
+  mix-blend-mode: soft-light;
+  animation: ccs-abg-spin var(--ccs-abg-dur-slow) linear infinite;
+  opacity: 0.45;
+}
+
+/* Queer Pride */
+.ccs-animated-bg-v-queer .ccs-abg-base {
+  background: #0a0a0a;
+}
+.ccs-animated-bg-v-queer .ccs-abg-a {
+  background: linear-gradient(
+    115deg,
+    #e40303 0%,
+    #ff8c00 14%,
+    #ffed00 28%,
+    #008026 42%,
+    #24408e 57%,
+    #732982 71%,
+    var(--ccs-abg-c1) 85%,
+    var(--ccs-abg-c2) 100%
+  );
+  background-size: 220% 220%;
+  animation: ccs-abg-pan var(--ccs-abg-dur) ease-in-out infinite alternate;
+  opacity: calc(var(--ccs-abg-intensity) * 0.9);
+}
+.ccs-animated-bg-v-queer .ccs-abg-b {
+  background:
+    radial-gradient(circle at 30% 40%, color-mix(in srgb, var(--ccs-abg-c3) 40%, transparent), transparent 45%),
+    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.2), transparent 40%);
+  animation: ccs-abg-drift-y var(--ccs-abg-dur-slow) ease-in-out infinite alternate;
+  mix-blend-mode: overlay;
+}
+
+/* Peace Soft */
+.ccs-animated-bg-v-peace .ccs-abg-base {
+  background: linear-gradient(160deg, #f7f1e6 0%, #d9ead3 45%, #b7d4c4 100%);
+}
+.ccs-animated-bg-v-peace .ccs-abg-a {
+  background:
+    radial-gradient(circle at 25% 35%, color-mix(in srgb, var(--ccs-abg-c1) 55%, transparent), transparent 42%),
+    radial-gradient(circle at 75% 55%, color-mix(in srgb, var(--ccs-abg-c2) 50%, transparent), transparent 48%),
+    radial-gradient(circle at 50% 80%, color-mix(in srgb, var(--ccs-abg-c3) 40%, transparent), transparent 50%);
+  filter: blur(18px);
+  animation: ccs-abg-wave var(--ccs-abg-dur-slow) ease-in-out infinite;
+}
+.ccs-animated-bg-v-peace .ccs-abg-b {
+  background:
+    radial-gradient(circle at 60% 25%, rgba(255, 255, 255, 0.55), transparent 35%),
+    radial-gradient(circle at 20% 70%, color-mix(in srgb, var(--ccs-abg-c1) 30%, transparent), transparent 40%);
+  animation: ccs-abg-pulse var(--ccs-abg-dur) ease-in-out infinite;
+}
+
+/* Street Graffiti */
+.ccs-animated-bg-v-street .ccs-abg-base {
+  background:
+    radial-gradient(ellipse at 10% 20%, #222 0%, transparent 40%),
+    radial-gradient(ellipse at 90% 80%, #111 0%, transparent 45%),
+    linear-gradient(135deg, #1a1a1a, #0d0d0d);
+}
+.ccs-animated-bg-v-street .ccs-abg-a {
+  background:
+    radial-gradient(circle at 18% 30%, var(--ccs-abg-c1) 0 8%, transparent 9%),
+    radial-gradient(circle at 72% 28%, var(--ccs-abg-c2) 0 6%, transparent 7%),
+    radial-gradient(circle at 55% 68%, var(--ccs-abg-c3) 0 10%, transparent 11%),
+    radial-gradient(circle at 30% 75%, #fff 0 3%, transparent 4%),
+    radial-gradient(circle at 85% 55%, var(--ccs-abg-c1) 0 5%, transparent 6%);
+  filter: blur(1px) contrast(1.2);
+  animation: ccs-abg-pulse var(--ccs-abg-dur) ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+.ccs-animated-bg-v-street .ccs-abg-b {
+  background-image: repeating-linear-gradient(
+    -18deg,
+    transparent 0 40px,
+    color-mix(in srgb, var(--ccs-abg-c2) 18%, transparent) 40px 44px
+  );
+  animation: ccs-abg-drift-x var(--ccs-abg-dur-slow) linear infinite alternate;
+}
+
+/* Aurora */
+.ccs-animated-bg-v-aurora .ccs-abg-base {
+  background: linear-gradient(180deg, #020617 0%, #0b1b2b 50%, #04120f 100%);
+}
+.ccs-animated-bg-v-aurora .ccs-abg-a {
+  background: linear-gradient(
+    100deg,
+    transparent 10%,
+    color-mix(in srgb, var(--ccs-abg-c1) 55%, transparent) 30%,
+    color-mix(in srgb, var(--ccs-abg-c2) 50%, transparent) 50%,
+    color-mix(in srgb, var(--ccs-abg-c3) 45%, transparent) 70%,
+    transparent 90%
+  );
+  background-size: 200% 100%;
+  filter: blur(20px) saturate(1.3);
+  animation: ccs-abg-pan var(--ccs-abg-dur-slow) ease-in-out infinite alternate;
+  transform: skewY(-8deg) scale(1.2);
+}
+.ccs-animated-bg-v-aurora .ccs-abg-b {
+  background:
+    radial-gradient(ellipse at 40% 30%, color-mix(in srgb, var(--ccs-abg-c1) 35%, transparent), transparent 50%),
+    radial-gradient(ellipse at 70% 50%, color-mix(in srgb, var(--ccs-abg-c2) 30%, transparent), transparent 45%);
+  animation: ccs-abg-wave var(--ccs-abg-dur) ease-in-out infinite;
+  filter: blur(12px);
+}
+
+/* Ocean */
+.ccs-animated-bg-v-ocean .ccs-abg-base {
+  background: linear-gradient(180deg, #082f49 0%, #0c4a6e 40%, #0369a1 100%);
+}
+.ccs-animated-bg-v-ocean .ccs-abg-a,
+.ccs-animated-bg-v-ocean .ccs-abg-b {
+  background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--ccs-abg-c3) 40%, transparent), transparent 60%);
+}
+.ccs-animated-bg-v-ocean .ccs-abg-a {
+  background:
+    radial-gradient(ellipse 120% 40% at 50% 80%, color-mix(in srgb, var(--ccs-abg-c1) 45%, transparent), transparent),
+    radial-gradient(ellipse 100% 30% at 30% 70%, color-mix(in srgb, var(--ccs-abg-c2) 35%, transparent), transparent);
+  animation: ccs-abg-wave var(--ccs-abg-dur) ease-in-out infinite;
+}
+.ccs-animated-bg-v-ocean .ccs-abg-b {
+  background:
+    radial-gradient(ellipse 110% 35% at 60% 85%, color-mix(in srgb, var(--ccs-abg-c3) 50%, transparent), transparent),
+    radial-gradient(ellipse 90% 28% at 20% 75%, rgba(255, 255, 255, 0.15), transparent);
+  animation: ccs-abg-wave calc(var(--ccs-abg-dur) * 1.3) ease-in-out infinite reverse;
+  opacity: 0.7;
+}
+
+/* Fire Ember */
+.ccs-animated-bg-v-fire .ccs-abg-base {
+  background: radial-gradient(ellipse at 50% 100%, #3a1000 0%, #120500 55%, #050200 100%);
+}
+.ccs-animated-bg-v-fire .ccs-abg-a {
+  width: 70%;
+  height: 70%;
+  left: 15%;
+  top: 40%;
+  background: radial-gradient(circle, var(--ccs-abg-c1), color-mix(in srgb, var(--ccs-abg-c2) 70%, transparent) 45%, transparent 70%);
+  filter: blur(24px);
+  animation: ccs-abg-blob var(--ccs-abg-dur) ease-in-out infinite;
+}
+.ccs-animated-bg-v-fire .ccs-abg-b {
+  width: 55%;
+  height: 55%;
+  left: 30%;
+  top: 50%;
+  background: radial-gradient(circle, var(--ccs-abg-c2), color-mix(in srgb, var(--ccs-abg-c3) 60%, transparent) 40%, transparent 70%);
+  filter: blur(18px);
+  animation: ccs-abg-blob calc(var(--ccs-abg-dur) * 0.8) ease-in-out infinite reverse;
+}
+.ccs-animated-bg-v-fire .ccs-abg-fx {
+  background-image:
+    radial-gradient(circle, var(--ccs-abg-c2) 0 1px, transparent 2px);
+  background-size: calc(36px / var(--ccs-abg-density)) calc(48px / var(--ccs-abg-density));
+  animation: ccs-abg-rise var(--ccs-abg-dur-fast) linear infinite;
+  opacity: 0.55;
+  mix-blend-mode: screen;
+}
+
+/* Cosmic Stars */
+.ccs-animated-bg-v-cosmic .ccs-abg-base {
+  background: radial-gradient(ellipse at 50% 30%, #1e1b4b 0%, #0b1026 50%, #020617 100%);
+}
+.ccs-animated-bg-v-cosmic .ccs-abg-a {
+  background-image:
+    radial-gradient(circle, #fff 0 1px, transparent 2px),
+    radial-gradient(circle, var(--ccs-abg-c1) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle, var(--ccs-abg-c2) 0 1px, transparent 2px);
+  background-size:
+    calc(48px / var(--ccs-abg-density)) calc(48px / var(--ccs-abg-density)),
+    calc(92px / var(--ccs-abg-density)) calc(92px / var(--ccs-abg-density)),
+    calc(64px / var(--ccs-abg-density)) calc(64px / var(--ccs-abg-density));
+  animation: ccs-abg-pan var(--ccs-abg-dur-slow) linear infinite, ccs-abg-sparkle var(--ccs-abg-dur-fast) ease-in-out infinite;
+}
+.ccs-animated-bg-v-cosmic .ccs-abg-b {
+  background:
+    radial-gradient(circle at 30% 40%, color-mix(in srgb, var(--ccs-abg-c3) 35%, transparent), transparent 40%),
+    radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--ccs-abg-c1) 30%, transparent), transparent 45%);
+  filter: blur(30px);
+  animation: ccs-abg-drift-x var(--ccs-abg-dur-slow) ease-in-out infinite alternate;
+}
+
+/* Glitch */
+.ccs-animated-bg-v-glitch .ccs-abg-base {
+  background: #050505;
+}
+.ccs-animated-bg-v-glitch .ccs-abg-a {
+  background: linear-gradient(90deg, var(--ccs-abg-c1), transparent 40%, var(--ccs-abg-c2));
+  mix-blend-mode: screen;
+  animation: ccs-abg-glitch-shift calc(var(--ccs-abg-dur-fast) * 0.35) steps(2) infinite;
+  opacity: calc(var(--ccs-abg-intensity) * 0.7);
+}
+.ccs-animated-bg-v-glitch .ccs-abg-b {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, 0.06) 3px 4px),
+    linear-gradient(0deg, color-mix(in srgb, var(--ccs-abg-c3) 20%, transparent), transparent);
+  animation: ccs-abg-scan var(--ccs-abg-dur-fast) linear infinite;
+}
+.ccs-animated-bg-v-glitch .ccs-abg-fx {
+  background: linear-gradient(90deg, var(--ccs-abg-c1), transparent, var(--ccs-abg-c2));
+  mix-blend-mode: color-dodge;
+  opacity: 0.25;
+  animation: ccs-abg-glitch-shift calc(var(--ccs-abg-dur-fast) * 0.5) steps(3) infinite reverse;
+}
+
+/* Pixel 8-Bit */
+.ccs-animated-bg-v-pixel .ccs-abg-base {
+  background: #0f172a;
+  image-rendering: pixelated;
+}
+.ccs-animated-bg-v-pixel .ccs-abg-a {
+  background-image:
+    linear-gradient(90deg, var(--ccs-abg-c1) 50%, transparent 50%),
+    linear-gradient(var(--ccs-abg-c2) 50%, transparent 50%),
+    linear-gradient(45deg, var(--ccs-abg-c3) 25%, transparent 25%);
+  background-size:
+    calc(24px / var(--ccs-abg-density)) calc(24px / var(--ccs-abg-density)),
+    calc(32px / var(--ccs-abg-density)) calc(32px / var(--ccs-abg-density)),
+    calc(48px / var(--ccs-abg-density)) calc(48px / var(--ccs-abg-density));
+  animation: ccs-abg-checker var(--ccs-abg-dur) steps(4) infinite;
+  opacity: calc(var(--ccs-abg-intensity) * 0.55);
+  filter: contrast(1.2);
+}
+.ccs-animated-bg-v-pixel .ccs-abg-b {
+  background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+/* Lava */
+.ccs-animated-bg-v-lava .ccs-abg-base {
+  background: radial-gradient(ellipse at 50% 120%, #3a0a00 0%, #1a0500 50%, #050200 100%);
+}
+.ccs-animated-bg-v-lava .ccs-abg-a {
+  width: 80%;
+  height: 80%;
+  left: 10%;
+  top: 20%;
+  background: radial-gradient(circle, var(--ccs-abg-c1), var(--ccs-abg-c2) 40%, transparent 70%);
+  filter: blur(28px);
+  animation: ccs-abg-blob var(--ccs-abg-dur) ease-in-out infinite;
+}
+.ccs-animated-bg-v-lava .ccs-abg-b {
+  width: 60%;
+  height: 60%;
+  left: 25%;
+  top: 35%;
+  background: radial-gradient(circle, var(--ccs-abg-c2), var(--ccs-abg-c3) 50%, transparent 72%);
+  filter: blur(20px);
+  animation: ccs-abg-blob calc(var(--ccs-abg-dur) * 1.2) ease-in-out infinite reverse;
+  mix-blend-mode: screen;
+}
+
+/* Ice Crystal */
+.ccs-animated-bg-v-ice .ccs-abg-base {
+  background: linear-gradient(160deg, #0c4a6e 0%, #e0f2fe 45%, #bae6fd 100%);
+}
+.ccs-animated-bg-v-ice .ccs-abg-a {
+  background-image:
+    linear-gradient(30deg, transparent 40%, color-mix(in srgb, var(--ccs-abg-c1) 40%, transparent) 50%, transparent 60%),
+    linear-gradient(150deg, transparent 40%, color-mix(in srgb, var(--ccs-abg-c2) 35%, transparent) 50%, transparent 60%),
+    linear-gradient(90deg, transparent 45%, rgba(255, 255, 255, 0.35) 50%, transparent 55%);
+  background-size: 180% 180%;
+  animation: ccs-abg-pan var(--ccs-abg-dur-slow) ease-in-out infinite alternate;
+}
+.ccs-animated-bg-v-ice .ccs-abg-b {
+  background:
+    radial-gradient(circle at 25% 30%, color-mix(in srgb, var(--ccs-abg-c3) 50%, transparent), transparent 35%),
+    radial-gradient(circle at 75% 60%, rgba(255, 255, 255, 0.45), transparent 40%);
+  animation: ccs-abg-sparkle var(--ccs-abg-dur) ease-in-out infinite;
+  filter: blur(2px);
+}
+
+/* Disco */
+.ccs-animated-bg-v-disco .ccs-abg-base {
+  background: radial-gradient(circle at center, #1a1028 0%, #050508 100%);
+}
+.ccs-animated-bg-v-disco .ccs-abg-a {
+  background: conic-gradient(
+    from 0deg,
+    var(--ccs-abg-c1),
+    var(--ccs-abg-c2),
+    var(--ccs-abg-c3),
+    #fff,
+    var(--ccs-abg-c1)
+  );
+  mix-blend-mode: screen;
+  opacity: calc(var(--ccs-abg-intensity) * 0.55);
+  animation: ccs-abg-spin var(--ccs-abg-dur) linear infinite;
+  mask-image: radial-gradient(circle at center, #000 20%, transparent 70%);
+}
+.ccs-animated-bg-v-disco .ccs-abg-b {
+  background-image:
+    radial-gradient(circle, #fff 0 2px, transparent 3px),
+    radial-gradient(circle, var(--ccs-abg-c1) 0 1.5px, transparent 2.5px);
+  background-size:
+    calc(56px / var(--ccs-abg-density)) calc(56px / var(--ccs-abg-density)),
+    calc(88px / var(--ccs-abg-density)) calc(88px / var(--ccs-abg-density));
+  animation: ccs-abg-pan var(--ccs-abg-dur-fast) linear infinite, ccs-abg-sparkle calc(var(--ccs-abg-dur-fast) * 0.5) ease-in-out infinite;
+}
+
+/* Rain */
+.ccs-animated-bg-v-rain .ccs-abg-base {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+.ccs-animated-bg-v-rain .ccs-abg-a {
+  background-image: repeating-linear-gradient(
+    100deg,
+    transparent 0 calc(10px / var(--ccs-abg-density)),
+    color-mix(in srgb, var(--ccs-abg-c1) 45%, transparent) calc(10px / var(--ccs-abg-density)) calc(11px / var(--ccs-abg-density)),
+    transparent calc(11px / var(--ccs-abg-density)) calc(22px / var(--ccs-abg-density))
+  );
+  background-size: 100% 180%;
+  animation: ccs-abg-fall calc(var(--ccs-abg-dur-fast) * 0.6) linear infinite;
+  opacity: calc(var(--ccs-abg-intensity) * 0.7);
+}
+.ccs-animated-bg-v-rain .ccs-abg-b {
+  background:
+    radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--ccs-abg-c2) 25%, transparent), transparent 50%),
+    radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--ccs-abg-c3) 20%, transparent), transparent 40%);
+  animation: ccs-abg-pulse var(--ccs-abg-dur) ease-in-out infinite;
+}
+
+/* Bubbles */
+.ccs-animated-bg-v-bubbles .ccs-abg-base {
+  background: linear-gradient(180deg, #312e81 0%, #1e1b4b 50%, #0f172a 100%);
+}
+.ccs-animated-bg-v-bubbles .ccs-abg-a {
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--ccs-abg-c1) 55%, transparent) 0 12%, transparent 13%),
+    radial-gradient(circle, color-mix(in srgb, var(--ccs-abg-c2) 45%, transparent) 0 8%, transparent 9%),
+    radial-gradient(circle, color-mix(in srgb, var(--ccs-abg-c3) 40%, transparent) 0 6%, transparent 7%);
+  background-size:
+    calc(90px / var(--ccs-abg-density)) calc(120px / var(--ccs-abg-density)),
+    calc(70px / var(--ccs-abg-density)) calc(100px / var(--ccs-abg-density)),
+    calc(50px / var(--ccs-abg-density)) calc(80px / var(--ccs-abg-density));
+  animation: ccs-abg-rise var(--ccs-abg-dur) linear infinite;
+}
+.ccs-animated-bg-v-bubbles .ccs-abg-b {
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.35) 0 4%, transparent 5%);
+  background-size: calc(110px / var(--ccs-abg-density)) calc(140px / var(--ccs-abg-density));
+  animation: ccs-abg-rise calc(var(--ccs-abg-dur) * 1.4) linear infinite;
+  opacity: 0.6;
+}
+
+/* HUD Grid */
+.ccs-animated-bg-v-grid .ccs-abg-base {
+  background: radial-gradient(ellipse at center, #082f49 0%, #020617 75%);
+}
+.ccs-animated-bg-v-grid .ccs-abg-a {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--ccs-abg-c1) 40%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ccs-abg-c1) 40%, transparent) 1px, transparent 1px);
+  background-size: calc(40px / var(--ccs-abg-density)) calc(40px / var(--ccs-abg-density));
+  animation: ccs-abg-pan var(--ccs-abg-dur) linear infinite;
+}
+.ccs-animated-bg-v-grid .ccs-abg-b {
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--ccs-abg-c2) 25%, transparent), transparent 55%),
+    linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--ccs-abg-c3) 30%, transparent) 48%, transparent 52%, transparent 100%);
+  background-size: 100% 100%, 100% 220%;
+  animation: ccs-abg-scan var(--ccs-abg-dur) ease-in-out infinite;
+}
+
+/* Sunset */
+.ccs-animated-bg-v-sunset .ccs-abg-base {
+  background: linear-gradient(180deg, #7c3aed 0%, #f472b6 35%, #fb923c 70%, #fef3c7 100%);
+}
+.ccs-animated-bg-v-sunset .ccs-abg-a {
+  background:
+    radial-gradient(circle at 70% 30%, color-mix(in srgb, var(--ccs-abg-c1) 60%, transparent), transparent 40%),
+    radial-gradient(circle at 30% 60%, color-mix(in srgb, var(--ccs-abg-c2) 45%, transparent), transparent 45%),
+    radial-gradient(circle at 50% 90%, color-mix(in srgb, var(--ccs-abg-c3) 40%, transparent), transparent 50%);
+  animation: ccs-abg-drift-y var(--ccs-abg-dur-slow) ease-in-out infinite alternate;
+  filter: blur(8px);
+}
+.ccs-animated-bg-v-sunset .ccs-abg-b {
+  background: linear-gradient(0deg, rgba(254, 243, 199, 0.35), transparent 40%);
+  animation: ccs-abg-pulse var(--ccs-abg-dur) ease-in-out infinite;
+}
+
+/* Forest */
+.ccs-animated-bg-v-forest .ccs-abg-base {
+  background: linear-gradient(180deg, #14532d 0%, #166534 40%, #052e16 100%);
+}
+.ccs-animated-bg-v-forest .ccs-abg-a {
+  background:
+    radial-gradient(ellipse at 20% 80%, color-mix(in srgb, var(--ccs-abg-c1) 45%, transparent), transparent 45%),
+    radial-gradient(ellipse at 70% 70%, color-mix(in srgb, var(--ccs-abg-c3) 35%, transparent), transparent 40%),
+    radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--ccs-abg-c2) 50%, transparent), transparent 55%);
+  filter: blur(16px);
+  animation: ccs-abg-wave var(--ccs-abg-dur-slow) ease-in-out infinite;
+}
+.ccs-animated-bg-v-forest .ccs-abg-b {
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--ccs-abg-c3) 50%, transparent) 0 1px, transparent 2px);
+  background-size: calc(64px / var(--ccs-abg-density)) calc(64px / var(--ccs-abg-density));
+  animation: ccs-abg-pan var(--ccs-abg-dur-slow) linear infinite, ccs-abg-sparkle var(--ccs-abg-dur) ease-in-out infinite;
+  opacity: 0.5;
+}
+
+/* Candy Pop */
+.ccs-animated-bg-v-candy .ccs-abg-base {
+  background: linear-gradient(135deg, #fce7f3 0%, #ede9fe 50%, #cffafe 100%);
+}
+.ccs-animated-bg-v-candy .ccs-abg-a {
+  background:
+    radial-gradient(circle at 20% 30%, var(--ccs-abg-c1), transparent 35%),
+    radial-gradient(circle at 80% 25%, var(--ccs-abg-c2), transparent 38%),
+    radial-gradient(circle at 50% 75%, var(--ccs-abg-c3), transparent 40%);
+  filter: blur(28px);
+  animation: ccs-abg-blob var(--ccs-abg-dur) ease-in-out infinite;
+  opacity: calc(var(--ccs-abg-intensity) * 0.85);
+}
+.ccs-animated-bg-v-candy .ccs-abg-b {
+  background:
+    radial-gradient(circle at 60% 40%, color-mix(in srgb, var(--ccs-abg-c1) 40%, transparent), transparent 30%),
+    radial-gradient(circle at 30% 70%, color-mix(in srgb, var(--ccs-abg-c2) 35%, transparent), transparent 35%);
+  animation: ccs-abg-blob calc(var(--ccs-abg-dur) * 1.25) ease-in-out infinite reverse;
+  filter: blur(20px);
+}
+
+/* Noir Film */
+.ccs-animated-bg-v-noir .ccs-abg-base {
+  background: radial-gradient(ellipse at 40% 30%, #404040 0%, #171717 55%, #0a0a0a 100%);
+  filter: grayscale(1);
+}
+.ccs-animated-bg-v-noir .ccs-abg-a {
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--ccs-abg-c1) 55%, transparent) 0 1px, transparent 2px);
+  background-size: calc(3px / var(--ccs-abg-density)) calc(3px / var(--ccs-abg-density));
+  animation: ccs-abg-pan var(--ccs-abg-dur-fast) steps(4) infinite;
+  opacity: calc(var(--ccs-abg-intensity) * 0.35);
+  mix-blend-mode: overlay;
+}
+.ccs-animated-bg-v-noir .ccs-abg-b {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(0, 0, 0, 0.12) 2px 3px),
+    radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
+  animation: ccs-abg-scan var(--ccs-abg-dur) linear infinite;
+}
+.ccs-animated-bg-v-noir .ccs-abg-fx {
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.08) 50%, transparent 60%);
+  background-size: 200% 100%;
+  animation: ccs-abg-pan var(--ccs-abg-dur-slow) ease-in-out infinite alternate;
+}
+
+/* ========== Parallax / Mountains (JS-driven) ========== */
+
+.ccs-animated-bg.is-parallax .ccs-abg-base,
+.ccs-animated-bg.is-parallax .ccs-abg-a,
+.ccs-animated-bg.is-parallax .ccs-abg-b {
+  display: none;
+}
+
+.ccs-abg-parallax {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.ccs-abg-parallax[hidden] {
+  display: none !important;
+}
+
+.ccs-abg-sky,
+.ccs-abg-decor,
+.ccs-abg-ridges,
+.ccs-abg-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ccs-abg-sky { z-index: 0; }
+.ccs-abg-decor { z-index: 1; }
+.ccs-abg-ridges { z-index: 2; }
+.ccs-abg-particles { z-index: 4; width: 100%; height: 100%; }
+
+.ccs-abg-ridge {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.ccs-abg-ridge svg {
+  display: block;
+  width: 120%;
+  height: 100%;
+  margin-left: -10%;
+}
+
+.ccs-abg-sun {
+  position: absolute;
+  width: 22%;
+  height: 22%;
+  left: 62%;
+  top: 14%;
+  border-radius: 50%;
+  filter: blur(2px);
+  will-change: transform;
+}
+
+.ccs-abg-horizon-glow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18%;
+  height: 42%;
+  filter: blur(8px);
+}
+
+.ccs-abg-fog {
+  position: absolute;
+  left: -15%;
+  right: -15%;
+  height: 28%;
+  bottom: calc(18% + var(--ccs-abg-fog-i, 0) * 12%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  filter: blur(18px);
+  will-change: transform;
+}
+
+.ccs-abg-storm-clouds {
+  position: absolute;
+  inset: 0 0 35% 0;
+  background:
+    radial-gradient(ellipse at 20% 30%, rgba(30, 40, 60, 0.7), transparent 45%),
+    radial-gradient(ellipse at 70% 20%, rgba(20, 28, 48, 0.75), transparent 50%),
+    radial-gradient(ellipse at 45% 40%, rgba(40, 48, 70, 0.55), transparent 40%);
+  filter: blur(10px);
+  animation: ccs-abg-drift-x var(--ccs-abg-dur-slow) ease-in-out infinite alternate;
+}
+
+.ccs-abg-lightning {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, transparent 42%, rgba(220, 235, 255, 0.75) 50%, transparent 58%),
+    radial-gradient(circle at 58% 28%, rgba(255, 255, 255, 0.55), transparent 28%);
+  opacity: 0;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.ccs-abg-orbit {
+  position: absolute;
+  width: 46%;
+  height: 46%;
+  left: 27%;
+  top: 12%;
+  border: 1px solid;
+  border-radius: 50%;
+  opacity: 0.45;
+  animation: ccs-abg-spin var(--ccs-abg-dur-slow) linear infinite;
+  mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+}
+
+.ccs-animated-bg.is-paused .ccs-abg-storm-clouds,
+.ccs-animated-bg.is-paused .ccs-abg-orbit {
+  animation-play-state: paused !important;
+}
+
+.ccs-animated-bg.is-parallax.has-vignette .ccs-abg-fx {
+  z-index: 5;
+  background: transparent;
+}
+
+/* Variant hooks (JS owns the look; classes keep selectors/tests stable) */
+.ccs-animated-bg-v-mountains,
+.ccs-animated-bg-v-alpine,
+.ccs-animated-bg-v-fuji,
+.ccs-animated-bg-v-mesa,
+.ccs-animated-bg-v-neon-peaks,
+.ccs-animated-bg-v-mist-peaks,
+.ccs-animated-bg-v-lowpoly,
+.ccs-animated-bg-v-papercut,
+.ccs-animated-bg-v-floating,
+.ccs-animated-bg-v-ridge-storm {
+  background: #0a0a12;
+}
+

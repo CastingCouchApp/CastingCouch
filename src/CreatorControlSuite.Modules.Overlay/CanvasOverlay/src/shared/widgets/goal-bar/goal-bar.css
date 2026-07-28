@@ -1,0 +1,235 @@
+.ccs-goal-bar {
+  --ccs-goal-color: var(--accent, #ff7a00);
+  --ccs-goal-color2: var(--accent2, #ffb36b);
+  --ccs-goal-track: rgba(255, 255, 255, 0.12);
+  --ccs-goal-text: #fff;
+  --ccs-goal-font: "Segoe UI", system-ui, sans-serif;
+  --ccs-goal-font-size: 14px;
+  --ccs-goal-bar-h: 14px;
+  --ccs-goal-radius: 999px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  color: var(--ccs-goal-text);
+  font-family: var(--ccs-goal-font);
+  font-size: var(--ccs-goal-font-size);
+}
+
+.ccs-goal-bar.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ccs-goal-bar-label-row {
+  display: flex;
+  align-items: center;
+  min-height: 1.2em;
+}
+
+.ccs-goal-bar-label {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ccs-goal-bar-track {
+  position: relative;
+  width: 100%;
+  height: var(--ccs-goal-bar-h);
+  border-radius: var(--ccs-goal-radius);
+  background: var(--ccs-goal-track);
+  overflow: hidden;
+}
+
+.ccs-goal-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--ccs-goal-color);
+  transition: width 0.45s ease;
+}
+
+.ccs-goal-bar.ccs-goal-fill-gradient .ccs-goal-bar-fill {
+  background: linear-gradient(90deg, var(--ccs-goal-color), var(--ccs-goal-color2));
+}
+
+.ccs-goal-bar.ccs-goal-fill-striped .ccs-goal-bar-fill {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--ccs-goal-color) 0 10px,
+    var(--ccs-goal-color2) 10px 20px
+  );
+}
+
+.ccs-goal-bar.ccs-goal-animate .ccs-goal-bar-fill {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ccs-goal-color) 55%, transparent);
+}
+
+.ccs-goal-bar-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.ccs-goal-bar-percent {
+  margin-left: auto;
+  opacity: 0.9;
+}
+
+.ccs-goal-bar.ccs-goal-pulse.ccs-goal-progress-bump .ccs-goal-bar-fill,
+.ccs-goal-bar.ccs-goal-pulse.is-complete .ccs-goal-bar-fill {
+  animation: ccs-goal-pulse 0.45s ease;
+}
+
+@keyframes ccs-goal-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.35);
+  }
+}
+
+/* Sizes */
+.ccs-goal-bar-s-mini {
+  padding: 6px 10px;
+  gap: 5px;
+  --ccs-goal-font-size: 11px;
+  --ccs-goal-bar-h: 8px;
+}
+
+.ccs-goal-bar-s-compact {
+  padding: 8px 12px;
+  gap: 6px;
+  --ccs-goal-font-size: 12px;
+  --ccs-goal-bar-h: 10px;
+}
+
+.ccs-goal-bar-s-wide {
+  padding: 12px 18px;
+  gap: 10px;
+  --ccs-goal-font-size: 16px;
+  --ccs-goal-bar-h: 18px;
+}
+
+.ccs-goal-bar-s-banner {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 8px 16px;
+  --ccs-goal-bar-h: 10px;
+}
+
+.ccs-goal-bar-s-banner .ccs-goal-bar-track {
+  flex: 1 1 180px;
+  order: 3;
+}
+
+.ccs-goal-bar-s-banner .ccs-goal-bar-meta {
+  order: 2;
+  margin-left: auto;
+}
+
+/* Variants */
+.ccs-goal-bar-v-classic {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+.ccs-goal-bar-v-neon {
+  background: rgba(8, 4, 0, 0.72);
+  border: 1px solid color-mix(in srgb, var(--ccs-goal-color) 80%, white);
+  border-radius: 12px;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--ccs-goal-color) 45%, transparent);
+}
+
+.ccs-goal-bar-v-glass {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+}
+
+.ccs-goal-bar-v-cyber {
+  background: linear-gradient(135deg, rgba(0, 20, 30, 0.9), rgba(30, 0, 40, 0.85));
+  border: 1px solid #00e5ff;
+  clip-path: polygon(0 10px, 10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+}
+
+.ccs-goal-bar-v-minimal {
+  background: transparent;
+  border: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ccs-goal-bar-v-bold {
+  background: #120900;
+  border: 3px solid var(--ccs-goal-color);
+  border-radius: 0;
+  box-shadow: 6px 6px 0 color-mix(in srgb, var(--ccs-goal-color) 55%, transparent);
+}
+
+.ccs-goal-bar-v-soft {
+  background: rgba(255, 244, 236, 0.08);
+  border: 1px solid color-mix(in srgb, var(--ccs-goal-color) 35%, transparent);
+  border-radius: 20px;
+}
+
+.ccs-goal-bar-v-outline {
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 10px;
+}
+
+.ccs-goal-bar-v-hud {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--ccs-goal-color) 25%, transparent), transparent 40%),
+    rgba(0, 0, 0, 0.55);
+  border-left: 4px solid var(--ccs-goal-color);
+  border-radius: 4px;
+}
+
+.ccs-goal-bar-v-pixel {
+  background: #111;
+  border: 4px solid #333;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+
+.ccs-goal-bar-v-pixel .ccs-goal-bar-track,
+.ccs-goal-bar-v-pixel .ccs-goal-bar-fill {
+  border-radius: 0;
+}
+
+.ccs-goal-bar-v-stripe {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.04) 8px,
+    rgba(0, 0, 0, 0.2) 8px,
+    rgba(0, 0, 0, 0.2) 16px
+  );
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.ccs-goal-bar-v-capsule {
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 999px;
+  padding: 12px 20px;
+}
+
+.ccs-goal-bar-v-capsule .ccs-goal-bar-track {
+  --ccs-goal-radius: 999px;
+}

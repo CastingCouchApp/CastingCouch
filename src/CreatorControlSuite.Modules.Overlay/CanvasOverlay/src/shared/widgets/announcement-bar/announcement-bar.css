@@ -1,0 +1,160 @@
+/* Announcement / ticker bar */
+.ccs-announcement-bar {
+  --ccs-announce-align: center;
+  --ccs-announce-color: #ffffff;
+  --ccs-announce-color2: #ff7a00;
+  --ccs-announce-bg: rgba(10, 10, 16, 0.88);
+  --ccs-announce-size: 20px;
+  --ccs-announce-weight: 600;
+  --ccs-announce-padding: 16px;
+  --ccs-announce-radius: 12px;
+  --ccs-announce-speed: 40;
+  --ccs-announce-repeat-gap: 48px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 var(--ccs-announce-padding);
+  border-radius: var(--ccs-announce-radius);
+  background: var(--ccs-announce-bg);
+  color: var(--ccs-announce-color);
+  font-size: var(--ccs-announce-size);
+  font-weight: var(--ccs-announce-weight);
+  font-family: var(--ccs-announce-font, inherit);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ccs-announce-color2) 35%, transparent);
+}
+
+.ccs-announcement-bar.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ccs-announcement-bar-accent {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ccs-announce-color2);
+  box-shadow: 0 0 10px var(--ccs-announce-color2);
+  flex: 0 0 auto;
+}
+
+.ccs-announcement-bar-icon,
+.ccs-announcement-bar-prefix {
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+.ccs-announcement-bar-prefix {
+  color: var(--ccs-announce-color2);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.ccs-announcement-bar-track {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: var(--ccs-announce-align);
+}
+
+.ccs-announcement-bar-marquee-inner {
+  display: inline-block;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.ccs-announcement-bar.ccs-announce-uppercase .ccs-announcement-bar-message {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Marquee */
+.ccs-announcement-bar.ccs-announce-scroll .ccs-announcement-bar-track.is-scrolling .ccs-announcement-bar-marquee-inner {
+  animation: ccs-announce-marquee-scroll var(--ccs-announce-marquee-duration, 12s) linear infinite;
+}
+
+.ccs-announcement-bar.ccs-announce-rtl .ccs-announcement-bar-track.is-scrolling .ccs-announcement-bar-marquee-inner {
+  animation-name: ccs-announce-marquee-scroll-rtl;
+}
+
+@keyframes ccs-announce-marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(-1 * var(--ccs-announce-marquee-distance, 120px))); }
+}
+
+@keyframes ccs-announce-marquee-scroll-rtl {
+  0% { transform: translateX(calc(-1 * var(--ccs-announce-marquee-distance, 120px))); }
+  100% { transform: translateX(0); }
+}
+
+/* Variants */
+.ccs-announcement-bar-v-classic {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.ccs-announcement-bar-v-neon {
+  border-color: var(--ccs-announce-color2);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--ccs-announce-color2) 50%, transparent);
+}
+
+.ccs-announcement-bar-v-glass {
+  background: color-mix(in srgb, var(--ccs-announce-bg) 50%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.ccs-announcement-bar-v-minimal {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.ccs-announcement-bar-v-bold {
+  background: var(--ccs-announce-color2);
+  color: #111;
+  border: none;
+}
+
+.ccs-announcement-bar-v-cyber {
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  border-width: 2px;
+}
+
+.ccs-announcement-bar-v-pill {
+  border-radius: 999px;
+}
+
+.ccs-announcement-bar-v-strip {
+  border-radius: 0;
+  border: none;
+  border-top: 2px solid var(--ccs-announce-color2);
+  border-bottom: 2px solid var(--ccs-announce-color2);
+}
+
+.ccs-announcement-bar-v-ribbon {
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+  border: none;
+}
+
+.ccs-announcement-bar-v-alert-soft {
+  background: color-mix(in srgb, #ff5a5a 22%, var(--ccs-announce-bg));
+  border-color: #ff8a8a;
+}
+
+.ccs-announcement-bar-v-sponsor {
+  border-left: 6px solid var(--ccs-announce-color2);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ccs-announcement-bar-v-schedule {
+  font-family: ui-monospace, monospace;
+  border-style: dashed;
+}
+
+/* Size presets */
+.ccs-announcement-bar-s-slim { --ccs-announce-size: 16px; }
+.ccs-announcement-bar-s-tall { --ccs-announce-size: 24px; }
+.ccs-announcement-bar-s-banner { --ccs-announce-size: 22px; }
