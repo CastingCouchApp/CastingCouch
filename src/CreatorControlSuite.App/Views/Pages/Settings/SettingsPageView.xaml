@@ -418,7 +418,7 @@
                     </TabItem>
                     <TabItem Header="Stream-Workflow">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="18">
+                            <StackPanel Margin="18" Style="{StaticResource CCSDarkSettingsContentStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="140"/>
@@ -431,20 +431,19 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="Startszene" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Startszene" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                                     <ComboBox x:Name="StartSceneBox" x:FieldModifier="public" Grid.Column="1" IsEditable="True" DisplayMemberPath="Name" SelectedValuePath="Name"/>
-                                    <TextBlock Text="Live-Szene" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    <TextBlock Text="Live-Szene" Foreground="{DynamicResource AccentBrush}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
                                     <ComboBox x:Name="LiveSceneBox" x:FieldModifier="public" Grid.Column="3" IsEditable="True" DisplayMemberPath="Name" SelectedValuePath="Name"/>
-                                    <TextBlock Text="Pausenszene" Grid.Row="1" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                    <TextBlock Text="Pausenszene" Foreground="{DynamicResource AccentBrush}" Grid.Row="1" VerticalAlignment="Center" Margin="0,10,0,0"/>
                                     <ComboBox x:Name="PauseSceneBox" x:FieldModifier="public" Grid.Row="1" Grid.Column="1" Margin="0,10,0,0" IsEditable="True" DisplayMemberPath="Name" SelectedValuePath="Name"/>
-                                    <TextBlock Text="Endszene" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="12,10,0,0"/>
+                                    <TextBlock Text="Endszene" Foreground="{DynamicResource AccentBrush}" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="12,10,0,0"/>
                                     <ComboBox x:Name="EndSceneBox" x:FieldModifier="public" Grid.Row="1" Grid.Column="3" Margin="0,10,0,0" IsEditable="True" DisplayMemberPath="Name" SelectedValuePath="Name"/>
-                                    <TextBlock Text="Endszene-Dauer" Grid.Row="2" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                    <TextBlock Text="Endszene-Dauer" Foreground="{DynamicResource AccentBrush}" Grid.Row="2" VerticalAlignment="Center" Margin="0,10,0,0"/>
                                     <TextBox x:Name="EndSceneSecondsBox" x:FieldModifier="public" Grid.Row="2" Grid.Column="1" Margin="0,10,0,0"/>
                                 </Grid>
                                 <Button x:Name="RefreshWorkflowScenesButton" x:FieldModifier="public" Content="OBS-Szenen neu laden" HorizontalAlignment="Left" Margin="0,14,0,0"/>
-                                <TextBlock Text="Die Szenenauswahl gehört zum Stream-Workflow. Beim Streamstart wechselt die Suite die gewählte OBS-Szene per WebSocket. In den HTML-Overlays wird kein OBS-Szenenname gespeichert." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                            
+                                <TextBlock Text="Die Szenenauswahl gehört zum Stream-Workflow. Beim Streamstart wechselt die Suite die gewählte OBS-Szene per WebSocket. In den HTML-Overlays wird kein OBS-Szenenname gespeichert." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

@@ -304,21 +304,27 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="34"/>
                                         </Grid.ColumnDefinitions>
-                                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                        <ContentPresenter x:Name="ContentSite"
+                                                          Margin="{TemplateBinding Padding}"
                                                           VerticalAlignment="Center"
                                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                           Content="{TemplateBinding SelectionBoxItem}"
                                                           ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                                          TextElement.Foreground="{TemplateBinding Foreground}"/>
-                                        <Border Grid.Column="1" Background="{DynamicResource ComboGlyphBackgroundBrush}" CornerRadius="0,5,5,0">
+                                                          TextElement.Foreground="{TemplateBinding Foreground}"
+                                                          IsHitTestVisible="False"/>
+                                        <Border Grid.Column="1"
+                                                Background="{DynamicResource ComboGlyphBackgroundBrush}"
+                                                CornerRadius="0,5,5,0"
+                                                IsHitTestVisible="False">
                                             <Path Width="9" Height="5"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
                                                   Fill="{DynamicResource ComboGlyphBrush}"
                                                   Data="M 0 0 L 4.5 5 L 9 0 Z"/>
                                         </Border>
-                                        <ToggleButton Grid.ColumnSpan="2"
+                                        <ToggleButton x:Name="DropDownToggle"
+                                                      Grid.ColumnSpan="2"
                                                       Background="Transparent"
                                                       BorderThickness="0"
                                                       Focusable="False"
@@ -329,6 +335,20 @@
                                                 </ControlTemplate>
                                             </ToggleButton.Template>
                                         </ToggleButton>
+                                        <TextBox x:Name="PART_EditableTextBox"
+                                                 Panel.ZIndex="1"
+                                                 Visibility="Collapsed"
+                                                 Background="Transparent"
+                                                 BorderThickness="0"
+                                                 Focusable="True"
+                                                 HorizontalAlignment="Stretch"
+                                                 VerticalAlignment="Center"
+                                                 Margin="{TemplateBinding Padding}"
+                                                 Foreground="{TemplateBinding Foreground}"
+                                                 CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                                 FontFamily="{TemplateBinding FontFamily}"
+                                                 FontSize="{TemplateBinding FontSize}"
+                                                 IsReadOnly="{TemplateBinding IsReadOnly}"/>
                                     </Grid>
                                 </Border>
                                 <Popup x:Name="PART_Popup"
@@ -351,6 +371,12 @@
                                 </Popup>
                             </Grid>
                             <ControlTemplate.Triggers>
+                                <Trigger Property="IsEditable" Value="True">
+                                    <Setter TargetName="ContentSite" Property="Visibility" Value="Collapsed"/>
+                                    <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
+                                    <Setter TargetName="DropDownToggle" Property="Grid.Column" Value="1"/>
+                                    <Setter TargetName="DropDownToggle" Property="Grid.ColumnSpan" Value="1"/>
+                                </Trigger>
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="OuterBorder" Property="BorderBrush" Value="{DynamicResource HoverBorderBrush}"/>
                                 </Trigger>
@@ -430,10 +456,64 @@
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
             </Style>
 
+            <Style TargetType="Separator">
+                <Setter Property="Background" Value="{DynamicResource StrongBorderBrush}"/>
+                <Setter Property="Margin" Value="0,8"/>
+                <Setter Property="Height" Value="1"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Separator">
+                            <Border Background="{TemplateBinding Background}"
+                                    Height="{TemplateBinding Height}"
+                                    SnapsToDevicePixels="True"/>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="TabControl">
+                <Setter Property="Background" Value="{DynamicResource SettingsTabBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabControl">
+                            <Grid KeyboardNavigation.TabNavigation="Local">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Disabled"
+                                              Focusable="False"
+                                              Padding="0,0,0,2">
+                                    <TabPanel IsItemsHost="True"
+                                              Margin="0"
+                                              Background="Transparent"
+                                              KeyboardNavigation.TabIndex="1"/>
+                                </ScrollViewer>
+                                <Border Grid.Row="1"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        KeyboardNavigation.TabNavigation="Local"
+                                        KeyboardNavigation.DirectionalNavigation="Contained"
+                                        KeyboardNavigation.TabIndex="2">
+                                    <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                      Margin="{TemplateBinding Padding}"
+                                                      ContentSource="SelectedContent"/>
+                                </Border>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style TargetType="TabItem">
                 <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                 <Setter Property="Background" Value="{DynamicResource TabBackgroundBrush}"/>
-                <Setter Property="Padding" Value="14,8"/>
+                <Setter Property="Padding" Value="10,7"/>
                 <Setter Property="Margin" Value="0,0,4,0"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
