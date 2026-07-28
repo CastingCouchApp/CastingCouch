@@ -102,7 +102,7 @@ public sealed class ThemeTitleBarChromeTests
             xaml,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Margin=\"4,0,0,0\"",
+            "Margin=\"0,0,0,0\"",
             xaml,
             StringComparison.Ordinal);
 
@@ -132,6 +132,47 @@ public sealed class ThemeTitleBarChromeTests
         Assert.DoesNotContain(
             "CornerRadius=\"9\"",
             widgetStrip,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindowTitleBar_UsesCompactBrandWidgetsAndConnectionSummary()
+    {
+        string path = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml");
+        string xaml = File.ReadAllText(path);
+
+        Assert.DoesNotContain(
+            "Text=\"STREAMING CONTROL SUITE\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "x:Name=\"TitleBarBrandPanel\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Margin=\"0,0,0,0\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "x:Name=\"DashboardHeaderStreamActionButton\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Padding=\"10,6\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "x:Name=\"DashboardConnectionSummaryChip\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Padding=\"8,5\"",
+            xaml,
             StringComparison.Ordinal);
     }
 

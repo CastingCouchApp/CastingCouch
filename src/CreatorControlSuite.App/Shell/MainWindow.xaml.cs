@@ -63,7 +63,6 @@ using Microsoft.Win32;
 using MultiPcDeviceRecord = CreatorControlSuite.Core.Security.PairedAgentDevice;
 
 namespace CreatorControlSuite.App.Shell;
-
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<string> _multiPcDeviceItems = [];

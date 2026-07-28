@@ -4,6 +4,7 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../../src/CreatorControlSuite.Core/CreatorControlSuite.Core.csproj" />
     <ProjectReference Include="../../src/CreatorControlSuite.App/CreatorControlSuite.App.csproj" />
     <ProjectReference Include="../../src/CreatorControlSuite.Modules.OBS/CreatorControlSuite.Modules.OBS.csproj" />

@@ -76,9 +76,9 @@
                             Grid.Column="0"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="4,0,0,0"
+                            Margin="0,0,0,0"
                             IsHitTestVisible="False">
-                    <Border Width="40" Height="40" CornerRadius="8" ClipToBounds="True" Margin="0,0,8,0">
+                    <Border Width="36" Height="36" CornerRadius="8" ClipToBounds="True" Margin="0,0,6,0">
                         <Image Source="Assets/Brand/app.png"
                                Stretch="UniformToFill"
                                RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -89,15 +89,11 @@
                                    FontSize="20"
                                    FontWeight="Light"
                                    FontFamily="{DynamicResource AppHeadingFontFamily}"/>
-                        <TextBlock Text="STREAMING CONTROL SUITE"
-                                   Foreground="{DynamicResource TextMutedBrush}"
-                                   FontSize="9"
-                                   FontWeight="SemiBold"/>
                     </StackPanel>
                 </StackPanel>
                 <Grid x:Name="DashboardTopStatusRow"
                       Grid.Column="1"
-                      Margin="4,6,4,6"
+                      Margin="0,6,0,6"
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Stretch"
                       shell:WindowChrome.IsHitTestVisibleInChrome="True"
@@ -118,7 +114,8 @@
                                     Style="{StaticResource TitleBarWidgetStyle}"
                                     Tag="TitleBarChromeWidget"
                                     Uid="Stream"
-                                    MinWidth="180">
+                                    MinWidth="172"
+                                    Padding="10,6">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <Border Width="38" Height="38" CornerRadius="8" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" Margin="0,0,9,0">
@@ -132,7 +129,7 @@
                                         <TextBlock Text="  "/>
                                         <TextBlock x:Name="DashboardStreamDetailText" Text="00:00:00" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="NoWrap"/>
                                     </StackPanel>
-                                    <Button x:Name="DashboardHeaderStreamActionButton" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Stream abhängig vom aktuellen Zustand starten oder beenden" Content="●  LIVE GEHEN" Background="{DynamicResource DangerBrush}" Foreground="{DynamicResource TextOnAccentBrush}" BorderBrush="{DynamicResource DangerBrush}" FontWeight="Bold" Height="30" Padding="12,2" Margin="0,10,0,0" HorizontalAlignment="Left"/>
+                                    <Button x:Name="DashboardHeaderStreamActionButton" shell:WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Stream abhängig vom aktuellen Zustand starten oder beenden" Content="●  LIVE GEHEN" Background="{DynamicResource DangerBrush}" Foreground="{DynamicResource TextOnAccentBrush}" BorderBrush="{DynamicResource DangerBrush}" FontWeight="Bold" Height="28" Padding="10,2" Margin="0,6,0,0" HorizontalAlignment="Left"/>
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="1"
@@ -144,7 +141,7 @@
                                     Style="{StaticResource TitleBarWidgetStyle}"
                                     Tag="TitleBarChromeWidget"
                                     Uid="Quality"
-                                    MinWidth="240"
+                                    MinWidth="220"
                                     x:Name="DashboardStreamQualityModule">
                                 <StackPanel>
                                     <DockPanel LastChildFill="True">
@@ -184,8 +181,8 @@
                                     Tag="TitleBarChromeWidget"
                                     Uid="Music"
                                     shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                                    Width="380"
-                                    MaxWidth="380"
+                                    Width="350"
+                                    MaxWidth="350"
                                     Cursor="Hand"
                                     ToolTip="Music Player öffnen">
                                 <Grid>
@@ -244,7 +241,7 @@
                                         Style="{StaticResource TitleBarWidgetStyle}"
                                         Tag="TitleBarChromeWidget"
                                         Uid="Community"
-                                        MinWidth="280">
+                                        MinWidth="250">
                                     <StackPanel>
                                         <TextBlock Text="COMMUNITY" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8"/>
                                         <UniformGrid Columns="4">
@@ -283,7 +280,7 @@
                                         Style="{StaticResource TitleBarWidgetStyle}"
                                         Tag="TitleBarChromeWidget"
                                         Uid="Session"
-                                        MinWidth="260">
+                                        MinWidth="230">
                                     <StackPanel>
                                         <TextBlock Text="SESSION" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8"/>
                                         <UniformGrid Columns="4">
@@ -317,7 +314,7 @@
                                         Tag="TitleBarChromeWidget"
                                         Uid="Countdown"
                                         shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                                        MinWidth="220">
+                                        MinWidth="205">
                                     <StackPanel>
                                         <DockPanel LastChildFill="True" Margin="0,0,0,6">
                                             <TextBlock Text="COUNTDOWN" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
@@ -438,8 +435,8 @@
                     <Border x:Name="DashboardConnectionSummaryChip"
                             Uid="Connections"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            Margin="0,6,8,0"
-                            Padding="12,8"
+                            Margin="0,4,4,0"
+                            Padding="8,5"
                             Background="{DynamicResource CardBackgroundBrush}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1"
@@ -463,11 +460,11 @@
                             </ToolTip>
                         </Border.ToolTip>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Ellipse x:Name="DashboardConnectionSummaryLamp" Width="9" Height="9" Fill="IndianRed" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="DashboardConnectionSummaryCount" Text="0/4" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="VERBINDUNGEN" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
-                                <TextBlock x:Name="DashboardConnectionSummaryDetail" Text="offline" Foreground="{DynamicResource WarningBrush}" FontSize="11"/>
+                            <Ellipse x:Name="DashboardConnectionSummaryLamp" Width="8" Height="8" Fill="IndianRed" Margin="0,0,7,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="DashboardConnectionSummaryCount" Text="0/4" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <StackPanel Margin="7,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="VERBINDUNGEN" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="DashboardConnectionSummaryDetail" Text="offline" Foreground="{DynamicResource WarningBrush}" FontSize="10"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
