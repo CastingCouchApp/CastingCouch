@@ -38,6 +38,7 @@
     h: Number(params.get("h")) || def.h,
     z: 1,
     effects: [] as unknown[],
+    animations: [] as unknown[],
     props: { ...(def.props || {}), ...props }
   };
 

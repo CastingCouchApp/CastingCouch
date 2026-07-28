@@ -1,0 +1,90 @@
+:root {
+  --ccs-anim-fade-min: 0.25;
+  --ccs-anim-slide-x: 0px;
+  --ccs-anim-slide-y: 24px;
+  --ccs-anim-bounce-h: 18px;
+  --ccs-anim-pop-scale: 1.12;
+  --ccs-anim-shake: 6px;
+  --ccs-anim-float: 10px;
+  --ccs-anim-pulse-scale: 1.08;
+  --ccs-anim-wiggle: 6deg;
+}
+
+.ccs-item-anim-target {
+  transform-origin: center center;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+@keyframes ccs-anim-fade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: var(--ccs-anim-fade-min); }
+}
+
+@keyframes ccs-anim-slide {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(var(--ccs-anim-slide-x), var(--ccs-anim-slide-y)); }
+}
+
+@keyframes ccs-anim-bounce {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(calc(var(--ccs-anim-bounce-h) * -1)); }
+  60% { transform: translateY(calc(var(--ccs-anim-bounce-h) * -0.35)); }
+}
+
+@keyframes ccs-anim-pop {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(var(--ccs-anim-pop-scale)); }
+}
+
+@keyframes ccs-anim-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(calc(var(--ccs-anim-shake) * -1)); }
+  40% { transform: translateX(var(--ccs-anim-shake)); }
+  60% { transform: translateX(calc(var(--ccs-anim-shake) * -0.6)); }
+  80% { transform: translateX(calc(var(--ccs-anim-shake) * 0.6)); }
+}
+
+@keyframes ccs-anim-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(calc(var(--ccs-anim-float) * -1)); }
+}
+
+@keyframes ccs-anim-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(var(--ccs-anim-pulse-scale)); opacity: 0.88; }
+}
+
+@keyframes ccs-anim-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ccs-anim-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(calc(var(--ccs-anim-wiggle) * -1)); }
+  75% { transform: rotate(var(--ccs-anim-wiggle)); }
+}
+
+@keyframes ccs-anim-flip-y {
+  0%, 100% { transform: perspective(600px) rotateY(0deg); }
+  50% { transform: perspective(600px) rotateY(180deg); }
+}
+
+@keyframes ccs-anim-flip-x {
+  0%, 100% { transform: perspective(600px) rotateX(0deg); }
+  50% { transform: perspective(600px) rotateX(180deg); }
+}
+
+.ccs-item-anim-fade,
+.ccs-item-anim-slide,
+.ccs-item-anim-bounce,
+.ccs-item-anim-pop,
+.ccs-item-anim-shake,
+.ccs-item-anim-float,
+.ccs-item-anim-pulse,
+.ccs-item-anim-spin,
+.ccs-item-anim-wiggle,
+.ccs-item-anim-flip {
+  /* marker classes for tests / debugging; animation applied via inline style */
+}
