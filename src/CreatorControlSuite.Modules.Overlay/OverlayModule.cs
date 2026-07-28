@@ -9,7 +9,8 @@ public sealed class OverlayModule(
     IOverlayWebServer webServer,
     IOverlayLayoutStore layoutStore,
     IOverlayExtensionStore extensionStore,
-    IOverlayAssetStore assetStore) : IConnectableModule
+    IOverlayAssetStore assetStore,
+    IChatHistoryService chatHistory) : IConnectableModule
 {
     private bool _initialized;
 
@@ -21,6 +22,7 @@ public sealed class OverlayModule(
     public IOverlayLayoutStore LayoutStore { get; } = layoutStore;
     public IOverlayExtensionStore ExtensionStore { get; } = extensionStore;
     public IOverlayAssetStore AssetStore { get; } = assetStore;
+    public IChatHistoryService ChatHistory { get; } = chatHistory;
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -34,6 +36,15 @@ public sealed class OverlayModule(
             // Overlay-Daten sind auch ohne Webserver nutzbar; Status meldet den Fehler.
         }
 
+        try
+        {
+            await ChatHistory.InitializeAsync(cancellationToken);
+        }
+        catch
+        {
+            // Chat-History ist best-effort.
+        }
+
         _initialized = true;
     }
 
@@ -44,6 +55,15 @@ public sealed class OverlayModule(
 
     public async Task DisconnectAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            await ChatHistory.FlushAsync(cancellationToken);
+        }
+        catch
+        {
+            // best-effort
+        }
+
         await WebServer.StopAsync(cancellationToken);
         _initialized = false;
     }

@@ -14,6 +14,8 @@ public sealed class OverlayModuleRegistration : IModuleRegistration
         services.AddSingleton<OverlayRealtimeHub>();
         services.AddSingleton<IOverlayRealtimeHub>(
             provider => provider.GetRequiredService<OverlayRealtimeHub>());
+        services.AddSingleton<IChatHistoryStore, ChatHistoryStore>();
+        services.AddSingleton<IChatHistoryService, ChatHistoryService>();
         services.AddSingleton<IOverlayDataService, OverlayDataService>();
         services.AddSingleton<IOverlayLayoutStore, OverlayLayoutStore>();
         services.AddSingleton<IOverlayExtensionStore, OverlayExtensionStore>();

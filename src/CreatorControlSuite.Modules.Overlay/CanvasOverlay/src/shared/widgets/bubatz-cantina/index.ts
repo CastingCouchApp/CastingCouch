@@ -63,7 +63,30 @@ function parseMenuLines(raw: unknown): string[] {
     .filter(Boolean);
 }
 
-function syncMarquee(el: HTMLElement, item: LayoutItem, scroll: boolean): void {
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildTickerText(
+  title: string,
+  message: string,
+  menuLines: string[],
+  statusLabel: string,
+  statusValue: string
+): string {
+  const status =
+    statusLabel || statusValue
+      ? [statusLabel, statusValue].filter(Boolean).join(": ")
+      : "";
+  return [title, message, ...menuLines, status].filter(Boolean).join("  ·  ");
+}
+
+/** Measure and start/stop marquee. Duplicated segments force overflow in ticker mode. */
+export function syncMarquee(el: HTMLElement, item: LayoutItem, scroll: boolean): void {
   const track = el.querySelector<HTMLElement>(".ccs-bubatz-cantina-track");
   if (!track) return;
   const inner = track.querySelector<HTMLElement>(".ccs-bubatz-cantina-marquee");
@@ -77,14 +100,16 @@ function syncMarquee(el: HTMLElement, item: LayoutItem, scroll: boolean): void {
   }
 
   void track.offsetWidth;
-  const overflow = inner.scrollWidth - track.clientWidth;
-  const scrolling = overflow > 4;
+  const first = inner.querySelector<HTMLElement>(".ccs-bubatz-cantina-marquee-seg");
+  const gap = Math.max(24, Number(prop(item, "repeatGap", 48)) || 48);
+  const segmentWidth = first ? first.offsetWidth : inner.scrollWidth;
+  const distance = Math.max(segmentWidth + gap, inner.scrollWidth - track.clientWidth);
+  const scrolling = distance > 4;
   track.classList.toggle("is-scrolling", scrolling);
   if (scrolling) {
-    const gap = Math.max(24, Number(prop(item, "repeatGap", 48)) || 48);
-    track.style.setProperty("--ccs-bubatz-marquee-distance", overflow + gap + "px");
+    track.style.setProperty("--ccs-bubatz-marquee-distance", distance + "px");
     const speed = Math.max(10, Number(prop(item, "speed", 40)) || 40);
-    const duration = Math.max(4, Math.min(40, (overflow + gap) / speed));
+    const duration = Math.max(4, Math.min(60, distance / speed));
     track.style.setProperty("--ccs-bubatz-marquee-duration", duration + "s");
   }
 }
@@ -137,10 +162,11 @@ function applyAppearance(el: HTMLElement, item: LayoutItem): void {
   el.style.setProperty("--ccs-bubatz-pad", (Number.isFinite(padding) ? padding : 20) + "px");
   el.style.setProperty("--ccs-bubatz-gap", (Number.isFinite(gap) ? gap : 10) + "px");
 
+  const scroll = mode === "ticker" || prop(item, "scroll", false) === true;
   el.classList.toggle("ccs-bubatz-uppercase", prop(item, "uppercase", false) === true);
   el.classList.toggle("ccs-bubatz-pulse-leaf", prop(item, "pulseLeaf", true) !== false);
   el.classList.toggle("ccs-bubatz-twinkle", prop(item, "twinkleStars", true) !== false);
-  el.classList.toggle("ccs-bubatz-scroll", prop(item, "scroll", false) === true);
+  el.classList.toggle("ccs-bubatz-scroll", scroll);
 }
 
 export function createBubatzCantinaEl(item?: LayoutItem): HTMLElement {
@@ -209,37 +235,51 @@ export function updateBubatzCantina(el: HTMLElement, item: LayoutItem): void {
   }
   if (stars) stars.style.display = showStars ? "" : "none";
 
+  const isTicker = mode === "ticker";
+
   if (titleEl) {
-    titleEl.style.display = showTitle && title ? "" : "none";
+    titleEl.style.display = !isTicker && showTitle && title ? "" : "none";
     titleEl.textContent = title;
   }
   if (subtitleEl) {
-    subtitleEl.style.display = showSubtitle && subtitle ? "" : "none";
+    subtitleEl.style.display = !isTicker && showSubtitle && subtitle ? "" : "none";
     subtitleEl.textContent = subtitle;
   }
   if (messageEl) {
-    const visible = showMessage && message && (mode === "sign" || mode === "status");
+    const visible = !isTicker && showMessage && message && (mode === "sign" || mode === "status");
     messageEl.style.display = visible ? "" : "none";
     messageEl.textContent = message;
   }
   if (menuEl) {
-    const visible = showMenu && menuLines.length > 0 && (mode === "menu" || mode === "sign");
+    const visible = !isTicker && showMenu && menuLines.length > 0 && (mode === "menu" || mode === "sign");
     menuEl.style.display = visible ? "" : "none";
     menuEl.innerHTML = menuLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("");
   }
   if (statusEl && statusLabelEl && statusValueEl) {
-    const visible = showStatus && (statusLabel || statusValue) && (mode === "status" || mode === "sign");
+    const visible =
+      !isTicker && showStatus && (statusLabel || statusValue) && (mode === "status" || mode === "sign");
     statusEl.style.display = visible ? "" : "none";
     statusLabelEl.textContent = statusLabel;
     statusValueEl.textContent = statusValue;
   }
 
-  const tickerText = [title, message, ...menuLines].filter(Boolean).join("  ·  ");
+  const tickerText = buildTickerText(title, message, menuLines, statusLabel, statusValue);
+  const scroll = isTicker || prop(item, "scroll", false) === true;
+  const showTrack = isTicker || scroll;
+
   if (track && marquee) {
-    const scroll = mode === "ticker" || prop(item, "scroll", false) === true;
-    track.style.display = mode === "ticker" || scroll ? "" : "none";
-    marquee.textContent = tickerText || message || title;
-    requestAnimationFrame(() => syncMarquee(el, item, scroll && Boolean(tickerText)));
+    track.classList.toggle("is-active", showTrack && Boolean(tickerText));
+    if (showTrack && tickerText) {
+      // Two segments → continuous loop even when text is shorter than the track.
+      const seg = `<span class="ccs-bubatz-cantina-marquee-seg">${escapeHtml(tickerText)}</span>`;
+      marquee.innerHTML = seg + seg;
+      const gap = Math.max(24, Number(prop(item, "repeatGap", 48)) || 48);
+      marquee.style.setProperty("--ccs-bubatz-repeat-gap", gap + "px");
+    } else {
+      marquee.innerHTML = "";
+      track.classList.remove("is-scrolling");
+    }
+    requestAnimationFrame(() => syncMarquee(el, item, showTrack && Boolean(tickerText)));
   }
 
   const empty =
@@ -251,12 +291,4 @@ export function updateBubatzCantina(el: HTMLElement, item: LayoutItem): void {
     !statusValue;
   el.classList.toggle("is-empty", empty);
   el.classList.toggle("is-hidden", empty && prop(item, "hideWhenEmpty", false) === true);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

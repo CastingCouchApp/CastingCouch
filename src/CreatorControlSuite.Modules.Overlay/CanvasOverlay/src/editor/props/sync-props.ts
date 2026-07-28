@@ -29,7 +29,8 @@ import {
   appendAnimatedBackgroundProps,
   appendDividerProps,
   appendCamRingProps,
-  appendStickerProps
+  appendStickerProps,
+  appendChatProps
 } from "./panels/new-streamer-widgets";
 
 export function syncProps(
@@ -79,25 +80,7 @@ export function syncProps(
   } else if (item.type === "music" || item.type === "spotify") {
     appendMusicProps(item, ctx, propExtra);
   } else if (item.type === "chat") {
-    const content = contentSection("chat");
-    content.body.appendChild(boolProp("showTwitchEvents", "Twitch-Events zeigen", item, ctx));
-    content.body.appendChild(numProp("maxLines", "Max. Zeilen", item, ctx, 80));
-    propExtra.appendChild(content.root);
-
-    const style = styleSection("chat");
-    style.body.appendChild(selectProp("backgroundType", "Hintergrund", item, ctx, [
-      { value: "None", label: "Keiner (transparent)" },
-      { value: "Color", label: "Farbe" },
-      { value: "Image", label: "Bild (aus Chat-Einstellungen)" }
-    ], "None"));
-    style.body.appendChild(colorProp("backgroundColor", "Farbe", item, ctx, "#000000"));
-    style.body.appendChild(numProp("backgroundOpacityPercent", "Transparenz %", item, ctx, 55));
-    style.body.appendChild(numProp("paddingPx", "Padding px", item, ctx, 12));
-    style.body.appendChild(numProp("borderRadiusPx", "Eckenradius px", item, ctx, 12));
-    style.body.appendChild(numProp("gapPx", "Abstand px", item, ctx, 6));
-    style.body.appendChild(numProp("fontSizePx", "Schriftgröße px", item, ctx, 18));
-    style.body.appendChild(fontProp("fontFamily", "Schriftart", item, ctx, "Segoe UI, system-ui, sans-serif"));
-    propExtra.appendChild(style.root);
+    appendChatProps(item, ctx, propExtra);
   } else if (item.type === "ending-stats") {
     const content = contentSection("ending-stats");
     content.body.appendChild(selectProp("variant", "Variante", item, ctx, [
@@ -370,7 +353,17 @@ function appendPartnerRouletteProps(item: LayoutItem, ctx: EditorContext, propEx
     { value: "scale-down", label: "Scale-down" }
   ], "contain"));
   style.body.appendChild(numProp("borderRadiusPx", "Eckenradius px", item, ctx, 12));
-  style.body.appendChild(textProp("objectPosition", "Position", item, ctx, "center"));
+  style.body.appendChild(selectProp("objectPosition", "Position", item, ctx, [
+    { value: "center", label: "Mitte" },
+    { value: "top", label: "Oben" },
+    { value: "bottom", label: "Unten" },
+    { value: "left", label: "Links" },
+    { value: "right", label: "Rechts" },
+    { value: "top left", label: "Oben links" },
+    { value: "top right", label: "Oben rechts" },
+    { value: "bottom left", label: "Unten links" },
+    { value: "bottom right", label: "Unten rechts" }
+  ], "center"));
   propExtra.appendChild(style.root);
 
   const imagesSection = propSection("partner-roulette-images", "Bilder", false);

@@ -1123,6 +1123,14 @@
   grid-template-columns: 88px minmax(0, 1fr) 52px;
 }
 
+.ccs-prop-row.ccs-text-prop-multiline {
+  align-items: start;
+}
+
+.ccs-prop-row.ccs-text-prop-multiline .ccs-prop-row-label {
+  padding-top: 4px;
+}
+
 .ccs-prop-row-label,
 .ccs-num-prop-label {
   overflow: hidden;
@@ -1187,13 +1195,21 @@
 .ccs-prop-row input[type="text"],
 .ccs-prop-row input[type="number"],
 .ccs-prop-row select,
-.ccs-prop-row-control:is(input, select) {
+.ccs-prop-row textarea,
+.ccs-prop-row-control:is(input, select, textarea) {
   background: #1e1e1e;
   border: 1px solid #3a3a3a;
   color: #f0f0f0;
   border-radius: 2px;
   padding: 2px 4px;
   font-size: 11px;
+}
+
+.ccs-prop-row textarea {
+  min-height: 64px;
+  resize: vertical;
+  line-height: 1.35;
+  font-family: inherit;
 }
 
 .ccs-num-slider {

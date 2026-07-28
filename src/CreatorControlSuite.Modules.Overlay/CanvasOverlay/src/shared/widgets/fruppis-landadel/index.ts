@@ -84,7 +84,8 @@ function applyAppearance(el: FruppisEl, item: LayoutItem): void {
   el.classList.toggle("ccs-fruppis-landadel-uppercase", prop(item, "uppercaseName", false) === true);
   el.classList.toggle("ccs-fruppis-landadel-accent-bar", prop(item, "showAccentBar", true) !== false);
 
-  const shade = Math.max(0, Math.min(1, Number(prop(item, "shadeIntensity", 0.45)) || 0));
+  const rawShade = Number(prop(item, "shadeIntensity", 0.45));
+  const shade = Number.isFinite(rawShade) ? Math.max(0, Math.min(1, rawShade)) : 0.45;
   setVar(el, "--ccs-fl-shade", shade);
 
   setVar(el, "--ccs-fl-hoodie", String(prop(item, "hoodieColor", "#2E6BB0") || "#2E6BB0"));

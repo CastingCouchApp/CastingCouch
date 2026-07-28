@@ -12,7 +12,8 @@ import { applyCutoutStackMask } from '../shapes/cutout';
 import {
   updateOnline, updateSpotify, updateChat, updateEndingStats, updateText, updateImage,
   updateCountdown, updateSocials, updatePartnerRoulette, paintSpotifyProgress, paintEndingStats, paintCountdown,
-  enqueueAlert, appendChatMessage, appendChatEvent, CHAT_EVENT_TYPES,
+  enqueueAlert, appendChatMessage, appendChatEvent, clearChat, removeChatMessageById, removeChatMessagesByUser,
+  CHAT_EVENT_TYPES,
   updateGoalBar, updateEventTicker, pushEventTickerItem, updateViewerCount, updateLowerThird,
   updateQrCode, updateBrbPanel, paintBrbPanel, updateAnnouncementBar, updateBubatzCantina, updateFruppisLandadel,
   updateAnimatedBackground,
@@ -69,19 +70,47 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
       return true;
     }
 
+    function clearRuntimeChatHistory() {
+      chatHistory.length = 0;
+      seenMessageIds.clear();
+    }
+
+    function removeRuntimeChatMessage(messageId) {
+      const id = String(messageId || "");
+      if (!id) return;
+      seenMessageIds.delete(id);
+      for (let i = chatHistory.length - 1; i >= 0; i--) {
+        const entry = chatHistory[i];
+        if (entry.kind === "message" && String((entry.data && entry.data.messageId) || "") === id) {
+          chatHistory.splice(i, 1);
+        }
+      }
+    }
+
+    function removeRuntimeChatUser(userLogin, userId) {
+      const login = String(userLogin || "").toLowerCase();
+      const id = String(userId || "");
+      for (let i = chatHistory.length - 1; i >= 0; i--) {
+        const entry = chatHistory[i];
+        if (entry.kind !== "message") continue;
+        const data = entry.data || {};
+        const matchLogin = login && String(data.userLogin || "").toLowerCase() === login;
+        const matchId = id && String(data.userId || "") === id;
+        if (!matchLogin && !matchId) continue;
+        if (data.messageId) seenMessageIds.delete(String(data.messageId));
+        chatHistory.splice(i, 1);
+      }
+    }
+
     function restoreChatWidget(el) {
       if (!el || !el._lines) return;
-      el._lines.innerHTML = "";
-      el._seenMessageIds = new Set();
+      clearChat(el);
       for (const entry of chatHistory) {
         if (entry.kind === "message") {
           appendChatMessage(el, entry.data || {});
         } else if (entry.kind === "event" && el._showTwitchEvents !== false) {
           appendChatEvent(el, entry.payload || {});
         }
-      }
-      if (!el._lines.children.length) {
-        el._lines.innerHTML = `<div class="ccs-chat-line ccs-chat-status">Chat bereit</div>`;
       }
     }
 
@@ -100,9 +129,14 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
       let added = false;
       for (const evt of events) {
         if (evt && evt.source === "twitch" && evt.type === "channel.chat.message") {
-          if (rememberChatMessage(evt.data || {})) {
+          const data = { ...(evt.data || {}) };
+          if (!data.at && evt.at) data.at = evt.at;
+          if (rememberChatMessage(data)) {
             added = true;
           }
+        } else if (evt && evt.source === "twitch" && CHAT_EVENT_TYPES.has(evt.type)) {
+          rememberChatEvent(evt);
+          added = true;
         }
       }
       if (added) {
@@ -307,8 +341,45 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
           }
         }
       }
+      if (
+        (evt.source === "app" && evt.type === "app.chat.clear") ||
+        (evt.source === "twitch" && evt.type === "channel.chat.clear")
+      ) {
+        clearRuntimeChatHistory();
+        for (const node of itemNodes.values()) {
+          if (node.item.type !== "chat") continue;
+          clearChat(node.content);
+        }
+        return;
+      }
+      if (evt.source === "twitch" && evt.type === "channel.chat.message_delete") {
+        const messageId = String(
+          (evt.data && (evt.data.messageId || evt.data.message_id)) || ""
+        );
+        removeRuntimeChatMessage(messageId);
+        for (const node of itemNodes.values()) {
+          if (node.item.type !== "chat") continue;
+          removeChatMessageById(node.content, messageId);
+        }
+        return;
+      }
+      if (evt.source === "twitch" && evt.type === "channel.chat.clear_user_messages") {
+        const userLogin = String(
+          (evt.data && (evt.data.targetUserLogin || evt.data.target_user_login)) || ""
+        );
+        const userId = String(
+          (evt.data && (evt.data.targetUserId || evt.data.target_user_id)) || ""
+        );
+        removeRuntimeChatUser(userLogin, userId);
+        for (const node of itemNodes.values()) {
+          if (node.item.type !== "chat") continue;
+          removeChatMessagesByUser(node.content, userLogin, userId);
+        }
+        return;
+      }
       if (evt.source === "twitch" && evt.type === "channel.chat.message") {
-        const messageData = evt.data || {};
+        const messageData = { ...(evt.data || {}) };
+        if (!messageData.at && evt.at) messageData.at = evt.at;
         if (!rememberChatMessage(messageData)) {
           return;
         }

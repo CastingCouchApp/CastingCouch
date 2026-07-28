@@ -1,0 +1,197 @@
+.ccs-chat {
+  --ccs-chat-padding: 12px;
+  --ccs-chat-radius: 12px;
+  --ccs-chat-gap: 6px;
+  --ccs-chat-bg-opacity: 0.55;
+  --ccs-chat-bg-color: #000000;
+  --ccs-chat-font-size: 18px;
+  --ccs-chat-font-family: "Segoe UI", system-ui, sans-serif;
+  --ccs-chat-font-weight: 600;
+  --ccs-chat-line-height: 1.35;
+  --ccs-chat-emote-size: 28px;
+  --ccs-chat-badge-size: 18px;
+  --ccs-chat-message-color: #f5f5f5;
+  --ccs-chat-event-color: #7dd3fc;
+  --ccs-chat-bubble-bg: rgba(0, 0, 0, 0.45);
+  --ccs-chat-bubble-radius: 10px;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: var(--ccs-chat-padding);
+  border-radius: var(--ccs-chat-radius);
+  overflow: hidden;
+  color: var(--ccs-chat-message-color);
+  font-family: var(--ccs-chat-font-family);
+  font-weight: var(--ccs-chat-font-weight);
+}
+
+.ccs-chat-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-color: var(--ccs-chat-bg-color);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.ccs-chat.has-bg .ccs-chat-bg {
+  opacity: var(--ccs-chat-bg-opacity);
+}
+
+.ccs-chat.bg-image .ccs-chat-bg {
+  background-image: var(--ccs-chat-bg-image);
+}
+
+.ccs-chat-lines {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--ccs-chat-gap);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ccs-chat-line {
+  display: block;
+  line-height: var(--ccs-chat-line-height);
+  font-size: var(--ccs-chat-font-size);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  color: var(--ccs-chat-message-color);
+}
+
+.ccs-chat-user {
+  margin-right: 0.35rem;
+}
+
+.ccs-chat-time {
+  opacity: 0.65;
+  margin-right: 0.35rem;
+  font-weight: 500;
+  font-size: 0.85em;
+}
+
+.ccs-chat-badge {
+  height: var(--ccs-chat-badge-size);
+  width: var(--ccs-chat-badge-size);
+  vertical-align: middle;
+  margin-right: 0.2rem;
+}
+
+.ccs-chat-emote {
+  height: var(--ccs-chat-emote-size);
+  width: auto;
+  vertical-align: middle;
+  margin: 0 0.05rem;
+}
+
+.ccs-chat-event {
+  color: var(--ccs-chat-event-color);
+}
+
+.ccs-chat-event-icon {
+  height: var(--ccs-chat-badge-size);
+  width: var(--ccs-chat-badge-size);
+  vertical-align: middle;
+  margin-right: 0.35rem;
+}
+
+.ccs-chat-event-summary {
+  font-weight: 600;
+}
+
+.ccs-chat-status {
+  opacity: 0.7;
+  font-weight: 500;
+  font-size: calc(var(--ccs-chat-font-size) * 0.78);
+}
+
+.ccs-chat-uppercase-names .ccs-chat-user {
+  text-transform: uppercase;
+}
+
+.ccs-chat-animate .ccs-chat-line:not(.ccs-chat-status) {
+  animation: ccs-chat-line-in 0.28s ease-out;
+}
+
+@keyframes ccs-chat-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ccs-chat-fade .ccs-chat-line {
+  transition: opacity var(--ccs-chat-fade-duration, 800ms) ease;
+}
+
+.ccs-chat-fade .ccs-chat-line.is-fading {
+  opacity: 0;
+}
+
+.ccs-chat-v-compact .ccs-chat-line {
+  line-height: 1.2;
+}
+
+.ccs-chat-v-compact {
+  --ccs-chat-gap: 2px;
+}
+
+.ccs-chat-v-bubbles .ccs-chat-line:not(.ccs-chat-status):not(.ccs-chat-event) {
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0.35em 0.65em;
+  border-radius: var(--ccs-chat-bubble-radius);
+  background: var(--ccs-chat-bubble-bg);
+  text-shadow: none;
+}
+
+.ccs-chat-v-neon {
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.45);
+}
+
+.ccs-chat-v-glass .ccs-chat-bg {
+  backdrop-filter: blur(8px);
+}
+
+.ccs-chat-v-minimal {
+  --ccs-chat-gap: 4px;
+  font-weight: 500;
+}
+
+.ccs-chat-v-hud .ccs-chat-line {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.ccs-chat-v-outline .ccs-chat-line {
+  text-shadow:
+    -1px -1px 0 rgba(0, 0, 0, 0.85),
+    1px -1px 0 rgba(0, 0, 0, 0.85),
+    -1px 1px 0 rgba(0, 0, 0, 0.85),
+    1px 1px 0 rgba(0, 0, 0, 0.85);
+}
+
+.ccs-chat-v-soft .ccs-chat-line {
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+.ccs-chat-v-strip .ccs-chat-line:not(.ccs-chat-status) {
+  padding: 0.15em 0.4em;
+  border-left: 3px solid var(--ccs-chat-event-color);
+}

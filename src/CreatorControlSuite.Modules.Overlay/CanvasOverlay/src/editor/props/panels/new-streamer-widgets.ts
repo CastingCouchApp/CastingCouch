@@ -470,7 +470,7 @@ export function appendAnnouncementBarProps(item: LayoutItem, ctx: EditorContext,
 }
 
 export function appendBubatzCantinaProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
-  const api = window.CcsCanvas as {
+  const api = (window.CcsCanvas || {}) as {
     BUBATZ_CANTINA_VARIANTS?: string[];
     BUBATZ_CANTINA_SIZE_PRESETS?: SizeMap;
     BUBATZ_CANTINA_MODES?: string[];
@@ -500,37 +500,40 @@ export function appendBubatzCantinaProps(item: LayoutItem, ctx: EditorContext, p
   content.body.appendChild(textProp("title", "Titel", item, ctx, "biomilchs Bubatz Cantina"));
   content.body.appendChild(textProp("subtitle", "Untertitel", item, ctx, "Open late · Orbit Sector 7"));
   content.body.appendChild(textProp("message", "Nachricht", item, ctx, "Blue Milk & Hyperspace Haze — heute happy hour"));
-  content.body.appendChild(textProp("menuLines", "Menüzeilen", item, ctx, "Blue Milk · 4 Credits"));
+  content.body.appendChild(textProp("menuLines", "Menüzeilen", item, ctx, "Blue Milk · 4 Credits", {
+    multiline: true,
+    rows: 4
+  }));
   content.body.appendChild(textProp("statusLabel", "Status-Label", item, ctx, "Special"));
   content.body.appendChild(textProp("statusValue", "Status-Wert", item, ctx, "Bubatz live"));
   content.body.appendChild(textProp("icon", "Icon", item, ctx, "🌿"));
-  content.body.appendChild(boolProp("showLeaf", "Leaf", item, ctx));
-  content.body.appendChild(boolProp("showStars", "Sterne", item, ctx));
-  content.body.appendChild(boolProp("showTitle", "Titel", item, ctx));
-  content.body.appendChild(boolProp("showSubtitle", "Untertitel", item, ctx));
-  content.body.appendChild(boolProp("showMessage", "Nachricht", item, ctx));
-  content.body.appendChild(boolProp("showMenu", "Menü", item, ctx));
-  content.body.appendChild(boolProp("showStatus", "Status", item, ctx));
-  content.body.appendChild(numProp("speed", "Ticker-Speed", item, ctx, 40));
-  content.body.appendChild(numProp("repeatGap", "Repeat-Gap", item, ctx, 48));
+  content.body.appendChild(boolProp("showLeaf", "Leaf anzeigen", item, ctx));
+  content.body.appendChild(boolProp("showStars", "Sterne anzeigen", item, ctx));
+  content.body.appendChild(boolProp("showTitle", "Titel anzeigen", item, ctx));
+  content.body.appendChild(boolProp("showSubtitle", "Untertitel anzeigen", item, ctx));
+  content.body.appendChild(boolProp("showMessage", "Nachricht anzeigen", item, ctx));
+  content.body.appendChild(boolProp("showMenu", "Menü anzeigen", item, ctx));
+  content.body.appendChild(boolProp("showStatus", "Status anzeigen", item, ctx));
+  content.body.appendChild(numProp("speed", "Ticker-Speed", item, ctx, 40, { min: 10, max: 200, step: 1 }));
+  content.body.appendChild(numProp("repeatGap", "Repeat-Gap", item, ctx, 48, { min: 0, max: 200, step: 1 }));
   propExtra.appendChild(content.root);
   propExtra.appendChild(buildLookSection("bubatz-cantina", item, ctx, variants, sizes, "cantina-neon", "standard").root);
 
   const style = styleSection("bubatz-cantina");
-  style.body.appendChild(fontProp("titleFontFamily", "Titel-Font", item, ctx, "Bahnschrift, Segoe UI Semibold, Segoe UI"));
-  style.body.appendChild(fontProp("bodyFontFamily", "Body-Font", item, ctx, "Segoe UI"));
-  style.body.appendChild(numProp("titleSizePx", "Titel px", item, ctx, 28));
-  style.body.appendChild(numProp("bodySizePx", "Body px", item, ctx, 15));
+  style.body.appendChild(fontProp("titleFontFamily", "Titel-Font", item, ctx, "Segoe UI, system-ui, sans-serif"));
+  style.body.appendChild(fontProp("bodyFontFamily", "Body-Font", item, ctx, "Segoe UI, system-ui, sans-serif"));
+  style.body.appendChild(numProp("titleSizePx", "Titel px", item, ctx, 28, { min: 8, max: 120, step: 1 }));
+  style.body.appendChild(numProp("bodySizePx", "Body px", item, ctx, 15, { min: 8, max: 72, step: 1 }));
   style.body.appendChild(colorProp("color", "Bubatz-Grün", item, ctx, "#5CDB6A"));
   style.body.appendChild(colorProp("color2", "Blue Milk", item, ctx, "#2EE6C5"));
   style.body.appendChild(colorProp("color3", "Cantina-Gold", item, ctx, "#E8B84A"));
   style.body.appendChild(colorProp("textColor", "Text", item, ctx, "#EAF6FF"));
   style.body.appendChild(colorProp("mutedColor", "Muted", item, ctx, "#9EC4D8"));
   style.body.appendChild(colorProp("bgColor", "Hintergrund", item, ctx, "#060B14"));
-  style.body.appendChild(numProp("bgOpacity", "BG Opacity", item, ctx, 0.88));
-  style.body.appendChild(numProp("borderRadiusPx", "Radius px", item, ctx, 16));
-  style.body.appendChild(numProp("paddingPx", "Padding px", item, ctx, 20));
-  style.body.appendChild(numProp("gapPx", "Gap px", item, ctx, 10));
+  style.body.appendChild(numProp("bgOpacity", "BG Opacity", item, ctx, 0.88, { min: 0, max: 1, step: 0.01 }));
+  style.body.appendChild(numProp("borderRadiusPx", "Radius px", item, ctx, 16, { min: 0, max: 80, step: 1 }));
+  style.body.appendChild(numProp("paddingPx", "Padding px", item, ctx, 20, { min: 0, max: 80, step: 1 }));
+  style.body.appendChild(numProp("gapPx", "Gap px", item, ctx, 10, { min: 0, max: 48, step: 1 }));
   propExtra.appendChild(style.root);
 
   const advanced = advancedSection("bubatz-cantina");
@@ -845,5 +848,90 @@ export function appendStickerProps(item: LayoutItem, ctx: EditorContext, propExt
       body.appendChild(numProp("pulseAmplitude", "Amplitude", item, ctx, 0.08));
       body.appendChild(numProp("pulseSpeed", "Speed", item, ctx, 1));
     })
+  ]);
+}
+
+export function appendChatProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
+  const api = window.CcsCanvas as {
+    CHAT_VARIANTS?: string[];
+    CHAT_SIZE_PRESETS?: SizeMap;
+  };
+  const variants = api.CHAT_VARIANTS || [
+    "classic", "compact", "bubbles", "neon", "glass", "minimal", "hud", "outline", "soft", "strip"
+  ];
+  const sizes = api.CHAT_SIZE_PRESETS || {
+    slim: { w: 320, h: 480, label: "Slim" },
+    standard: { w: 420, h: 560, label: "Standard" },
+    tall: { w: 420, h: 720, label: "Tall" },
+    wide: { w: 560, h: 480, label: "Wide" },
+    banner: { w: 720, h: 280, label: "Banner" },
+    "obs-side": { w: 360, h: 640, label: "OBS Side" }
+  };
+
+  const content = contentSection("chat");
+  content.body.appendChild(boolProp("showBadges", "Badges", item, ctx));
+  content.body.appendChild(boolProp("showEmotes", "Emotes", item, ctx));
+  content.body.appendChild(boolProp("showTimestamps", "Zeitstempel", item, ctx));
+  content.body.appendChild(selectProp("timestampFormat", "Zeitformat", item, ctx, [
+    { value: "hh:mm", label: "HH:MM" },
+    { value: "hh:mm:ss", label: "HH:MM:SS" }
+  ], "hh:mm"));
+  content.body.appendChild(boolProp("showTwitchEvents", "Twitch-Events", item, ctx));
+  content.body.appendChild(boolProp("showEventIcons", "Event-Icons", item, ctx));
+  content.body.appendChild(numProp("maxLines", "Max. Zeilen", item, ctx, 80));
+  content.body.appendChild(boolProp("hideCommands", "Commands ausblenden", item, ctx));
+  content.body.appendChild(selectProp("nameDisplay", "Name", item, ctx, [
+    { value: "display", label: "Anzeigename" },
+    { value: "login", label: "Login" },
+    { value: "both", label: "Beides" }
+  ], "display"));
+  propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("chat", item, ctx, variants, sizes).root);
+
+  const style = styleSection("chat");
+  style.body.appendChild(fontProp("fontFamily", "Schriftart", item, ctx, "Segoe UI, system-ui, sans-serif"));
+  style.body.appendChild(numProp("fontSizePx", "Schriftgröße", item, ctx, 18));
+  style.body.appendChild(selectProp("fontWeight", "Gewicht", item, ctx, [
+    { value: "400", label: "400" },
+    { value: "500", label: "500" },
+    { value: "600", label: "600" },
+    { value: "700", label: "700" }
+  ], "600"));
+  style.body.appendChild(numProp("lineHeight", "Zeilenhöhe", item, ctx, 1.35));
+  style.body.appendChild(colorProp("messageColor", "Text", item, ctx, "#f5f5f5"));
+  style.body.appendChild(colorProp("eventColor", "Events", item, ctx, "#7dd3fc"));
+  style.body.appendChild(boolProp("useTwitchUserColor", "Twitch-Namefarbe", item, ctx));
+  style.body.appendChild(colorProp("fallbackUserColor", "Name-Fallback", item, ctx, "#dedede"));
+  style.body.appendChild(selectProp("backgroundType", "Hintergrund", item, ctx, [
+    { value: "None", label: "Keiner (transparent)" },
+    { value: "Color", label: "Farbe" },
+    { value: "Image", label: "Bild (aus Chat-Einstellungen)" }
+  ], "None"));
+  style.body.appendChild(colorProp("backgroundColor", "HG-Farbe", item, ctx, "#000000"));
+  style.body.appendChild(numProp("backgroundOpacityPercent", "HG-Transparenz %", item, ctx, 55));
+  style.body.appendChild(numProp("paddingPx", "Padding", item, ctx, 12));
+  style.body.appendChild(numProp("borderRadiusPx", "Eckenradius", item, ctx, 12));
+  style.body.appendChild(numProp("gapPx", "Abstand", item, ctx, 6));
+  style.body.appendChild(numProp("emoteScale", "Emote-Scale", item, ctx, 1.55));
+  style.body.appendChild(numProp("badgeScale", "Badge-Scale", item, ctx, 1));
+  style.body.appendChild(colorProp("bubbleBgColor", "Bubble-Farbe", item, ctx, "#000000"));
+  style.body.appendChild(numProp("bubbleOpacityPercent", "Bubble %", item, ctx, 45));
+  style.body.appendChild(numProp("bubbleRadiusPx", "Bubble-Radius", item, ctx, 10));
+  propExtra.appendChild(style.root);
+
+  appendAdvanced("chat", propExtra, [
+    featureToggle("chat-fade", "Zeilen ausblenden", "fadeOut", item, ctx, (body) => {
+      body.appendChild(numProp("fadeAfterMs", "Nach ms", item, ctx, 15000));
+      body.appendChild(numProp("fadeDurationMs", "Dauer ms", item, ctx, 800));
+    }),
+    featureToggle("chat-animate", "Neue Zeilen animieren", "animateNewLines", item, ctx),
+    selectProp("separator", "Trenner", item, ctx, [
+      { value: "colon", label: "Doppelpunkt" },
+      { value: "dash", label: "Bindestrich" },
+      { value: "pipe", label: "Pipe" },
+      { value: "none", label: "Keiner" }
+    ], "colon"),
+    featureToggle("chat-uppercase", "Namen GROSS", "uppercaseNames", item, ctx),
+    featureToggle("chat-status", "Statuszeile", "showStatusLine", item, ctx)
   ]);
 }

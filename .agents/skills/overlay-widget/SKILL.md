@@ -33,7 +33,7 @@ Overlay Widget Progress:
 - [x] 9. Tests grün
 ```
 
-<!-- Last widget: bubatz-cantina (biomilchs Bubatz Cantina) -->
+<!-- Last widget: chat (configurable + twitch colors + persistence + clear/delete) -->
 
 ## Architektur
 
@@ -114,7 +114,7 @@ Alle Controls nutzen `.ccs-prop-row` (**Label 88px | Control**), analog zu Zahle
 - Gruppen: `contentSection` / `lookSection` (offen), `styleSection` / `advancedSection` (zugeklappt).
 - Farben → `colorProp`, Schriften → `fontProp`.
 - Item-Effekte **nicht** als Widget-Props — Effects-Panel / `overlay-effect` / Packs.
-- Palette: kategorisiert (`Live`, `Interaktion`, `Content`, `Hintergrund`, `Frames`, `Masken`, `Deko`) + Suche (`#paletteSearch`, filtert Label/Typ/Kategorie/Keywords). Hover auf Karte → Live-Vorschau mit Demodaten (`palette-preview.ts` + `palette-demo.ts`, `paintItemContent`).
+- Palette: kategorisiert (`Live`, `Interaktion`, `Content`, `Community Widgets`, `Hintergrund`, `Frames`, `Masken`, `Deko`) + Suche (`#paletteSearch`, filtert Label/Typ/Kategorie/Keywords). Hover auf Karte → Live-Vorschau mit Demodaten (`palette-preview.ts` + `palette-demo.ts`, `paintItemContent`). Community-Widgets (z. B. `fruppis-landadel`) unter **Community Widgets**.
 
 ## Build
 

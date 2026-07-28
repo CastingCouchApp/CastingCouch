@@ -43,7 +43,8 @@ public static class OverlayEventBridge
         IReadOnlyList<OverlayChatBadgePart> badges,
         string summary,
         DateTimeOffset at,
-        IReadOnlyList<OverlayChatMessagePart> parts)
+        IReadOnlyList<OverlayChatMessagePart> parts,
+        string userId = "")
     {
         string partsJson = JsonSerializer.Serialize(parts ?? [], PartsJsonOptions);
         string badgesJson = JsonSerializer.Serialize(badges ?? [], PartsJsonOptions);
@@ -57,11 +58,16 @@ public static class OverlayEventBridge
                 ["messageId"] = messageId ?? "",
                 ["userName"] = userName ?? "",
                 ["userLogin"] = userLogin ?? "",
+                ["userId"] = userId ?? "",
                 ["color"] = color ?? "",
+                ["at"] = at.ToString("O"),
                 ["badges"] = badgesJson,
                 ["parts"] = partsJson
             });
     }
+
+    public static OverlayRealtimeEvent AppChatClear() =>
+        App("app.chat.clear", "Chat geleert", new Dictionary<string, string>());
 
     public static OverlayRealtimeEvent AppStreamPhase(string phase) =>
         App(

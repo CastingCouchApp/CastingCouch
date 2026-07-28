@@ -40,7 +40,7 @@ public sealed class OverlayChatSettings
         FontFamily = string.IsNullOrWhiteSpace(FontFamily)
             ? "Segoe UI, system-ui, sans-serif"
             : FontFamily.Trim();
-        MaxBufferedMessages = Math.Clamp(MaxBufferedMessages, 0, 1000);
+        MaxBufferedMessages = Math.Clamp(MaxBufferedMessages, 0, 2000);
     }
 }
 

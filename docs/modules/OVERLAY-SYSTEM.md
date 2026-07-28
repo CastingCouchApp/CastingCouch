@@ -40,9 +40,11 @@ Verwaltung in der Overlay-Seite: auswählen, neu, umbenennen, duplizieren, lösc
 
 OBS-Browserquelle auf `/chat` (Standalone) oder Canvas-Widget `chat` / Solo `/w/chat`. Der Client verbindet sich auf `/ws` und rendert Events vom Typ `channel.chat.message`.
 
-Session-History: Nachrichten werden serverseitig gepuffert und bei Connect sowie über `GET /chat/history` zurückgespielt.
+Session-History: Nachrichten werden serverseitig gepuffert (Kapazität `maxLines × 2` über Canvas-Chat-Widgets), bei Connect sowie über `GET /chat/history` zurückgespielt und persistent unter `%LocalAppData%\CreatorControlSuite\Overlay\chat-history.json` gespeichert (debounced + Flush beim App-Ende).
 
-Appearance (Hintergrund, Padding, Radius, Gap, Schriftgröße, Schriftart): `/chat/config` bzw. Props am Canvas-Widget.
+Moderation: `/clear` von Broadcaster/Mod leert Hub, Datei und Clients (`app.chat.clear`). Twitch-EventSub `channel.chat.message_delete`, `channel.chat.clear` und `channel.chat.clear_user_messages` entfernen Zeilen im Overlay.
+
+Appearance: `/chat/config` bzw. umfangreiche Props am Canvas-Widget (Varianten, Typografie, Farben, Badges/Emotes/Timestamps, …).
 
 ## Extension Packs
 

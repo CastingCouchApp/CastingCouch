@@ -162,6 +162,12 @@ public partial class MainWindow : Window
 
         try
         {
+            if (IsOverlayChatClearCommand(message))
+            {
+                await _overlayModule.ChatHistory.ClearAndBroadcastAsync();
+                return;
+            }
+
             await EnsureChatEmoteCatalogAsync(message.BroadcasterUserId);
             await EnsureChatBadgeCatalogAsync(message.BroadcasterUserId);
 
@@ -196,13 +202,66 @@ public partial class MainWindow : Window
                 badges,
                 $"{message.ChatterName}: {message.MessageText}",
                 message.ReceivedAt,
-                parts));
+                parts,
+                message.ChatterUserId));
         }
         catch
         {
             // Chat overlay is best-effort and must not break the in-app chat UI.
         }
     }
+
+    private static bool IsOverlayChatClearCommand(TwitchChatMessage message)
+    {
+        if (!string.Equals(message.MessageText?.Trim(), "/clear", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return message.Badges.Any(badge =>
+            string.Equals(badge.SetId, "broadcaster", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(badge.SetId, "moderator", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private Task HandleOverlayChatModerationEventAsync(TwitchEvent twitchEvent)
+    {
+        if (!_settings.Overlay.Chat.Enabled)
+        {
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            if (string.Equals(twitchEvent.Type, "channel.chat.message_delete", StringComparison.Ordinal))
+            {
+                string messageId = GetTwitchEventData(twitchEvent, "message_id");
+                _overlayModule.ChatHistory.RemoveMessage(messageId);
+            }
+            else if (string.Equals(twitchEvent.Type, "channel.chat.clear", StringComparison.Ordinal))
+            {
+                _overlayRealtimeHub.ClearBufferedChat();
+                _ = _overlayModule.ChatHistory.FlushAsync();
+            }
+            else if (string.Equals(
+                         twitchEvent.Type,
+                         "channel.chat.clear_user_messages",
+                         StringComparison.Ordinal))
+            {
+                string userId = GetTwitchEventData(twitchEvent, "target_user_id");
+                string userLogin = GetTwitchEventData(twitchEvent, "target_user_login");
+                _overlayModule.ChatHistory.RemoveUserMessages(userLogin, userId);
+            }
+        }
+        catch
+        {
+            // best-effort
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static string GetTwitchEventData(TwitchEvent twitchEvent, string key) =>
+        twitchEvent.Data.TryGetValue(key, out string? value) ? value ?? "" : "";
 
     private async Task EnsureChatEmoteCatalogAsync(string broadcasterUserId)
     {

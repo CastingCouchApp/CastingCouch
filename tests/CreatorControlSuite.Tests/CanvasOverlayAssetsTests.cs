@@ -291,6 +291,7 @@ public sealed class CanvasOverlayAssetsTests
         Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
         Assert.Contains("type: \"partner-roulette\"", editor);
         Assert.Contains("selectProp(\"transition\"", editor);
+        Assert.Contains("selectProp(\"objectPosition\"", editor);
         Assert.Contains("intervalMs", editor);
         Assert.Contains("transitionMs", editor);
         Assert.Contains("Bild hinzuf\\xFCgen", editor);
@@ -916,6 +917,7 @@ public sealed class CanvasOverlayAssetsTests
         Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
         Assert.Contains("type: \"bubatz-cantina\"", editor);
         Assert.Contains("Bubatz Cantina", editor);
+        Assert.Contains("Community Widgets", editor);
         Assert.Contains("appendBubatzCantinaProps", editor);
 
         Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
@@ -937,6 +939,7 @@ public sealed class CanvasOverlayAssetsTests
         Assert.True(CanvasOverlayAssets.TryGet("editor/editor.js", out string editor, out _));
         Assert.Contains("type: \"fruppis-landadel\"", editor);
         Assert.Contains("fruppis Landadel", editor);
+        Assert.Contains("Community Widgets", editor);
         Assert.Contains("appendFruppisLandadelProps", editor);
 
         Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));

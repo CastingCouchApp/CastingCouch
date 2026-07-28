@@ -27,6 +27,22 @@
 
   let showTwitchEvents = true;
   const panel = document.getElementById("panel");
+  const TWITCH_DEFAULT_COLORS = [
+    "#FF0000", "#0000FF", "#00FF00", "#B22222", "#FF7F50",
+    "#9ACD32", "#FF4500", "#2E8B57", "#DAA520", "#D2691E",
+    "#5F9EA0", "#1E90FF", "#FF69B4", "#8A2BE2", "#00FF7F"
+  ];
+
+  function resolveChatUserColor(color, login) {
+    const raw = String(color ?? "").trim();
+    const match = /^#?([0-9a-fA-F]{6})$/.exec(raw);
+    if (match) {
+      return `#${match[1].toUpperCase()}`;
+    }
+    const name = String(login || "user").trim() || "user";
+    const n = name.charCodeAt(0) + name.charCodeAt(name.length - 1);
+    return TWITCH_DEFAULT_COLORS[n % TWITCH_DEFAULT_COLORS.length];
+  }
 
   function wsUrl() {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -122,6 +138,36 @@
     }
   }
 
+  function clearChat() {
+    seenMessageIds.clear();
+    setStatus("Chat bereit");
+  }
+
+  function removeMessageById(messageId) {
+    const id = String(messageId || "");
+    if (!id) return;
+    seenMessageIds.delete(id);
+    const lines = Array.from(root.querySelectorAll(".line[data-message-id]"));
+    for (const line of lines) {
+      if (line.dataset.messageId === id) {
+        line.remove();
+      }
+    }
+  }
+
+  function removeMessagesByUser(userLogin, userId) {
+    const login = String(userLogin || "").toLowerCase();
+    const id = String(userId || "");
+    const lines = Array.from(root.querySelectorAll(".line[data-message-id]"));
+    for (const line of lines) {
+      const matchLogin = login && String(line.dataset.userLogin || "").toLowerCase() === login;
+      const matchId = id && String(line.dataset.userId || "") === id;
+      if (!matchLogin && !matchId) continue;
+      if (line.dataset.messageId) seenMessageIds.delete(line.dataset.messageId);
+      line.remove();
+    }
+  }
+
   function trimLines() {
     while (root.children.length > maxLines) {
       const first = root.firstChild;
@@ -148,10 +194,12 @@
     if (messageId) {
       line.dataset.messageId = messageId;
     }
+    const userLogin = String(data.userLogin || "");
+    const userId = String(data.userId || "");
+    if (userLogin) line.dataset.userLogin = userLogin;
+    if (userId) line.dataset.userId = userId;
 
-    const color = data.color && /^#[0-9a-fA-F]{6}$/.test(data.color)
-      ? data.color
-      : "#dedede";
+    const color = resolveChatUserColor(data.color, userLogin || data.userName);
 
     line.innerHTML =
       `${renderBadges(data.badges)}` +
@@ -228,6 +276,27 @@
       try {
         payload = JSON.parse(event.data);
       } catch {
+        return;
+      }
+
+      if (
+        (payload?.source === "app" && payload?.type === "app.chat.clear") ||
+        (payload?.source === "twitch" && payload?.type === "channel.chat.clear")
+      ) {
+        clearChat();
+        return;
+      }
+
+      if (payload?.source === "twitch" && payload?.type === "channel.chat.message_delete") {
+        removeMessageById((payload.data && (payload.data.messageId || payload.data.message_id)) || "");
+        return;
+      }
+
+      if (payload?.source === "twitch" && payload?.type === "channel.chat.clear_user_messages") {
+        removeMessagesByUser(
+          (payload.data && (payload.data.targetUserLogin || payload.data.target_user_login)) || "",
+          (payload.data && (payload.data.targetUserId || payload.data.target_user_id)) || ""
+        );
         return;
       }
 

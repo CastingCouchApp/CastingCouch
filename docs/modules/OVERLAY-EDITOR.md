@@ -43,7 +43,7 @@ Beispiel: `/editor/default`, `/view/just-chatting`.
 
 - **Fenstergröße**: Modal über Toolbar-Button (Badge mit aktueller Größe); Preset / B×H, **Größe anwenden**, OBS-Base-Auflösung + **Von OBS übernehmen**.
 - **OBS-Vorschau** / **Raster** / **Einrasten** / **Magnet** (Toolbar-Icon-Toggles; Tooltips per `title`; Prefs in `localStorage` `ccs-editor-prefs`).
-- **Widget-Palette**: Kategorien (Live, Interaktion, Content, Hintergrund, Frames, Masken, Deko) + Suche (Label/Typ/Kategorie/Keywords). Installierte Extension-Packs erscheinen zusätzlich unter `Extension · {Pack-Name}` (`ext:{packId}:{id}`). Hover auf einer Karte zeigt eine Live-Vorschau mit Demodaten (skaliert).
+- **Widget-Palette**: Kategorien (Live, Interaktion, Content, Community Widgets, Hintergrund, Frames, Masken, Deko) + Suche (Label/Typ/Kategorie/Keywords). Installierte Extension-Packs erscheinen zusätzlich unter `Extension · {Pack-Name}` (`ext:{packId}:{id}`). Hover auf einer Karte zeigt eine Live-Vorschau mit Demodaten (skaliert).
 - **32px Padding** um die Zeichenfläche (Fit/Scale berücksichtigt den Abstand).
 - **Raster** Unterteilungen **H × V** (Default 32×18 für 16:9; `gridDivisionsForCanvas` leitet V aus dem Canvas-Seitenverhältnis ab); liegt immer im Vordergrund über den Widgets (`pointer-events: none`). Editor-Layer (Grid/OBS-Vorschau) werden nach jedem `setLayout`/`renderItems` via `onAfterRender` neu gesetzt.
 - **Einrasten**: Snap an Rasterlinien (H×V) beim Verschieben **und** Skalieren (nur die gezogene Handle-Kante); Threshold ~20 % der Zellengröße (min. 8px), inkl. Guide-Linien. Unabhängig von der Raster-Anzeige.
@@ -100,13 +100,13 @@ Standalone-Chat bleibt zusätzlich unter `/chat` verfügbar.
 | `online` | `stream.isLive`, Uhr, Uptime |
 | `alert` | WS `app.alert` / Twitch-Events |
 | `music` | Now Playing aus aktivem Music-Provider; Alias-Typ `spotify`. Props: `variant` (22 Styles), `sizePreset` (Mini–XL/Banner/Cover), Anzeige-Toggles; Titel/Artist/Album scrollen bei Overflow (Marquee); skaliert responsiv |
-| `chat` | WS `channel.chat.message` (+ optional Twitch-Events); Appearance/Font per Widget-Props (Fallback: Overlay-Chat-Einstellungen); Session-History via `/chat/history` + WS-Replay |
+| `chat` | WS `channel.chat.message` (+ Twitch-Events); Props: Inhalt (Badges/Emotes/Timestamps/Events/`maxLines`/`hideCommands`/`nameDisplay`), Look (`variant` ×10, `sizePreset` ×6), Stil (`fontProp`/`fontSizePx`/Farben inkl. Twitch-Namefarbe, BG, Bubble), Erweitert (Fade/Animation/Separator). Persistente History (`maxLines×2`); `/clear` + Twitch-Delete/Clear sync |
 | `ending-stats` | Session-Stats (`stats.*`) + Followerziel (`twitch.followers` / `followerGoal`); Prop `variant` mit 10 Looks; skaliert bei Größenänderung |
 | `socials` | Ein Social-Link pro Widget (`platform` + `handle`/`url`/`label`/`iconUrl`); für YT+Twitch zwei Instanzen; Icons SVG oder Font Awesome; Props `variant` / `iconLibrary` |
 | `text` | Statischer Text aus Props (`content`, Typografie, Ausrichtung, Schatten) |
 | `image` | Bild aus URL (`src`, `fit`, Opacity, Radius) |
 | `countdown` | Globaler Countdown aus `countdown.*` (Dashboard / Workflow / Automationen); Props: `variant`, `format`, `showLabel`, `hideWhenIdle` |
-| `partner-roulette` | Partner-Logos/-Bilder rotieren; Props: `images[]`, `intervalMs`, `transition` (`fade`/`crossfade`/`slide`/`none`), `transitionMs`, `fit`, `borderRadiusPx` |
+| `partner-roulette` | Partner-Logos/-Bilder rotieren; Props: `images[]`, `intervalMs`, `transition` (`fade`/`crossfade`/`slide`/`none`), `transitionMs`, `fit`, `objectPosition` (Dropdown), `borderRadiusPx` |
 | `goal-bar` | Live-Zielleiste (`followers`/`subs`/`bits`/`custom`); `variant` (≥12), `sizePreset`, Show-Toggles, `fillStyle`, `colorProp`/`fontProp`, Features `hideWhenComplete` / `pulseOnProgress` |
 | `event-ticker` | Event-Laufschrift aus Twitch-/Alert-Events; `variant`, Marquee/Fade/Liste, Template, Sources |
 | `viewer-count` | Live-Zuschauerzahl + Peak; `stream.viewerCount` / `stats.peakViewers` |
@@ -114,8 +114,8 @@ Standalone-Chat bleibt zusätzlich unter `/chat` verfügbar.
 | `qr-code` | QR aus URL (clientseitig) + Caption/Logo; `errorCorrection`, `fg`/`bg` |
 | `brb-panel` | BRB/Starting/Tech-Pause Panel; optional globaler `countdown.*` |
 | `announcement-bar` | Ankündigungsbanner mit optionalem Marquee |
-| `bubatz-cantina` | Orbit-Cantina: Schild/Menü/Status/Ticker mit Bubatz-Grün, Blue-Milk-Türkis, Cantina-Gold (14 Variants, 6 Sizes) |
-| `fruppis-landadel` | Persona-Karte (Peter Saul Defaults): CSS-Figur mit Hoodie/Hose/Schuhe, 16 Variants, Outfit-`colorProp`s, Moods, Quote/Stats |
+| `bubatz-cantina` | Orbit-Cantina: Schild/Menü/Status/Ticker mit Bubatz-Grün, Blue-Milk-Türkis, Cantina-Gold (14 Variants, 6 Sizes); Palette **Community Widgets** |
+| `fruppis-landadel` | Persona-Karte (Peter Saul Defaults): CSS-Figur mit Hoodie/Hose/Schuhe, 16 Variants, Outfit-`colorProp`s, Moods, Quote/Stats; Palette **Community Widgets** |
 | `animated-background` | Animierter Full-Bleed-Hintergrund mit **34 Styles**: CSS-Looks (`cyber` … `noir`), **JS-Matrix-Rain** (`hacker`: fallende Katakana/Symbole), plus **JS-Parallax-Berge** (`mountains` … `ridge-storm`); Props: `variant`, `sizePreset`, `color`/`color2`/`color3`, `speed`, `intensity`, `density`, `opacity`, Features `vignette` / `paused` |
 
 ## Globaler Countdown

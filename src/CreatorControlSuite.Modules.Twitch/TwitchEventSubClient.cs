@@ -64,20 +64,33 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
 
         if (enableChat)
         {
-            if (await TryCreateSubscriptionAsync(
-                    apiClient,
-                    "channel.chat.message",
-                    "1",
-                    new
-                    {
-                        broadcaster_user_id = broadcasterUserId,
-                        user_id = userId
-                    },
-                    sessionId,
-                    "Twitch-Chat",
-                    cancellationToken))
+            var chatCondition = new
             {
-                activeSubscriptions++;
+                broadcaster_user_id = broadcasterUserId,
+                user_id = userId
+            };
+
+            (string Type, string Label)[] chatSubscriptions =
+            [
+                ("channel.chat.message", "Twitch-Chat"),
+                ("channel.chat.message_delete", "Twitch-Chat-Delete"),
+                ("channel.chat.clear", "Twitch-Chat-Clear"),
+                ("channel.chat.clear_user_messages", "Twitch-Chat-Clear-User")
+            ];
+
+            foreach ((string type, string label) in chatSubscriptions)
+            {
+                if (await TryCreateSubscriptionAsync(
+                        apiClient,
+                        type,
+                        "1",
+                        chatCondition,
+                        sessionId,
+                        label,
+                        cancellationToken))
+                {
+                    activeSubscriptions++;
+                }
             }
         }
 

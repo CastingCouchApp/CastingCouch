@@ -5,6 +5,20 @@ import "./partner-roulette.css";
 export const PARTNER_ROULETTE_TRANSITIONS = ["fade", "crossfade", "slide", "none"] as const;
 export type PartnerRouletteTransition = (typeof PARTNER_ROULETTE_TRANSITIONS)[number];
 
+/** Common CSS object-position keywords for the editor dropdown. */
+export const PARTNER_ROULETTE_OBJECT_POSITIONS = [
+  "center",
+  "top",
+  "bottom",
+  "left",
+  "right",
+  "top left",
+  "top right",
+  "bottom left",
+  "bottom right"
+] as const;
+export type PartnerRouletteObjectPosition = (typeof PARTNER_ROULETTE_OBJECT_POSITIONS)[number];
+
 type RouletteEl = HTMLElement & {
   _timer?: ReturnType<typeof setTimeout> | null;
   _index?: number;
@@ -129,11 +143,13 @@ function advance(el: RouletteEl, images: string[]): void {
 
   setSlideSrc(incoming, images[next]);
   incoming.classList.remove("is-exit");
+  // Commit index before the CSS transition finishes so data refreshes
+  // (refreshAllData) cannot overwrite the incoming slide with the old src.
+  el._index = next;
 
   if (transition === "none" || transitionMs <= 0) {
     active.classList.remove("is-active", "is-exit");
     incoming.classList.add("is-active");
-    el._index = next;
     scheduleNext(el, images);
     return;
   }
@@ -148,7 +164,6 @@ function advance(el: RouletteEl, images: string[]): void {
       incoming.classList.add("is-active");
       active.classList.remove("is-exit");
       active.removeAttribute("src");
-      el._index = next;
       el._transitioning = false;
       scheduleNext(el, images);
     }, transitionMs + 30);
@@ -167,7 +182,6 @@ function advance(el: RouletteEl, images: string[]): void {
     if (!el.isConnected) return;
     active.classList.remove("is-exit");
     active.removeAttribute("src");
-    el._index = next;
     el._transitioning = false;
     scheduleNext(el, images);
   }, transitionMs + 30);
@@ -175,9 +189,12 @@ function advance(el: RouletteEl, images: string[]): void {
 
 function scheduleNext(el: RouletteEl, images: string[]): void {
   clearTimer(el);
-  if (!el.isConnected || images.length < 2) {
+  if (images.length < 2) {
     return;
   }
+  // Do not require isConnected here: createItemContent runs before appendChild,
+  // and the subsequent refresh often skips rescheduling when props are unchanged.
+  // advance() already no-ops when the node is detached.
   const intervalMs = Math.max(500, Number(el._intervalMs) || 4000);
   el._timer = setTimeout(() => advance(el, images), intervalMs);
 }
@@ -231,16 +248,24 @@ export function updatePartnerRoulette(el: RouletteEl, item: LayoutItem): void {
 
   if (imagesChanged || el._index == null || el._index >= images.length) {
     clearTimer(el);
+    el._transitioning = false;
     showImmediate(el, images, 0);
     scheduleNext(el, images);
     return;
   }
 
-  // Appearance-only update: keep current slide, restart timer if timing changed.
+  // During a transition, do not touch slide src/classes — refreshAllData would
+  // otherwise reset the incoming slide back to the previous image.
+  if (el._transitioning) {
+    return;
+  }
+
+  // Appearance-only update: keep current slide, restart timer if timing changed
+  // or if the timer was never started (create-before-append race).
   const [a, b] = ensureSlides(el);
   const active = a.classList.contains("is-active") ? a : b.classList.contains("is-active") ? b : a;
   setSlideSrc(active, images[el._index]);
-  if (timingChanged && !el._transitioning) {
+  if (timingChanged || el._timer == null) {
     scheduleNext(el, images);
   }
 }

@@ -77,10 +77,25 @@
 
 .ccs-fruppis-landadel-layout-banner .ccs-fruppis-landadel-inner {
   flex-direction: row;
+  align-items: center;
+  gap: calc(var(--ccs-fl-gap) * 1.35);
 }
 
 .ccs-fruppis-landadel-layout-banner .ccs-fruppis-landadel-figure {
-  transform: scale(0.85);
+  transform: scale(0.72);
+  transform-origin: center center;
+}
+
+.ccs-fruppis-landadel-layout-banner .ccs-fruppis-landadel-text {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+
+.ccs-fruppis-landadel-layout-banner .ccs-fruppis-landadel-quote {
+  flex: 1 1 100%;
 }
 
 /* CSS figure — Peter Saul silhouette */
@@ -292,17 +307,21 @@
   margin-bottom: 8px;
 }
 
-/* Moods */
+/* Moods — shadeIntensity (--ccs-fl-shade) always contributes */
 .ccs-fruppis-landadel-mood-shady {
   box-shadow:
     inset 0 0 0 1px rgba(232, 213, 163, 0.1),
-    inset 40px 0 60px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.35));
+    inset 40px 0 60px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.45));
 }
 .ccs-fruppis-landadel-mood-polished {
-  box-shadow: inset 0 0 0 1px rgba(232, 213, 163, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 213, 163, 0.22),
+    inset 0 0 48px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.2));
 }
 .ccs-fruppis-landadel-mood-casual {
-  box-shadow: inset 0 0 0 1px rgba(46, 107, 176, 0.25);
+  box-shadow:
+    inset 0 0 0 1px rgba(46, 107, 176, 0.25),
+    inset 0 0 40px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.18));
 }
 
 /* Entrances */
@@ -329,57 +348,87 @@
   to { transform: none; opacity: 1; }
 }
 
-/* Variants */
+/* Variants — keep background-color on --ccs-fl-bg so bgColor/bgOpacity apply */
 .ccs-fruppis-landadel-v-gentry {
-  background: linear-gradient(135deg, rgba(12, 18, 28, 0.92), rgba(8, 12, 18, 0.88));
+  background-color: var(--ccs-fl-bg);
+  background-image: linear-gradient(135deg, rgba(46, 107, 176, 0.14), transparent 65%);
 }
 .ccs-fruppis-landadel-v-counsel {
-  box-shadow: inset 0 0 0 1px rgba(232, 213, 163, 0.28);
+  background-color: var(--ccs-fl-bg);
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 213, 163, 0.28),
+    inset 0 0 48px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.22));
 }
 .ccs-fruppis-landadel-v-counsel .ccs-fruppis-landadel-name {
   letter-spacing: 0.02em;
 }
 .ccs-fruppis-landadel-v-cambridge {
-  background: linear-gradient(160deg, rgba(20, 40, 72, 0.9), rgba(8, 12, 18, 0.88));
+  background-color: var(--ccs-fl-bg);
+  background-image: linear-gradient(160deg, rgba(30, 74, 122, 0.35), transparent 70%);
 }
 .ccs-fruppis-landadel-v-hoodie .ccs-fruppis-landadel-title {
   color: var(--ccs-fl-hoodie);
 }
+.ccs-fruppis-landadel-v-hoodie {
+  background-color: var(--ccs-fl-bg);
+}
 .ccs-fruppis-landadel-v-estate {
-  background: linear-gradient(180deg, rgba(18, 22, 18, 0.92), rgba(8, 12, 12, 0.9));
+  background-color: var(--ccs-fl-bg);
+  background-image: linear-gradient(180deg, rgba(40, 48, 36, 0.35), transparent 70%);
 }
 .ccs-fruppis-landadel-v-shadow {
-  background: rgba(4, 6, 10, 0.92);
+  background-color: var(--ccs-fl-bg);
+  background-image: linear-gradient(135deg, rgba(0, 0, 0, 0.35), transparent 60%);
   filter: saturate(0.9);
 }
 .ccs-fruppis-landadel-v-shadow .ccs-fruppis-landadel-figure {
   opacity: 0.88;
 }
 .ccs-fruppis-landadel-v-ivory {
-  background: linear-gradient(135deg, rgba(42, 38, 32, 0.9), rgba(12, 12, 14, 0.88));
-  box-shadow: inset 0 0 0 1px rgba(242, 238, 230, 0.28);
+  background-color: var(--ccs-fl-bg);
+  background-image: linear-gradient(135deg, rgba(242, 238, 230, 0.08), transparent 70%);
+  box-shadow:
+    inset 0 0 0 1px rgba(242, 238, 230, 0.28),
+    inset 0 0 48px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.2));
+}
+.ccs-fruppis-landadel-v-crimson {
+  background-color: var(--ccs-fl-bg);
 }
 .ccs-fruppis-landadel-v-crimson .ccs-fruppis-landadel-accent {
   background: linear-gradient(180deg, var(--ccs-fl-pants), var(--ccs-fl-accent));
 }
+.ccs-fruppis-landadel-v-split {
+  background-color: var(--ccs-fl-bg);
+}
 .ccs-fruppis-landadel-v-split .ccs-fruppis-landadel-inner {
-  background: linear-gradient(90deg, rgba(46, 107, 176, 0.18) 0 38%, transparent 38%);
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--ccs-fl-accent) 22%, transparent) 0 38%, transparent 38%);
   border-radius: calc(var(--ccs-fl-radius) - 2px);
+}
+.ccs-fruppis-landadel-v-crest {
+  background-color: var(--ccs-fl-bg);
 }
 .ccs-fruppis-landadel-v-crest .ccs-fruppis-landadel-tag::before {
   content: "◆ ";
   color: var(--ccs-fl-accent2);
 }
 .ccs-fruppis-landadel-v-dossier {
-  border-radius: 4px;
-  box-shadow: inset 0 0 0 1px rgba(200, 184, 144, 0.35);
-  background: linear-gradient(180deg, rgba(24, 28, 34, 0.95), rgba(10, 12, 16, 0.92));
+  background-color: var(--ccs-fl-bg);
+  background-image: linear-gradient(180deg, rgba(200, 184, 144, 0.08), transparent 55%);
+  box-shadow:
+    inset 0 0 0 1px rgba(200, 184, 144, 0.35),
+    inset 0 0 40px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.18));
 }
 .ccs-fruppis-landadel-v-dossier .ccs-fruppis-landadel-name {
   font-variant: small-caps;
 }
+.ccs-fruppis-landadel-v-portrait {
+  background-color: var(--ccs-fl-bg);
+}
 .ccs-fruppis-landadel-v-portrait .ccs-fruppis-landadel-quote {
   max-width: 22em;
+}
+.ccs-fruppis-landadel-v-ribbon {
+  background-color: var(--ccs-fl-bg);
 }
 .ccs-fruppis-landadel-v-ribbon .ccs-fruppis-landadel-tag {
   display: inline-block;
@@ -390,20 +439,25 @@
   width: fit-content;
 }
 .ccs-fruppis-landadel-v-glass {
-  background: rgba(16, 24, 36, 0.45);
+  background-color: var(--ccs-fl-bg);
   backdrop-filter: blur(10px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 0 40px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.15));
 }
 .ccs-fruppis-landadel-v-neon {
+  background-color: var(--ccs-fl-bg);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--ccs-fl-accent) 55%, transparent),
-    0 0 18px color-mix(in srgb, var(--ccs-fl-accent) 35%, transparent);
+    0 0 18px color-mix(in srgb, var(--ccs-fl-accent) 35%, transparent),
+    inset 0 0 40px rgba(0, 0, 0, calc(var(--ccs-fl-shade) * 0.2));
 }
 .ccs-fruppis-landadel-v-neon .ccs-fruppis-landadel-name {
   text-shadow: 0 0 10px color-mix(in srgb, var(--ccs-fl-accent) 50%, transparent);
 }
 .ccs-fruppis-landadel-v-minimal {
-  background: transparent;
+  background-color: transparent;
+  background-image: none;
   box-shadow: none;
 }
 .ccs-fruppis-landadel-v-minimal .ccs-fruppis-landadel-accent {

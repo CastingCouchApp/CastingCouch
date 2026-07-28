@@ -151,8 +151,9 @@ function bootEditor(): void {
     { type: "brb-panel", label: "BRB Panel", category: "Content", kind: "widget", keywords: "starting pause" },
     { type: "qr-code", label: "QR Code", category: "Content", kind: "widget" },
     { type: "music", label: "Music Player", category: "Content", kind: "widget", keywords: "spotify youtube" },
-    { type: "bubatz-cantina", label: "Bubatz Cantina", category: "Content", kind: "widget", keywords: "cantina space starwars food bubatz cannabis turquoise biomilch menu" },
-    { type: "fruppis-landadel", label: "fruppis Landadel", category: "Content", kind: "widget", keywords: "peter saul anwalt cambridge hoodie landadel kanzlei fruppi persona" },
+    // Community Widgets
+    { type: "bubatz-cantina", label: "Bubatz Cantina", category: "Community Widgets", kind: "widget", keywords: "cantina space starwars food bubatz cannabis turquoise biomilch menu community" },
+    { type: "fruppis-landadel", label: "fruppis Landadel", category: "Community Widgets", kind: "widget", keywords: "peter saul anwalt cambridge hoodie landadel kanzlei fruppi persona community" },
     // Hintergrund
     { type: "animated-background", label: "Animated Background", category: "Hintergrund", kind: "widget", keywords: "bg parallax" },
     { type: "shape.scene-bg", label: "Starting Hintergrund", category: "Hintergrund", kind: "shape", keywords: "scene bg" },

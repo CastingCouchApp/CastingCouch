@@ -191,12 +191,41 @@
   margin-top: 4px;
   overflow: hidden;
   width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.ccs-bubatz-cantina-track.is-active {
+  display: block;
+}
+
+.ccs-bubatz-cantina-mode-ticker .ccs-bubatz-cantina-track.is-active {
+  margin-top: 0;
+  align-self: center;
+}
+
+.ccs-bubatz-cantina-mode-ticker .ccs-bubatz-cantina-chrome {
+  align-items: center;
+}
+
+.ccs-bubatz-cantina-mode-ticker .ccs-bubatz-cantina-body {
+  justify-content: center;
 }
 
 .ccs-bubatz-cantina-marquee {
-  display: inline-block;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--ccs-bubatz-repeat-gap, 48px);
   white-space: nowrap;
+  width: max-content;
   color: var(--ccs-bubatz-turquoise);
+  will-change: transform;
+}
+
+.ccs-bubatz-cantina-marquee-seg {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .ccs-bubatz-cantina.ccs-bubatz-uppercase .ccs-bubatz-cantina-title,
@@ -217,6 +246,9 @@
 }
 
 /* Mode visibility defaults */
+.ccs-bubatz-cantina-mode-ticker .ccs-bubatz-cantina-title,
+.ccs-bubatz-cantina-mode-ticker .ccs-bubatz-cantina-subtitle,
+.ccs-bubatz-cantina-mode-ticker .ccs-bubatz-cantina-message,
 .ccs-bubatz-cantina-mode-ticker .ccs-bubatz-cantina-menu,
 .ccs-bubatz-cantina-mode-ticker .ccs-bubatz-cantina-status {
   display: none !important;

@@ -19,11 +19,13 @@ public sealed class OverlayRealtimeHub : IOverlayRealtimeHub
 
     public int ConnectedClients => _clients.Count;
 
+    public event Action? ChatBufferChanged;
+
     public void ConfigureChatBuffer(int maxMessages)
     {
         lock (_chatGate)
         {
-            _chatBufferCapacity = Math.Clamp(maxMessages, 0, 1000);
+            _chatBufferCapacity = Math.Clamp(maxMessages, 0, 2000);
             while (_chatBuffer.Count > _chatBufferCapacity)
             {
                 _chatBuffer.Dequeue();
@@ -37,6 +39,123 @@ public sealed class OverlayRealtimeHub : IOverlayRealtimeHub
         {
             return _chatBuffer.ToArray();
         }
+    }
+
+    public void RestoreBufferedChatEvents(IEnumerable<OverlayRealtimeEvent> events)
+    {
+        lock (_chatGate)
+        {
+            _chatBuffer.Clear();
+            if (_chatBufferCapacity <= 0)
+            {
+                return;
+            }
+
+            foreach (OverlayRealtimeEvent evt in events)
+            {
+                if (!IsChatMessage(evt))
+                {
+                    continue;
+                }
+
+                _chatBuffer.Enqueue(evt);
+            }
+
+            while (_chatBuffer.Count > _chatBufferCapacity)
+            {
+                _chatBuffer.Dequeue();
+            }
+        }
+    }
+
+    public void ClearBufferedChat()
+    {
+        lock (_chatGate)
+        {
+            _chatBuffer.Clear();
+        }
+
+        ChatBufferChanged?.Invoke();
+    }
+
+    public bool RemoveBufferedChatMessage(string messageId)
+    {
+        string id = (messageId ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return false;
+        }
+
+        bool removed;
+        lock (_chatGate)
+        {
+            int before = _chatBuffer.Count;
+            OverlayRealtimeEvent[] kept =
+            [
+                .. _chatBuffer.Where(evt =>
+                    !string.Equals(
+                        GetData(evt, "messageId"),
+                        id,
+                        StringComparison.OrdinalIgnoreCase))
+            ];
+            _chatBuffer.Clear();
+            foreach (OverlayRealtimeEvent evt in kept)
+            {
+                _chatBuffer.Enqueue(evt);
+            }
+
+            removed = kept.Length != before;
+        }
+
+        if (removed)
+        {
+            ChatBufferChanged?.Invoke();
+        }
+
+        return removed;
+    }
+
+    public int RemoveBufferedChatMessagesByUser(string userLogin, string userId)
+    {
+        string login = (userLogin ?? "").Trim();
+        string id = (userId ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(login) && string.IsNullOrWhiteSpace(id))
+        {
+            return 0;
+        }
+
+        int removed;
+        lock (_chatGate)
+        {
+            int before = _chatBuffer.Count;
+            OverlayRealtimeEvent[] kept =
+            [
+                .. _chatBuffer.Where(evt =>
+                {
+                    string evtLogin = GetData(evt, "userLogin");
+                    string evtId = GetData(evt, "userId");
+                    bool matchLogin = !string.IsNullOrWhiteSpace(login) &&
+                        string.Equals(evtLogin, login, StringComparison.OrdinalIgnoreCase);
+                    bool matchId = !string.IsNullOrWhiteSpace(id) &&
+                        string.Equals(evtId, id, StringComparison.Ordinal);
+                    return !matchLogin && !matchId;
+                })
+            ];
+            _chatBuffer.Clear();
+            foreach (OverlayRealtimeEvent evt in kept)
+            {
+                _chatBuffer.Enqueue(evt);
+            }
+
+            removed = before - kept.Length;
+        }
+
+        if (removed > 0)
+        {
+            ChatBufferChanged?.Invoke();
+        }
+
+        return removed;
     }
 
     public string SerializeEvent(OverlayRealtimeEvent evt) =>
@@ -64,6 +183,7 @@ public sealed class OverlayRealtimeHub : IOverlayRealtimeHub
         if (IsChatMessage(evt))
         {
             BufferChat(evt);
+            ChatBufferChanged?.Invoke();
         }
 
         string json = SerializeEvent(evt);
@@ -102,6 +222,9 @@ public sealed class OverlayRealtimeHub : IOverlayRealtimeHub
             }
         }
     }
+
+    private static string GetData(OverlayRealtimeEvent evt, string key) =>
+        evt.Data.TryGetValue(key, out string? value) ? value ?? "" : "";
 
     private static bool IsChatMessage(OverlayRealtimeEvent evt) =>
         string.Equals(evt.Type, ChatMessageType, StringComparison.Ordinal) &&

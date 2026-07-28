@@ -85,6 +85,30 @@ describe("fruppis-landadel widget", () => {
     expect(el.style.getPropertyValue("--ccs-fl-name-size")).toBe("32px");
   });
 
+  it("applies bgColor/bgOpacity and shadeIntensity CSS vars", () => {
+    const el = createFruppisLandadelEl(
+      landadelItem({
+        bgColor: "#102040",
+        bgOpacity: 0.5,
+        shadeIntensity: 0.8,
+        borderRadiusPx: 22,
+        paddingPx: 20,
+        gapPx: 10
+      })
+    );
+
+    expect(el.style.getPropertyValue("--ccs-fl-bg")).toBe("rgba(16,32,64,0.5)");
+    expect(el.style.getPropertyValue("--ccs-fl-shade")).toBe("0.8");
+    expect(el.style.getPropertyValue("--ccs-fl-radius")).toBe("22px");
+    expect(el.style.getPropertyValue("--ccs-fl-pad")).toBe("20px");
+    expect(el.style.getPropertyValue("--ccs-fl-gap")).toBe("10px");
+  });
+
+  it("respects shadeIntensity of 0 without falling back", () => {
+    const el = createFruppisLandadelEl(landadelItem({ shadeIntensity: 0 }));
+    expect(el.style.getPropertyValue("--ccs-fl-shade")).toBe("0");
+  });
+
   it("toggles visibility of sections and updates variant/layout", () => {
     const el = createFruppisLandadelEl(landadelItem());
     updateFruppisLandadel(

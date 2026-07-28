@@ -177,6 +177,8 @@ public partial class MainWindow : Window
                 }
             });
 
+            await HandleOverlayChatModerationEventAsync(twitchEvent);
+
             await PublishOverlayRealtimeEventAsync(OverlayEventBridge.FromTwitch(
                 twitchEvent.Type,
                 twitchEvent.Summary,
