@@ -12,6 +12,8 @@ description: >-
 # Overlay-Effect einführen (Built-in)
 
 Effects sind stapelbare Modifier auf **allen** Layout-Items (`item.effects[]`).
+Optional `target: "box" | "content"` — nur anbieten, wenn `strategy.targets` `content` enthält
+(Default ohne Angabe: nur `box`). Content-fähig u. a. Glow, Drop Shadow, Outline, Glitch.
 Built-ins liegen unter `CanvasOverlay/src/shared/effects/<type>/`.
 
 ## Fortschritt
@@ -45,7 +47,13 @@ Overlay Effect Progress:
 
 Registrierung in `effects/registry.ts`. Runtime: `applyItemEffects`. Editor: generisches Effects-Panel.
 
-Ausgeliefert: `glow`, `particles`, `scanlines`, `vignette`, `blur`, `noise`.
+Ausgeliefert: `glow`, `particles`, `scanlines`, `vignette`, `blur`, `noise`,
+`neon`, `glitch`, `sparkle`, `aurora`, `pulse-ring`, `hologram`, `outline`,
+`drop-shadow`, `rainbow`, `spotlight`.
+
+Item-Animationen (`item.animations[]`) liegen parallel unter
+`shared/animations/` (`fade`, `slide`, `bounce`, `pop`, `shake`, `float`,
+`pulse`, `spin`, `wiggle`, `flip`) — gleiches Strategy-/Panel-Muster.
 
 ## Anti-Patterns
 

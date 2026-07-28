@@ -64,6 +64,8 @@ Naming: Typ **lowercase** / `kebab-case`; CSS-Prefix **`ccs-`**; keine Standalon
 cd src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
 npm install
 npm run build
+# Browser-Dev mit Hot-Reload + Overlay-Server-Simulation (ohne WPF):
+npm run dev   # → http://127.0.0.1:8765/editor/default
 ```
 
 dotnet build führt das MSBuild-Target `BuildCanvasOverlay` automatisch aus.
