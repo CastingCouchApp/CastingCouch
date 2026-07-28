@@ -11,6 +11,7 @@ export interface LayoutItem {
   locked?: boolean;
   props: Record<string, unknown>;
   effects?: EffectInstance[];
+  animations?: AnimationInstance[];
 }
 
 export interface Layout {
@@ -25,6 +26,8 @@ export interface EffectInstance {
   id?: string;
   type: string;
   enabled?: boolean;
+  /** Where the effect is painted: item box/container, or drawn content (shape/text). Default: box. */
+  target?: "box" | "content";
   settings?: Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -45,12 +48,46 @@ export interface EffectStrategy {
   label?: string;
   defaults?: Record<string, unknown>;
   fields?: EffectField[];
+  /** Where this effect can paint. Default: box only. */
+  targets?: Array<"box" | "content">;
   apply: (
     layer: HTMLElement,
     effect: EffectInstance,
     item: LayoutItem,
     wrapper?: HTMLElement
   ) => void;
+}
+
+export interface AnimationInstance {
+  id?: string;
+  type: string;
+  enabled?: boolean;
+  settings?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface AnimationField {
+  key: string;
+  kind: "color" | "number" | "bool" | "text" | "select";
+  label: string;
+  fallback?: unknown;
+  step?: number;
+  min?: number;
+  max?: number;
+  options?: Array<{ value: string; label: string }>;
+}
+
+export interface AnimationStrategy {
+  type?: string;
+  label?: string;
+  defaults?: Record<string, unknown>;
+  fields?: AnimationField[];
+  /** Returns CSS animation shorthand fragment, or void if only vars/classes were set. */
+  apply: (
+    target: HTMLElement,
+    animation: AnimationInstance,
+    item: LayoutItem
+  ) => string | void;
 }
 
 export interface WidgetDefaults {
@@ -76,6 +113,8 @@ export interface RuntimeOptions {
   chatConfig?: unknown;
   onSelect?: (item: LayoutItem | null) => void;
   onChange?: (layout: Layout) => void;
+  /** Called after each full canvas rebuild (setLayout / renderItems). */
+  onAfterRender?: (ctx: { canvas: HTMLElement }) => void;
 }
 
 export interface ItemNode {
@@ -128,12 +167,41 @@ export interface CcsCanvasApi {
   MUSIC_VARIANT_LABELS: Record<string, string>;
   MUSIC_SIZE_PRESETS: Record<string, { w: number; h: number; label: string; scale?: number }>;
   PARTNER_ROULETTE_TRANSITIONS: readonly string[];
+  GOAL_BAR_VARIANTS?: readonly string[];
+  GOAL_BAR_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  EVENT_TICKER_VARIANTS?: readonly string[];
+  EVENT_TICKER_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  EVENT_TICKER_SOURCES?: readonly string[];
+  VIEWER_COUNT_VARIANTS?: readonly string[];
+  VIEWER_COUNT_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  LOWER_THIRD_VARIANTS?: readonly string[];
+  LOWER_THIRD_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  QR_CODE_VARIANTS?: readonly string[];
+  QR_CODE_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  BRB_PANEL_VARIANTS?: readonly string[];
+  BRB_PANEL_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  BRB_PANEL_MODES?: readonly string[];
+  ANNOUNCEMENT_BAR_VARIANTS?: readonly string[];
+  ANNOUNCEMENT_BAR_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  ANIMATED_BACKGROUND_VARIANTS?: readonly string[];
+  ANIMATED_BACKGROUND_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  ANIMATED_BACKGROUND_VARIANT_LABELS?: Record<string, string>;
+  DIVIDER_VARIANTS?: readonly string[];
+  DIVIDER_STYLES?: readonly string[];
+  DIVIDER_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  CAM_RING_VARIANTS?: readonly string[];
+  CAM_RING_SIZE_PRESETS?: Record<string, { w: number; h: number; label: string }>;
+  STICKER_PRESETS?: readonly string[];
+  STICKER_VARIANTS?: readonly string[];
   DEFAULT_LAYOUT: Layout;
   uid: () => string;
   registerWidget: (type: string, handlers: WidgetHandlers) => void;
   registerEffect: (type: string, strategy: EffectStrategy) => void;
   listEffectTypes: () => string[];
   EFFECT_STRATEGIES: Record<string, EffectStrategy>;
+  registerAnimation: (type: string, strategy: AnimationStrategy) => void;
+  listAnimationTypes: () => string[];
+  ANIMATION_STRATEGIES: Record<string, AnimationStrategy>;
   extUrl: (packId: string, path: string) => string;
   loadExtensions: () => Promise<void>;
 }

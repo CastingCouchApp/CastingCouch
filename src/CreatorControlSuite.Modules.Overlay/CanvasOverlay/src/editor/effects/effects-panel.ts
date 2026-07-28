@@ -1,5 +1,6 @@
 import type { EffectField, EffectInstance, LayoutItem } from "../../shared/types";
 import { EFFECT_STRATEGIES } from "../../shared/effects/registry";
+import { effectTargets, resolveEffectTarget } from "../../shared/effects/apply";
 import type { EditorContext } from "../props/context";
 import { propSection } from "../sections/prop-section";
 import { colorProp } from "../controls/color-prop";
@@ -69,6 +70,11 @@ function renderField(
   }
 }
 
+const TARGET_LABELS: Record<string, string> = {
+  box: "Box",
+  content: "Inhalt"
+};
+
 export function renderEffectsPanel(container: HTMLElement, item: LayoutItem, ctx: EditorContext): void {
   const { root, body } = propSection("effects", "Effekte", false);
   item.effects = item.effects || [];
@@ -117,9 +123,31 @@ export function renderEffectsPanel(container: HTMLElement, item: LayoutItem, ctx
           const strat = EFFECT_STRATEGIES[typeSelect.value];
           next.effects[i].type = typeSelect.value;
           next.effects[i].settings = { ...(strat?.defaults || {}) };
+          next.effects[i].target = resolveEffectTarget(next.effects[i], strat);
         });
         renderList();
       });
+
+      const allowedTargets = effectTargets(strategy);
+      const resolvedTarget = resolveEffectTarget(effect, strategy);
+      let targetSelect: HTMLSelectElement | null = null;
+      if (allowedTargets.length > 1) {
+        targetSelect = document.createElement("select");
+        targetSelect.title = "Effekt-Ziel";
+        for (const value of allowedTargets) {
+          const opt = document.createElement("option");
+          opt.value = value;
+          opt.textContent = TARGET_LABELS[value] || value;
+          if (resolvedTarget === value) opt.selected = true;
+          targetSelect.appendChild(opt);
+        }
+        targetSelect.addEventListener("change", () => {
+          ctx.commitProp(item, (next) => {
+            if (!next.effects || !next.effects[i] || !targetSelect) return;
+            next.effects[i].target = targetSelect.value === "content" ? "content" : "box";
+          });
+        });
+      }
 
       const remove = document.createElement("button");
       remove.type = "button";
@@ -136,6 +164,7 @@ export function renderEffectsPanel(container: HTMLElement, item: LayoutItem, ctx
       row.className = "ccs-effect-row";
       row.appendChild(header);
       row.appendChild(typeSelect);
+      if (targetSelect) row.appendChild(targetSelect);
       row.appendChild(remove);
       card.appendChild(row);
 
@@ -163,6 +192,7 @@ export function renderEffectsPanel(container: HTMLElement, item: LayoutItem, ctx
         id: uid(),
         type,
         enabled: true,
+        target: "box",
         settings: { ...(strat?.defaults || {}) }
       });
     });
