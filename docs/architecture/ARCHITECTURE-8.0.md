@@ -155,5 +155,11 @@ Streamer.bot-Unterdrückung, OBS-Quellnamen, Zwischenpause und die Darstellung
 des Queue-Zustands. Benutzeraktionen werden als Commands an schmale
 OBS-/Streamer.bot-Plattformadapter delegiert; die View enthält keine
 Geschäftslogik.
+Die Stream-Statistik ist als `StatisticsPageView` und
+`StatisticsPageViewModel` vollständig aus der Shell extrahiert.
+`StreamStatisticsApplicationService` liest die JSONL-Historie fehlertolerant
+und projiziert Kennzahlen, Kategorien sowie Verlauf ohne WPF-Abhängigkeit.
+`MainWindow` stellt nur noch Historienpfad, Ordneröffnung und die
+Dashboard-Kennzahl-Aktualisierung als Plattformcallbacks bereit.
 Der Agent-Composition-Root liegt unter 1.000 Zeilen; Hosting, Discovery und
 Datei-/Update-Helfer sind in `AgentUtilities` isoliert.

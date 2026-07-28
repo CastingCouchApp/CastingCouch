@@ -113,6 +113,7 @@ public partial class MainWindow : Window
     private readonly AlertDefinitionEditorViewModel
         _alertDefinitionEditorViewModel;
     private readonly AlertRuntimePageViewModel _alertRuntimePageViewModel;
+    private readonly StatisticsPageViewModel _statisticsPageViewModel;
     private readonly CreatorIntelligenceService _creatorIntelligence;
     private readonly AlertsModule _alertsModule;
     private readonly OverlayModule _overlayModule;
@@ -457,6 +458,7 @@ public partial class MainWindow : Window
         AlertLibraryPageViewModel alertLibraryPageViewModel,
         AlertDefinitionEditorViewModel alertDefinitionEditorViewModel,
         AlertRuntimePageViewModel alertRuntimePageViewModel,
+        StatisticsPageViewModel statisticsPageViewModel,
         CreatorIntelligenceService creatorIntelligence,
         IEventBus eventBus)
     {
@@ -493,6 +495,7 @@ public partial class MainWindow : Window
         _alertLibraryPageViewModel = alertLibraryPageViewModel;
         _alertDefinitionEditorViewModel = alertDefinitionEditorViewModel;
         _alertRuntimePageViewModel = alertRuntimePageViewModel;
+        _statisticsPageViewModel = statisticsPageViewModel;
         _creatorIntelligence = creatorIntelligence;
         _eventBus = eventBus;
         DiagnosticsModuleView.DataContext = _diagnosticsPageViewModel;
@@ -516,6 +519,7 @@ public partial class MainWindow : Window
         AlertLibraryViewHost.DataContext = _alertLibraryPageViewModel;
         AlertDesignerPanel.DataContext = _alertDefinitionEditorViewModel;
         AlertsContentPanel.DataContext = _alertRuntimePageViewModel;
+        StatisticsPageViewHost.DataContext = _statisticsPageViewModel;
         AlertTypeBox.ItemsSource = _alertLibraryPageViewModel.Types;
         _overlayConnectionSettingsPageViewModel.CopyTextRequested =
             text => Clipboard.SetText(text);
@@ -592,6 +596,18 @@ public partial class MainWindow : Window
             () => alertsModule.ClearQueueAsync();
         _alertRuntimePageViewModel.InstallObsSourcesRequestedAsync =
             InstallObsAlertSceneAsync;
+        _statisticsPageViewModel.RefreshRequestedAsync =
+            () => _statisticsPageViewModel.LoadAsync(
+                GetStreamHistoryFilePath());
+        _statisticsPageViewModel.OpenFolderRequested =
+            OpenStreamHistoryFolder;
+        _statisticsPageViewModel.MetricChangedAsync =
+            async metric =>
+            {
+                _settings.Dashboard.DashboardStatistic = metric;
+                UpdateDashboardSelectedStatistic();
+                await _settingsStore.SaveAsync(_settings);
+            };
         _updatePageViewModel.ConfirmRestoreAsync = ConfirmUpdateRestoreAsync;
         _updatePageViewModel.AfterRestoreAsync = LoadSettingsAsync;
         _migrationPageViewModel.AfterImportAsync = LoadSettingsAsync;
@@ -746,15 +762,6 @@ public partial class MainWindow : Window
         ServicesCreatorIntelligenceCompleteActionButton.Click += async (_, _) => await CompleteSelectedCreatorActionAsync();
         ServicesCreatorIntelligenceStartExperimentButton.Click += async (_, _) => await StartSelectedCreatorExperimentAsync();
         SelectDashboardStatisticInUi();
-        StatisticsDashboardMetricBox.SelectionChanged += (_, _) =>
-        {
-            if (StatisticsDashboardMetricBox.SelectedItem is ComboBoxItem item && item.Tag is string metric)
-            {
-                _settings.Dashboard.DashboardStatistic = metric;
-                UpdateDashboardSelectedStatistic();
-                _ = _settingsStore.SaveAsync(_settings);
-            }
-        };
         DashboardTwitchUsersList.SelectionChanged += (_, _) => CopySelectedModerationUser(DashboardTwitchUsersList, DashboardModerationUserBox);
         ServicesTwitchUsersList.SelectionChanged += (_, _) => CopySelectedModerationUser(ServicesTwitchUsersList, ServicesModerationUserBox);
         DashboardPreflightList.ItemsSource = _dashboardPreflightItems;
@@ -1028,7 +1035,8 @@ public partial class MainWindow : Window
         StatisticsButton.Click += async (_, _) =>
         {
             ShowPage(StatisticsPage);
-            await RefreshStatisticsAsync();
+            await _statisticsPageViewModel.LoadAsync(
+                GetStreamHistoryFilePath());
         };
         ProfilesButton.Click += async (_, _) =>
         {
@@ -1199,7 +1207,8 @@ public partial class MainWindow : Window
         DashboardOpenEventsButton.Click += async (_, _) =>
         {
             ShowPage(StatisticsPage);
-            await RefreshStatisticsAsync();
+            await _statisticsPageViewModel.LoadAsync(
+                GetStreamHistoryFilePath());
         };
         DashboardOpenDiagnosticsButton.Click += async (_, _) =>
         {
@@ -1455,9 +1464,6 @@ public partial class MainWindow : Window
         DashboardOpenDiagnosticsAdvancedButton.Click += async (_, _) => { ShowPage(DiagnosticsPage); await RunDiagnosticsAsync(); };
         DashboardOpenSettingsAdvancedButton.Click += (_, _) => ShowPage(SettingsPage);
         DashboardOpenProfilesAdvancedButton.Click += async (_, _) => { ShowPage(ProfilesPage); await RefreshProfilesAsync(); };
-
-        StatisticsRefreshButton.Click += async (_, _) => await RefreshStatisticsAsync();
-        StatisticsOpenFolderButton.Click += (_, _) => OpenStreamHistoryFolder();
 
         DashboardModuleMoveUpButton.Click += (_, _) => MoveDashboardModuleEditorItem(-1);
         DashboardModuleMoveDownButton.Click += (_, _) => MoveDashboardModuleEditorItem(1);
@@ -12352,14 +12358,7 @@ public partial class MainWindow : Window
         string metric = string.IsNullOrWhiteSpace(_settings.Dashboard.DashboardStatistic)
             ? "ViewerCount"
             : _settings.Dashboard.DashboardStatistic;
-        foreach (ComboBoxItem entry in StatisticsDashboardMetricBox.Items.OfType<ComboBoxItem>())
-        {
-            if (string.Equals(entry.Tag as string, metric, StringComparison.OrdinalIgnoreCase))
-            {
-                StatisticsDashboardMetricBox.SelectedItem = entry;
-                break;
-            }
-        }
+        _statisticsPageViewModel.LoadMetric(metric);
         UpdateDashboardSelectedStatistic();
     }
 
@@ -12589,7 +12588,9 @@ public partial class MainWindow : Window
         ServicesTwitchProfessionalTotalStreamsText.Text = rows.Count.ToString();
         ServicesTwitchProfessionalRecordPeakText.Text = rows.Count == 0 ? "0" : rows.Max(x => x.Peak).ToString();
         ServicesTwitchProfessionalRecordAverageText.Text = rows.Count == 0 ? "0,0" : rows.Max(x => x.Average).ToString("0.0");
-        ServicesTwitchProfessionalTotalDurationText.Text = FormatStatisticsDuration(rows.Sum(x => x.DurationSeconds));
+        ServicesTwitchProfessionalTotalDurationText.Text =
+            StreamStatisticsApplicationService.FormatDuration(
+                rows.Sum(x => x.DurationSeconds));
         ServicesTwitchProfessionalTotalFollowersText.Text = rows.Sum(x => x.Followers).ToString();
 
         var recent = rows.OrderBy(x => x.StartedAt).TakeLast(10).ToList();
@@ -12608,7 +12609,12 @@ public partial class MainWindow : Window
             ServicesTwitchProfessionalFollowerTrendText.Text = "Followertrend: Noch nicht genügend Daten";
         }
         ServicesTwitchProfessionalCategoryTrendText.Text = "Häufigste Kategorie: " + (rows.Where(x => !string.IsNullOrWhiteSpace(x.Category) && x.Category != "-").GroupBy(x => x.Category).OrderByDescending(g => g.Count()).FirstOrDefault()?.Key ?? "-");
-        ServicesTwitchProfessionalDurationTrendText.Text = "Ø Streamdauer: " + FormatStatisticsDuration(rows.Count == 0 ? 0 : (long)rows.Average(x => x.DurationSeconds));
+        ServicesTwitchProfessionalDurationTrendText.Text =
+            "Ø Streamdauer: " +
+            StreamStatisticsApplicationService.FormatDuration(
+                rows.Count == 0
+                    ? 0
+                    : (long)rows.Average(x => x.DurationSeconds));
 
         var ordered = rows.OrderByDescending(x => x.StartedAt).ToList();
         var latestFive = ordered.Take(5).ToList();
@@ -14734,7 +14740,8 @@ public partial class MainWindow : Window
         await Task.Delay(500);
         await RefreshObsAsync();
         await LoadStreamHistoryAsync();
-        await RefreshStatisticsAsync();
+        await _statisticsPageViewModel.LoadAsync(
+            GetStreamHistoryFilePath());
         TryCloseApplicationAfterStreamEnd();
     }
 
@@ -18251,166 +18258,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private sealed class StreamStatisticsRow
-    {
-        public string Date { get; init; } = "";
-        public string Duration { get; init; } = "";
-        public double AverageViewers { get; init; }
-        public int PeakViewers { get; init; }
-        public int FollowersGained { get; init; }
-        public int NewSubscriptions { get; init; }
-        public int GiftSubscriptions { get; init; }
-        public int BitsCheered { get; init; }
-        public string Category { get; init; } = "";
-        public string Title { get; init; } = "";
-        public long DurationSeconds { get; init; }
-        public DateTimeOffset StartedAt { get; init; }
-    }
-
-    private async Task RefreshStatisticsAsync()
-    {
-        var rows = new List<StreamStatisticsRow>();
-        string path = GetStreamHistoryFilePath();
-
-        if (File.Exists(path))
-        {
-            foreach (string line in await File.ReadAllLinesAsync(path))
-            {
-                if (string.IsNullOrWhiteSpace(line))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    using var document = System.Text.Json.JsonDocument.Parse(line);
-                    JsonElement item = document.RootElement;
-
-                    DateTimeOffset startedAt = item.TryGetProperty("StartedAt", out JsonElement startedProperty)
-                        ? startedProperty.GetDateTimeOffset().ToLocalTime()
-                        : DateTimeOffset.MinValue;
-                    long durationSeconds = item.TryGetProperty("DurationSeconds", out JsonElement durationProperty)
-                        ? durationProperty.GetInt64()
-                        : 0;
-                    double averageViewers = item.TryGetProperty("AverageViewers", out JsonElement averageProperty)
-                        ? averageProperty.GetDouble()
-                        : 0;
-                    int peakViewers = item.TryGetProperty("PeakViewers", out JsonElement peakProperty)
-                        ? peakProperty.GetInt32()
-                        : 0;
-                    int followers = item.TryGetProperty("FollowersGained", out JsonElement followersProperty)
-                        ? followersProperty.GetInt32()
-                        : 0;
-                    int newSubscriptions = item.TryGetProperty("NewSubscriptions", out JsonElement subscriptionsProperty)
-                        ? subscriptionsProperty.GetInt32()
-                        : 0;
-                    int giftSubscriptions = item.TryGetProperty("GiftSubscriptions", out JsonElement giftSubscriptionsProperty)
-                        ? giftSubscriptionsProperty.GetInt32()
-                        : 0;
-                    int bitsCheered = item.TryGetProperty("BitsCheered", out JsonElement bitsProperty)
-                        ? bitsProperty.GetInt32()
-                        : 0;
-                    string category = item.TryGetProperty("Category", out JsonElement categoryProperty)
-                        ? categoryProperty.ToString()
-                        : "";
-                    string title = item.TryGetProperty("Title", out JsonElement titleProperty)
-                        ? titleProperty.GetString() ?? ""
-                        : "";
-
-                    rows.Add(new StreamStatisticsRow
-                    {
-                        Date = startedAt == DateTimeOffset.MinValue ? "-" : startedAt.ToString("dd.MM.yyyy HH:mm"),
-                        Duration = TimeSpan.FromSeconds(Math.Max(0, durationSeconds)).ToString(@"hh\:mm\:ss"),
-                        AverageViewers = Math.Round(averageViewers, 1),
-                        PeakViewers = peakViewers,
-                        FollowersGained = followers,
-                        NewSubscriptions = newSubscriptions,
-                        GiftSubscriptions = giftSubscriptions,
-                        BitsCheered = bitsCheered,
-                        Category = string.IsNullOrWhiteSpace(category) ? "Nicht angegeben" : category,
-                        Title = title,
-                        DurationSeconds = durationSeconds,
-                        StartedAt = startedAt
-                    });
-                }
-                catch
-                {
-                    // Ignore malformed history entries and continue with valid sessions.
-                }
-            }
-        }
-
-        var ordered = rows
-            .OrderByDescending(row => row.StartedAt)
-            .ToList();
-
-        StatisticsSessionsGrid.ItemsSource = ordered;
-
-        int totalStreams = rows.Count;
-        long totalSeconds = rows.Sum(row => Math.Max(0, row.DurationSeconds));
-        double weightedAverageViewers = totalSeconds > 0
-            ? rows.Sum(row => row.AverageViewers * Math.Max(0, row.DurationSeconds)) / totalSeconds
-            : rows.Count > 0 ? rows.Average(row => row.AverageViewers) : 0;
-        int peak = rows.Count > 0 ? rows.Max(row => row.PeakViewers) : 0;
-        int followersTotal = rows.Sum(row => row.FollowersGained);
-        long averageDurationSeconds = rows.Count > 0 ? totalSeconds / rows.Count : 0;
-
-        StatisticsTotalStreamsText.Text = totalStreams.ToString();
-        StatisticsTotalDurationText.Text = FormatStatisticsDuration(totalSeconds);
-        StatisticsAverageViewersText.Text = weightedAverageViewers.ToString("0.0");
-        StatisticsPeakViewersText.Text = peak.ToString();
-        StatisticsFollowersText.Text = followersTotal.ToString();
-        StatisticsAverageDurationText.Text = FormatStatisticsDuration(averageDurationSeconds);
-
-        StatisticsCategoriesList.Items.Clear();
-        foreach (var category in rows
-                     .GroupBy(row => row.Category, StringComparer.OrdinalIgnoreCase)
-                     .Select(group => new
-                     {
-                         Name = group.Key,
-                         Count = group.Count(),
-                         Hours = group.Sum(row => row.DurationSeconds) / 3600.0,
-                         Average = group.Average(row => row.AverageViewers)
-                     })
-                     .OrderByDescending(item => item.Count)
-                     .ThenByDescending(item => item.Hours))
-        {
-            StatisticsCategoriesList.Items.Add(
-                $"{category.Name} · {category.Count} Stream(s) · {category.Hours:0.0} h · Ø {category.Average:0.0} Viewer");
-        }
-
-        if (StatisticsCategoriesList.Items.Count == 0)
-        {
-            StatisticsCategoriesList.Items.Add("Noch keine Kategorien gespeichert.");
-        }
-
-        StatisticsDevelopmentList.Items.Clear();
-        foreach (StreamStatisticsRow? row in rows
-                     .Where(row => row.StartedAt != DateTimeOffset.MinValue)
-                     .OrderBy(row => row.StartedAt)
-                     .TakeLast(20))
-        {
-            StatisticsDevelopmentList.Items.Add(
-                $"{row.StartedAt:dd.MM.} · Ø {row.AverageViewers:0.0} · Peak {row.PeakViewers} · +{row.FollowersGained} Follower");
-        }
-
-        if (StatisticsDevelopmentList.Items.Count == 0)
-        {
-            StatisticsDevelopmentList.Items.Add("Noch keine Verlaufsdaten vorhanden.");
-        }
-    }
-
-    private static string FormatStatisticsDuration(long totalSeconds)
-    {
-        var duration = TimeSpan.FromSeconds(Math.Max(0, totalSeconds));
-        if (duration.TotalHours >= 24)
-        {
-            return $"{(int)duration.TotalDays}d {duration.Hours:00}:{duration.Minutes:00}";
-        }
-
-        return duration.ToString(@"hh\:mm");
-    }
-
     private async Task RefreshCreatorIntelligenceAsync()
     {
         CreatorIntelligenceSummary? summary = await _creatorIntelligence.AnalyzeLatestSessionAsync();
@@ -18854,7 +18701,7 @@ public partial class MainWindow : Window
             .FirstOrDefault();
         string tableRows = string.Join(Environment.NewLine, ordered.Take(50).Select(row =>
             $"<tr><td>{row.StartedAt.ToLocalTime():dd.MM.yyyy HH:mm}</td><td>{H(row.Title)}</td><td>{H(row.Category)}</td><td>{TimeSpan.FromSeconds(Math.Max(0, row.DurationSeconds)):hh\\:mm\\:ss}</td><td>{row.Peak}</td><td>{row.Average:0.0}</td><td>{row.Followers}</td><td>{row.Chat}</td></tr>"));
-        string html = $$"""<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Twitch Stream-Report</title><style>body{font-family:Segoe UI,Arial;background:#0b1014;color:#eef3f6;margin:32px}h1,h2{color:#fff}.cards{display:flex;flex-wrap:wrap;gap:12px}.card{background:#151d23;border:1px solid #2a3740;border-radius:10px;padding:16px;min-width:160px}.value{font-size:26px;font-weight:700;margin-top:5px}table{width:100%;border-collapse:collapse;margin-top:16px;background:#11181d}th,td{border-bottom:1px solid #2a3740;padding:10px;text-align:left}th{background:#192229}.muted{color:#aeb8bf}</style></head><body><h1>Creator Control Suite – Twitch Stream-Report</h1><p class="muted">Erstellt am {{DateTime.Now:dd.MM.yyyy HH:mm}}</p><div class="cards"><div class="card">Streams<div class="value">{{rows.Count}}</div></div><div class="card">Rekord-Peak<div class="value">{{rows.Max(x => x.Peak)}}</div></div><div class="card">Bestes Ø<div class="value">{{rows.Max(x => x.Average):0.0}}</div></div><div class="card">Livezeit<div class="value">{{FormatStatisticsDuration(rows.Sum(x => x.DurationSeconds))}}</div></div><div class="card">Follower<div class="value">{{rows.Sum(x => x.Followers)}}</div></div><div class="card">Chat / Std.<div class="value">{{(totalHours <= 0 ? 0 : rows.Sum(x => x.Chat) / totalHours):0.0}}</div></div></div><h2>Auswertung</h2><p>Die letzten {{recent.Count}} Streams erreichten durchschnittlich {{recent.Average(x => x.Average):0.0}} Zuschauer bei einem mittleren Peak von {{recent.Average(x => x.Peak):0.0}}. Beste Kategorie nach Zuschauerdurchschnitt: <strong>{{H(bestCategory?.Name ?? "-")}}</strong>.</p><h2>Letzte Streams</h2><table><thead><tr><th>Start</th><th>Titel</th><th>Kategorie</th><th>Dauer</th><th>Peak</th><th>Ø</th><th>Follower</th><th>Chat</th></tr></thead><tbody>{{tableRows}}</tbody></table></body></html>""";
+        string html = $$"""<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Twitch Stream-Report</title><style>body{font-family:Segoe UI,Arial;background:#0b1014;color:#eef3f6;margin:32px}h1,h2{color:#fff}.cards{display:flex;flex-wrap:wrap;gap:12px}.card{background:#151d23;border:1px solid #2a3740;border-radius:10px;padding:16px;min-width:160px}.value{font-size:26px;font-weight:700;margin-top:5px}table{width:100%;border-collapse:collapse;margin-top:16px;background:#11181d}th,td{border-bottom:1px solid #2a3740;padding:10px;text-align:left}th{background:#192229}.muted{color:#aeb8bf}</style></head><body><h1>Creator Control Suite – Twitch Stream-Report</h1><p class="muted">Erstellt am {{DateTime.Now:dd.MM.yyyy HH:mm}}</p><div class="cards"><div class="card">Streams<div class="value">{{rows.Count}}</div></div><div class="card">Rekord-Peak<div class="value">{{rows.Max(x => x.Peak)}}</div></div><div class="card">Bestes Ø<div class="value">{{rows.Max(x => x.Average):0.0}}</div></div><div class="card">Livezeit<div class="value">{{StreamStatisticsApplicationService.FormatDuration(rows.Sum(x => x.DurationSeconds))}}</div></div><div class="card">Follower<div class="value">{{rows.Sum(x => x.Followers)}}</div></div><div class="card">Chat / Std.<div class="value">{{(totalHours <= 0 ? 0 : rows.Sum(x => x.Chat) / totalHours):0.0}}</div></div></div><h2>Auswertung</h2><p>Die letzten {{recent.Count}} Streams erreichten durchschnittlich {{recent.Average(x => x.Average):0.0}} Zuschauer bei einem mittleren Peak von {{recent.Average(x => x.Peak):0.0}}. Beste Kategorie nach Zuschauerdurchschnitt: <strong>{{H(bestCategory?.Name ?? "-")}}</strong>.</p><h2>Letzte Streams</h2><table><thead><tr><th>Start</th><th>Titel</th><th>Kategorie</th><th>Dauer</th><th>Peak</th><th>Ø</th><th>Follower</th><th>Chat</th></tr></thead><tbody>{{tableRows}}</tbody></table></body></html>""";
         string reportPath = Path.Combine(GetStreamHistoryDirectory(), $"twitch-stream-report-{DateTime.Now:yyyyMMdd-HHmmss}.html");
         await File.WriteAllTextAsync(reportPath, html, new System.Text.UTF8Encoding(true));
         Process.Start(new ProcessStartInfo(reportPath) { UseShellExecute = true });

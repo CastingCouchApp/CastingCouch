@@ -112,6 +112,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<
             IAlertDefinitionApplicationService,
             AlertDefinitionApplicationService>();
+        services.AddSingleton<StreamStatisticsApplicationService>();
         services.AddSingleton<IEventBus, EventBus>();
         services.AddSingleton<IAutomationRuleEngine, AutomationRuleEngine>();
         services.AddSingleton<IMultiPcAgentClient, MultiPcAgentClient>();
@@ -151,6 +152,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<AlertLibraryPageViewModel>();
         services.AddSingleton<AlertDefinitionEditorViewModel>();
         services.AddSingleton<AlertRuntimePageViewModel>();
+        services.AddSingleton<StatisticsPageViewModel>();
         services.AddSingleton<CreatorIntelligenceSectionViewModel>();
         services.AddSingleton<PageNavigationCoordinator>();
         services.AddSingleton<TimedAutomationTickPublisher>();

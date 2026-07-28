@@ -16,6 +16,7 @@
         xmlns:workflow="clr-namespace:CreatorControlSuite.App.Views.Pages.Workflow"
         xmlns:overlayconfig="clr-namespace:CreatorControlSuite.App.Views.Pages.Overlay"
         xmlns:alertsview="clr-namespace:CreatorControlSuite.App.Views.Pages.Alerts"
+        xmlns:statistics="clr-namespace:CreatorControlSuite.App.Views.Pages.Statistics"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         x:Class="CreatorControlSuite.App.Shell.MainWindow"
         Title="Creator Control Suite"
@@ -3757,124 +3758,7 @@
                 </TabControl>
             </Grid>
             <Grid x:Name="StatisticsPage" Visibility="Collapsed">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                <DockPanel Margin="0,0,0,14">
-                    <StackPanel DockPanel.Dock="Left">
-                        <TextBlock Text="STREAM-STATISTIK" FontSize="28" FontWeight="Bold"/>
-                        <TextBlock Text="Dauerhafte Auswertung deiner gespeicherten Streams" Foreground="{DynamicResource TextMutedBrush}" Margin="0,4,0,0"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                            <TextBlock Text="Auf dem Dashboard anzeigen:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <ComboBox x:Name="StatisticsDashboardMetricBox" Width="220" SelectedIndex="0">
-                                <ComboBoxItem Content="Zuschauerzahl" Tag="ViewerCount"/>
-                                <ComboBoxItem Content="Followerzahl" Tag="FollowerCount"/>
-                                <ComboBoxItem Content="Sub-Anzahl" Tag="SubscriberCount"/>
-                                <ComboBoxItem Content="Neue Follower" Tag="NewFollowers"/>
-                                <ComboBoxItem Content="Neue Subs" Tag="NewSubscribers"/>
-                            </ComboBox>
-                        </StackPanel>
-                    </StackPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button x:Name="StatisticsRefreshButton" Content="AKTUALISIEREN" Margin="4,0"/>
-                        <Button x:Name="StatisticsOpenFolderButton" Content="DATENORDNER ÖFFNEN" Margin="4,0"/>
-                    </StackPanel>
-                </DockPanel>
-                <UniformGrid Grid.Row="1" Columns="6" Margin="0,0,0,14">
-                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
-                        <StackPanel>
-                            <TextBlock Text="STREAMS" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
-                            <TextBlock x:Name="StatisticsTotalStreamsText" Text="0" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
-                        <StackPanel>
-                            <TextBlock Text="GESAMTZEIT" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
-                            <TextBlock x:Name="StatisticsTotalDurationText" Text="00:00" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
-                        <StackPanel>
-                            <TextBlock Text="Ø ZUSCHAUER" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
-                            <TextBlock x:Name="StatisticsAverageViewersText" Text="0,0" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
-                        <StackPanel>
-                            <TextBlock Text="BESTER PEAK" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
-                            <TextBlock x:Name="StatisticsPeakViewersText" Text="0" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
-                        <StackPanel>
-                            <TextBlock Text="FOLLOWER +" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
-                            <TextBlock x:Name="StatisticsFollowersText" Text="0" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
-                        <StackPanel>
-                            <TextBlock Text="Ø DAUER" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
-                            <TextBlock x:Name="StatisticsAverageDurationText" Text="00:00" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
-                        </StackPanel>
-                    </Border>
-                </UniformGrid>
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.6*"/>
-                        <ColumnDefinition Width="1*"/>
-                    </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3,0,6,0">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="STREAMS IM VERLAUF" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                            <DataGrid x:Name="StatisticsSessionsGrid" Grid.Row="1" Margin="0,10,0,0" AutoGenerateColumns="False" IsReadOnly="True" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Datum" Binding="{Binding Date}" Width="125"/>
-                                    <DataGridTextColumn Header="Dauer" Binding="{Binding Duration}" Width="85"/>
-                                    <DataGridTextColumn Header="Ø Viewer" Binding="{Binding AverageViewers}" Width="85"/>
-                                    <DataGridTextColumn Header="Peak" Binding="{Binding PeakViewers}" Width="65"/>
-                                    <DataGridTextColumn Header="Follower" Binding="{Binding FollowersGained}" Width="75"/>
-                                    <DataGridTextColumn Header="Subs" Binding="{Binding NewSubscriptions}" Width="60"/>
-                                    <DataGridTextColumn Header="Gift-Subs" Binding="{Binding GiftSubscriptions}" Width="70"/>
-                                    <DataGridTextColumn Header="Bits" Binding="{Binding BitsCheered}" Width="65"/>
-                                    <DataGridTextColumn Header="Kategorie" Binding="{Binding Category}" Width="*"/>
-                                    <DataGridTextColumn Header="Titel" Binding="{Binding Title}" Width="2*"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </Grid>
-                    </Border>
-                    <Grid Grid.Column="1" Margin="6,0,3,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="1*"/>
-                            <RowDefinition Height="1*"/>
-                        </Grid.RowDefinitions>
-                        <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,6">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="KATEGORIEN" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                                <ListBox x:Name="StatisticsCategoriesList" Grid.Row="1" Margin="0,10,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            </Grid>
-                        </Border>
-                        <Border Grid.Row="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,6,0,0">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="ENTWICKLUNG PRO STREAM" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
-                                <ListBox x:Name="StatisticsDevelopmentList" Grid.Row="1" Margin="0,10,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                </Grid>
+                <statistics:StatisticsPageView x:Name="StatisticsPageViewHost"/>
             </Grid>
             <Grid x:Name="ProfilesPage" Visibility="Collapsed">
                 <profiles:ProfilesPageView x:Name="ProfilesPageViewHost"/>

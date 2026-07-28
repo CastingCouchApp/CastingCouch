@@ -87,6 +87,18 @@
 - Dreiundzwanzig neue Tests sichern Bibliotheksaktionen, Rollbacks,
   Bestätigungsdialog-Delegation, Feld-Mapping und numerische Grenzwerte ab.
 
+## Stream-Statistik
+
+- Die vollständige Statistikseite liegt in `StatisticsPageView` und
+  `StatisticsPageViewModel` statt in `MainWindow.xaml`.
+- JSONL-Parsing, beschädigte Datensätze, gewichtete Zuschauerdurchschnitte,
+  Kategorien und Verlaufsreihen liegen im
+  `StreamStatisticsApplicationService`.
+- Refresh, Ordneröffnung und Auswahl der Dashboard-Kennzahl werden über
+  Commands beziehungsweise schmale Shell-Callbacks delegiert.
+- Vier neue Tests sichern Projektion, Leerzustand, Dateiladen und
+  Kennzahlwechsel ab.
+
 ## IPC-Vertrag
 
 - Echte Named-Pipe-Client/Server-Tests prüfen Roundtrip, JSON-Fehlerisolation

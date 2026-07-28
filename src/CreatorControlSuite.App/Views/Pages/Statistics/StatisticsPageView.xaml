@@ -1,0 +1,122 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Statistics.StatisticsPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,14">
+            <StackPanel DockPanel.Dock="Left">
+                <TextBlock Text="STREAM-STATISTIK" FontSize="28" FontWeight="Bold"/>
+                <TextBlock Text="Dauerhafte Auswertung deiner gespeicherten Streams" Foreground="{DynamicResource TextMutedBrush}" Margin="0,4,0,0"/>
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBlock Text="Auf dem Dashboard anzeigen:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <ComboBox Width="220"
+                              ItemsSource="{Binding Metrics}"
+                              DisplayMemberPath="Name"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding SelectedMetric}"/>
+                </StackPanel>
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="AKTUALISIEREN" Margin="4,0" Command="{Binding RefreshCommand}"/>
+                <Button Content="DATENORDNER ÖFFNEN" Margin="4,0" Command="{Binding OpenFolderCommand}"/>
+            </StackPanel>
+        </DockPanel>
+        <UniformGrid Grid.Row="1" Columns="6" Margin="0,0,0,14">
+            <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
+                <StackPanel>
+                    <TextBlock Text="STREAMS" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding TotalStreams}" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
+                <StackPanel>
+                    <TextBlock Text="GESAMTZEIT" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding TotalDuration}" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
+                <StackPanel>
+                    <TextBlock Text="Ø ZUSCHAUER" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding AverageViewers}" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
+                <StackPanel>
+                    <TextBlock Text="BESTER PEAK" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding PeakViewers}" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
+                <StackPanel>
+                    <TextBlock Text="FOLLOWER +" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding Followers}" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3">
+                <StackPanel>
+                    <TextBlock Text="Ø DAUER" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding AverageDuration}" FontSize="24" FontWeight="Bold" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.6*"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3,0,6,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="STREAMS IM VERLAUF" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                    <DataGrid Grid.Row="1" Margin="0,10,0,0" ItemsSource="{Binding Rows}" AutoGenerateColumns="False" IsReadOnly="True" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Datum" Binding="{Binding Date}" Width="125"/>
+                            <DataGridTextColumn Header="Dauer" Binding="{Binding Duration}" Width="85"/>
+                            <DataGridTextColumn Header="Ø Viewer" Binding="{Binding AverageViewers}" Width="85"/>
+                            <DataGridTextColumn Header="Peak" Binding="{Binding PeakViewers}" Width="65"/>
+                            <DataGridTextColumn Header="Follower" Binding="{Binding FollowersGained}" Width="75"/>
+                            <DataGridTextColumn Header="Subs" Binding="{Binding NewSubscriptions}" Width="60"/>
+                            <DataGridTextColumn Header="Gift-Subs" Binding="{Binding GiftSubscriptions}" Width="70"/>
+                            <DataGridTextColumn Header="Bits" Binding="{Binding BitsCheered}" Width="65"/>
+                            <DataGridTextColumn Header="Kategorie" Binding="{Binding Category}" Width="*"/>
+                            <DataGridTextColumn Header="Titel" Binding="{Binding Title}" Width="2*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+            <Grid Grid.Column="1" Margin="6,0,3,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
+                </Grid.RowDefinitions>
+                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,6">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="KATEGORIEN" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                        <ListBox Grid.Row="1" Margin="0,10,0,0" ItemsSource="{Binding Categories}" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    </Grid>
+                </Border>
+                <Border Grid.Row="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,6,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="ENTWICKLUNG PRO STREAM" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                        <ListBox Grid.Row="1" Margin="0,10,0,0" ItemsSource="{Binding Development}" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>
