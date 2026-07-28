@@ -38,8 +38,8 @@
     <SolidColorBrush x:Key="SettingsTabBackgroundBrush" Color="#FFF0F5"/>
 
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#4A3050"/>
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#7A5A70"/>
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#A08090"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5C3D55"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#6E4A60"/>
     <SolidColorBrush x:Key="TextOnAccentBrush" Color="#4A3050"/>
     <SolidColorBrush x:Key="ComboGlyphBrush" Color="#E8A0BF"/>
 
@@ -59,9 +59,11 @@
     <SolidColorBrush x:Key="SuccessBrush" Color="#7BC47F"/>
     <SolidColorBrush x:Key="WarningBrush" Color="#E8C070"/>
     <SolidColorBrush x:Key="DangerBrush" Color="#E08090"/>
-    <SolidColorBrush x:Key="HighlightItemBrush" Color="#F3E5F5"/>
+    <SolidColorBrush x:Key="HighlightItemBrush" Color="#E4C8EE"/>
+    <SolidColorBrush x:Key="ButtonHighlightBrush" Color="#55E8A0BF"/>
+    <SolidColorBrush x:Key="ButtonPressedBrush" Color="#66C9B6E4"/>
 
     <SolidColorBrush x:Key="PanelBrush" Color="#FFF0F5"/>
     <SolidColorBrush x:Key="CardBrush" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="MutedBrush" Color="#A08090"/>
+    <SolidColorBrush x:Key="MutedBrush" Color="#6E4A60"/>
 </ResourceDictionary>

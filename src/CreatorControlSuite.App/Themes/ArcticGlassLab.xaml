@@ -60,6 +60,8 @@
     <SolidColorBrush x:Key="WarningBrush" Color="#FFCA28"/>
     <SolidColorBrush x:Key="DangerBrush" Color="#EF5350"/>
     <SolidColorBrush x:Key="HighlightItemBrush" Color="#1E3040"/>
+    <SolidColorBrush x:Key="ButtonHighlightBrush" Color="#444FC3F7"/>
+    <SolidColorBrush x:Key="ButtonPressedBrush" Color="#6629B6F6"/>
 
     <SolidColorBrush x:Key="PanelBrush" Color="#0E1820"/>
     <SolidColorBrush x:Key="CardBrush" Color="#142028"/>

@@ -18,9 +18,54 @@
                 <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}"/>
                 <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
                 <Setter Property="Padding" Value="14,9"/>
                 <Setter Property="Margin" Value="4"/>
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4"
+                                    SnapsToDevicePixels="True">
+                                <Grid>
+                                    <Border x:Name="HighlightOverlay"
+                                            Background="{DynamicResource ButtonHighlightBrush}"
+                                            CornerRadius="3"
+                                            Opacity="0"
+                                            IsHitTestVisible="False"/>
+                                    <Border x:Name="PressedOverlay"
+                                            Background="{DynamicResource ButtonPressedBrush}"
+                                            CornerRadius="3"
+                                            Opacity="0"
+                                            IsHitTestVisible="False"/>
+                                    <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                      RecognizesAccessKey="True"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="HighlightOverlay" Property="Opacity" Value="1"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource HoverBorderBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="HighlightOverlay" Property="Opacity" Value="0"/>
+                                    <Setter TargetName="PressedOverlay" Property="Opacity" Value="1"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource HoverBorderBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.45"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <Style x:Key="SidebarNavButtonStyle" TargetType="Button">
@@ -33,12 +78,50 @@
                 <Setter Property="FontSize" Value="14"/>
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
                 <Setter Property="Cursor" Value="Hand"/>
-                <Style.Triggers>
-                    <Trigger Property="IsMouseOver" Value="True">
-                        <Setter Property="Background" Value="{DynamicResource NavHoverBackgroundBrush}"/>
-                        <Setter Property="Foreground" Value="{DynamicResource NavActiveForegroundBrush}"/>
-                    </Trigger>
-                </Style.Triggers>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    SnapsToDevicePixels="True">
+                                <Grid>
+                                    <Border x:Name="HighlightOverlay"
+                                            Background="{DynamicResource ButtonHighlightBrush}"
+                                            Opacity="0"
+                                            IsHitTestVisible="False"/>
+                                    <Border x:Name="PressedOverlay"
+                                            Background="{DynamicResource ButtonPressedBrush}"
+                                            Opacity="0"
+                                            IsHitTestVisible="False"/>
+                                    <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalAlignment="Center"
+                                                      RecognizesAccessKey="True"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="HighlightOverlay" Property="Opacity" Value="1"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource NavActiveForegroundBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="HighlightOverlay" Property="Opacity" Value="0"/>
+                                    <Setter TargetName="PressedOverlay" Property="Opacity" Value="1"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource NavActiveForegroundBrush}"/>
+                                </Trigger>
+                                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="Active">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavActiveBackgroundBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource NavActiveForegroundBrush}"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </DataTrigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.45"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <Style x:Key="DashboardCardStyle" TargetType="Border">
@@ -62,6 +145,36 @@
                 <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}"/>
                 <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4"
+                                    Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  RecognizesAccessKey="True"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTabBorderBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSelectedBrush}"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTabBorderBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.45"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <Style x:Key="TitleBarWidgetStyle" TargetType="Border">
@@ -398,8 +511,8 @@
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
                 <Style.Triggers>
                     <Trigger Property="IsSelected" Value="True">
-                        <Setter Property="Background" Value="{DynamicResource AccentSelectedBrush}"/>
-                        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
+                        <Setter Property="Background" Value="{DynamicResource AccentSelectedDeepBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AccentSelectedForegroundBrush}"/>
                     </Trigger>
                     <Trigger Property="IsMouseOver" Value="True">
                         <Setter Property="Background" Value="{DynamicResource HighlightItemBrush}"/>

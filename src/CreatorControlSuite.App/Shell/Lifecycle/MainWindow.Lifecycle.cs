@@ -372,13 +372,15 @@ public partial class MainWindow : Window
         DashboardConnectionSummaryChip?.ClearValue(Border.BorderBrushProperty);
         DashboardServiceStatusSection?.ClearValue(Border.BackgroundProperty);
 
+        // Active-Nav nutzt Tag + DynamicResource; Theme-Swap aktualisiert Farben ohne Reapply.
+        // Player/MultiPc hier mitführen, falls später lokale Werte gesetzt werden.
         Button? active = new Button?[]
         {
-            DashboardButton, ServicesButton, WorkflowButton, StatisticsButton,
-            OverlaysButton, AlertsButton, SettingsButton, DiagnosticsButton,
+            DashboardButton, PlayerButton, ServicesButton, WorkflowButton, MultiPcButton,
+            StatisticsButton, OverlaysButton, AlertsButton, SettingsButton, DiagnosticsButton,
             ServicesSpotifyButton, ServicesTwitchButton, ServicesObsButton,
             ServicesStreamerBotButton, ServicesStreamDeckButton
-        }.FirstOrDefault(b => b is not null && b.FontWeight == FontWeights.SemiBold);
+        }.FirstOrDefault(b => b is not null && Equals(b.Tag, "Active"));
         if (active is not null)
         {
             SetActiveNavigationButton(active);

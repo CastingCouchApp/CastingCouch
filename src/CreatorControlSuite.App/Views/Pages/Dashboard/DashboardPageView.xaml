@@ -71,19 +71,19 @@
                                         <TextBlock Text="KATEGORIE · LIVE-BENACHRICHTIGUNG" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
                                         <TextBlock x:Name="DashboardTwitchChannelDetailsText" x:FieldModifier="public" Text="- · nicht gesetzt" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
                                     </StackPanel>
-                                    <TextBlock Grid.Column="3" Text="BEARBEITEN  ›" Foreground="{DynamicResource AccentHoverBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="3" Text="BEARBEITEN  ›" Foreground="{DynamicResource AccentSelectedForegroundBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 </Grid>
                             </Border>
                             <Border Grid.Row="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardStreamControlModule" x:FieldModifier="public" Margin="0,0,0,12" HorizontalAlignment="Stretch" VerticalAlignment="Top">
                                              <StackPanel>
                                                 <TextBlock Text="SCHNELLZUGRIFF" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
                                                 <UniformGrid Columns="6" Rows="1" Margin="0,12,0,8">
-                                                    <Button x:Name="DashboardPrepareStreamButton" x:FieldModifier="public" ToolTip="Konfigurierte Streaming-Dienste starten und den Stream vorbereiten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="🚀  STREAM VORBEREITEN" Style="{StaticResource OrangeActionButtonStyle}" FontWeight="Bold" Margin="3" Padding="8,4"/>
-                                                    <Button x:Name="DashboardObsStartStreamButton" x:FieldModifier="public" ToolTip="OBS-Stream starten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="▷  STREAM STARTEN" FontWeight="Bold" Margin="3" Padding="8,4"/>
-                                                    <Button x:Name="DashboardObsStopStreamButton" x:FieldModifier="public" Content="■  STREAM BEENDEN" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Margin="3" Padding="8,4"/>
-                                                    <Button x:Name="DashboardQuickAccessAlertButton" x:FieldModifier="public" ToolTip="Einen Test-Alert auslösen" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="♧  TEST-ALERT" Margin="3" Padding="8,4"/>
-                                                    <Button x:Name="DashboardQuickAccessOverlayButton" x:FieldModifier="public" ToolTip="Overlay-Einstellungen öffnen" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="▱  OVERLAY EIN/AUS" Margin="3" Padding="8,4"/>
-                                                    <Button x:Name="DashboardShortStreamTestButton" x:FieldModifier="public" ToolTip="Automatisierung öffnen und einen kurzen Testlauf ohne Stream starten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="⚙  STREAM-KURZTEST" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardPrepareStreamButton" x:FieldModifier="public" ToolTip="Konfigurierte Streaming-Dienste starten und den Stream vorbereiten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Center" Content="🚀  STREAM VORBEREITEN" Style="{StaticResource OrangeActionButtonStyle}" FontWeight="Bold" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardObsStartStreamButton" x:FieldModifier="public" ToolTip="OBS-Stream starten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Center" Content="▷  STREAM STARTEN" FontWeight="Bold" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardObsStopStreamButton" x:FieldModifier="public" Content="■  STREAM BEENDEN" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Center" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardQuickAccessAlertButton" x:FieldModifier="public" ToolTip="Einen Test-Alert auslösen" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Center" Content="♧  TEST-ALERT" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardQuickAccessOverlayButton" x:FieldModifier="public" ToolTip="Overlay-Einstellungen öffnen" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Center" Content="▱  OVERLAY EIN/AUS" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardShortStreamTestButton" x:FieldModifier="public" ToolTip="Automatisierung öffnen und einen kurzen Testlauf ohne Stream starten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Center" Content="⚙  STREAM-KURZTEST" Margin="3" Padding="8,4"/>
                                                 </UniformGrid>
                                                 <Border x:Name="DashboardPrepareProgressPanel" x:FieldModifier="public" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10" Margin="3,2,3,10" Visibility="Collapsed">
                                                     <StackPanel>
@@ -190,7 +190,7 @@
                                                             </StackPanel>
                                                         </Border>
                                                         <Border Background="#A0000000" VerticalAlignment="Bottom" Padding="8,4">
-                                                            <TextBlock x:Name="DashboardCurrentSceneText" x:FieldModifier="public" Text="AKTUELLE SZENE" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock x:Name="DashboardCurrentSceneText" x:FieldModifier="public" Text="AKTUELLE SZENE" Foreground="White" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                                         </Border>
                                                     </Grid>
                                                 </Border>
@@ -205,7 +205,7 @@
                                                     <RowDefinition Height="*"/>
                                                 </Grid.RowDefinitions>
                                                 <TextBlock x:Name="DashboardTwitchUsersHeaderText" x:FieldModifier="public" Text="TWITCH · USER (0)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                                                <ListBox x:Name="DashboardTwitchUsersList" x:FieldModifier="public" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Stretch">
+                                                <ListBox x:Name="DashboardTwitchUsersList" x:FieldModifier="public" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource ListBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Stretch">
                                                     <ListBox.ItemContainerStyle>
                                                         <Style TargetType="ListBoxItem">
                                                             <Setter Property="Background" Value="Transparent"/>
@@ -244,7 +244,19 @@
                                                         <TextBlock Text="LETZTE EVENTS" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                                         <Button x:Name="DashboardJoinStreamTogetherButton" x:FieldModifier="public" Grid.Column="1" Content="BEITRETEN" Padding="8,4" Visibility="Collapsed"/>
                                                     </Grid>
-                                                    <ListBox x:Name="DashboardTwitchEventsList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Stretch"/>
+                                                    <ListBox x:Name="DashboardTwitchEventsList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource ListBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Stretch" Focusable="False">
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="ListBoxItem">
+                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                <Setter Property="BorderThickness" Value="0"/>
+                                                                <Setter Property="Padding" Value="8,6"/>
+                                                                <Setter Property="Margin" Value="2"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                                                <Setter Property="Focusable" Value="False"/>
+                                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
+                                                    </ListBox>
                                                 </Grid>
                                             </Border>
                                             <Border Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardTwitchChatModule" x:FieldModifier="public" Margin="4,0,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
@@ -259,7 +271,16 @@
                                                         <TextBlock Text="LIVE" Foreground="#9B5CFF" HorizontalAlignment="Right"/>
                                                     </DockPanel>
                                                     <Grid x:Name="DashboardTwitchChatContentHost" x:FieldModifier="public" Grid.Row="1" Margin="0,8,0,8">
-                                                        <ListBox x:Name="DashboardTwitchChatList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" VerticalAlignment="Stretch">
+                                                        <ListBox x:Name="DashboardTwitchChatList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource ListBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" VerticalAlignment="Stretch" Focusable="False">
+                                                            <ListBox.ItemContainerStyle>
+                                                                <Style TargetType="ListBoxItem">
+                                                                    <Setter Property="Background" Value="Transparent"/>
+                                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                                    <Setter Property="Padding" Value="0"/>
+                                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                                    <Setter Property="Focusable" Value="False"/>
+                                                                </Style>
+                                                            </ListBox.ItemContainerStyle>
                                                             <ListBox.ItemTemplate>
                                                                 <DataTemplate>
                                                                     <TextBlock Text="{Binding}" Foreground="{Binding Converter={StaticResource TwitchRoleToBrushConverter}}" TextWrapping="Wrap" Margin="3,2"/>

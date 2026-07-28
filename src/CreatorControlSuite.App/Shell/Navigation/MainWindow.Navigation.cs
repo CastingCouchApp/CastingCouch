@@ -122,6 +122,7 @@ public partial class MainWindow : Window
             ServicesStreamerBotButton,
             ServicesStreamDeckButton,
             WorkflowButton,
+            MultiPcButton,
             StatisticsButton,
             OverlaysButton,
             AlertsButton,
@@ -131,9 +132,10 @@ public partial class MainWindow : Window
 
         foreach (Button button in navigationButtons)
         {
+            button.ClearValue(FrameworkElement.TagProperty);
             button.ClearValue(Control.BackgroundProperty);
             button.ClearValue(Control.ForegroundProperty);
-            button.FontWeight = FontWeights.Normal;
+            button.ClearValue(Control.FontWeightProperty);
         }
 
         if (activeButton is null)
@@ -141,13 +143,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        activeButton.Background =
-            _themeService.GetBrush("NavActiveBackgroundBrush")
-            ?? new SolidColorBrush(Color.FromRgb(42, 23, 10));
-        activeButton.Foreground =
-            _themeService.GetBrush("NavActiveForegroundBrush")
-            ?? new SolidColorBrush(Color.FromRgb(255, 122, 26));
-        activeButton.FontWeight = FontWeights.SemiBold;
+        activeButton.Tag = "Active";
     }
 
     private void ShowPage(UIElement page)

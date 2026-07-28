@@ -60,6 +60,8 @@
     <SolidColorBrush x:Key="WarningBrush" Color="#E6A817"/>
     <SolidColorBrush x:Key="DangerBrush" Color="#DC5A5A"/>
     <SolidColorBrush x:Key="HighlightItemBrush" Color="#26333C"/>
+    <SolidColorBrush x:Key="ButtonHighlightBrush" Color="#44FF7A1A"/>
+    <SolidColorBrush x:Key="ButtonPressedBrush" Color="#66FF6A00"/>
 
     <!-- Legacy aliases used across existing XAML -->
     <SolidColorBrush x:Key="PanelBrush" Color="#0B1014"/>
