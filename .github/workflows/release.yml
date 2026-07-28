@@ -73,7 +73,7 @@ jobs:
           Write-Host "Release-Version: $version (Kanal: $channel, MSI: $msi)"
 
       - name: Cache NuGet
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
