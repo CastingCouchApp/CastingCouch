@@ -1,8 +1,11 @@
 # Separater Updater
 
 Der Updater wartet optional auf das Ende der Suite, entpackt das Update-ZIP,
-sichert betroffene Dateien, schreibt ein Transaktionsjournal, kopiert die
-Programmdateien und startet die Suite neu. Bei Fehlern rollt er zurück.
+sichert betroffene Dateien, schreibt nach jeder angewendeten Datei ein
+Transaktionsjournal, kopiert die Programmdateien und startet die Suite neu.
+Bei Fehlern rollt er zurück. Beim nächsten Start werden unvollständige Journale
+unter `%LOCALAPPDATA%\CreatorControlSuite\UpdateTransactions` erkannt und vor
+einem weiteren Update zurückgerollt.
 
 Aufruf:
 

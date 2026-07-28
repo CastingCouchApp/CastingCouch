@@ -1,13 +1,14 @@
 using System.Windows.Threading;
 using CreatorControlSuite.App.Core.Eventing;
 using CreatorControlSuite.Core.Eventing;
+using Microsoft.Extensions.Hosting;
 
 namespace CreatorControlSuite.App.Services;
 
 /// <summary>
 /// Publishes periodic timed-automation ticks on the UI dispatcher via <see cref="IEventBus"/>.
 /// </summary>
-public sealed class TimedAutomationTickPublisher : IDisposable
+public sealed class TimedAutomationTickPublisher : IHostedService, IDisposable
 {
     private readonly IEventBus _eventBus;
     private readonly DispatcherTimer _timer;
@@ -31,6 +32,18 @@ public sealed class TimedAutomationTickPublisher : IDisposable
         {
             _timer.Start();
         }
+    }
+
+    Task IHostedService.StartAsync(CancellationToken cancellationToken)
+    {
+        Start();
+        return Task.CompletedTask;
+    }
+
+    Task IHostedService.StopAsync(CancellationToken cancellationToken)
+    {
+        Stop();
+        return Task.CompletedTask;
     }
 
     public void Stop()

@@ -194,20 +194,14 @@ public sealed class StreamWorkflowServiceTests
 
         var store = new InMemorySettingsStore(settings);
         var obs = new FakeObsWebSocketClient();
-        var overlay = new FakeOverlayDataService();
+        var overlay = new FakeWorkflowOverlayCapability();
         var alerts = new FakeAlertEngine();
-        var secrets = new MemorySecretStore();
-        var spotify = new SpotifyModule(
-            store,
-            new StubSpotifyOAuthClient(),
-            new StubSpotifyApiClient(),
-            new SpotifyTokenRepository(secrets));
 
         var service = new StreamWorkflowService(
             store,
-            obs,
-            spotify,
-            new AlertsModule(alerts),
+            new FakeWorkflowObsCapability(obs),
+            new FakeWorkflowMusicCapability(),
+            new FakeWorkflowAlertCapability(alerts),
             overlay);
 
         return new Harness(service, obs, overlay, alerts);
@@ -216,7 +210,7 @@ public sealed class StreamWorkflowServiceTests
     private sealed record Harness(
         StreamWorkflowService Service,
         FakeObsWebSocketClient Obs,
-        FakeOverlayDataService Overlay,
+        FakeWorkflowOverlayCapability Overlay,
         FakeAlertEngine Alerts);
 
     private sealed class InMemorySettingsStore(AppSettings settings) : ISettingsStore
@@ -252,6 +246,60 @@ public sealed class StreamWorkflowServiceTests
         public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
         {
             _values.Remove(key);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeWorkflowObsCapability(
+        FakeObsWebSocketClient obs) : IWorkflowObsCapability
+    {
+        public bool IsConnected => obs.IsConnected;
+
+        public Task SetSceneAsync(
+            string sceneName,
+            CancellationToken cancellationToken) =>
+            obs.SetCurrentProgramSceneAsync(sceneName, cancellationToken);
+
+        public async Task<bool> IsStreamActiveAsync(
+            CancellationToken cancellationToken) =>
+            (await obs.GetStreamStatusAsync(cancellationToken)).OutputActive;
+
+        public Task StartStreamAsync(CancellationToken cancellationToken) =>
+            obs.StartStreamAsync(cancellationToken);
+
+        public Task StopStreamAsync(CancellationToken cancellationToken) =>
+            obs.StopStreamAsync(cancellationToken);
+    }
+
+    private sealed class FakeWorkflowMusicCapability : IWorkflowMusicCapability
+    {
+        public Task FadeToAsync(
+            int targetVolumePercent,
+            TimeSpan duration,
+            bool pauseAfterFade,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
+    private sealed class FakeWorkflowAlertCapability(
+        FakeAlertEngine alerts) : IWorkflowAlertCapability
+    {
+        public async Task StopAndClearAsync(CancellationToken cancellationToken)
+        {
+            await alerts.StopCurrentAsync(cancellationToken);
+            await alerts.ClearQueueAsync(cancellationToken);
+        }
+    }
+
+    private sealed class FakeWorkflowOverlayCapability : IWorkflowOverlayCapability
+    {
+        public WorkflowOverlayData Current { get; private set; } = new();
+
+        public Task UpdateAsync(
+            Action<WorkflowOverlayData> update,
+            CancellationToken cancellationToken)
+        {
+            update(Current);
             return Task.CompletedTask;
         }
     }

@@ -1,0 +1,62 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Updates.UpdateSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <CheckBox Content="Automatisch nach Updates suchen"
+                  IsChecked="{Binding AutoCheck}"/>
+        <CheckBox Content="Vor Updates ein Backup erstellen"
+                  IsChecked="{Binding BackupBeforeUpdate}"
+                  Margin="0,8,0,0"/>
+        <TextBlock Text="Updatekanal"
+                   Foreground="{DynamicResource AccentBrush}"
+                   Margin="0,14,0,6"/>
+        <ComboBox ItemsSource="{Binding Channels}"
+                  SelectedItem="{Binding UpdateChannel}"/>
+        <WrapPanel Margin="0,14,0,0">
+            <Button Content="Nach Updates suchen"
+                    Command="{Binding CheckCommand}"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="{DynamicResource TextOnAccentBrush}"
+                    FontWeight="Bold"/>
+            <Button Content="Update installieren"
+                    Command="{Binding InstallCommand}"
+                    Margin="8,0,0,0"
+                    Background="#315A3A"
+                    Foreground="{DynamicResource TextPrimaryBrush}"
+                    FontWeight="Bold"/>
+            <Button Content="Backup jetzt erstellen"
+                    Command="{Binding CreateBackupCommand}"/>
+            <Button Content="Ausgewähltes Backup wiederherstellen"
+                    Command="{Binding RestoreBackupCommand}"/>
+        </WrapPanel>
+        <TextBlock Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   Margin="0,10,0,0">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource MutedBrush}"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding StatusIsSuccess}"
+                                     Value="True">
+                            <Setter Property="Foreground"
+                                    Value="LightGreen"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding StatusIsError}"
+                                     Value="True">
+                            <Setter Property="Foreground"
+                                    Value="IndianRed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+        <ListBox ItemsSource="{Binding Backups}"
+                 SelectedItem="{Binding SelectedBackup}"
+                 Height="160"
+                 Background="{DynamicResource WindowBackgroundBrush}"
+                 Foreground="{DynamicResource TextPrimaryBrush}"
+                 DisplayMemberPath="Path"
+                 Margin="0,12,0,0"/>
+    </StackPanel>
+</UserControl>

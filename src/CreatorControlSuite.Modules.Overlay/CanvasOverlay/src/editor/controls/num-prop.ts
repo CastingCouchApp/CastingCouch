@@ -82,10 +82,10 @@ export function numProp(
   value = Math.min(max, Math.max(min, value));
 
   const wrap = document.createElement("div");
-  wrap.className = "ccs-num-prop";
+  wrap.className = "ccs-prop-row ccs-num-prop";
 
   const title = document.createElement("span");
-  title.className = "ccs-num-prop-label";
+  title.className = "ccs-prop-row-label ccs-num-prop-label";
   title.textContent = label;
 
   const slider = document.createElement("input");

@@ -25,13 +25,16 @@ export function fontProp(
   ctx: EditorContext,
   fallback: string
 ): HTMLElement {
-  const wrap = document.createElement("label");
-  wrap.className = "ccs-font-prop";
-  wrap.textContent = label;
+  const wrap = document.createElement("div");
+  wrap.className = "ccs-prop-row ccs-font-prop";
+
+  const title = document.createElement("span");
+  title.className = "ccs-prop-row-label";
+  title.textContent = label;
 
   const current = String((item.props && item.props[key]) ?? fallback);
   const select = document.createElement("select");
-  select.className = "ccs-font-select";
+  select.className = "ccs-prop-row-control ccs-font-select";
 
   const choices = fontChoices();
   if (current && !choices.includes(current)) {
@@ -56,6 +59,7 @@ export function fontProp(
     });
   });
 
+  wrap.appendChild(title);
   wrap.appendChild(select);
   return wrap;
 }

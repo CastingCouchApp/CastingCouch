@@ -13,4 +13,10 @@
 
 Einstieg Architektur: [`architecture/ARCHITECTURE.md`](architecture/ARCHITECTURE.md)
 
+8.x-Zielbild: [`architecture/ARCHITECTURE-8.0.md`](architecture/ARCHITECTURE-8.0.md)
+
+Verkaufsrisiken: [`architecture/RISK-REGISTER.md`](architecture/RISK-REGISTER.md)
+
+Betriebsfreigabe: [`operations/SALES-READINESS-RUNBOOK.md`](operations/SALES-READINESS-RUNBOOK.md)
+
 UI-Themes: [`architecture/UI-THEMES.md`](architecture/UI-THEMES.md)

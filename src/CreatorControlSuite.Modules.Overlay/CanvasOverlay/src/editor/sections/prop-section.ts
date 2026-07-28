@@ -46,6 +46,26 @@ export function propSection(
   return { root, body };
 }
 
+/** Primary content — open by default (Widget-Tab). */
+export function contentSection(id: string, title = "Inhalt") {
+  return propSection(`${id}-content`, title, false);
+}
+
+/** Variant / size presets — open by default (Widget-Tab). */
+export function lookSection(id: string, title = "Look") {
+  return propSection(`${id}-look`, title, false);
+}
+
+/** Colors, fonts, spacing — collapsed by default (extended). */
+export function styleSection(id: string, title = "Stil") {
+  return propSection(`${id}-style`, title, true);
+}
+
+/** Feature toggles / extras — collapsed by default (extended). */
+export function advancedSection(id: string, title = "Erweitert") {
+  return propSection(`${id}-advanced`, title, true);
+}
+
 export function featureSection(options: {
   id: string;
   title: string;
@@ -64,6 +84,7 @@ export function featureSection(options: {
   const enabled = !enabledKey || (item?.props?.[enabledKey] !== false);
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
+  checkbox.className = "ccs-check";
   checkbox.checked = enabled;
   const label = document.createElement("span");
   label.className = "ccs-feature-title";

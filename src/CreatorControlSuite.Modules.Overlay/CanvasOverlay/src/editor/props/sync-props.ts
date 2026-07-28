@@ -6,7 +6,14 @@ import { textProp } from "../controls/text-prop";
 import { selectProp } from "../controls/select-prop";
 import { fontProp } from "../controls/font-prop";
 import { colorProp } from "../controls/color-prop";
-import { propSection } from "../sections/prop-section";
+import {
+  advancedSection,
+  contentSection,
+  featureSection,
+  lookSection,
+  propSection,
+  styleSection
+} from "../sections/prop-section";
 import { renderEffectsPanel } from "../effects/effects-panel";
 import { renderAnimationsPanel } from "../animations/animations-panel";
 import {
@@ -56,29 +63,39 @@ export function syncProps(
   if (animationsPane) animationsPane.innerHTML = "";
 
   if (item.type === "online") {
-    propExtra.appendChild(boolProp("showClock", "Uhr zeigen", item, ctx));
-    propExtra.appendChild(boolProp("showUptime", "Uptime zeigen", item, ctx));
+    const content = contentSection("online");
+    content.body.appendChild(boolProp("showClock", "Uhr zeigen", item, ctx));
+    content.body.appendChild(boolProp("showUptime", "Uptime zeigen", item, ctx));
+    propExtra.appendChild(content.root);
   } else if (item.type === "alert") {
-    propExtra.appendChild(numProp("durationMs", "Dauer (ms)", item, ctx, 5000));
+    const content = contentSection("alert");
+    content.body.appendChild(numProp("durationMs", "Dauer (ms)", item, ctx, 5000));
+    propExtra.appendChild(content.root);
   } else if (item.type === "music" || item.type === "spotify") {
     appendMusicProps(item, ctx, propExtra);
   } else if (item.type === "chat") {
-    propExtra.appendChild(boolProp("showTwitchEvents", "Twitch-Events zeigen", item, ctx));
-    propExtra.appendChild(numProp("maxLines", "Max. Zeilen", item, ctx, 80));
-    propExtra.appendChild(selectProp("backgroundType", "Hintergrund", item, ctx, [
+    const content = contentSection("chat");
+    content.body.appendChild(boolProp("showTwitchEvents", "Twitch-Events zeigen", item, ctx));
+    content.body.appendChild(numProp("maxLines", "Max. Zeilen", item, ctx, 80));
+    propExtra.appendChild(content.root);
+
+    const style = styleSection("chat");
+    style.body.appendChild(selectProp("backgroundType", "Hintergrund", item, ctx, [
       { value: "None", label: "Keiner (transparent)" },
       { value: "Color", label: "Farbe" },
       { value: "Image", label: "Bild (aus Chat-Einstellungen)" }
     ], "None"));
-    propExtra.appendChild(colorProp("backgroundColor", "Farbe", item, ctx, "#000000"));
-    propExtra.appendChild(numProp("backgroundOpacityPercent", "Transparenz %", item, ctx, 55));
-    propExtra.appendChild(numProp("paddingPx", "Padding px", item, ctx, 12));
-    propExtra.appendChild(numProp("borderRadiusPx", "Eckenradius px", item, ctx, 12));
-    propExtra.appendChild(numProp("gapPx", "Abstand px", item, ctx, 6));
-    propExtra.appendChild(numProp("fontSizePx", "Schriftgröße px", item, ctx, 18));
-    propExtra.appendChild(fontProp("fontFamily", "Schriftart", item, ctx, "Segoe UI, system-ui, sans-serif"));
+    style.body.appendChild(colorProp("backgroundColor", "Farbe", item, ctx, "#000000"));
+    style.body.appendChild(numProp("backgroundOpacityPercent", "Transparenz %", item, ctx, 55));
+    style.body.appendChild(numProp("paddingPx", "Padding px", item, ctx, 12));
+    style.body.appendChild(numProp("borderRadiusPx", "Eckenradius px", item, ctx, 12));
+    style.body.appendChild(numProp("gapPx", "Abstand px", item, ctx, 6));
+    style.body.appendChild(numProp("fontSizePx", "Schriftgröße px", item, ctx, 18));
+    style.body.appendChild(fontProp("fontFamily", "Schriftart", item, ctx, "Segoe UI, system-ui, sans-serif"));
+    propExtra.appendChild(style.root);
   } else if (item.type === "ending-stats") {
-    propExtra.appendChild(selectProp("variant", "Variante", item, ctx, [
+    const content = contentSection("ending-stats");
+    content.body.appendChild(selectProp("variant", "Variante", item, ctx, [
       { value: "classic", label: "Classic" },
       { value: "neon", label: "Neon" },
       { value: "minimal", label: "Minimal" },
@@ -90,59 +107,75 @@ export function syncProps(
       { value: "gradient", label: "Gradient" },
       { value: "compact", label: "Compact" }
     ], "classic"));
-    propExtra.appendChild(boolProp("showTitle", "Titel zeigen", item, ctx));
+    content.body.appendChild(boolProp("showTitle", "Titel zeigen", item, ctx));
+    propExtra.appendChild(content.root);
   } else if (item.type === "text") {
-    propExtra.appendChild(textProp("content", "Text", item, ctx, "Text"));
-    propExtra.appendChild(numProp("fontSizePx", "Schriftgröße px", item, ctx, 48));
-    propExtra.appendChild(fontProp("fontFamily", "Schriftart", item, ctx, "Segoe UI, system-ui, sans-serif"));
-    propExtra.appendChild(colorProp("color", "Farbe", item, ctx, "#ffffff"));
-    propExtra.appendChild(selectProp("align", "Ausrichtung", item, ctx, [
+    const content = contentSection("text");
+    content.body.appendChild(textProp("content", "Text", item, ctx, "Text"));
+    content.body.appendChild(selectProp("align", "Ausrichtung", item, ctx, [
       { value: "left", label: "Links" },
       { value: "center", label: "Mitte" },
       { value: "right", label: "Rechts" }
     ], "center"));
-    propExtra.appendChild(selectProp("verticalAlign", "Vertikal", item, ctx, [
+    content.body.appendChild(selectProp("verticalAlign", "Vertikal", item, ctx, [
       { value: "top", label: "Oben" },
       { value: "middle", label: "Mitte" },
       { value: "bottom", label: "Unten" }
     ], "middle"));
-    propExtra.appendChild(textProp("fontWeight", "Schriftstärke", item, ctx, "700"));
-    propExtra.appendChild(numProp("letterSpacingPx", "Zeichenabstand px", item, ctx, 0));
-    propExtra.appendChild(numProp("lineHeight", "Zeilenhöhe", item, ctx, 1.15));
-    propExtra.appendChild(textProp("textShadow", "Schatten", item, ctx, "0 2px 12px rgba(0,0,0,.55)"));
+    propExtra.appendChild(content.root);
+
+    const style = styleSection("text");
+    style.body.appendChild(numProp("fontSizePx", "Schriftgröße px", item, ctx, 48));
+    style.body.appendChild(fontProp("fontFamily", "Schriftart", item, ctx, "Segoe UI, system-ui, sans-serif"));
+    style.body.appendChild(colorProp("color", "Farbe", item, ctx, "#ffffff"));
+    style.body.appendChild(textProp("fontWeight", "Schriftstärke", item, ctx, "700"));
+    style.body.appendChild(numProp("letterSpacingPx", "Zeichenabstand px", item, ctx, 0));
+    style.body.appendChild(numProp("lineHeight", "Zeilenhöhe", item, ctx, 1.15));
+    style.body.appendChild(textProp("textShadow", "Schatten", item, ctx, "0 2px 12px rgba(0,0,0,.55)"));
+    propExtra.appendChild(style.root);
   } else if (item.type === "image") {
-    propExtra.appendChild(textProp("src", "Bild-URL", item, ctx, ""));
-    propExtra.appendChild(selectProp("fit", "Einpassung", item, ctx, [
+    const content = contentSection("image");
+    content.body.appendChild(textProp("src", "Bild-URL", item, ctx, ""));
+    content.body.appendChild(selectProp("fit", "Einpassung", item, ctx, [
       { value: "contain", label: "Contain" },
       { value: "cover", label: "Cover" },
       { value: "fill", label: "Fill" },
       { value: "none", label: "None" },
       { value: "scale-down", label: "Scale-down" }
     ], "contain"));
-    propExtra.appendChild(numProp("opacity", "Opacity", item, ctx, 1));
-    propExtra.appendChild(numProp("borderRadiusPx", "Eckenradius px", item, ctx, 0));
-    propExtra.appendChild(textProp("objectPosition", "Position", item, ctx, "center"));
+    propExtra.appendChild(content.root);
+
+    const style = styleSection("image");
+    style.body.appendChild(numProp("opacity", "Opacity", item, ctx, 1));
+    style.body.appendChild(numProp("borderRadiusPx", "Eckenradius px", item, ctx, 0));
+    style.body.appendChild(textProp("objectPosition", "Position", item, ctx, "center"));
+    propExtra.appendChild(style.root);
   } else if (item.type === "countdown") {
-    propExtra.appendChild(selectProp("variant", "Variante", item, ctx, [
+    const content = contentSection("countdown");
+    content.body.appendChild(selectProp("variant", "Variante", item, ctx, [
       { value: "classic", label: "Classic" },
       { value: "neon", label: "Neon" },
       { value: "minimal", label: "Minimal" },
       { value: "bold", label: "Bold" }
     ], "classic"));
-    propExtra.appendChild(selectProp("format", "Format", item, ctx, [
+    content.body.appendChild(selectProp("format", "Format", item, ctx, [
       { value: "mm:ss", label: "mm:ss" },
       { value: "hh:mm:ss", label: "hh:mm:ss" },
       { value: "ss", label: "Sekunden" }
     ], "mm:ss"));
-    propExtra.appendChild(boolProp("showLabel", "Label zeigen", item, ctx));
-    propExtra.appendChild(boolProp("hideWhenIdle", "Leer ausblenden", item, ctx));
-    propExtra.appendChild(numProp("fontSizePx", "Schriftgröße px", item, ctx, 72));
-    propExtra.appendChild(colorProp("color", "Farbe", item, ctx, "#ffffff"));
-    propExtra.appendChild(selectProp("align", "Ausrichtung", item, ctx, [
+    content.body.appendChild(boolProp("showLabel", "Label zeigen", item, ctx));
+    content.body.appendChild(boolProp("hideWhenIdle", "Leer ausblenden", item, ctx));
+    content.body.appendChild(selectProp("align", "Ausrichtung", item, ctx, [
       { value: "flex-start", label: "Links" },
       { value: "center", label: "Mitte" },
       { value: "flex-end", label: "Rechts" }
     ], "center"));
+    propExtra.appendChild(content.root);
+
+    const style = styleSection("countdown");
+    style.body.appendChild(numProp("fontSizePx", "Schriftgröße px", item, ctx, 72));
+    style.body.appendChild(colorProp("color", "Farbe", item, ctx, "#ffffff"));
+    propExtra.appendChild(style.root);
   } else if (item.type === "socials") {
     appendSocialsProps(item, ctx, propExtra);
   } else if (item.type === "partner-roulette") {
@@ -168,7 +201,9 @@ export function syncProps(
   } else if (item.type === "frame" || (item.type || "").startsWith("frame.")) {
     appendFrameProps(item, ctx, propExtra);
   } else if (item.type === "shape.cutout") {
-    propExtra.appendChild(numProp("radius", "Eckenradius px", item, ctx, 24));
+    const style = styleSection("shape-cutout");
+    style.body.appendChild(numProp("radius", "Eckenradius px", item, ctx, 24));
+    propExtra.appendChild(style.root);
   } else if (item.type === "shape.divider") {
     appendDividerProps(item, ctx, propExtra);
   } else if (item.type === "shape.cam-ring") {
@@ -188,7 +223,15 @@ function appendMusicProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLE
   const labels = window.CcsCanvas.MUSIC_VARIANT_LABELS || {};
   const sizePresets = window.CcsCanvas.MUSIC_SIZE_PRESETS || {};
 
-  const look = propSection("music-look", "Look & Größe");
+  const content = contentSection("music");
+  content.body.appendChild(boolProp("showTitle", "Titel", item, ctx));
+  content.body.appendChild(boolProp("showArtist", "Artist", item, ctx));
+  content.body.appendChild(boolProp("showAlbumCover", "Cover", item, ctx));
+  content.body.appendChild(boolProp("showProgress", "Progress", item, ctx));
+  content.body.appendChild(boolProp("hideWhenPaused", "Bei Pause ausblenden", item, ctx));
+  propExtra.appendChild(content.root);
+
+  const look = lookSection("music", "Look & Größe");
   look.body.appendChild(selectProp("variant", "Style", item, ctx, variants.map((key) => ({
     value: key,
     label: (labels as Record<string, string>)[key] || key
@@ -204,18 +247,11 @@ function appendMusicProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLE
     live.h = next.h;
   }));
   propExtra.appendChild(look.root);
-
-  const content = propSection("music-content", "Inhalt");
-  content.body.appendChild(boolProp("showTitle", "Titel", item, ctx));
-  content.body.appendChild(boolProp("showArtist", "Artist", item, ctx));
-  content.body.appendChild(boolProp("showAlbumCover", "Cover", item, ctx));
-  content.body.appendChild(boolProp("showProgress", "Progress", item, ctx));
-  content.body.appendChild(boolProp("hideWhenPaused", "Bei Pause ausblenden", item, ctx));
-  propExtra.appendChild(content.root);
 }
 
 function appendSocialsProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
-  propExtra.appendChild(selectProp("platform", "Plattform", item, ctx, [
+  const content = contentSection("socials");
+  content.body.appendChild(selectProp("platform", "Plattform", item, ctx, [
     { value: "twitch", label: "Twitch" },
     { value: "youtube", label: "YouTube" },
     { value: "discord", label: "Discord" },
@@ -227,11 +263,11 @@ function appendSocialsProps(item: LayoutItem, ctx: EditorContext, propExtra: HTM
     { value: "custom1", label: "Custom 1" },
     { value: "custom2", label: "Custom 2" }
   ], "twitch"));
-  propExtra.appendChild(textProp("handle", "Handle", item, ctx, ""));
-  propExtra.appendChild(textProp("url", "URL (optional)", item, ctx, ""));
-  propExtra.appendChild(textProp("label", "Label (optional)", item, ctx, ""));
-  propExtra.appendChild(textProp("iconUrl", "Icon-URL (optional)", item, ctx, ""));
-  propExtra.appendChild(selectProp("variant", "Variante", item, ctx, [
+  content.body.appendChild(textProp("handle", "Handle", item, ctx, ""));
+  content.body.appendChild(textProp("url", "URL (optional)", item, ctx, ""));
+  content.body.appendChild(textProp("label", "Label (optional)", item, ctx, ""));
+  content.body.appendChild(textProp("iconUrl", "Icon-URL (optional)", item, ctx, ""));
+  content.body.appendChild(selectProp("variant", "Variante", item, ctx, [
     { value: "row", label: "Row" },
     { value: "pills", label: "Pills" },
     { value: "cards", label: "Cards" },
@@ -239,19 +275,23 @@ function appendSocialsProps(item: LayoutItem, ctx: EditorContext, propExtra: HTM
     { value: "neon", label: "Neon" },
     { value: "minimal", label: "Minimal" }
   ], "pills"));
-  propExtra.appendChild(selectProp("iconLibrary", "Icons", item, ctx, [
+  content.body.appendChild(selectProp("iconLibrary", "Icons", item, ctx, [
     { value: "svg", label: "Built-in SVG" },
     { value: "fontawesome", label: "Font Awesome" }
   ], "svg"));
-  propExtra.appendChild(selectProp("colorMode", "Farben", item, ctx, [
+  content.body.appendChild(boolProp("showLabels", "Labels zeigen", item, ctx));
+  content.body.appendChild(boolProp("showHandles", "Handles zeigen", item, ctx));
+  propExtra.appendChild(content.root);
+
+  const style = styleSection("socials");
+  style.body.appendChild(selectProp("colorMode", "Farben", item, ctx, [
     { value: "brand", label: "Brand" },
     { value: "mono", label: "Mono" }
   ], "brand"));
-  propExtra.appendChild(boolProp("showLabels", "Labels zeigen", item, ctx));
-  propExtra.appendChild(boolProp("showHandles", "Handles zeigen", item, ctx));
-  propExtra.appendChild(numProp("iconSize", "Icon-Größe px", item, ctx, 36));
-  propExtra.appendChild(numProp("gap", "Abstand px", item, ctx, 12));
-  propExtra.appendChild(colorProp("iconColor", "Mono-Farbe", item, ctx, "#ffffff"));
+  style.body.appendChild(numProp("iconSize", "Icon-Größe px", item, ctx, 36));
+  style.body.appendChild(numProp("gap", "Abstand px", item, ctx, 12));
+  style.body.appendChild(colorProp("iconColor", "Mono-Farbe", item, ctx, "#ffffff"));
+  propExtra.appendChild(style.root);
 }
 
 function readRouletteImages(item: LayoutItem): string[] {
@@ -265,7 +305,7 @@ function readRouletteImages(item: LayoutItem): string[] {
 }
 
 function appendPartnerRouletteProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
-  const timing = propSection("partner-roulette-timing", "Timing & Übergang");
+  const timing = contentSection("partner-roulette", "Timing & Übergang");
   timing.body.appendChild(numProp("intervalMs", "Anzeige (ms)", item, ctx, 4000, {
     min: 500,
     max: 60000,
@@ -284,19 +324,19 @@ function appendPartnerRouletteProps(item: LayoutItem, ctx: EditorContext, propEx
   }));
   propExtra.appendChild(timing.root);
 
-  const look = propSection("partner-roulette-look", "Darstellung");
-  look.body.appendChild(selectProp("fit", "Einpassung", item, ctx, [
+  const style = styleSection("partner-roulette", "Darstellung");
+  style.body.appendChild(selectProp("fit", "Einpassung", item, ctx, [
     { value: "contain", label: "Contain" },
     { value: "cover", label: "Cover" },
     { value: "fill", label: "Fill" },
     { value: "none", label: "None" },
     { value: "scale-down", label: "Scale-down" }
   ], "contain"));
-  look.body.appendChild(numProp("borderRadiusPx", "Eckenradius px", item, ctx, 12));
-  look.body.appendChild(textProp("objectPosition", "Position", item, ctx, "center"));
-  propExtra.appendChild(look.root);
+  style.body.appendChild(numProp("borderRadiusPx", "Eckenradius px", item, ctx, 12));
+  style.body.appendChild(textProp("objectPosition", "Position", item, ctx, "center"));
+  propExtra.appendChild(style.root);
 
-  const imagesSection = propSection("partner-roulette-images", "Bilder");
+  const imagesSection = propSection("partner-roulette-images", "Bilder", false);
   const list = document.createElement("div");
   list.className = "ccs-effects-list";
 
@@ -387,13 +427,19 @@ function appendFrameProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLE
     "frame.dashed": "dashed"
   };
   const modeFallback = legacyFallback[item.type] || "rect";
-  propExtra.appendChild(selectProp("mode", "Modus", item, ctx, modeOptions, modeFallback, (live, value) => {
+
+  const content = contentSection("frame");
+  content.body.appendChild(selectProp("mode", "Modus", item, ctx, modeOptions, modeFallback, (live, value) => {
     live.props.mode = value;
     // Normalize legacy shape ids to the unified frame type once the user picks a mode.
     if (live.type !== "frame") live.type = "frame";
   }));
-  propExtra.appendChild(colorProp("color", "Farbe", item, ctx, "#ff7a00"));
-  propExtra.appendChild(numProp("radius", "Eckenradius px", item, ctx, 16));
+  propExtra.appendChild(content.root);
+
+  const style = styleSection("frame");
+  style.body.appendChild(colorProp("color", "Farbe", item, ctx, "#ff7a00"));
+  style.body.appendChild(numProp("radius", "Eckenradius px", item, ctx, 16));
+  propExtra.appendChild(style.root);
 }
 
 function appendFrameCardProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -402,7 +448,9 @@ function appendFrameCardProps(item: LayoutItem, ctx: EditorContext, propExtra: H
     value: key,
     label: (sizePresets as Record<string, { label?: string }>)[key].label || key
   }));
-  propExtra.appendChild(selectProp("variant", "Variante", item, ctx, [
+
+  const content = contentSection("frame-card");
+  content.body.appendChild(selectProp("variant", "Variante", item, ctx, [
     { value: "classic", label: "Classic" },
     { value: "neon", label: "Neon" },
     { value: "soft", label: "Soft" },
@@ -412,18 +460,37 @@ function appendFrameCardProps(item: LayoutItem, ctx: EditorContext, propExtra: H
     { value: "cyber", label: "Cyber" },
     { value: "minimal", label: "Minimal" }
   ], "classic"));
-  propExtra.appendChild(selectProp("sizePreset", "Größe", item, ctx, sizeOptions, "metaschutz", (live, value) => {
+  content.body.appendChild(selectProp("sizePreset", "Größe", item, ctx, sizeOptions, "metaschutz", (live, value) => {
     live.props.sizePreset = value;
     const next = (sizePresets as Record<string, { w: number; h: number }>)[value];
     if (!next) return;
     live.w = next.w;
     live.h = next.h;
   }));
-  propExtra.appendChild(colorProp("color", "Farbe", item, ctx, "#ff7a00"));
-  propExtra.appendChild(colorProp("color2", "Farbe 2", item, ctx, "#ffb36b"));
-  propExtra.appendChild(numProp("fillOpacity", "Fill Opacity", item, ctx, 0.18));
-  propExtra.appendChild(boolProp("showSweep", "Sweep", item, ctx));
-  propExtra.appendChild(boolProp("showLines", "Linien", item, ctx));
+  propExtra.appendChild(content.root);
+
+  const style = styleSection("frame-card");
+  style.body.appendChild(colorProp("color", "Farbe", item, ctx, "#ff7a00"));
+  style.body.appendChild(colorProp("color2", "Farbe 2", item, ctx, "#ffb36b"));
+  style.body.appendChild(numProp("fillOpacity", "Fill Opacity", item, ctx, 0.18));
+  propExtra.appendChild(style.root);
+
+  const advanced = advancedSection("frame-card");
+  advanced.body.appendChild(featureSection({
+    id: "frame-card-sweep",
+    title: "Sweep",
+    enabledKey: "showSweep",
+    item,
+    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
+  }));
+  advanced.body.appendChild(featureSection({
+    id: "frame-card-lines",
+    title: "Linien",
+    enabledKey: "showLines",
+    item,
+    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
+  }));
+  propExtra.appendChild(advanced.root);
 }
 
 function appendSceneBgProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -435,7 +502,9 @@ function appendSceneBgProps(item: LayoutItem, ctx: EditorContext, propExtra: HTM
     value: key,
     label: String((presets as Record<string, { label?: string }>)[key].label || key)
   }));
-  propExtra.appendChild(selectProp("preset", "Variation", item, ctx, presetOptions, "ember", (live, value) => {
+
+  const look = lookSection("scene-bg");
+  look.body.appendChild(selectProp("preset", "Variation", item, ctx, presetOptions, "ember", (live, value) => {
     const next = (presets as Record<string, Record<string, unknown>>)[value];
     if (!next) {
       live.props.preset = value;
@@ -450,23 +519,48 @@ function appendSceneBgProps(item: LayoutItem, ctx: EditorContext, propExtra: HTM
     delete live.props.driftDuration;
     delete live.props.particleDuration;
   }));
-  propExtra.appendChild(colorProp("bgBase", "BG Basis", item, ctx, String(cfg.bgBase || "#030303")));
-  propExtra.appendChild(colorProp("bgMid", "BG Mitte", item, ctx, String(cfg.bgMid || "#101010")));
-  propExtra.appendChild(colorProp("bgDeep", "BG Tief", item, ctx, String(cfg.bgDeep || "#1a0d03")));
-  propExtra.appendChild(colorProp("glow1", "Glow 1", item, ctx, String(cfg.glow1 || "#ff7a00")));
-  propExtra.appendChild(colorProp("glow2", "Glow 2", item, ctx, String(cfg.glow2 || "#ffb36b")));
-  propExtra.appendChild(colorProp("stripeColor", "Streifen-Farbe", item, ctx, String(cfg.stripeColor || cfg.glow1 || "#ff7a00")));
-  propExtra.appendChild(colorProp("particleColor", "Partikel-Farbe", item, ctx, String(cfg.particleColor || cfg.glow1 || "#ff7a00")));
-  propExtra.appendChild(numProp("glow1Opacity", "Glow-1-Opacity", item, ctx, Number(cfg.glow1Opacity ?? 0.18)));
-  propExtra.appendChild(numProp("glow2Opacity", "Glow-2-Opacity", item, ctx, Number(cfg.glow2Opacity ?? 0.10)));
-  propExtra.appendChild(numProp("stripeOpacity", "Streifen-Opacity", item, ctx, Number(cfg.stripeOpacity ?? 0.065)));
-  propExtra.appendChild(numProp("particleOpacity", "Partikel-Opacity", item, ctx, Number(cfg.particleOpacity ?? 0.34)));
-  propExtra.appendChild(numProp("speed", "Geschwindigkeit", item, ctx, Number(cfg.speed ?? 1)));
-  propExtra.appendChild(numProp("driftDuration", "Drift (s)", item, ctx, Number(cfg.driftDuration ?? 18)));
-  propExtra.appendChild(numProp("particleDuration", "Partikel (s)", item, ctx, Number(cfg.particleDuration ?? 22)));
-  propExtra.appendChild(numProp("vignetteOpacity", "Vignette", item, ctx, Number(cfg.vignetteOpacity ?? 0)));
-  propExtra.appendChild(numProp("scanOpacity", "Scanline", item, ctx, Number(cfg.scanOpacity ?? 0)));
-  propExtra.appendChild(boolProp("stripes", "Streifen", item, ctx));
-  propExtra.appendChild(boolProp("particles", "Partikel", item, ctx));
-  propExtra.appendChild(boolProp("paused", "Pause", item, ctx));
+  propExtra.appendChild(look.root);
+
+  const style = styleSection("scene-bg");
+  style.body.appendChild(colorProp("bgBase", "BG Basis", item, ctx, String(cfg.bgBase || "#030303")));
+  style.body.appendChild(colorProp("bgMid", "BG Mitte", item, ctx, String(cfg.bgMid || "#101010")));
+  style.body.appendChild(colorProp("bgDeep", "BG Tief", item, ctx, String(cfg.bgDeep || "#1a0d03")));
+  style.body.appendChild(colorProp("glow1", "Glow 1", item, ctx, String(cfg.glow1 || "#ff7a00")));
+  style.body.appendChild(colorProp("glow2", "Glow 2", item, ctx, String(cfg.glow2 || "#ffb36b")));
+  style.body.appendChild(colorProp("stripeColor", "Streifen-Farbe", item, ctx, String(cfg.stripeColor || cfg.glow1 || "#ff7a00")));
+  style.body.appendChild(colorProp("particleColor", "Partikel-Farbe", item, ctx, String(cfg.particleColor || cfg.glow1 || "#ff7a00")));
+  style.body.appendChild(numProp("glow1Opacity", "Glow-1-Opacity", item, ctx, Number(cfg.glow1Opacity ?? 0.18)));
+  style.body.appendChild(numProp("glow2Opacity", "Glow-2-Opacity", item, ctx, Number(cfg.glow2Opacity ?? 0.10)));
+  style.body.appendChild(numProp("stripeOpacity", "Streifen-Opacity", item, ctx, Number(cfg.stripeOpacity ?? 0.065)));
+  style.body.appendChild(numProp("particleOpacity", "Partikel-Opacity", item, ctx, Number(cfg.particleOpacity ?? 0.34)));
+  style.body.appendChild(numProp("speed", "Geschwindigkeit", item, ctx, Number(cfg.speed ?? 1)));
+  style.body.appendChild(numProp("driftDuration", "Drift (s)", item, ctx, Number(cfg.driftDuration ?? 18)));
+  style.body.appendChild(numProp("particleDuration", "Partikel (s)", item, ctx, Number(cfg.particleDuration ?? 22)));
+  style.body.appendChild(numProp("vignetteOpacity", "Vignette", item, ctx, Number(cfg.vignetteOpacity ?? 0)));
+  style.body.appendChild(numProp("scanOpacity", "Scanline", item, ctx, Number(cfg.scanOpacity ?? 0)));
+  propExtra.appendChild(style.root);
+
+  const advanced = advancedSection("scene-bg");
+  advanced.body.appendChild(featureSection({
+    id: "scene-bg-stripes",
+    title: "Streifen",
+    enabledKey: "stripes",
+    item,
+    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
+  }));
+  advanced.body.appendChild(featureSection({
+    id: "scene-bg-particles",
+    title: "Partikel",
+    enabledKey: "particles",
+    item,
+    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
+  }));
+  advanced.body.appendChild(featureSection({
+    id: "scene-bg-paused",
+    title: "Pause",
+    enabledKey: "paused",
+    item,
+    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
+  }));
+  propExtra.appendChild(advanced.root);
 }

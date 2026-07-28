@@ -61,6 +61,7 @@ using CreatorControlSuite.Modules.YouTubeMusic;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Microsoft.Win32;
+using MultiPcDeviceRecord = CreatorControlSuite.Core.Security.PairedAgentDevice;
 
 namespace CreatorControlSuite.App.Shell;
 
@@ -90,6 +91,8 @@ public partial class MainWindow : Window
     private readonly IMusicPlayerRouter _musicPlayerRouter;
     private readonly IMusicPlayerUiPresenter _musicPlayerUiPresenter;
     private readonly IMultiPcAgentClient _multiPcAgentClient;
+    private readonly IMultiPcPairingClient _multiPcPairingClient;
+    private readonly RemoteUpdateRolloutService _remoteUpdateRolloutService;
     private readonly IStreamerBotClient _streamerBotClient;
     private readonly INavigationService _navigationService;
     private readonly IEventBus _eventBus;
@@ -108,10 +111,11 @@ public partial class MainWindow : Window
     private readonly WorkflowModule _workflowModule;
     private readonly IProfileService _profileService;
     private readonly IUpdateService _updateService;
+    private readonly UpdateWorkflowService _updateWorkflowService;
     private readonly ILegacyMigrationService _migrationService;
     private readonly StreamDeckModule _streamDeckModule;
     private readonly IAppLogger _appLogger;
-    private readonly ISettingsValidator _settingsValidator;
+    private readonly SettingsApplicationService _settingsApplicationService;
     private readonly RuntimeHealthService _runtimeHealthService;
     private readonly ICrashReporter _crashReporter;
     private readonly ILocalIpcServer _ipcServer;
@@ -388,6 +392,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, string> _multiPcRolloutGroups = new(StringComparer.OrdinalIgnoreCase);
     private readonly System.Windows.Threading.DispatcherTimer _multiPcRefreshTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly List<MultiPcDeviceRecord> _multiPcDevices = [];
+    private readonly PairedAgentRegistry _multiPcRegistry;
     private string _multiPcPairingCode = "------";
     private readonly System.Net.Http.HttpClient _multiPcHttpClient = new() { Timeout = TimeSpan.FromSeconds(2) };
     private string MultiPcRegistryPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "multi-pc-devices.json");
@@ -413,10 +418,11 @@ public partial class MainWindow : Window
         WorkflowModule workflowModule,
         IProfileService profileService,
         IUpdateService updateService,
+        UpdateWorkflowService updateWorkflowService,
         ILegacyMigrationService migrationService,
         StreamDeckModule streamDeckModule,
         IAppLogger appLogger,
-        ISettingsValidator settingsValidator,
+        SettingsApplicationService settingsApplicationService,
         RuntimeHealthService runtimeHealthService,
         ICrashReporter crashReporter,
         ILocalIpcServer ipcServer,
@@ -432,6 +438,8 @@ public partial class MainWindow : Window
         IThemeService themeService,
         IMusicPlayerUiPresenter musicPlayerUiPresenter,
         IMultiPcAgentClient multiPcAgentClient,
+        IMultiPcPairingClient multiPcPairingClient,
+        RemoteUpdateRolloutService remoteUpdateRolloutService,
         IStreamerBotClient streamerBotClient,
         INavigationService navigationService,
         DiagnosticsPageViewModel diagnosticsPageViewModel,
@@ -439,8 +447,7 @@ public partial class MainWindow : Window
         AboutPageViewModel aboutPageViewModel,
         MusicPlayerPageViewModel musicPlayerPageViewModel,
         CreatorIntelligenceService creatorIntelligence,
-        IEventBus eventBus,
-        AppEventBridge appEventBridge)
+        IEventBus eventBus)
     {
         InitializeComponent();
         NativeWindowHelper.RestrictMaximizeToWorkArea(this);
@@ -453,6 +460,8 @@ public partial class MainWindow : Window
         _themeService = themeService;
         _musicPlayerUiPresenter = musicPlayerUiPresenter;
         _multiPcAgentClient = multiPcAgentClient;
+        _multiPcPairingClient = multiPcPairingClient;
+        _remoteUpdateRolloutService = remoteUpdateRolloutService;
         _streamerBotClient = streamerBotClient;
         _navigationService = navigationService;
         _diagnosticsPageViewModel = diagnosticsPageViewModel;
@@ -473,9 +482,9 @@ public partial class MainWindow : Window
                 DashboardProfileBox.SelectedIndex = 0;
             }
         };
-        appEventBridge.Start();
         _externalAlertActivity.ActiveCountChanged += async (_, _) => await ApplyCombinedAlertDuckingAsync();
         _secretStore = secretStore;
+        _multiPcRegistry = new PairedAgentRegistry(MultiPcRegistryPath, secretStore);
         _obsClient = obsClient;
         _twitchModule = twitchModule;
         _spotifyModule = spotifyModule;
@@ -490,10 +499,11 @@ public partial class MainWindow : Window
         _workflowModule = workflowModule;
         _profileService = profileService;
         _updateService = updateService;
+        _updateWorkflowService = updateWorkflowService;
         _migrationService = migrationService;
         _streamDeckModule = streamDeckModule;
         _appLogger = appLogger;
-        _settingsValidator = settingsValidator;
+        _settingsApplicationService = settingsApplicationService;
         _runtimeHealthService = runtimeHealthService;
         _crashReporter = crashReporter;
         _ipcServer = ipcServer;
@@ -2867,13 +2877,8 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (!File.Exists(MultiPcRegistryPath))
-            {
-                return;
-            }
-
-            string json = File.ReadAllText(MultiPcRegistryPath);
-            List<MultiPcDeviceRecord> devices = System.Text.Json.JsonSerializer.Deserialize<List<MultiPcDeviceRecord>>(json) ?? [];
+            IReadOnlyList<MultiPcDeviceRecord> devices =
+                _multiPcRegistry.LoadAsync().GetAwaiter().GetResult();
             _multiPcDevices.Clear();
             _multiPcDevices.AddRange(devices);
         }
@@ -2885,17 +2890,17 @@ public partial class MainWindow : Window
 
     private async Task SaveMultiPcRegistryAsync()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(MultiPcRegistryPath)!);
-        string json = System.Text.Json.JsonSerializer.Serialize(_multiPcDevices, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(MultiPcRegistryPath, json);
+        await _multiPcRegistry.SaveAsync(_multiPcDevices);
     }
 
     private void GenerateMultiPcPairingCode()
     {
-        _multiPcPairingCode = Random.Shared.Next(100000, 999999).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _multiPcPairingCode = "------";
         MultiPcPairingCodeText.Text = _multiPcPairingCode;
-        MultiPcPairingInputBox.Text = _multiPcPairingCode;
-        MultiPcStatusText.Text = "Neuer Pairing-Code erzeugt. Er gilt für diese lokale Sitzung.";
+        MultiPcPairingInputBox.Clear();
+        MultiPcCertificateFingerprintBox.Clear();
+        MultiPcStatusText.Text =
+            "Pairing-Code und SHA-256-Fingerprint direkt aus der Agent-Anzeige übernehmen.";
     }
 
     private async Task AddMultiPcDeviceAsync()
@@ -2903,9 +2908,20 @@ public partial class MainWindow : Window
         string name = MultiPcDeviceNameBox.Text.Trim();
         string host = MultiPcHostBox.Text.Trim();
         string code = MultiPcPairingInputBox.Text.Trim();
+        string expectedFingerprint;
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(host))
         {
             MultiPcStatusText.Text = "Gerätename und Host dürfen nicht leer sein.";
+            return;
+        }
+        try
+        {
+            expectedFingerprint = CertificateFingerprint.Normalize(
+                MultiPcCertificateFingerprintBox.Text);
+        }
+        catch (FormatException ex)
+        {
+            MultiPcStatusText.Text = ex.Message;
             return;
         }
         if (_multiPcDevices.Any(device => string.Equals(device.Host, host, StringComparison.OrdinalIgnoreCase)))
@@ -2913,33 +2929,15 @@ public partial class MainWindow : Window
             MultiPcStatusText.Text = "Dieses Gerät ist bereits registriert.";
             return;
         }
-        string agentKey;
         try
         {
-            string pairUri = $"https://{host}:{GetMultiPcAgentPort()}/api/pair?code={Uri.EscapeDataString(code)}";
-            string? observedFingerprint = null;
-            using var pairHandler = new System.Net.Http.HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = (_, certificate, _, _) =>
-                {
-                    observedFingerprint = certificate is null ? null : Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(certificate.GetRawCertData()));
-                    return certificate is not null;
-                }
-            };
-            using var pairClient = new System.Net.Http.HttpClient(pairHandler) { Timeout = TimeSpan.FromSeconds(5) };
-            MultiPcPairingResponse? pairing = await pairClient.GetFromJsonAsync<MultiPcPairingResponse>(pairUri);
-            if (pairing is null || string.IsNullOrWhiteSpace(pairing.AgentKey))
-            {
-                MultiPcStatusText.Text = "Der Remote-Agent hat keine gültigen Kopplungsdaten geliefert.";
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(observedFingerprint) || !string.Equals(observedFingerprint, pairing.CertificateFingerprint, StringComparison.OrdinalIgnoreCase))
-            {
-                MultiPcStatusText.Text = "TLS-Fingerabdruck des Agenten stimmt nicht mit der Pairing-Antwort überein.";
-                return;
-            }
-            agentKey = pairing.AgentKey;
-            _multiPcDevices.Add(new MultiPcDeviceRecord(Guid.NewGuid().ToString("N"), name, host, DateTimeOffset.Now, agentKey, pairing.CertificateFingerprint, pairing.AllowedCommands ?? [], MultiPcMacAddressBox.Text.Trim(), pairing.Port));
+            MultiPcPairingResult pairing = await _multiPcPairingClient.PairAsync(
+                host,
+                GetMultiPcAgentPort(),
+                code,
+                Environment.MachineName,
+                expectedFingerprint);
+            _multiPcDevices.Add(new MultiPcDeviceRecord(pairing.DeviceId, name, host, DateTimeOffset.Now, pairing.AgentKey, pairing.CertificateFingerprint, pairing.AllowedCommands, MultiPcMacAddressBox.Text.Trim(), pairing.Port));
         }
         catch (Exception ex)
         {
@@ -2962,7 +2960,7 @@ public partial class MainWindow : Window
         }
         MultiPcDeviceRecord removed = _multiPcDevices[index];
         _multiPcDevices.RemoveAt(index);
-        await SaveMultiPcRegistryAsync();
+        await _multiPcRegistry.DeleteAsync(removed.Id);
         await RefreshMultiPcPageAsync();
         MultiPcStatusText.Text = $"{removed.Name} wurde entfernt.";
     }
@@ -3030,7 +3028,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/status");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/status");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             using HttpResponseMessage response = await client.SendAsync(request);
             if (!response.IsSuccessStatusCode)
@@ -3055,7 +3053,7 @@ public partial class MainWindow : Window
                 return;
             }
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/command");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/command");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { command });
             using HttpResponseMessage response = await client.SendAsync(request);
@@ -3074,7 +3072,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/state");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/obs/state");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             using HttpResponseMessage response = await client.SendAsync(request);
             string json = await response.Content.ReadAsStringAsync();
@@ -3148,7 +3146,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        try { using HttpClient client = CreateTrustedMultiPcClient(device); using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/filters?sourceName={Uri.EscapeDataString(source)}"); request.Headers.Add("X-CCS-Agent-Key", device.AgentKey); using HttpResponseMessage response = await client.SendAsync(request); if (!response.IsSuccessStatusCode) { return; } RemoteObsFilter[]? filters = await response.Content.ReadFromJsonAsync<RemoteObsFilter[]>(); MultiPcObsFiltersBox.ItemsSource = filters?.Select(x => x.Name + (x.Enabled ? " · aktiv" : " · aus")).ToArray() ?? []; if (MultiPcObsFiltersBox.Items.Count > 0) { MultiPcObsFiltersBox.SelectedIndex = 0; } } catch { }
+        try { using HttpClient client = CreateTrustedMultiPcClient(device); using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/obs/filters?sourceName={Uri.EscapeDataString(source)}"); request.Headers.Add("X-CCS-Agent-Key", device.AgentKey); using HttpResponseMessage response = await client.SendAsync(request); if (!response.IsSuccessStatusCode) { return; } RemoteObsFilter[]? filters = await response.Content.ReadFromJsonAsync<RemoteObsFilter[]>(); MultiPcObsFiltersBox.ItemsSource = filters?.Select(x => x.Name + (x.Enabled ? " · aktiv" : " · aus")).ToArray() ?? []; if (MultiPcObsFiltersBox.Items.Count > 0) { MultiPcObsFiltersBox.SelectedIndex = 0; } } catch { }
     }
 
     private async Task SetRemoteObsFilterAsync(bool enabled)
@@ -3186,7 +3184,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/{endpoint}");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/obs/{endpoint}");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(payload);
             using HttpResponseMessage response = await client.SendAsync(request);
@@ -3206,11 +3204,10 @@ public partial class MainWindow : Window
         {
             return;
         }
-
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/output");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/obs/output");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             using HttpResponseMessage response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
@@ -3237,7 +3234,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/output");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/obs/output");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { action });
             using HttpResponseMessage response = await client.SendAsync(request);
@@ -3265,7 +3262,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/transition");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/obs/transition");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { transitionName = transition, durationMilliseconds = duration });
             using HttpResponseMessage response = await client.SendAsync(request);
@@ -3281,7 +3278,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/preview");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/obs/preview");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             using HttpResponseMessage response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
@@ -3303,7 +3300,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/settings");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/settings");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { obsPath = "", streamerBotPath = "", obsWebSocketHost = MultiPcRemoteObsHostBox.Text.Trim(), obsWebSocketPort = obsPort, obsWebSocketPassword = MultiPcRemoteObsPasswordBox.Password });
             using HttpResponseMessage response = await client.SendAsync(request);
@@ -3431,8 +3428,6 @@ public partial class MainWindow : Window
 
     private sealed record MultiPcDiscoveryResponse(string MachineName, string Host, int Port, string Version, string? MacAddress);
 
-    private sealed record MultiPcDeviceRecord(string Id, string Name, string Host, DateTimeOffset PairedAt, string AgentKey, string CertificateFingerprint = "", string[]? AllowedCommands = null, string MacAddress = "", int AgentPort = 47631);
-    private sealed record MultiPcPairingResponse(string MachineName, string AgentKey, int Port, string CertificateFingerprint, string Transport, string[]? AllowedCommands);
     private sealed record RemoteObsAudioInput(string Name, bool Muted, double VolumeDb);
     private sealed record RemoteObsSceneItem(string SourceName, bool Enabled);
     private sealed record RemoteObsFilter(string Name, string Kind, bool Enabled, int Index);
@@ -3671,45 +3666,12 @@ public partial class MainWindow : Window
     private async Task LoadSettingsAsync()
     {
         _loadingSettingsIntoUi = true;
-        _settings = await _settingsStore.LoadAsync();
-        _settings.Workflow ??= new WorkflowSettings();
-        _settings.Workflow.TimedAutomations ??= [];
-        _settings.Workflow.RunOfShowSteps ??= [];
-        _settings.Workflow.RunOfShowPlans ??= [];
-        _settings.MusicPlayer ??= new MusicPlayerSettings();
-        _settings.YouTubeMusic ??= new YouTubeMusicSettings();
-        _settings.Dashboard ??= new DashboardSettings();
-        _settings.Dashboard.SceneButtons ??= [];
-        bool disabledLegacyAlertAutoCreate = _settings.Alerts.AutoCreateObsSources;
-        // Eine alte Einstellung darf beim Start niemals OBS-Alertquellen erzeugen.
-        // Das Anlegen bleibt ausschließlich der expliziten OBS-Übertragung im Alert-Bereich vorbehalten.
-        _settings.Alerts.AutoCreateObsSources = false;
-        _settings.Twitch.Scopes ??= [];
-        bool addedGuestStarScope = !_settings.Twitch.Scopes.Contains(
-            "channel:read:guest_star",
-            StringComparer.Ordinal);
-        if (addedGuestStarScope)
-        {
-            _settings.Twitch.Scopes =
-            [
-                .. _settings.Twitch.Scopes,
-                "channel:read:guest_star"
-            ];
-        }
-        if (string.IsNullOrWhiteSpace(_settings.MusicPlayer.ProviderId))
-        {
-            _settings.MusicPlayer.ProviderId = MusicProviderIds.Spotify;
-        }
-
+        _settings = await _settingsApplicationService.LoadAsync();
         bool migratedSceneAutomation = MigrateLegacyStartToGameAutomation();
-        _settings.Overlay.EnsureInstancesMigrated();
-        bool canvasesWereEmpty = _settings.Overlay.Canvases is null || _settings.Overlay.Canvases.Count == 0;
-        _settings.Overlay.EnsureCanvasesMigrated();
-        if (migratedSceneAutomation || addedGuestStarScope || disabledLegacyAlertAutoCreate || canvasesWereEmpty)
+        if (migratedSceneAutomation)
         {
             await _settingsStore.SaveAsync(_settings);
         }
-        _settings.Obs.AudioProfiles ??= [];
         _settings.Product.Version = GetCurrentProductVersion();
         if (string.IsNullOrWhiteSpace(_settings.Updates.Channel))
         {
@@ -4270,7 +4232,8 @@ public partial class MainWindow : Window
             _settings.Product.UpdateChannel = _settings.Updates.Channel;
             _settings.Product.Version = GetCurrentProductVersion();
 
-            ValidationReport validation = _settingsValidator.Validate(_settings);
+            ValidationReport validation =
+                _settingsApplicationService.Validate(_settings);
 
             if (!validation.IsValid)
             {
@@ -4290,7 +4253,7 @@ public partial class MainWindow : Window
             RebuildDashboardSceneButtons();
             RefreshRaidChannelSelectors();
 
-            await _settingsStore.SaveAsync(_settings);
+            await _settingsApplicationService.SaveAsync(_settings);
             await RestartOverlayWebServerFromSettingsAsync();
             await _musicPlayerRouter.ApplyProviderAsync(_settings.MusicPlayer.ProviderId);
             ApplyMusicProviderUiState();
@@ -7182,7 +7145,7 @@ public partial class MainWindow : Window
                 UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
             }
 
-            UpdateCheckResult result = await _updateService.CheckAsync();
+            UpdateCheckResult result = await _updateWorkflowService.CheckAsync();
             _pendingUpdatePackage = result.Package;
             InstallUpdateButton.IsEnabled = result.UpdateAvailable && result.Package is not null;
 
@@ -7226,25 +7189,21 @@ public partial class MainWindow : Window
             UpdateStatusText.Text = "Update wird heruntergeladen …";
             UpdateStatusText.Foreground = System.Windows.Media.Brushes.Gray;
 
-            var progress = new Progress<double>(value =>
-            {
-                UpdateStatusText.Text =
-                    $"Update wird heruntergeladen … {value:P0}";
-            });
+            var progress = new Progress<UpdateWorkflowProgress>(
+                item => UpdateStatusText.Text =
+                    UpdateWorkflowPresentation.Format(item));
 
-            string packagePath = await _updateService.DownloadAsync(
+            UpdateWorkflowResult result =
+                await _updateWorkflowService.InstallAsync(
                 _pendingUpdatePackage,
+                new UpdateWorkflowOptions(
+                    _settings.Updates.BackupBeforeUpdate,
+                    GetCurrentProductVersion()),
                 progress);
-
-            if (_settings.Updates.BackupBeforeUpdate)
+            if (result.Backups.Count > 0)
             {
-                UpdateStatusText.Text = "Backup vor Update …";
-                await _updateService.CreateBackupAsync(GetCurrentProductVersion());
-                BackupsList.ItemsSource = await _updateService.ListBackupsAsync();
+                BackupsList.ItemsSource = result.Backups;
             }
-
-            UpdateStatusText.Text = "Updater wird gestartet. Die App wird beendet …";
-            await _updateService.ApplyAsync(packagePath);
 
             Application.Current.Shutdown(0);
         }
@@ -16562,7 +16521,7 @@ public partial class MainWindow : Window
 
     private Task ValidateSettingsAsync()
     {
-        ValidationReport report = _settingsValidator.Validate(_settings);
+        ValidationReport report = _settingsApplicationService.Validate(_settings);
         ValidationGrid.ItemsSource = report.Issues;
 
         _appLogger.Write(
@@ -24413,7 +24372,7 @@ public partial class MainWindow : Window
         {
             using HttpClient client = CreateTrustedAgentClient(device);
             client.DefaultRequestHeaders.Add("X-Agent-Key", device.AgentKey);
-            RemoteObsConfiguration? data = await client.GetFromJsonAsync<RemoteObsConfiguration>($"https://{device.Host}:{GetMultiPcAgentPort()}/api/obs/configuration");
+            RemoteObsConfiguration? data = await client.GetFromJsonAsync<RemoteObsConfiguration>($"https://{device.Host}:{GetMultiPcAgentPort()}/api/v1/obs/configuration");
             MultiPcObsProfilesBox.ItemsSource = data?.Profiles ?? [];
             MultiPcObsSceneCollectionsBox.ItemsSource = data?.SceneCollections ?? [];
             MultiPcObsProfilesBox.SelectedItem = data?.CurrentProfile;
@@ -24442,7 +24401,7 @@ public partial class MainWindow : Window
         {
             using HttpClient client = CreateTrustedAgentClient(device);
             client.DefaultRequestHeaders.Add("X-Agent-Key", device.AgentKey);
-            HttpResponseMessage response = await client.PostAsJsonAsync($"https://{device.Host}:{GetMultiPcAgentPort()}/api/obs/configuration", new { ProfileName = profileName, SceneCollectionName = collectionName });
+            HttpResponseMessage response = await client.PostAsJsonAsync($"https://{device.Host}:{GetMultiPcAgentPort()}/api/v1/obs/configuration", new { ProfileName = profileName, SceneCollectionName = collectionName });
             response.EnsureSuccessStatusCode();
             MultiPcStatusText.Text = profile ? $"OBS-Profil aktiviert: {profileName}" : $"OBS-Szenensammlung aktiviert: {collectionName}";
             await Task.Delay(750);
@@ -24458,7 +24417,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/obs/presets");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/obs/presets");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             using HttpResponseMessage response = await client.SendAsync(request);
             RemoteObsPresetInfo[]? presets = await response.Content.ReadFromJsonAsync<RemoteObsPresetInfo[]>();
@@ -24509,7 +24468,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/logs?lines=500");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/logs?lines=500");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             using HttpResponseMessage response = await client.SendAsync(request);
             string[]? lines = await response.Content.ReadFromJsonAsync<string[]>();
@@ -24536,11 +24495,19 @@ public partial class MainWindow : Window
         {
             byte[] bytes = await File.ReadAllBytesAsync(dialog.FileName);
             if (bytes.Length > 100 * 1024 * 1024) { MultiPcStatusText.Text = "Das Paket ist größer als 100 MB und wurde nicht übertragen."; return; }
+            SignedUpdateManifest? manifest = endpoint.StartsWith("update", StringComparison.OrdinalIgnoreCase)
+                ? await SignedUpdateManifestFile.LoadAdjacentAsync(dialog.FileName)
+                : null;
+            if (endpoint.StartsWith("update", StringComparison.OrdinalIgnoreCase) && manifest is null)
+            {
+                MultiPcStatusText.Text = "Zum Update-ZIP fehlt ein lesbares update-manifest.json im selben Ordner.";
+                return;
+            }
             using HttpClient client = CreateTrustedMultiPcClient(device);
             client.Timeout = TimeSpan.FromMinutes(5);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/{endpoint}");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/{endpoint}");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            request.Content = System.Net.Http.Json.JsonContent.Create(new { fileName = Path.GetFileName(dialog.FileName), base64Zip = Convert.ToBase64String(bytes) });
+            request.Content = System.Net.Http.Json.JsonContent.Create(new { fileName = Path.GetFileName(dialog.FileName), base64Zip = Convert.ToBase64String(bytes), manifest });
             using HttpResponseMessage response = await client.SendAsync(request);
             string result = await response.Content.ReadAsStringAsync();
             MultiPcStatusText.Text = response.IsSuccessStatusCode ? $"{device.Name}: {successText}." : "Remote-Dateifehler: " + result;
@@ -24560,7 +24527,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/status");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/update/status");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             using HttpResponseMessage response = await client.SendAsync(request);
             RemoteUpdateState? state = await response.Content.ReadFromJsonAsync<RemoteUpdateState>();
@@ -24586,7 +24553,7 @@ public partial class MainWindow : Window
         try
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/history");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/update/history");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             using HttpResponseMessage response = await client.SendAsync(request);
             RemoteUpdateHistoryEntry[]? history = await response.Content.ReadFromJsonAsync<RemoteUpdateHistoryEntry[]>();
@@ -24607,7 +24574,7 @@ public partial class MainWindow : Window
         {
             using HttpClient client = CreateTrustedMultiPcClient(device);
             client.Timeout = TimeSpan.FromMinutes(2);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/{action}");
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/v1/update/{action}");
             request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
             request.Content = System.Net.Http.Json.JsonContent.Create(new { restartSuite = MultiPcRestartSuiteAfterUpdateCheckBox.IsChecked == true, automaticRollback = MultiPcAutomaticRollbackCheckBox.IsChecked == true });
             using HttpResponseMessage response = await client.SendAsync(request);
@@ -24658,87 +24625,112 @@ public partial class MainWindow : Window
             MultiPcStatusText.Text = "Das Update-Paket ist größer als 100 MB.";
             return;
         }
+        SignedUpdateManifest? manifest;
+        try
+        {
+            manifest = await SignedUpdateManifestFile.LoadAdjacentAsync(packagePath);
+        }
+        catch (Exception ex)
+        {
+            MultiPcStatusText.Text = "Das signierte Update-Manifest konnte nicht geladen werden: " + ex.Message;
+            return;
+        }
+        if (manifest is null)
+        {
+            MultiPcStatusText.Text = "Zum Update-Paket wurde kein signiertes Manifest gefunden.";
+            return;
+        }
+
         int delaySeconds = int.TryParse(MultiPcRolloutDelayBox.Text, out int parsedDelay) ? Math.Clamp(parsedDelay, 0, 600) : 20;
         int canaryCount = int.TryParse(MultiPcCanaryCountBox.Text, out int parsedCanary) ? Math.Clamp(parsedCanary, 0, targets.Length) : Math.Min(1, targets.Length);
         int maxFailurePercent = int.TryParse(MultiPcMaxFailurePercentBox.Text, out int parsedFailure) ? Math.Clamp(parsedFailure, 0, 100) : 25;
         bool stopOnThreshold = MultiPcStopOnFailureThresholdCheckBox.IsChecked == true;
+        var package = new RemoteUpdatePackage(Path.GetFileName(packagePath), bytes, manifest);
+        var options = new RemoteUpdateRolloutOptions(
+            canaryCount,
+            TimeSpan.FromSeconds(delaySeconds),
+            maxFailurePercent,
+            stopOnThreshold,
+            MultiPcRestartSuiteAfterUpdateCheckBox.IsChecked == true,
+            MultiPcAutomaticRollbackCheckBox.IsChecked == true);
         _multiPcRolloutCts = new CancellationTokenSource();
         CancellationToken token = _multiPcRolloutCts.Token;
         _multiPcRolloutItems.Clear();
         MultiPcStartRolloutButton.IsEnabled = false;
         MultiPcStatusText.Text = $"Rollout '{selectedGroup}' an {targets.Length} Remote-PC(s) gestartet · Canary: {canaryCount}.";
-        int attempted = 0;
-        int succeeded = 0;
-        int failed = 0;
         try
         {
-            for (int index = 0; index < targets.Length; index++)
+            var progress = new Progress<RemoteUpdateRolloutProgress>(item =>
             {
-                token.ThrowIfCancellationRequested();
-                await WaitForMaintenanceWindowAsync(token);
-                MultiPcDeviceRecord device = targets[index];
-                string phase = index < canaryCount ? "CANARY" : "ROLLOUT";
-                UpdateRolloutLine(device.Name, $"{phase} · Paket wird übertragen …");
-                attempted++;
-                bool staged = await StageUpdateForRolloutAsync(device, packagePath, bytes, token);
-                if (!staged)
+                string status = item.Status switch
                 {
-                    failed++;
-                    UpdateRolloutLine(device.Name, $"{phase} · FEHLER beim Bereitstellen");
+                    "Staging" => "Paket wird übertragen …",
+                    "StageFailed" => "FEHLER beim Bereitstellen",
+                    "Validating" => "Paket wird validiert …",
+                    "ValidationFailed" => "FEHLER bei Validierung",
+                    "Applying" => "Installation wird gestartet …",
+                    "InstallationStarted" => "Installation gestartet",
+                    "ApplyFailed" => "FEHLER beim Installationsstart",
+                    _ => item.Status
+                };
+                UpdateRolloutLine(item.DeviceName, $"{item.Phase} · {status}");
+                int failurePercent = item.Attempted == 0
+                    ? 0
+                    : (int)Math.Round(item.Failed * 100d / item.Attempted);
+                MultiPcStatusText.Text =
+                    $"Rollout läuft · {item.Attempted}/{item.Total} bearbeitet · " +
+                    $"{item.Succeeded} erfolgreich · {item.Failed} Fehler ({failurePercent} %).";
+                if (item.Status is "InstallationStarted" or "ApplyFailed")
+                {
+                    AddMultiPcHistory(
+                        item.DeviceName,
+                        "rollout",
+                        item.Status == "InstallationStarted"
+                            ? $"{item.Phase}: Installation gestartet"
+                            : $"{item.Phase}: Fehler");
                 }
-                else
-                {
-                    UpdateRolloutLine(device.Name, $"{phase} · Paket wird validiert …");
-                    bool validated = await SendRolloutUpdateActionAsync(device, "validate", token);
-                    if (!validated)
-                    {
-                        failed++;
-                        UpdateRolloutLine(device.Name, $"{phase} · FEHLER bei Validierung");
-                    }
-                    else
-                    {
-                        UpdateRolloutLine(device.Name, $"{phase} · Installation wird gestartet …");
-                        bool applied = await SendRolloutUpdateActionAsync(device, "apply", token);
-                        if (applied)
-                        {
-                            succeeded++;
-                        }
-                        else
-                        {
-                            failed++;
-                        }
+            });
 
-                        UpdateRolloutLine(device.Name, applied ? $"{phase} · Installation gestartet" : $"{phase} · FEHLER beim Installationsstart");
-                        AddMultiPcHistory(device.Name, "rollout", applied ? $"{phase}: Installation gestartet" : $"{phase}: Fehler");
-                    }
-                }
-
-                int failurePercent = attempted == 0 ? 0 : (int)Math.Round(failed * 100d / attempted);
-                MultiPcStatusText.Text = $"Rollout läuft · {attempted}/{targets.Length} bearbeitet · {succeeded} erfolgreich · {failed} Fehler ({failurePercent} %).";
-                if (stopOnThreshold && failed > 0 && failurePercent > maxFailurePercent)
-                {
-                    MultiPcStatusText.Text = $"Rollout automatisch gestoppt: Fehlerquote {failurePercent} % überschreitet Grenzwert {maxFailurePercent} %.";
-                    AddMultiPcHistory("Rollout", selectedGroup, $"Automatischer Stopp bei {failurePercent} % Fehlerquote");
-                    break;
-                }
-                if (canaryCount > 0 && index + 1 == canaryCount && failed > 0)
-                {
-                    MultiPcStatusText.Text = $"Canary-Phase beendet: {failed} Fehler. Der weitere Rollout wurde aus Sicherheitsgründen gestoppt.";
-                    AddMultiPcHistory("Rollout", selectedGroup, "Canary-Stopp");
-                    break;
-                }
-                if (index < targets.Length - 1 && delaySeconds > 0)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds), token);
-                }
-            }
-            if (attempted == targets.Length && failed == 0)
+            RemoteUpdateRolloutResult result =
+                await _remoteUpdateRolloutService.RunAsync(
+                    targets,
+                    package,
+                    options,
+                    progress,
+                    WaitForMaintenanceWindowAsync,
+                    token);
+            if (result.StopReason ==
+                RemoteUpdateRolloutStopReason.FailureThresholdExceeded)
             {
-                MultiPcStatusText.Text = $"Rollout erfolgreich abgeschlossen: {succeeded}/{targets.Length} Geräte.";
+                int failurePercent = result.Attempted == 0
+                    ? 0
+                    : (int)Math.Round(result.Failed * 100d / result.Attempted);
+                MultiPcStatusText.Text =
+                    $"Rollout automatisch gestoppt: Fehlerquote {failurePercent} % " +
+                    $"überschreitet Grenzwert {maxFailurePercent} %.";
+                AddMultiPcHistory(
+                    "Rollout",
+                    selectedGroup,
+                    $"Automatischer Stopp bei {failurePercent} % Fehlerquote");
             }
-            else if (attempted == targets.Length)
+            else if (result.StopReason ==
+                     RemoteUpdateRolloutStopReason.CanaryFailed)
             {
-                MultiPcStatusText.Text = $"Rollout abgeschlossen: {succeeded} erfolgreich, {failed} fehlgeschlagen.";
+                MultiPcStatusText.Text =
+                    $"Canary-Phase beendet: {result.Failed} Fehler. " +
+                    "Der weitere Rollout wurde aus Sicherheitsgründen gestoppt.";
+                AddMultiPcHistory("Rollout", selectedGroup, "Canary-Stopp");
+            }
+            else if (result.Failed == 0)
+            {
+                MultiPcStatusText.Text =
+                    $"Rollout erfolgreich abgeschlossen: {result.Succeeded}/{targets.Length} Geräte.";
+            }
+            else
+            {
+                MultiPcStatusText.Text =
+                    $"Rollout abgeschlossen: {result.Succeeded} erfolgreich, " +
+                    $"{result.Failed} fehlgeschlagen.";
             }
         }
         catch (OperationCanceledException)
@@ -24975,36 +24967,6 @@ public partial class MainWindow : Window
             return;
         }
         _multiPcRolloutCts.Cancel();
-    }
-
-    private async Task<bool> StageUpdateForRolloutAsync(MultiPcDeviceRecord device, string filePath, byte[] bytes, CancellationToken token)
-    {
-        try
-        {
-            using HttpClient client = CreateTrustedMultiPcClient(device);
-            client.Timeout = TimeSpan.FromMinutes(5);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/stage");
-            request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            request.Content = System.Net.Http.Json.JsonContent.Create(new { fileName = Path.GetFileName(filePath), base64Zip = Convert.ToBase64String(bytes) });
-            using HttpResponseMessage response = await client.SendAsync(request, token);
-            return response.IsSuccessStatusCode;
-        }
-        catch when (!token.IsCancellationRequested) { return false; }
-    }
-
-    private async Task<bool> SendRolloutUpdateActionAsync(MultiPcDeviceRecord device, string action, CancellationToken token)
-    {
-        try
-        {
-            using HttpClient client = CreateTrustedMultiPcClient(device);
-            client.Timeout = TimeSpan.FromMinutes(2);
-            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"https://{device.Host}:{GetMultiPcAgentPort(device)}/api/update/{action}");
-            request.Headers.Add("X-CCS-Agent-Key", device.AgentKey);
-            request.Content = System.Net.Http.Json.JsonContent.Create(new { restartSuite = MultiPcRestartSuiteAfterUpdateCheckBox.IsChecked == true, automaticRollback = MultiPcAutomaticRollbackCheckBox.IsChecked == true });
-            using HttpResponseMessage response = await client.SendAsync(request, token);
-            return response.IsSuccessStatusCode;
-        }
-        catch when (!token.IsCancellationRequested) { return false; }
     }
 
     private void UpdateRolloutLine(string deviceName, string status)

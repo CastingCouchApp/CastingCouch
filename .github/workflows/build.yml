@@ -17,7 +17,121 @@ env:
   CONFIGURATION: Release
 
 jobs:
-  build:
+  overlay:
+    name: Overlay Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay/package-lock.json
+
+      - name: Install
+        working-directory: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+        run: npm run typecheck
+
+      - name: Unit and DOM smoke tests
+        working-directory: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+        run: npm test
+
+      - name: Bundle
+        working-directory: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+        run: npm run build
+
+  architecture:
+    name: Architecture Gates
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay/package-lock.json
+
+      - name: Restore
+        run: dotnet restore tests/CreatorControlSuite.Tests/CreatorControlSuite.Tests.csproj
+
+      - name: Architecture tests
+        run: >
+          dotnet test tests/CreatorControlSuite.Tests/CreatorControlSuite.Tests.csproj
+          -c ${{ env.CONFIGURATION }}
+          --no-restore
+          --filter Category=Architecture
+
+      - name: PowerShell syntax
+        shell: pwsh
+        run: ./build/Test-PowerShellSyntax.ps1
+
+  security:
+    name: Dependency Security
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay/package-lock.json
+
+      - name: Restore
+        run: dotnet restore CreatorControlSuite.sln
+
+      - name: NuGet vulnerability audit
+        run: dotnet list CreatorControlSuite.sln package --vulnerable --include-transitive --no-restore
+
+      - name: npm vulnerability audit
+        working-directory: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+        run: npm audit --audit-level=high
+
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+
+  dotnet:
     name: Build & Test
     runs-on: windows-latest
     timeout-minutes: 45
@@ -61,8 +175,60 @@ jobs:
           dotnet test tests/CreatorControlSuite.Tests/CreatorControlSuite.Tests.csproj
           -c ${{ env.CONFIGURATION }}
           --no-build
+          --collect "XPlat Code Coverage"
           --logger "trx;LogFileName=tests.trx"
           --results-directory artifacts/test-results
+
+      - name: Enforce coverage baseline
+        shell: pwsh
+        run: |
+          $coverage = Get-ChildItem artifacts/test-results -Recurse -Filter coverage.cobertura.xml |
+            Select-Object -First 1
+          if ($null -eq $coverage) {
+            throw "Coverage-Datei fehlt."
+          }
+          ./build/Test-CoverageBaseline.ps1 -CoveragePath $coverage.FullName
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/test-results/**
+          if-no-files-found: ignore
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: artifacts/test-results/**/coverage.cobertura.xml
+          if-no-files-found: error
+
+  package:
+    name: Package (win-x64)
+    needs: [overlay, architecture, security, dotnet]
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay/package-lock.json
+
+      - name: Restore
+        run: dotnet restore CreatorControlSuite.sln
 
       - name: Publish (win-x64)
         run: >
@@ -75,16 +241,7 @@ jobs:
           -p:ContinuousIntegrationBuild=true
           -o artifacts/publish/win-x64
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: artifacts/test-results/**
-          if-no-files-found: ignore
-
       - name: Upload publish output
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: publish-win-x64

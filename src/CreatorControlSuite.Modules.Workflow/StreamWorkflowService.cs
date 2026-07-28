@@ -1,26 +1,21 @@
 using System.Text.Json;
 using CreatorControlSuite.Core.Configuration;
-using CreatorControlSuite.Modules.Alerts;
-using CreatorControlSuite.Modules.OBS;
-using CreatorControlSuite.Modules.OBS.Models;
-using CreatorControlSuite.Modules.Overlay;
-using CreatorControlSuite.Modules.Spotify;
 using CreatorControlSuite.Modules.Workflow.Models;
 
 namespace CreatorControlSuite.Modules.Workflow;
 
 public sealed class StreamWorkflowService(
     ISettingsStore settingsStore,
-    IObsWebSocketClient obsClient,
-    SpotifyModule spotify,
-    AlertsModule alerts,
-    IOverlayDataService overlay) : IStreamWorkflowService
+    IWorkflowObsCapability obs,
+    IWorkflowMusicCapability music,
+    IWorkflowAlertCapability alerts,
+    IWorkflowOverlayCapability overlay) : IStreamWorkflowService
 {
     private readonly ISettingsStore _settingsStore = settingsStore;
-    private readonly IObsWebSocketClient _obsClient = obsClient;
-    private readonly SpotifyModule _spotify = spotify;
-    private readonly AlertsModule _alerts = alerts;
-    private readonly IOverlayDataService _overlay = overlay;
+    private readonly IWorkflowObsCapability _obs = obs;
+    private readonly IWorkflowMusicCapability _music = music;
+    private readonly IWorkflowAlertCapability _alerts = alerts;
+    private readonly IWorkflowOverlayCapability _overlay = overlay;
     private readonly SemaphoreSlim _transitionLock = new(1, 1);
 
     private CancellationTokenSource? _countdownCancellation;
@@ -58,7 +53,7 @@ public sealed class StreamWorkflowService(
                 SessionStats.IncomingRaids = 0;
 
                 if (settings.Workflow.AutoSwitchScenes &&
-                    _obsClient.IsConnected &&
+                    _obs.IsConnected &&
                     !string.IsNullOrWhiteSpace(settings.Obs.StartScene))
                 {
                     await SetCurrentProgramSceneWhenObsReadyAsync(
@@ -100,14 +95,14 @@ public sealed class StreamWorkflowService(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!_obsClient.IsConnected)
+            if (!_obs.IsConnected)
             {
                 return;
             }
 
             try
             {
-                await _obsClient.SetCurrentProgramSceneAsync(
+                await _obs.SetSceneAsync(
                     sceneName,
                     cancellationToken);
                 return;
@@ -254,22 +249,19 @@ public sealed class StreamWorkflowService(
                     "Wechsel auf Live.");
 
                 if (settings.Workflow.AutoStartObsStream &&
-                    _obsClient.IsConnected)
+                    _obs.IsConnected)
                 {
-                    ObsStreamStatus stream = await _obsClient.GetStreamStatusAsync(
-                        cancellationToken);
-
-                    if (!stream.OutputActive)
+                    if (!await _obs.IsStreamActiveAsync(cancellationToken))
                     {
-                        await _obsClient.StartStreamAsync(
+                        await _obs.StartStreamAsync(
                             cancellationToken);
                     }
                 }
 
                 if (settings.Workflow.AutoSwitchScenes &&
-                    _obsClient.IsConnected)
+                    _obs.IsConnected)
                 {
-                    await _obsClient.SetCurrentProgramSceneAsync(
+                    await _obs.SetSceneAsync(
                         settings.Obs.LiveScene,
                         cancellationToken);
                 }
@@ -279,7 +271,7 @@ public sealed class StreamWorkflowService(
                 {
                     try
                     {
-                        await _spotify.FadeToAsync(
+                        await _music.FadeToAsync(
                             0,
                             TimeSpan.FromSeconds(
                                 settings.Spotify.FadeOutSeconds),
@@ -329,9 +321,9 @@ public sealed class StreamWorkflowService(
             async settings =>
             {
                 if (settings.Workflow.AutoSwitchScenes &&
-                    _obsClient.IsConnected)
+                    _obs.IsConnected)
                 {
-                    await _obsClient.SetCurrentProgramSceneAsync(
+                    await _obs.SetSceneAsync(
                         settings.Obs.PauseScene,
                         cancellationToken);
                 }
@@ -357,9 +349,9 @@ public sealed class StreamWorkflowService(
             async settings =>
             {
                 if (settings.Workflow.AutoSwitchScenes &&
-                    _obsClient.IsConnected)
+                    _obs.IsConnected)
                 {
-                    await _obsClient.SetCurrentProgramSceneAsync(
+                    await _obs.SetSceneAsync(
                         settings.Obs.LiveScene,
                         cancellationToken);
                 }
@@ -393,9 +385,9 @@ public sealed class StreamWorkflowService(
                 await FinalizeSessionStatsAsync(endedAt, cancellationToken);
 
                 if (settings.Workflow.AutoSwitchScenes &&
-                    _obsClient.IsConnected)
+                    _obs.IsConnected)
                 {
-                    await _obsClient.SetCurrentProgramSceneAsync(
+                    await _obs.SetSceneAsync(
                         settings.Obs.EndScene,
                         cancellationToken);
                 }
@@ -406,20 +398,16 @@ public sealed class StreamWorkflowService(
                     cancellationToken);
 
                 if (settings.Workflow.AutoStopObsStream &&
-                    _obsClient.IsConnected)
+                    _obs.IsConnected)
                 {
-                    ObsStreamStatus stream = await _obsClient.GetStreamStatusAsync(
-                        cancellationToken);
-
-                    if (stream.OutputActive)
+                    if (await _obs.IsStreamActiveAsync(cancellationToken))
                     {
-                        await _obsClient.StopStreamAsync(
+                        await _obs.StopStreamAsync(
                             cancellationToken);
                     }
                 }
 
-                await _alerts.StopCurrentAsync(cancellationToken);
-                await _alerts.ClearQueueAsync(cancellationToken);
+                await _alerts.StopAndClearAsync(cancellationToken);
 
                 await _overlay.UpdateAsync(
                     data =>

@@ -5,28 +5,42 @@ function resolveCanvas(target: CreateRuntime | HTMLElement): HTMLElement {
   return "canvas" in target ? target.canvas : target;
 }
 
-function ensureLayer(canvas: HTMLElement, className: string): HTMLElement {
+/** Above typical item.z stacking; below magnet guides (9999). */
+const GRID_Z_INDEX = "9000";
+
+function ensureLayer(
+  canvas: HTMLElement,
+  className: string,
+  placement: "back" | "front" = "back"
+): HTMLElement {
   let el = canvas.querySelector(":scope > ." + className) as HTMLElement | null;
   if (!el) {
     el = document.createElement("div");
     el.className = className;
     el.setAttribute("aria-hidden", "true");
-    canvas.insertBefore(el, canvas.firstChild);
+    if (placement === "front") {
+      canvas.appendChild(el);
+    } else {
+      canvas.insertBefore(el, canvas.firstChild);
+    }
+  } else if (placement === "front" && canvas.lastElementChild !== el) {
+    canvas.appendChild(el);
   }
   return el;
 }
 
 export function applyEditorLayers(target: CreateRuntime | HTMLElement, prefs: EditorPrefs): void {
   const canvas = resolveCanvas(target);
-  const preview = ensureLayer(canvas, "ccs-obs-preview");
-  const grid = ensureLayer(canvas, "ccs-editor-grid");
+  const preview = ensureLayer(canvas, "ccs-obs-preview", "back");
+  const grid = ensureLayer(canvas, "ccs-editor-grid", "front");
 
   preview.style.display = prefs.obsPreview ? "block" : "none";
+  grid.style.zIndex = GRID_Z_INDEX;
 
   if (prefs.grid) {
     grid.style.display = "block";
-    const h = Math.max(2, Math.min(64, prefs.gridH || 16));
-    const v = Math.max(2, Math.min(64, prefs.gridV || 6));
+    const h = Math.max(2, Math.min(64, prefs.gridH || 32));
+    const v = Math.max(2, Math.min(64, prefs.gridV || 16));
     const xStep = 100 / h;
     const yStep = 100 / v;
     grid.style.backgroundImage = [

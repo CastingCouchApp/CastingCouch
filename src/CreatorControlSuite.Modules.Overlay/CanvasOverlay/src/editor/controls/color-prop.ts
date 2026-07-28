@@ -26,14 +26,15 @@ export function colorProp(
   fallback: string
 ): HTMLElement {
   const wrap = document.createElement("div");
-  wrap.className = "ccs-color-prop";
+  wrap.className = "ccs-prop-row ccs-color-prop";
+
   const title = document.createElement("span");
-  title.className = "ccs-color-prop-label";
+  title.className = "ccs-prop-row-label";
   title.textContent = label;
   wrap.appendChild(title);
 
   const row = document.createElement("div");
-  row.className = "ccs-color-prop-row";
+  row.className = "ccs-prop-row-control ccs-color-prop-row";
 
   const current = String((item.props && item.props[key]) ?? fallback);
   const picker = document.createElement("input");
@@ -43,6 +44,7 @@ export function colorProp(
 
   const text = document.createElement("input");
   text.type = "text";
+  text.className = "ccs-color-text";
   text.value = current;
   text.placeholder = "#RRGGBB / css";
 
@@ -57,12 +59,10 @@ export function colorProp(
     }
   };
 
-  // input = HSV-Ziehen: Canvas live, Props-Panel NICHT neu bauen
   picker.addEventListener("input", () => {
     text.value = picker.value;
     applyValue(picker.value, true);
   });
-  // change = Picker geschlossen: speichern + Panel sync ok
   picker.addEventListener("change", () => {
     text.value = picker.value;
     applyValue(picker.value, false);
@@ -78,7 +78,7 @@ export function colorProp(
   wrap.appendChild(row);
 
   const swatchRow = document.createElement("div");
-  swatchRow.className = "ccs-color-swatches";
+  swatchRow.className = "ccs-prop-row-extra ccs-color-swatches";
   for (const hex of SWATCHES) {
     const btn = document.createElement("button");
     btn.type = "button";

@@ -1,7 +1,6 @@
 import type { AnimationField, AnimationInstance, LayoutItem } from "../../shared/types";
 import { ANIMATION_STRATEGIES } from "../../shared/animations/registry";
 import type { EditorContext } from "../props/context";
-import { propSection } from "../sections/prop-section";
 import { colorProp } from "../controls/color-prop";
 import { numProp } from "../controls/num-prop";
 import { boolProp } from "../controls/bool-prop";
@@ -70,7 +69,6 @@ function renderField(
 }
 
 export function renderAnimationsPanel(container: HTMLElement, item: LayoutItem, ctx: EditorContext): void {
-  const { root, body } = propSection("animations", "Animationen", false);
   item.animations = item.animations || [];
 
   const list = document.createElement("div");
@@ -90,6 +88,7 @@ export function renderAnimationsPanel(container: HTMLElement, item: LayoutItem, 
       header.className = "ccs-feature-header";
       const enabled = document.createElement("input");
       enabled.type = "checkbox";
+      enabled.className = "ccs-check";
       enabled.checked = animation.enabled !== false;
       enabled.addEventListener("change", () => {
         ctx.commitProp(item, (next) => {
@@ -170,7 +169,6 @@ export function renderAnimationsPanel(container: HTMLElement, item: LayoutItem, 
   });
 
   renderList();
-  body.appendChild(list);
-  body.appendChild(addBtn);
-  container.appendChild(root);
+  container.appendChild(list);
+  container.appendChild(addBtn);
 }

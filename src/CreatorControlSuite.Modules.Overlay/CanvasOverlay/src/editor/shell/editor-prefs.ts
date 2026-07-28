@@ -12,8 +12,8 @@ export interface EditorPrefs {
 const DEFAULTS: EditorPrefs = {
   obsPreview: false,
   grid: true,
-  gridH: 16,
-  gridV: 6,
+  gridH: 32,
+  gridV: 16,
   gridSnap: true,
   magnet: true
 };

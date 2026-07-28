@@ -2,10 +2,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../CreatorControlSuite.Core/CreatorControlSuite.Core.csproj" />
-    <ProjectReference Include="../CreatorControlSuite.Modules.Overlay/CreatorControlSuite.Modules.Overlay.csproj" />
-    <ProjectReference Include="../CreatorControlSuite.Modules.Alerts/CreatorControlSuite.Modules.Alerts.csproj" />
-    <ProjectReference Include="../CreatorControlSuite.Modules.Spotify/CreatorControlSuite.Modules.Spotify.csproj" />
-    <ProjectReference Include="../CreatorControlSuite.Modules.OBS/CreatorControlSuite.Modules.OBS.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>

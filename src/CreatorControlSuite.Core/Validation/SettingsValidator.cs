@@ -171,7 +171,7 @@ public sealed class SettingsValidator : ISettingsValidator
     {
         if (!string.IsNullOrWhiteSpace(settings.Overlay.RootPath))
         {
-            if (settings.Overlay.RootPath.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+            if (ContainsInvalidWindowsPathCharacter(settings.Overlay.RootPath))
             {
                 issues.Add(Error(
                     "OVERLAY_PATH_INVALID",
@@ -194,6 +194,27 @@ public sealed class SettingsValidator : ISettingsValidator
                     "Leer lassen (Standard) oder einen gültigen lokalen Pfad wählen."));
             }
         }
+    }
+
+    private static bool ContainsInvalidWindowsPathCharacter(string path)
+    {
+        for (int index = 0; index < path.Length; index++)
+        {
+            char character = path[index];
+            if (character < ' ' ||
+                character is '<' or '>' or '"' or '|' or '?' or '*')
+            {
+                return true;
+            }
+
+            if (character == ':' &&
+                !(index == 1 && char.IsAsciiLetter(path[0])))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void ValidateWorkflow(

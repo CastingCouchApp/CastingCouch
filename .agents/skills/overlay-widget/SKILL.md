@@ -53,7 +53,7 @@ Naming: Typ **lowercase** / `kebab-case`; CSS-Prefix **`ccs-`**; keine Standalon
 
 ## Settings-Conventions
 
-- Gruppen: `propSection(id, title, collapsed?)` — Position/Größe kommt aus common/geometry (default collapsed).
+- Gruppen: `contentSection` / `lookSection` (offen), `styleSection` / `advancedSection` (zugeklappt) — Layout-Geometrie aus common/geometry (default collapsed). Effekte-/Animationen-Tabs ohne äußeren `propSection`-Wrapper.
 - LiveFX: `featureSection({ enabledKey })` — Settings bleiben erhalten wenn aus.
 - Farben → `colorProp`, Schriften → `fontProp` (kein Freitext für Farbe/Font).
 - Item-Effekte **nicht** als Widget-Props — Effects-Panel / `overlay-effect` / Packs.

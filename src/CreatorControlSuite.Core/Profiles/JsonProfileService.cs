@@ -70,9 +70,9 @@ public sealed class JsonProfileService : IProfileService
         string path = GetPath(profile.Id);
         string temp = path + ".tmp";
 
-        await File.WriteAllTextAsync(
+        await WriteSanitizedProfileAsync(
             temp,
-            JsonSerializer.Serialize(profile, JsonOptions),
+            profile,
             cancellationToken);
 
         File.Move(temp, path, overwrite: true);
@@ -100,6 +100,9 @@ public sealed class JsonProfileService : IProfileService
         CancellationToken cancellationToken = default)
     {
         CreatorProfile profile = await LoadAsync(profileId, cancellationToken);
+        AppSettings current = await _settingsStore.LoadAsync(cancellationToken);
+        profile.Settings.StreamerBot.Password =
+            current.StreamerBot.Password;
         await _settingsStore.SaveAsync(profile.Settings, cancellationToken);
     }
 
@@ -130,9 +133,9 @@ public sealed class JsonProfileService : IProfileService
             Directory.CreateDirectory(targetDirectory);
         }
 
-        await File.WriteAllTextAsync(
+        await WriteSanitizedProfileAsync(
             targetPath,
-            JsonSerializer.Serialize(profile, JsonOptions),
+            profile,
             cancellationToken);
 
         return targetPath;
@@ -143,6 +146,7 @@ public sealed class JsonProfileService : IProfileService
         CancellationToken cancellationToken = default)
     {
         CreatorProfile profile = await ReadAsync(sourcePath, cancellationToken);
+        profile.Settings.StreamerBot.Password = "";
         profile.Id = Guid.NewGuid().ToString("N");
         profile.Name += " (Import)";
         profile.CreatedAt = DateTimeOffset.UtcNow;
@@ -180,5 +184,25 @@ public sealed class JsonProfileService : IProfileService
                 character is '-' or '_'));
 
         return Path.Combine(_profileRoot, safeId + ".json");
+    }
+
+    private static async Task WriteSanitizedProfileAsync(
+        string path,
+        CreatorProfile profile,
+        CancellationToken cancellationToken)
+    {
+        string password = profile.Settings.StreamerBot.Password;
+        try
+        {
+            profile.Settings.StreamerBot.Password = "";
+            await File.WriteAllTextAsync(
+                path,
+                JsonSerializer.Serialize(profile, JsonOptions),
+                cancellationToken);
+        }
+        finally
+        {
+            profile.Settings.StreamerBot.Password = password;
+        }
     }
 }

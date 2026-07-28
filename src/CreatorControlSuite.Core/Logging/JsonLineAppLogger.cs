@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using CreatorControlSuite.Core.Security;
 
 namespace CreatorControlSuite.Core.Logging;
 
@@ -40,11 +41,9 @@ public sealed class JsonLineAppLogger : IAppLogger
             DateTimeOffset.Now,
             level,
             category,
-            message,
-            exception?.ToString(),
-            properties ??
-                new Dictionary<string, string>(
-                    StringComparer.OrdinalIgnoreCase));
+            SecretRedactor.Redact(message),
+            SecretRedactor.Redact(exception?.ToString()),
+            RedactProperties(properties, OperationCorrelation.CurrentId));
 
         string line = JsonSerializer.Serialize(entry, JsonOptions);
         string path = GetCurrentLogPath();
@@ -91,6 +90,25 @@ public sealed class JsonLineAppLogger : IAppLogger
         }
 
         EntryWritten?.Invoke(this, entry);
+    }
+
+    private static IReadOnlyDictionary<string, string> RedactProperties(
+        IReadOnlyDictionary<string, string>? properties,
+        string? correlationId)
+    {
+        var result = properties?.ToDictionary(
+            pair => pair.Key,
+            pair => SecretRedactor.IsSensitiveKey(pair.Key)
+                ? "[REDACTED]"
+                : SecretRedactor.Redact(pair.Value),
+            StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            result["correlationId"] = correlationId;
+        }
+
+        return result;
     }
 
     public async Task<IReadOnlyList<AppLogEntry>> ReadRecentAsync(

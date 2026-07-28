@@ -7,11 +7,17 @@ export function textProp(
   item: LayoutItem,
   ctx: EditorContext,
   fallback: string
-): HTMLLabelElement {
-  const wrap = document.createElement("label");
-  wrap.textContent = label;
+): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "ccs-prop-row ccs-text-prop";
+
+  const title = document.createElement("span");
+  title.className = "ccs-prop-row-label";
+  title.textContent = label;
+
   const input = document.createElement("input");
   input.type = "text";
+  input.className = "ccs-prop-row-control";
   const props = item.props as Record<string, unknown> | undefined;
   input.value = (props && props[key] != null ? String(props[key]) : fallback) || fallback;
   input.addEventListener("change", () => {
@@ -19,6 +25,8 @@ export function textProp(
       live.props[key] = input.value;
     });
   });
+
+  wrap.appendChild(title);
   wrap.appendChild(input);
   return wrap;
 }

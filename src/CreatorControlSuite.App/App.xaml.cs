@@ -9,6 +9,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using CreatorControlSuite.App.Core.Eventing;
+using CreatorControlSuite.App.DependencyInjection;
 using CreatorControlSuite.App.Modules;
 using CreatorControlSuite.App.Mvvm;
 using CreatorControlSuite.App.Services;
@@ -102,128 +103,13 @@ public partial class App : Application
 
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices(services =>
-                {
-                    services.AddSingleton<ISettingsStore>(
-                        new JsonSettingsStore(
-                            Path.Combine(localAppData, "settings.json")));
-
-                    services.AddSingleton<ISecretStore>(
-                        new WindowsDpapiSecretStore(
-                            Path.Combine(localAppData, "Secrets")));
-
-                    services.AddSingleton<IAppLogger>(
-                        new JsonLineAppLogger(
-                            Path.Combine(localAppData, "Logs")));
-
-                    services.AddSingleton<ICrashReporter>(
-                        new FileCrashReporter(
-                            Path.Combine(localAppData, "CrashReports")));
-
-                    services.AddSingleton<ISettingsValidator, SettingsValidator>();
-                    services.AddSingleton<RuntimeHealthService>();
-
-                    services.AddSingleton<IFirstRunService>(
-                        provider => new FirstRunService(
-                            Path.Combine(localAppData, "first-run.json"),
-                            provider.GetRequiredService<ISettingsStore>()));
-
-                    services.AddSingleton<ExternalAlertActivityService>();
-                    services.AddSingleton<IIpcCommandRouter, AppIpcCommandRouter>();
-                    services.AddSingleton<ILocalIpcServer, NamedPipeIpcServer>();
-
-                    services.AddSingleton<ILegalConsentService>(new LegalConsentService(Path.Combine(localAppData, "legal-consent.json"), Path.Combine(AppContext.BaseDirectory, "Legal")));
-
-                    services.AddSingleton<ILicenseService>(provider => new LocalLicenseService(provider.GetRequiredService<ISecretStore>(), Path.Combine(AppContext.BaseDirectory, "Keys", "license-public.pem"),
-#if DEBUG
-                        developmentMode: true
-#else
-                    developmentMode: false
-#endif
-                    ));
-
-                    services.AddSingleton<IUpdateSignatureVerifier>(new RsaUpdateSignatureVerifier(Path.Combine(AppContext.BaseDirectory, "Keys", "update-public.pem")));
-
-                    services.AddSingleton<IFeatureGate, FeatureGate>();
-                    services.AddSingleton<IFeatureActionRunner, FeatureActionRunner>();
-                    services.AddSingleton<IWorkflowE2eService, WorkflowE2eService>();
-                    services.AddHttpClient<ILicenseServerClient, HttpLicenseServerClient>(client =>
-                    {
-                        client.BaseAddress = new Uri("https://license.invalid/");
-                        client.Timeout = TimeSpan.FromSeconds(15);
-                    });
-                    services.AddSingleton<ISupportPackageService>(provider => new SupportPackageService(localAppData, provider.GetRequiredService<ISettingsStore>(), provider.GetRequiredService<IAppLogger>(), provider.GetRequiredService<RuntimeHealthService>()));
-                    services.AddSingleton<IReleaseReadinessService, ReleaseReadinessService>();
-                    services.AddSingleton<IInstallerSelfTestService>(provider => new InstallerSelfTestService(
-                        provider.GetRequiredService<ISettingsStore>(), provider.GetRequiredService<ISettingsValidator>(),
-                        provider.GetRequiredService<ILegalConsentService>(), provider.GetRequiredService<ILicenseService>(), localAppData));
-                    services.AddSingleton<IBetaReadinessService, BetaReadinessService>();
-                    services.AddSingleton<IStartupDependencyValidationService, StartupDependencyValidationService>();
-                    services.AddSingleton<IInstallationStateService>(
-                        new InstallationStateService(Path.Combine(localAppData, "installation-state.json")));
-
-
-                    services.AddSingleton<IProfileService>(
-                        provider => new JsonProfileService(
-                            Path.Combine(localAppData, "Profiles"),
-                            provider.GetRequiredService<ISettingsStore>()));
-
-                    services.AddSingleton<ILegacyMigrationService, LegacyMigrationService>();
-
-                    services.AddHttpClient("CreatorControlSuite.UpdateClient");
-
-                    services.AddSingleton<IUpdateService>(provider =>
-                    {
-                        IHttpClientFactory httpClientFactory =
-                            provider.GetRequiredService<IHttpClientFactory>();
-
-                        HttpClient httpClient =
-                            httpClientFactory.CreateClient(
-                                "CreatorControlSuite.UpdateClient");
-
-                        return new LocalUpdateService(
-                            httpClient,
-                            provider.GetRequiredService<ISettingsStore>(),
-                            provider.GetRequiredService<IUpdateSignatureVerifier>(),
-                            localAppData,
-                            currentVersionProvider: GetCurrentProductVersion);
-                    });
-
-                    services.AddSingleton(
-                        new StreamDeckProfileService(
-                            Path.Combine(localAppData, "StreamDeck")));
-
-                    services.AddStreamingModules();
-
-                    services.AddSingleton<IEventBus, EventBus>();
-                    services.AddSingleton<IAutomationRuleEngine, AutomationRuleEngine>();
-                    services.AddSingleton<IMultiPcAgentClient, MultiPcAgentClient>();
-                    services.AddSingleton<IStreamerBotClient, StreamerBotClient>();
-                    services.AddSingleton<IMusicPlayerUiPresenter, MusicPlayerUiPresenter>();
-                    services.AddSingleton<INavigationService, NavigationService>();
-                    services.AddSingleton<CreatorIntelligenceService>();
-                    services.AddSingleton<DiagnosticsPageViewModel>();
-                    services.AddSingleton<IPageViewModel>(sp => sp.GetRequiredService<DiagnosticsPageViewModel>());
-                    services.AddSingleton<ProfilesPageViewModel>();
-                    services.AddSingleton<IPageViewModel>(sp => sp.GetRequiredService<ProfilesPageViewModel>());
-                    services.AddSingleton<AboutPageViewModel>();
-                    services.AddSingleton<IPageViewModel>(sp => sp.GetRequiredService<AboutPageViewModel>());
-                    services.AddSingleton<MusicPlayerPageViewModel>();
-                    services.AddSingleton<IPageViewModel>(sp => sp.GetRequiredService<MusicPlayerPageViewModel>());
-                    services.AddSingleton<CreatorIntelligenceSectionViewModel>();
-                    services.AddSingleton<PageNavigationCoordinator>();
-                    services.AddSingleton<TimedAutomationTickPublisher>();
-                    services.AddSingleton<AppEventBridge>();
-
-                    services.AddSingleton<IThemeService, ThemeService>();
-                    services.AddSingleton<DiagnosticService>();
-                    services.AddSingleton<MainWindow>();
-                })
+                    services.AddCreatorControlSuiteApplication(
+                        localAppData,
+                        GetCurrentProductVersion))
                 .Build();
 
             await _host.StartAsync();
             _ = _host.Services.GetRequiredService<PageNavigationCoordinator>();
-            _host.Services.GetRequiredService<TimedAutomationTickPublisher>().Start();
-            _host.Services.GetRequiredService<AppEventBridge>().Start();
 
             try
             {
@@ -270,27 +156,6 @@ public partial class App : Application
                     ["currentVersion"] = installationTransition.CurrentVersion
                 });
 
-
-            foreach (IStreamingModule module in _host.Services.GetServices<IStreamingModule>())
-            {
-                try
-                {
-                    await module.InitializeAsync(CancellationToken.None);
-                }
-                catch (Exception moduleException)
-                {
-                    string moduleName = module.GetType().Name;
-                    WriteBootstrapLog($"Module initialization failed ({moduleName}): {moduleException}");
-                    _appLogger.Write(
-                        AppLogLevel.Error,
-                        "Startup",
-                        $"Modul {moduleName} konnte beim Start nicht initialisiert werden. Die Suite wird im eingeschränkten Modus fortgesetzt.",
-                        moduleException);
-                }
-            }
-
-            await _host.Services.GetRequiredService<ILocalIpcServer>()
-                .StartAsync(CancellationToken.None);
 
             IReadOnlyList<string> dependencyValidation =
                 await _host.Services

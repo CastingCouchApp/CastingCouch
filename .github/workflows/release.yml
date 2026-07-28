@@ -21,6 +21,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 env:
   DOTNET_NOLOGO: true
@@ -116,6 +117,14 @@ jobs:
             -OutputDirectory "artifacts/release" `
             -ReleaseNotes $notes
 
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: artifacts/publish/win-x64
+          format: spdx-json
+          output-file: artifacts/release/CreatorControlSuite-${{ steps.version.outputs.version }}.spdx.json
+          upload-artifact: false
+
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -140,6 +149,7 @@ jobs:
           files: |
             artifacts/release/*.zip
             artifacts/release/update-manifest.json
+            artifacts/release/*.spdx.json
             artifacts/installer/CreatorControlSuite-${{ steps.version.outputs.version }}-x64.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

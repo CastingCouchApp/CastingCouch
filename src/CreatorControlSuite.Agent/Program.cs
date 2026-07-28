@@ -4,10 +4,16 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using System.Threading.RateLimiting;
+using CreatorControlSuite.Agent.Security;
+using CreatorControlSuite.Core.Security;
+using CreatorControlSuite.Core.Updates;
 using CreatorControlSuite.Modules.OBS;
 using CreatorControlSuite.Modules.OBS.Models;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Primitives;
+using static AgentUtilities;
 
 string agentVersion = Assembly.GetExecutingAssembly()
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
@@ -22,56 +28,50 @@ string keyPath = Path.Combine(dataDirectory, "agent-key.txt");
 string certificatePath = Path.Combine(dataDirectory, "agent-certificate.pfx");
 string permissionsPath = Path.Combine(dataDirectory, "agent-permissions.json");
 string settingsPath = Path.Combine(dataDirectory, "agent-settings.json");
+string secretsDirectory = Path.Combine(dataDirectory, "Secrets");
 string obsPresetsPath = Path.Combine(dataDirectory, "obs-presets.json");
 string agentLogPath = Path.Combine(dataDirectory, "agent.log");
 string updateStatePath = Path.Combine(dataDirectory, "update-state.json");
 string maintenancePath = Path.Combine(dataDirectory, "maintenance.flag");
 string updateHistoryPath = Path.Combine(dataDirectory, "update-history.json");
+string updatePublicKeyPath = Path.Combine(AppContext.BaseDirectory, "Keys", "update-public.pem");
 
-string agentKey = File.Exists(keyPath)
-    ? File.ReadAllText(keyPath).Trim()
-    : Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-if (!File.Exists(keyPath))
-{
-    File.WriteAllText(keyPath, agentKey);
-}
+ISecretStore secretStore = new WindowsDpapiSecretStore(secretsDirectory);
+var credentialStore = new AgentCredentialStore(secretStore);
+List<AgentCredential> credentials =
+    (await credentialStore.LoadAndMigrateAsync(keyPath)).ToList();
+IUpdateSignatureVerifier releaseSignatureVerifier =
+    new RsaUpdateSignatureVerifier(updatePublicKeyPath);
 
-X509Certificate2 certificate = LoadOrCreateCertificate(certificatePath);
+X509Certificate2 certificate =
+    await new AgentCertificateStore(certificatePath, secretStore)
+        .LoadOrCreateAsync();
 string certificateFingerprint = certificate.GetCertHashString(HashAlgorithmName.SHA256);
 AgentPermissions permissions = LoadPermissions(permissionsPath);
-AgentSettings agentSettings = LoadSettings(settingsPath);
+var agentSettingsStore = new AgentSettingsStore(settingsPath, secretStore);
+AgentSettings agentSettings = await agentSettingsStore.LoadAsync();
 var commandHistory = new System.Collections.Concurrent.ConcurrentQueue<CommandHistoryEntry>();
 string pairingCode = NewPairingCode();
+PairingSession pairingSession = NewPairingSession(pairingCode);
 DateTimeOffset startedAt = DateTimeOffset.UtcNow;
 string lastUpdateResultPath = Path.Combine(dataDirectory, "last-update-result.txt");
-if (File.Exists(lastUpdateResultPath))
-{
-    string result = File.ReadAllText(lastUpdateResultPath).Trim();
-    AgentUpdateState previous = LoadUpdateState(updateStatePath);
-    string message = result == "automatic-rollback" ? "Health-Check fehlgeschlagen; automatisches Rollback wurde ausgeführt."
-        : result == "healthy" ? "Update erfolgreich; Health-Check bestanden."
-        : "Update wurde angewendet.";
-    SaveUpdateState(updateStatePath, previous with { Status = result == "automatic-rollback" ? "rolled-back" : "healthy", MaintenanceMode = false, Message = message });
-    File.Delete(lastUpdateResultPath);
-}
+ProcessLastUpdateResult(lastUpdateResultPath, updateStatePath);
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-builder.WebHost.ConfigureKestrel(options =>
-{
-    options.ListenAnyIP(agentPort, listen => listen.UseHttps(new HttpsConnectionAdapterOptions
-    {
-        ServerCertificate = certificate
-    }));
-});
+ConfigureAgentBuilder(builder, agentPort, certificate);
 WebApplication app = builder.Build();
+AsyncLocal<string?> requestCorrelationId = ConfigureAgentPipeline(app);
 
 Console.WriteLine($"Creator Control Agent {agentVersion} läuft verschlüsselt auf Port {agentPort}.");
 Console.WriteLine($"Pairing-Code: {pairingCode}");
 Console.WriteLine($"Zertifikat-Fingerabdruck: {certificateFingerprint}");
 Console.WriteLine($"Berechtigungsdatei: {permissionsPath}");
 
-bool Authorized(HttpRequest request) => request.Headers.TryGetValue("X-CCS-Agent-Key", out StringValues value) && CryptographicOperations.FixedTimeEquals(
-    System.Text.Encoding.UTF8.GetBytes(value.ToString()), System.Text.Encoding.UTF8.GetBytes(agentKey));
+AgentCredential? Authenticate(HttpRequest request) =>
+    request.Headers.TryGetValue("X-CCS-Agent-Key", out StringValues value)
+        ? AgentCredentialStore.Authenticate(credentials, value.ToString())
+        : null;
+bool Authorized(HttpRequest request) => Authenticate(request) is not null;
 bool Running(string name) => Process.GetProcessesByName(name).Length > 0;
 
 async Task<IResult> WithObsControl(HttpRequest request, AgentPermissions permissions, Func<IObsWebSocketClient, Task<IResult>> action)
@@ -97,7 +97,7 @@ async Task<IResult> WithObsControl(HttpRequest request, AgentPermissions permiss
     }
 }
 
-app.MapGet("/api/status", (HttpRequest request) =>
+app.MapGet("/api/v1/status", (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -121,7 +121,7 @@ app.MapGet("/api/status", (HttpRequest request) =>
     });
 });
 
-app.MapPost("/api/command", async (HttpRequest request) =>
+app.MapPost("/api/v1/command", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -164,28 +164,96 @@ app.MapPost("/api/command", async (HttpRequest request) =>
     catch (Exception ex) { commandHistory.Enqueue(new CommandHistoryEntry(DateTimeOffset.UtcNow, command, "error: " + ex.Message)); return Results.Problem(ex.Message); }
 });
 
-app.MapGet("/api/pair", (string code) =>
+app.MapPost("/api/v1/pair", async (HttpRequest request) =>
 {
-    if (!string.Equals(code, pairingCode, StringComparison.Ordinal))
+    if (request.ContentLength is > 4096)
     {
-        return Results.Unauthorized();
+        return Results.Problem(
+            statusCode: StatusCodes.Status413PayloadTooLarge,
+            title: "Pairing-Anfrage ist zu groß.");
     }
 
+    PairingRequest? payload = await JsonSerializer.DeserializeAsync<PairingRequest>(request.Body);
+    PairingAttemptResult attempt = pairingSession.TryConsume(
+        payload?.Code,
+        DateTimeOffset.UtcNow);
+    if (attempt != PairingAttemptResult.Accepted)
+    {
+        AppendAgentLog(
+            agentLogPath,
+            $"Pairing abgelehnt ({attempt}) von {request.HttpContext.Connection.RemoteIpAddress}.");
+        return attempt is PairingAttemptResult.Locked
+            ? Results.Problem(
+                statusCode: StatusCodes.Status429TooManyRequests,
+                title: "Pairing vorübergehend gesperrt.")
+            : Results.Unauthorized();
+    }
+
+    AgentCredential credential = await credentialStore.AddAsync(
+        payload?.DeviceName ?? "");
+    credentials.Add(credential);
     pairingCode = NewPairingCode();
+    pairingSession = NewPairingSession(pairingCode);
+    AppendAgentLog(
+        agentLogPath,
+        $"Gerät '{credential.DisplayName}' gekoppelt ({credential.DeviceId}).");
     Console.WriteLine($"Gerät gekoppelt. Neuer Pairing-Code: {pairingCode}");
     return Results.Ok(new
     {
+        deviceId = credential.DeviceId,
         machineName = Environment.MachineName,
-        agentKey,
+        agentKey = credential.ApiKey,
         port = agentPort,
         certificateFingerprint,
         transport = "HTTPS/TLS",
         allowedCommands = permissions.AllowedCommands.OrderBy(x => x).ToArray()
     });
+}).RequireRateLimiting("pairing");
+
+app.MapPost("/api/v1/credentials/rotate", async (HttpRequest request) =>
+{
+    AgentCredential? current = Authenticate(request);
+    if (current is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    AgentCredential? rotated = await credentialStore.RotateAsync(current.DeviceId);
+    if (rotated is null)
+    {
+        return Results.NotFound();
+    }
+
+    int index = credentials.FindIndex(item => item.DeviceId == current.DeviceId);
+    if (index >= 0)
+    {
+        credentials[index] = rotated;
+    }
+
+    AppendAgentLog(agentLogPath, $"Agent-Schlüssel rotiert ({current.DeviceId}).");
+    return Results.Ok(new
+    {
+        deviceId = rotated.DeviceId,
+        agentKey = rotated.ApiKey
+    });
+});
+
+app.MapPost("/api/v1/credentials/unpair", async (HttpRequest request) =>
+{
+    AgentCredential? current = Authenticate(request);
+    if (current is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    await credentialStore.DeleteAsync(current.DeviceId);
+    credentials.RemoveAll(item => item.DeviceId == current.DeviceId);
+    AppendAgentLog(agentLogPath, $"Gerät entkoppelt ({current.DeviceId}).");
+    return Results.Ok(new { unpaired = true });
 });
 
 
-app.MapGet("/api/obs/state", async (HttpRequest request) =>
+app.MapGet("/api/v1/obs/state", async (HttpRequest request) =>
     await WithObsControl(request, permissions, async obs =>
     {
         IReadOnlyList<ObsSceneInfo> scenes = await obs.GetSceneListAsync();
@@ -205,7 +273,7 @@ app.MapGet("/api/obs/state", async (HttpRequest request) =>
         return Results.Ok(new { connected = true, currentScene, scenes = scenes.Select(x => x.Name).ToArray(), audioInputs = audio, sceneItems = sceneItems.Select(x => new { sourceName = x.SourceName, enabled = x.Enabled }).ToArray() });
     }));
 
-app.MapPost("/api/obs/scene", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/scene", async (HttpRequest request) =>
 {
     ObsSceneRequest? payload = await JsonSerializer.DeserializeAsync<ObsSceneRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName))
@@ -220,7 +288,7 @@ app.MapPost("/api/obs/scene", async (HttpRequest request) =>
     });
 });
 
-app.MapPost("/api/obs/mute", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/mute", async (HttpRequest request) =>
 {
     ObsMuteRequest? payload = await JsonSerializer.DeserializeAsync<ObsMuteRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.InputName))
@@ -236,7 +304,7 @@ app.MapPost("/api/obs/mute", async (HttpRequest request) =>
 });
 
 
-app.MapPost("/api/obs/volume", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/volume", async (HttpRequest request) =>
 {
     ObsVolumeRequest? payload = await JsonSerializer.DeserializeAsync<ObsVolumeRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.InputName) || payload.VolumeDb is < -100 or > 26)
@@ -251,7 +319,7 @@ app.MapPost("/api/obs/volume", async (HttpRequest request) =>
     });
 });
 
-app.MapPost("/api/obs/scene-item", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/scene-item", async (HttpRequest request) =>
 {
     ObsSceneItemRequest? payload = await JsonSerializer.DeserializeAsync<ObsSceneItemRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName) || string.IsNullOrWhiteSpace(payload.SourceName))
@@ -266,11 +334,11 @@ app.MapPost("/api/obs/scene-item", async (HttpRequest request) =>
     });
 });
 
-app.MapGet("/api/obs/filters", async (HttpRequest request, string sourceName) =>
+app.MapGet("/api/v1/obs/filters", async (HttpRequest request, string sourceName) =>
     await WithObsControl(request, permissions, async obs =>
         Results.Ok(await obs.GetSourceFilterListAsync(sourceName))));
 
-app.MapPost("/api/obs/filter", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/filter", async (HttpRequest request) =>
 {
     ObsFilterRequest? payload = await JsonSerializer.DeserializeAsync<ObsFilterRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.SourceName) || string.IsNullOrWhiteSpace(payload.FilterName))
@@ -285,7 +353,7 @@ app.MapPost("/api/obs/filter", async (HttpRequest request) =>
     });
 });
 
-app.MapPost("/api/obs/transform", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/transform", async (HttpRequest request) =>
 {
     ObsTransformRequest? payload = await JsonSerializer.DeserializeAsync<ObsTransformRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.SceneName) || string.IsNullOrWhiteSpace(payload.SourceName))
@@ -319,7 +387,7 @@ app.MapPost("/api/obs/transform", async (HttpRequest request) =>
     });
 });
 
-app.MapPost("/api/obs/volume-fade", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/volume-fade", async (HttpRequest request) =>
 {
     ObsVolumeFadeRequest? payload = await JsonSerializer.DeserializeAsync<ObsVolumeFadeRequest>(request.Body);
     if (payload is null || string.IsNullOrWhiteSpace(payload.InputName))
@@ -342,7 +410,7 @@ app.MapPost("/api/obs/volume-fade", async (HttpRequest request) =>
     });
 });
 
-app.MapGet("/api/obs/configuration", async (HttpRequest request) =>
+app.MapGet("/api/v1/obs/configuration", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -364,7 +432,7 @@ app.MapGet("/api/obs/configuration", async (HttpRequest request) =>
     catch (Exception ex) { return Results.Problem(ex.Message); }
 });
 
-app.MapPost("/api/obs/configuration", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/configuration", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -400,7 +468,7 @@ app.MapPost("/api/obs/configuration", async (HttpRequest request) =>
     catch (Exception ex) { return Results.Problem(ex.Message); }
 });
 
-app.MapGet("/api/obs/presets", (HttpRequest request) =>
+app.MapGet("/api/v1/obs/presets", (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -416,7 +484,7 @@ app.MapGet("/api/obs/presets", (HttpRequest request) =>
     return Results.Ok(presets.OrderByDescending(x => x.CreatedAt).Select(x => new { x.Name, x.CreatedAt, x.ProfileName, x.SceneCollectionName, x.CurrentScene }).ToArray());
 });
 
-app.MapPost("/api/obs/presets/save", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/presets/save", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -457,7 +525,7 @@ app.MapPost("/api/obs/presets/save", async (HttpRequest request) =>
     catch (Exception ex) { return Results.Problem(ex.Message); }
 });
 
-app.MapPost("/api/obs/presets/apply", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/presets/apply", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -519,7 +587,7 @@ app.MapPost("/api/obs/presets/apply", async (HttpRequest request) =>
     catch (Exception ex) { return Results.Problem(ex.Message); }
 });
 
-app.MapPost("/api/obs/presets/delete", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/presets/delete", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -548,7 +616,7 @@ app.MapPost("/api/obs/presets/delete", async (HttpRequest request) =>
     return Results.Ok(new { accepted = true, payload.Name });
 });
 
-app.MapGet("/api/obs/output", async (HttpRequest request) =>
+app.MapGet("/api/v1/obs/output", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -571,7 +639,7 @@ app.MapGet("/api/obs/output", async (HttpRequest request) =>
     catch (Exception ex) { return Results.Problem(ex.Message); }
 });
 
-app.MapPost("/api/obs/output", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/output", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -607,7 +675,7 @@ app.MapPost("/api/obs/output", async (HttpRequest request) =>
     catch (Exception ex) { return Results.Problem(ex.Message); }
 });
 
-app.MapPost("/api/obs/transition", async (HttpRequest request) =>
+app.MapPost("/api/v1/obs/transition", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -639,7 +707,7 @@ app.MapPost("/api/obs/transition", async (HttpRequest request) =>
     catch (Exception ex) { return Results.Problem(ex.Message); }
 });
 
-app.MapGet("/api/obs/preview", async (HttpRequest request) =>
+app.MapGet("/api/v1/obs/preview", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -661,7 +729,7 @@ app.MapGet("/api/obs/preview", async (HttpRequest request) =>
     catch (Exception ex) { return Results.Problem(ex.Message); }
 });
 
-app.MapGet("/api/logs", (HttpRequest request, int? lines) =>
+app.MapGet("/api/v1/logs", (HttpRequest request, int? lines) =>
 {
     if (!Authorized(request))
     {
@@ -677,7 +745,7 @@ app.MapGet("/api/logs", (HttpRequest request, int? lines) =>
     return Results.Ok(File.ReadLines(agentLogPath).TakeLast(take).ToArray());
 });
 
-app.MapPost("/api/update/stage", async (HttpRequest request) =>
+app.MapPost("/api/v1/update/stage", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -690,7 +758,9 @@ app.MapPost("/api/update/stage", async (HttpRequest request) =>
     }
 
     FileDeployRequest? payload = await JsonSerializer.DeserializeAsync<FileDeployRequest>(request.Body);
-    if (payload is null || string.IsNullOrWhiteSpace(payload.Base64Zip))
+    if (payload is null ||
+        string.IsNullOrWhiteSpace(payload.Base64Zip) ||
+        payload.Manifest is null)
     {
         return Results.BadRequest("Update-Daten fehlen");
     }
@@ -703,15 +773,37 @@ app.MapPost("/api/update/stage", async (HttpRequest request) =>
         Directory.CreateDirectory(target);
         string zipPath = Path.Combine(target, Path.GetFileName(payload.FileName ?? "update.zip"));
         await File.WriteAllBytesAsync(zipPath, Convert.FromBase64String(payload.Base64Zip));
+        if (!string.Equals(
+                payload.Manifest.ProductId,
+                UpdateManifestCanonical.ProductId,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                payload.Manifest.PackageFileName,
+                Path.GetFileName(zipPath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !releaseSignatureVerifier.VerifyManifest(payload.Manifest) ||
+            !await releaseSignatureVerifier.VerifyPackageAsync(
+                zipPath,
+                payload.Manifest,
+                request.HttpContext.RequestAborted))
+        {
+            File.Delete(zipPath);
+            return Results.BadRequest(
+                "Update-Manifest, Signatur oder Paket-Prüfsumme ist ungültig.");
+        }
+
+        string signedManifestPath = Path.Combine(target, "update-manifest.json");
+        await File.WriteAllTextAsync(
+            signedManifestPath,
+            JsonSerializer.Serialize(payload.Manifest),
+            request.HttpContext.RequestAborted);
         string packageDirectory = Path.Combine(target, "package");
-        SafeExtractZip(zipPath, packageDirectory);
+        SafeZipExtractor.ExtractToDirectory(zipPath, packageDirectory);
         string checksum = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(zipPath)));
         string[] files = [.. Directory.EnumerateFiles(packageDirectory, "*", SearchOption.AllDirectories)];
         int fileCount = files.Length;
-        string packageVersion = DetectPackageVersion(packageDirectory);
-        string manifestPayload = $"{payload.FileName}|{checksum}|{fileCount}|{packageVersion}|{agentVersion}";
-        string manifestSignature = Convert.ToHexString(HMACSHA256.HashData(Convert.FromHexString(agentKey), System.Text.Encoding.UTF8.GetBytes(manifestPayload)));
-        var state = new AgentUpdateState("staged", payload.FileName ?? "update.zip", target, packageDirectory, "", DateTimeOffset.Now, null, "Update wurde bereitgestellt und mit dem Agent-Schlüssel signiert.", checksum, fileCount, false, false, null, packageVersion, agentVersion, manifestSignature, false);
+        string packageVersion = payload.Manifest.Version;
+        var state = new AgentUpdateState("staged", payload.FileName ?? "update.zip", target, packageDirectory, "", DateTimeOffset.Now, null, "Update wurde mit Release-Signatur geprüft und bereitgestellt.", checksum, fileCount, false, false, null, packageVersion, payload.Manifest.MinimumVersion, payload.Manifest.Signature, true);
         SaveUpdateState(updateStatePath, state);
         AppendUpdateHistory(updateHistoryPath, new AgentUpdateHistoryEntry(DateTimeOffset.Now, "stage", packageVersion, checksum, true, "Update bereitgestellt"));
         AppendAgentLog(agentLogPath, $"Update-Paket '{payload.FileName}' in '{target}' bereitgestellt.");
@@ -720,7 +812,7 @@ app.MapPost("/api/update/stage", async (HttpRequest request) =>
     catch (Exception ex) { AppendAgentLog(agentLogPath, "Update-Bereitstellung fehlgeschlagen: " + ex.Message); return Results.Problem(ex.Message); }
 });
 
-app.MapGet("/api/update/status", (HttpRequest request) =>
+app.MapGet("/api/v1/update/status", (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -730,7 +822,7 @@ app.MapGet("/api/update/status", (HttpRequest request) =>
     return Results.Ok(LoadUpdateState(updateStatePath));
 });
 
-app.MapGet("/api/update/history", (HttpRequest request) =>
+app.MapGet("/api/v1/update/history", (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -740,7 +832,7 @@ app.MapGet("/api/update/history", (HttpRequest request) =>
     return Results.Ok(LoadUpdateHistory(updateHistoryPath).OrderByDescending(entry => entry.At).Take(100));
 });
 
-app.MapPost("/api/update/validate", (HttpRequest request) =>
+app.MapPost("/api/v1/update/validate", (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -760,9 +852,16 @@ app.MapPost("/api/update/validate", (HttpRequest request) =>
 
     string[] files = [.. Directory.EnumerateFiles(state.PackageDirectory, "*", SearchOption.AllDirectories)];
     bool hasExecutable = files.Any(path => path.EndsWith("CreatorControlSuite.App.exe", StringComparison.OrdinalIgnoreCase));
-    string manifestPayload = $"{state.PackageName}|{state.Sha256}|{state.FileCount}|{state.PackageVersion}|{state.MinimumAgentVersion}";
-    string expectedSignature = Convert.ToHexString(HMACSHA256.HashData(Convert.FromHexString(agentKey), System.Text.Encoding.UTF8.GetBytes(manifestPayload)));
-    bool signatureValid = !string.IsNullOrWhiteSpace(state.ManifestSignature) && CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expectedSignature), Convert.FromHexString(state.ManifestSignature));
+    string manifestPath = Path.Combine(state.StagingDirectory, "update-manifest.json");
+    SignedUpdateManifest? manifest = File.Exists(manifestPath)
+        ? JsonSerializer.Deserialize<SignedUpdateManifest>(File.ReadAllText(manifestPath))
+        : null;
+    string archivePath = Path.Combine(state.StagingDirectory, state.PackageName);
+    bool signatureValid = manifest is not null &&
+        releaseSignatureVerifier.VerifyManifest(manifest) &&
+        releaseSignatureVerifier.VerifyPackageAsync(
+            archivePath,
+            manifest).GetAwaiter().GetResult();
     bool compatible = IsCompatibleVersion(agentVersion, state.MinimumAgentVersion);
     bool valid = files.Length > 0 && hasExecutable && signatureValid && compatible;
     string message = valid
@@ -775,7 +874,7 @@ app.MapPost("/api/update/validate", (HttpRequest request) =>
     return valid ? Results.Ok(updated) : Results.BadRequest(message);
 });
 
-app.MapPost("/api/update/apply", async (HttpRequest request) =>
+app.MapPost("/api/v1/update/apply", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -821,7 +920,7 @@ app.MapPost("/api/update/apply", async (HttpRequest request) =>
     catch (Exception ex) { AppendAgentLog(agentLogPath, "Update-Anwendung fehlgeschlagen: " + ex.Message); return Results.Problem(ex.Message); }
 });
 
-app.MapPost("/api/update/rollback", async (HttpRequest request) =>
+app.MapPost("/api/v1/update/rollback", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -856,7 +955,7 @@ app.MapPost("/api/update/rollback", async (HttpRequest request) =>
     catch (Exception ex) { AppendAgentLog(agentLogPath, "Rollback fehlgeschlagen: " + ex.Message); return Results.Problem(ex.Message); }
 });
 
-app.MapPost("/api/settings", async (HttpRequest request) =>
+app.MapPost("/api/v1/settings", async (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -870,11 +969,11 @@ app.MapPost("/api/settings", async (HttpRequest request) =>
     }
 
     agentSettings = updated;
-    File.WriteAllText(settingsPath, JsonSerializer.Serialize(agentSettings, new JsonSerializerOptions { WriteIndented = true }));
+    await agentSettingsStore.SaveAsync(agentSettings);
     return Results.Ok(new { saved = true });
 });
 
-app.MapGet("/api/history", (HttpRequest request) =>
+app.MapGet("/api/v1/history", (HttpRequest request) =>
 {
     if (!Authorized(request))
     {
@@ -884,245 +983,17 @@ app.MapGet("/api/history", (HttpRequest request) =>
     return Results.Ok(commandHistory.Reverse().Take(50).ToArray());
 });
 
-_ = Task.Run(async () =>
-{
-    using var udp = new System.Net.Sockets.UdpClient(47632);
-    while (true)
-    {
-        try
-        {
-            System.Net.Sockets.UdpReceiveResult received = await udp.ReceiveAsync();
-            if (System.Text.Encoding.UTF8.GetString(received.Buffer) != "CCS_DISCOVER_V1")
-            {
-                continue;
-            }
-
-            string mac = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
-                .Where(x => x.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && x.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
-                .Select(x => x.GetPhysicalAddress().ToString())
-                .FirstOrDefault(x => x.Length == 12) ?? "";
-            byte[] payload = JsonSerializer.SerializeToUtf8Bytes(new { machineName = Environment.MachineName, host = Environment.MachineName, port = agentPort, version = agentVersion, macAddress = mac });
-            await udp.SendAsync(payload, payload.Length, received.RemoteEndPoint);
-        }
-        catch (Exception ex) { Console.WriteLine("LAN-Erkennung: " + ex.Message); await Task.Delay(1000); }
-    }
-});
+_ = RunDiscoveryAsync(agentPort, agentVersion);
 
 app.Run();
 
-
-static async Task<ObsWebSocketClient> ConnectObsAsync(AgentSettings settings)
-{
-    var client = new ObsWebSocketClient();
-    await client.ConnectAsync(new ObsConnectionOptions(settings.ObsWebSocketHost, settings.ObsWebSocketPort, settings.ObsWebSocketPassword, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(6)));
-    return client;
-}
-
-static void AppendAgentLog(string path, string message)
+void AppendAgentLog(string path, string message)
 {
     Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-    File.AppendAllText(path, $"{DateTimeOffset.Now:O} {message}{Environment.NewLine}");
-}
-
-static void CopyDirectory(string source, string destination, Func<string, bool>? include = null)
-{
-    Directory.CreateDirectory(destination);
-    foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
-    {
-        string relative = Path.GetRelativePath(source, file);
-        if (include is not null && !include(relative))
-        {
-            continue;
-        }
-
-        string target = Path.Combine(destination, relative);
-        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        File.Copy(file, target, true);
-    }
-}
-
-
-static string DetectPackageVersion(string packageDirectory)
-{
-    string? changelog = Directory.EnumerateFiles(packageDirectory, "CHANGELOG-8.0.0-alpha*.md", SearchOption.AllDirectories)
-        .Select(Path.GetFileNameWithoutExtension)
-        .OrderByDescending(name => name, StringComparer.OrdinalIgnoreCase)
-        .FirstOrDefault();
-    return changelog?.Replace("CHANGELOG-", "", StringComparison.OrdinalIgnoreCase) ?? "unbekannt";
-}
-
-static bool IsCompatibleVersion(string currentVersion, string minimumVersion)
-{
-    if (string.IsNullOrWhiteSpace(minimumVersion))
-    {
-        return true;
-    }
-
-    static int AlphaNumber(string value)
-    {
-        string marker = "alpha";
-        int index = value.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        return index >= 0 && int.TryParse(value[(index + marker.Length)..], out int number) ? number : 0;
-    }
-    return AlphaNumber(currentVersion) >= AlphaNumber(minimumVersion);
-}
-
-static List<AgentUpdateHistoryEntry> LoadUpdateHistory(string path)
-{
-    if (!File.Exists(path))
-    {
-        return [];
-    }
-
-    try { return JsonSerializer.Deserialize<List<AgentUpdateHistoryEntry>>(File.ReadAllText(path)) ?? []; }
-    catch { return []; }
-}
-
-static void AppendUpdateHistory(string path, AgentUpdateHistoryEntry entry)
-{
-    List<AgentUpdateHistoryEntry> history = LoadUpdateHistory(path);
-    history.Add(entry);
-    if (history.Count > 250)
-    {
-        history = [.. history.OrderByDescending(item => item.At).Take(250)];
-    }
-
-    string temp = path + ".tmp";
-    File.WriteAllText(temp, JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true }));
-    File.Move(temp, path, true);
-}
-
-static AgentUpdateState LoadUpdateState(string path)
-{
-    if (!File.Exists(path))
-    {
-        return AgentUpdateState.Empty;
-    }
-
-    try { return JsonSerializer.Deserialize<AgentUpdateState>(File.ReadAllText(path)) ?? AgentUpdateState.Empty; }
-    catch { return AgentUpdateState.Empty with { Status = "error", Message = "Update-Statusdatei konnte nicht gelesen werden." }; }
-}
-
-static void SaveUpdateState(string path, AgentUpdateState state)
-{
-    string temp = path + ".tmp";
-    File.WriteAllText(temp, JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
-    File.Move(temp, path, true);
-}
-
-static void SafeExtractZip(string zipPath, string destination)
-{
-    Directory.CreateDirectory(destination);
-    string root = Path.GetFullPath(destination) + Path.DirectorySeparatorChar;
-    using ZipArchive archive = ZipFile.OpenRead(zipPath);
-    foreach (ZipArchiveEntry entry in archive.Entries)
-    {
-        string target = Path.GetFullPath(Path.Combine(destination, entry.FullName));
-        if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException("Unsicherer ZIP-Pfad");
-        }
-
-        if (string.IsNullOrEmpty(entry.Name)) { Directory.CreateDirectory(target); continue; }
-        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        entry.ExtractToFile(target, true);
-    }
-}
-
-static void StartConfigured(string? configuredPath, string fallback)
-{
-    string target = !string.IsNullOrWhiteSpace(configuredPath) && File.Exists(configuredPath) ? configuredPath : fallback;
-    Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
-}
-
-static AgentSettings LoadSettings(string path)
-{
-    if (File.Exists(path))
-    {
-        try { return JsonSerializer.Deserialize<AgentSettings>(File.ReadAllText(path)) ?? new AgentSettings(); } catch { }
-    }
-    var settings = new AgentSettings();
-    File.WriteAllText(path, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
-    return settings;
-}
-
-static string NewPairingCode() => Random.Shared.Next(100000, 1000000).ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-static X509Certificate2 LoadOrCreateCertificate(string path)
-{
-    if (File.Exists(path))
-    {
-        return X509CertificateLoader.LoadPkcs12FromFile(path, null, X509KeyStorageFlags.Exportable);
-    }
-
-    using var rsa = RSA.Create(3072);
-    var request = new CertificateRequest("CN=CreatorControlSuite.Agent", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-    request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
-    request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, false));
-    request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
-    using X509Certificate2 generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(5));
-    byte[] bytes = generated.Export(X509ContentType.Pfx);
-    File.WriteAllBytes(path, bytes);
-    return X509CertificateLoader.LoadPkcs12(bytes, null, X509KeyStorageFlags.Exportable);
-}
-
-static List<ObsRemotePreset> LoadObsPresets(string path)
-{
-    if (!File.Exists(path))
-    {
-        return [];
-    }
-
-    try { return JsonSerializer.Deserialize<List<ObsRemotePreset>>(File.ReadAllText(path)) ?? []; }
-    catch { return []; }
-}
-
-static void SaveObsPresets(string path, List<ObsRemotePreset> presets)
-{
-    string tempPath = path + ".tmp";
-    File.WriteAllText(tempPath, JsonSerializer.Serialize(presets, new JsonSerializerOptions { WriteIndented = true }));
-    File.Move(tempPath, path, true);
-}
-
-static AgentPermissions LoadPermissions(string path)
-{
-    if (File.Exists(path))
-    {
-        try { return JsonSerializer.Deserialize<AgentPermissions>(File.ReadAllText(path)) ?? AgentPermissions.Default; }
-        catch { }
-    }
-    AgentPermissions defaults = AgentPermissions.Default;
-    File.WriteAllText(path, JsonSerializer.Serialize(defaults, new JsonSerializerOptions { WriteIndented = true }));
-    return defaults;
-}
-
-internal sealed record CommandRequest(string Command);
-internal sealed record ObsSceneRequest(string SceneName);
-internal sealed record ObsMuteRequest(string InputName, bool Muted);
-internal sealed record ObsVolumeRequest(string InputName, double VolumeDb);
-internal sealed record ObsSceneItemRequest(string SceneName, string SourceName, bool Enabled);
-internal sealed record ObsFilterRequest(string SourceName, string FilterName, bool Enabled);
-internal sealed record ObsTransformRequest(string SceneName, string SourceName, bool Reset, double X, double Y, double Width, double Height, double Rotation);
-internal sealed record ObsConfigurationRequest(string ProfileName, string SceneCollectionName);
-internal sealed record ObsPresetRequest(string Name);
-internal sealed record ObsPresetAudio(string Name, bool Muted, double VolumeDb);
-internal sealed record ObsPresetSceneItem(string SourceName, bool Enabled);
-internal sealed record ObsRemotePreset(string Name, DateTimeOffset CreatedAt, string ProfileName, string SceneCollectionName, string CurrentScene, ObsPresetAudio[] AudioInputs, ObsPresetSceneItem[] SceneItems);
-internal sealed record ObsVolumeFadeRequest(string InputName, double TargetVolumeDb, int DurationMilliseconds);
-internal sealed record ObsOutputRequest(string Action);
-internal sealed record ObsTransitionRequest(string TransitionName, int DurationMilliseconds);
-internal sealed record AgentPermissions(string[] AllowedCommands)
-{
-    public static AgentPermissions Default { get; } = new(["obs.start", "obs.stop", "obs.control", "spotify.playpause", "streamerbot.start", "files.deploy", "updates.stage", "updates.apply"]);
-}
-
-internal sealed record AgentSettings(string ObsPath = "", string StreamerBotPath = "", string ObsWebSocketHost = "127.0.0.1", int ObsWebSocketPort = 4455, string ObsWebSocketPassword = "", string OverlayDirectory = "", string UpdateStagingDirectory = "", string SuiteInstallDirectory = "", string SuiteExecutablePath = "");
-internal sealed record FileDeployRequest(string FileName, string Base64Zip);
-internal sealed record CommandHistoryEntry(DateTimeOffset At, string Command, string Result);
-
-internal sealed record UpdateApplyRequest(bool RestartSuite, bool AutomaticRollback);
-internal sealed record AgentUpdateHistoryEntry(DateTimeOffset At, string Action, string PackageVersion, string Sha256, bool Success, string Message);
-internal sealed record AgentUpdateState(string Status, string PackageName, string StagingDirectory, string PackageDirectory, string BackupDirectory, DateTimeOffset StagedAt, DateTimeOffset? AppliedAt, string Message, string Sha256, int FileCount, bool Validated, bool MaintenanceMode, bool? AutomaticRollback, string PackageVersion, string MinimumAgentVersion, string ManifestSignature, bool SignatureValid)
-{
-    public static AgentUpdateState Empty { get; } = new("none", "", "", "", "", DateTimeOffset.MinValue, null, "Kein Update bereitgestellt.", "", 0, false, false, null, "", "", "", false);
+    string correlation = requestCorrelationId.Value is null
+        ? ""
+        : $" correlationId={requestCorrelationId.Value}";
+    File.AppendAllText(
+        path,
+        $"{DateTimeOffset.Now:O}{correlation} {SecretRedactor.Redact(message)}{Environment.NewLine}");
 }

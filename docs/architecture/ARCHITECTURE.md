@@ -1,29 +1,19 @@
 # Architektur
 
-## Anwendung
+Die aktuelle Ist- und Zielarchitektur der 8.x-Linie ist unter
+[`ARCHITECTURE-8.0.md`](ARCHITECTURE-8.0.md) dokumentiert.
 
-- WPF/.NET 10
-- Dependency Injection
-- JSON-Konfiguration
-- DPAPI-Secrets
-- getrennte Module
-- Diagnose-Service
-- Profile
-- Updates und Backups
+Verbindliche Leitplanken:
 
-## Installation
+- WPF/.NET 10 bleibt die Desktop-Plattform.
+- Die Anwendung bleibt ein modularer Monolith.
+- Secrets liegen ausschließlich im DPAPI-geschützten `ISecretStore`.
+- Views enthalten keine Geschäftslogik; die Shell verantwortet nur Navigation
+  und Window-Lifecycle.
+- Core referenziert keine App- oder Integrationsprojekte.
+- Neue und extrahierte Quell-/XAML-Dateien bleiben unter 1.000 Zeilen.
+- Änderungen an Geschäftslogik erfolgen testgetrieben.
 
-Der Installer installiert nur Programmdateien und Verknüpfungen.
-
-Nach der Installation werden in der Anwendung eingerichtet:
-
-- OBS-WebSocket und Passwort
-- Twitch Client-ID, Client-Secret und OAuth
-- Spotify Client-ID, Client-Secret und OAuth
-- Alert-Medien und Audiokanal
-- Overlay-Ordner
-- Szenen und Workflow
-- Stream-Deck-Plugin
-
-Dadurch bleiben Updates und Neuinstallationen sauber von Benutzerkonten
-und Tokens getrennt.
+Historische Migrationsnotizen bleiben in
+[`ARCHITECTURE-3.0.md`](ARCHITECTURE-3.0.md) erhalten, sind aber nicht mehr das
+aktuelle Zielbild.

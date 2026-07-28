@@ -1,0 +1,8 @@
+{
+  "capturedAt": "2026-07-28",
+  "lineRate": 0.36,
+  "branchRate": 0.28,
+  "policy": "ratchet-only",
+  "targetForChangedBusinessLogic": 0.80,
+  "targetForSecurityAndUpdates": 0.90
+}

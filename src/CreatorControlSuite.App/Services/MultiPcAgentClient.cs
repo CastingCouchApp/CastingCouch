@@ -111,16 +111,16 @@ public sealed class MultiPcAgentClient : IMultiPcAgentClient
     private static string NormalizeObsPath(string obsRelativePath)
     {
         string trimmed = (obsRelativePath ?? string.Empty).Trim().TrimStart('/');
-        if (trimmed.StartsWith("api/obs/", StringComparison.OrdinalIgnoreCase))
+        if (trimmed.StartsWith("api/v1/obs/", StringComparison.OrdinalIgnoreCase))
         {
             return trimmed;
         }
 
         if (trimmed.StartsWith("obs/", StringComparison.OrdinalIgnoreCase))
         {
-            return "api/" + trimmed;
+            return "api/v1/" + trimmed;
         }
 
-        return "api/obs/" + trimmed;
+        return "api/v1/obs/" + trimmed;
     }
 }

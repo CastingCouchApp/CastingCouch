@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CreatorControlSuite.Core.Music;
 
 namespace CreatorControlSuite.Core.Configuration;
@@ -23,13 +24,25 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
             return defaults;
         }
 
-        await using FileStream stream = File.OpenRead(_path);
+        JsonObject root;
+        await using (FileStream stream = File.OpenRead(_path))
+        {
+            root = await JsonSerializer.DeserializeAsync<JsonObject>(
+                       stream,
+                       SerializerOptions,
+                       cancellationToken)
+                   ?? new JsonObject();
+        }
 
-        return EnsureDefaults(await JsonSerializer.DeserializeAsync<AppSettings>(
-                   stream,
-                   SerializerOptions,
-                   cancellationToken)
-               ?? new AppSettings());
+        bool migrated = SettingsSchemaMigrator.Migrate(root);
+        AppSettings settings = EnsureDefaults(
+            root.Deserialize<AppSettings>(SerializerOptions) ?? new AppSettings());
+        if (migrated)
+        {
+            await SaveAsync(settings, cancellationToken);
+        }
+
+        return settings;
     }
 
     public async Task SaveAsync(
@@ -37,6 +50,7 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
         CancellationToken cancellationToken = default)
     {
         EnsureDefaults(settings);
+        settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
         await _saveLock.WaitAsync(cancellationToken);
         string? tempPath = null;
 

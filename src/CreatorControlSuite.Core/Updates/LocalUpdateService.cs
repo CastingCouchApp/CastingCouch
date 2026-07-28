@@ -449,7 +449,9 @@ public sealed class LocalUpdateService : IUpdateService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            string destination = Path.Combine(_dataRoot, entry.FullName);
+            string destination = SafeZipExtractor.ResolveDestinationPath(
+                _dataRoot,
+                entry.FullName);
             string? directory = Path.GetDirectoryName(destination);
 
             if (!string.IsNullOrWhiteSpace(directory))

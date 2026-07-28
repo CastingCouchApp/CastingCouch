@@ -3,6 +3,7 @@ using CreatorControlSuite.Core.Eventing;
 using CreatorControlSuite.Core.Music;
 using CreatorControlSuite.Modules.Workflow;
 using CreatorControlSuite.Modules.Workflow.Models;
+using Microsoft.Extensions.Hosting;
 
 namespace CreatorControlSuite.App.Services;
 
@@ -13,7 +14,7 @@ namespace CreatorControlSuite.App.Services;
 public sealed class AppEventBridge(
     IEventBus eventBus,
     IStreamWorkflowService workflow,
-    IMusicPlayerRouter musicRouter) : IDisposable
+    IMusicPlayerRouter musicRouter) : IHostedService, IDisposable
 {
     private readonly IEventBus _eventBus = eventBus;
     private readonly IStreamWorkflowService _workflow = workflow;
@@ -32,6 +33,18 @@ public sealed class AppEventBridge(
         _musicRouter.SnapshotChanged += OnMusicSnapshotChanged;
         _musicRouter.ActiveProviderChanged += OnActiveProviderChanged;
         _started = true;
+    }
+
+    Task IHostedService.StartAsync(CancellationToken cancellationToken)
+    {
+        Start();
+        return Task.CompletedTask;
+    }
+
+    Task IHostedService.StopAsync(CancellationToken cancellationToken)
+    {
+        Unsubscribe();
+        return Task.CompletedTask;
     }
 
     private void OnWorkflowStateChanged(object? sender, WorkflowState state)
@@ -68,13 +81,20 @@ public sealed class AppEventBridge(
             return;
         }
 
-        if (_started)
+        Unsubscribe();
+        _disposed = true;
+    }
+
+    private void Unsubscribe()
+    {
+        if (!_started)
         {
-            _workflow.StateChanged -= OnWorkflowStateChanged;
-            _musicRouter.SnapshotChanged -= OnMusicSnapshotChanged;
-            _musicRouter.ActiveProviderChanged -= OnActiveProviderChanged;
+            return;
         }
 
-        _disposed = true;
+        _workflow.StateChanged -= OnWorkflowStateChanged;
+        _musicRouter.SnapshotChanged -= OnMusicSnapshotChanged;
+        _musicRouter.ActiveProviderChanged -= OnActiveProviderChanged;
+        _started = false;
     }
 }

@@ -14,10 +14,16 @@ export function selectProp(
   options: SelectOption[],
   fallback: string,
   customApply?: (live: LayoutItem, value: string) => void
-): HTMLLabelElement {
-  const wrap = document.createElement("label");
-  wrap.textContent = label;
+): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "ccs-prop-row ccs-select-prop";
+
+  const title = document.createElement("span");
+  title.className = "ccs-prop-row-label";
+  title.textContent = label;
+
   const select = document.createElement("select");
+  select.className = "ccs-prop-row-control";
   const props = item.props as Record<string, unknown> | undefined;
   const current = props && props[key] != null ? String(props[key]) : String(fallback);
   for (const entry of options) {
@@ -38,6 +44,8 @@ export function selectProp(
       }
     });
   });
+
+  wrap.appendChild(title);
   wrap.appendChild(select);
   return wrap;
 }

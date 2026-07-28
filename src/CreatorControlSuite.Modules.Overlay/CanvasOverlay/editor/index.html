@@ -65,8 +65,8 @@
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5h9v9h-9zM8 3.5v9M3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
           <span class="ccs-sr-only">Raster</span>
         </label>
-        <label class="ccs-toolbar-toggle ccs-toolbar-num" title="Raster horizontal">H <input type="number" id="gridHInput" min="2" max="64" step="1" value="16" aria-label="Raster horizontal" /></label>
-        <label class="ccs-toolbar-toggle ccs-toolbar-num" title="Raster vertikal">V <input type="number" id="gridVInput" min="2" max="64" step="1" value="6" aria-label="Raster vertikal" /></label>
+        <label class="ccs-toolbar-toggle ccs-toolbar-num" title="Raster horizontal">H <input type="number" id="gridHInput" min="2" max="64" step="1" value="32" aria-label="Raster horizontal" /></label>
+        <label class="ccs-toolbar-toggle ccs-toolbar-num" title="Raster vertikal">V <input type="number" id="gridVInput" min="2" max="64" step="1" value="16" aria-label="Raster vertikal" /></label>
         <label class="ccs-toolbar-btn ccs-toolbar-toggle" title="Einrasten an Raster">
           <input type="checkbox" id="toggleGridSnap" />
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h3M9.5 8h3M8 3.5v3M8 9.5v3M6.2 6.2l1.8 1.8 1.8-1.8M6.2 9.8l1.8-1.8 1.8 1.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -99,7 +99,7 @@
           <label>Breite <input id="propW" type="number" /></label>
           <label>Höhe <input id="propH" type="number" /></label>
           <label>Z <input id="propZ" type="number" /></label>
-          <label><input id="propLocked" type="checkbox" /> Gesperrt</label>
+          <label>Gesperrt <input id="propLocked" type="checkbox" class="ccs-check" /></label>
         </div>
         <div class="ccs-props-pane" id="propExtra" data-pane="widget" role="tabpanel" hidden></div>
         <div class="ccs-props-pane" id="propEffects" data-pane="effects" role="tabpanel" hidden></div>

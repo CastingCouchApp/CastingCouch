@@ -6,7 +6,13 @@ import { textProp } from "../../controls/text-prop";
 import { selectProp } from "../../controls/select-prop";
 import { fontProp } from "../../controls/font-prop";
 import { colorProp } from "../../controls/color-prop";
-import { propSection, featureSection } from "../../sections/prop-section";
+import {
+  advancedSection,
+  contentSection,
+  featureSection,
+  lookSection,
+  styleSection
+} from "../../sections/prop-section";
 
 type SizeMap = Record<string, { w: number; h: number; label?: string }>;
 
@@ -20,17 +26,16 @@ function variantOptions(keys: readonly string[] | string[]): { value: string; la
   }));
 }
 
-function appendLookSection(
+function buildLookSection(
   id: string,
   item: LayoutItem,
   ctx: EditorContext,
-  propExtra: HTMLElement,
   variants: readonly string[] | string[],
   sizePresets: SizeMap,
   defaultVariant = "classic",
   defaultSize = "standard"
-): void {
-  const look = propSection(id + "-look", "Look");
+): { root: HTMLDetailsElement; body: HTMLDivElement } {
+  const look = lookSection(id);
   look.body.appendChild(
     selectProp("variant", "Style", item, ctx, variantOptions(variants), defaultVariant)
   );
@@ -54,7 +59,38 @@ function appendLookSection(
       }
     )
   );
-  propExtra.appendChild(look.root);
+  return look;
+}
+
+function appendAdvanced(
+  id: string,
+  propExtra: HTMLElement,
+  features: HTMLElement[]
+): void {
+  if (!features.length) return;
+  const advanced = advancedSection(id);
+  for (const feature of features) advanced.body.appendChild(feature);
+  propExtra.appendChild(advanced.root);
+}
+
+function featureToggle(
+  id: string,
+  title: string,
+  enabledKey: string,
+  item: LayoutItem,
+  ctx: EditorContext,
+  children?: (body: HTMLElement) => void
+): HTMLElement {
+  return featureSection({
+    id,
+    title,
+    enabledKey,
+    item,
+    commit: (apply) => {
+      ctx.commitProp(item, apply as (live: LayoutItem) => void);
+    },
+    children
+  });
 }
 
 export function appendGoalBarProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -68,9 +104,8 @@ export function appendGoalBarProps(item: LayoutItem, ctx: EditorContext, propExt
     wide: { w: 760, h: 96, label: "Wide" },
     banner: { w: 920, h: 64, label: "Banner" }
   };
-  appendLookSection("goal-bar", item, ctx, propExtra, variants, sizes);
 
-  const content = propSection("goal-bar-content", "Inhalt");
+  const content = contentSection("goal-bar");
   content.body.appendChild(selectProp("kind", "Ziel-Typ", item, ctx, [
     { value: "followers", label: "Follower" },
     { value: "subs", label: "Subs" },
@@ -86,8 +121,9 @@ export function appendGoalBarProps(item: LayoutItem, ctx: EditorContext, propExt
   content.body.appendChild(boolProp("showPercent", "Prozent", item, ctx));
   content.body.appendChild(boolProp("showRemaining", "Rest", item, ctx));
   propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("goal-bar", item, ctx, variants, sizes).root);
 
-  const style = propSection("goal-bar-style", "Stil");
+  const style = styleSection("goal-bar");
   style.body.appendChild(selectProp("fillStyle", "Fill", item, ctx, [
     { value: "solid", label: "Solid" },
     { value: "gradient", label: "Gradient" },
@@ -103,27 +139,11 @@ export function appendGoalBarProps(item: LayoutItem, ctx: EditorContext, propExt
   style.body.appendChild(colorProp("textColor", "Text", item, ctx, "#ffffff"));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "goal-bar-animate",
-    title: "Fill animieren",
-    enabledKey: "animateFill",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "goal-bar-hide-complete",
-    title: "Ausblenden wenn fertig",
-    enabledKey: "hideWhenComplete",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "goal-bar-pulse",
-    title: "Pulse bei Fortschritt",
-    enabledKey: "pulseOnProgress",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  appendAdvanced("goal-bar", propExtra, [
+    featureToggle("goal-bar-animate", "Fill animieren", "animateFill", item, ctx),
+    featureToggle("goal-bar-hide-complete", "Ausblenden wenn fertig", "hideWhenComplete", item, ctx),
+    featureToggle("goal-bar-pulse", "Pulse bei Fortschritt", "pulseOnProgress", item, ctx)
+  ]);
 }
 
 export function appendEventTickerProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -136,9 +156,8 @@ export function appendEventTickerProps(item: LayoutItem, ctx: EditorContext, pro
     tall: { w: 1100, h: 80, label: "Tall" },
     banner: { w: 1400, h: 64, label: "Banner" }
   };
-  appendLookSection("event-ticker", item, ctx, propExtra, variants, sizes);
 
-  const content = propSection("event-ticker-content", "Inhalt");
+  const content = contentSection("event-ticker");
   content.body.appendChild(numProp("maxItems", "Max. Items", item, ctx, 20));
   content.body.appendChild(selectProp("order", "Reihenfolge", item, ctx, [
     { value: "newest", label: "Neueste zuerst" },
@@ -156,8 +175,9 @@ export function appendEventTickerProps(item: LayoutItem, ctx: EditorContext, pro
   ], "marquee"));
   content.body.appendChild(numProp("speed", "Geschwindigkeit", item, ctx, 40));
   propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("event-ticker", item, ctx, variants, sizes).root);
 
-  const style = propSection("event-ticker-style", "Stil");
+  const style = styleSection("event-ticker");
   style.body.appendChild(fontProp("fontFamily", "Schrift", item, ctx));
   style.body.appendChild(numProp("fontSizePx", "Schrift px", item, ctx, 16));
   style.body.appendChild(colorProp("color", "Text", item, ctx, "#ffffff"));
@@ -169,27 +189,11 @@ export function appendEventTickerProps(item: LayoutItem, ctx: EditorContext, pro
   style.body.appendChild(numProp("paddingPx", "Padding px", item, ctx, 10));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "event-ticker-hide-empty",
-    title: "Leer ausblenden",
-    enabledKey: "hideWhenEmpty",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "event-ticker-uppercase",
-    title: "Uppercase",
-    enabledKey: "uppercase",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "event-ticker-avatars",
-    title: "Avatare",
-    enabledKey: "showAvatars",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  appendAdvanced("event-ticker", propExtra, [
+    featureToggle("event-ticker-hide-empty", "Leer ausblenden", "hideWhenEmpty", item, ctx),
+    featureToggle("event-ticker-uppercase", "Uppercase", "uppercase", item, ctx),
+    featureToggle("event-ticker-avatars", "Avatare", "showAvatars", item, ctx)
+  ]);
 }
 
 export function appendViewerCountProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -202,9 +206,8 @@ export function appendViewerCountProps(item: LayoutItem, ctx: EditorContext, pro
     standard: { w: 260, h: 80, label: "Standard" },
     wide: { w: 360, h: 88, label: "Wide" }
   };
-  appendLookSection("viewer-count", item, ctx, propExtra, variants, sizes);
 
-  const content = propSection("viewer-count-content", "Inhalt");
+  const content = contentSection("viewer-count");
   content.body.appendChild(textProp("label", "Label", item, ctx, "Viewer"));
   content.body.appendChild(boolProp("showLabel", "Label", item, ctx));
   content.body.appendChild(boolProp("showIcon", "Icon", item, ctx));
@@ -220,8 +223,9 @@ export function appendViewerCountProps(item: LayoutItem, ctx: EditorContext, pro
     { value: "flex-end", label: "Rechts" }
   ], "center"));
   propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("viewer-count", item, ctx, variants, sizes).root);
 
-  const style = propSection("viewer-count-style", "Stil");
+  const style = styleSection("viewer-count");
   style.body.appendChild(fontProp("fontFamily", "Schrift", item, ctx));
   style.body.appendChild(numProp("fontSizePx", "Schrift px", item, ctx, 28));
   style.body.appendChild(numProp("iconSize", "Icon px", item, ctx, 22));
@@ -232,20 +236,10 @@ export function appendViewerCountProps(item: LayoutItem, ctx: EditorContext, pro
   style.body.appendChild(numProp("borderRadiusPx", "Radius px", item, ctx, 12));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "viewer-count-offline",
-    title: "Offline ausblenden",
-    enabledKey: "hideWhenOffline",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "viewer-count-pulse",
-    title: "Pulse bei Änderung",
-    enabledKey: "pulseOnChange",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  appendAdvanced("viewer-count", propExtra, [
+    featureToggle("viewer-count-offline", "Offline ausblenden", "hideWhenOffline", item, ctx),
+    featureToggle("viewer-count-pulse", "Pulse bei Änderung", "pulseOnChange", item, ctx)
+  ]);
 }
 
 export function appendLowerThirdProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -259,9 +253,8 @@ export function appendLowerThirdProps(item: LayoutItem, ctx: EditorContext, prop
     wide: { w: 720, h: 140, label: "Wide" },
     banner: { w: 960, h: 128, label: "Banner" }
   };
-  appendLookSection("lower-third", item, ctx, propExtra, variants, sizes);
 
-  const content = propSection("lower-third-content", "Inhalt");
+  const content = contentSection("lower-third");
   content.body.appendChild(textProp("name", "Name", item, ctx, "Streamer"));
   content.body.appendChild(textProp("subtitle", "Untertitel", item, ctx, "Just Chatting"));
   content.body.appendChild(textProp("tag", "Tag", item, ctx, "LIVE"));
@@ -292,8 +285,9 @@ export function appendLowerThirdProps(item: LayoutItem, ctx: EditorContext, prop
     { value: "wipe", label: "Wipe" }
   ], "none"));
   propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("lower-third", item, ctx, variants, sizes).root);
 
-  const style = propSection("lower-third-style", "Stil");
+  const style = styleSection("lower-third");
   style.body.appendChild(fontProp("nameFont", "Name-Font", item, ctx));
   style.body.appendChild(fontProp("subtitleFont", "Subtitle-Font", item, ctx));
   style.body.appendChild(numProp("nameSizePx", "Name px", item, ctx, 28));
@@ -320,9 +314,8 @@ export function appendQrCodeProps(item: LayoutItem, ctx: EditorContext, propExtr
     lg: { w: 280, h: 320, label: "L" },
     xl: { w: 360, h: 400, label: "XL" }
   };
-  appendLookSection("qr-code", item, ctx, propExtra, variants, sizes, "classic", "md");
 
-  const content = propSection("qr-code-content", "Inhalt");
+  const content = contentSection("qr-code");
   content.body.appendChild(textProp("url", "URL", item, ctx, ""));
   content.body.appendChild(textProp("caption", "Caption", item, ctx, "Scan me"));
   content.body.appendChild(boolProp("showCaption", "Caption", item, ctx));
@@ -342,8 +335,9 @@ export function appendQrCodeProps(item: LayoutItem, ctx: EditorContext, propExtr
   content.body.appendChild(boolProp("showLogo", "Logo", item, ctx));
   content.body.appendChild(boolProp("frame", "Rahmen", item, ctx));
   propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("qr-code", item, ctx, variants, sizes, "classic", "md").root);
 
-  const style = propSection("qr-code-style", "Stil");
+  const style = styleSection("qr-code");
   style.body.appendChild(colorProp("fg", "QR Vordergrund", item, ctx, "#111111"));
   style.body.appendChild(colorProp("bg", "QR Hintergrund", item, ctx, "#ffffff"));
   style.body.appendChild(colorProp("color", "Rahmen-Akzent", item, ctx, "#ff7a00"));
@@ -352,20 +346,10 @@ export function appendQrCodeProps(item: LayoutItem, ctx: EditorContext, propExtr
   style.body.appendChild(numProp("paddingPx", "Padding px", item, ctx, 12));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "qr-code-invert",
-    title: "Invertieren",
-    enabledKey: "invert",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "qr-code-hide-empty",
-    title: "Ohne URL ausblenden",
-    enabledKey: "hideWhenEmptyUrl",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  appendAdvanced("qr-code", propExtra, [
+    featureToggle("qr-code-invert", "Invertieren", "invert", item, ctx),
+    featureToggle("qr-code-hide-empty", "Ohne URL ausblenden", "hideWhenEmptyUrl", item, ctx)
+  ]);
 }
 
 export function appendBrbPanelProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -380,9 +364,8 @@ export function appendBrbPanelProps(item: LayoutItem, ctx: EditorContext, propEx
     poster: { w: 720, h: 900, label: "Poster" },
     brb: { w: 1060, h: 420, label: "BRB" }
   };
-  appendLookSection("brb-panel", item, ctx, propExtra, variants, sizes, "classic", "brb");
 
-  const content = propSection("brb-panel-content", "Inhalt");
+  const content = contentSection("brb-panel");
   content.body.appendChild(selectProp("mode", "Modus", item, ctx, [
     { value: "brb", label: "BRB" },
     { value: "starting", label: "Starting Soon" },
@@ -409,8 +392,9 @@ export function appendBrbPanelProps(item: LayoutItem, ctx: EditorContext, propEx
   ], "center"));
   content.body.appendChild(numProp("stackGap", "Gap px", item, ctx, 12));
   propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("brb-panel", item, ctx, variants, sizes, "classic", "brb").root);
 
-  const style = propSection("brb-panel-style", "Stil");
+  const style = styleSection("brb-panel");
   style.body.appendChild(fontProp("titleFont", "Titel-Font", item, ctx));
   style.body.appendChild(fontProp("messageFont", "Message-Font", item, ctx));
   style.body.appendChild(numProp("titleSizePx", "Titel px", item, ctx, 48));
@@ -423,27 +407,11 @@ export function appendBrbPanelProps(item: LayoutItem, ctx: EditorContext, propEx
   style.body.appendChild(numProp("borderRadiusPx", "Radius px", item, ctx, 16));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "brb-panel-countdown",
-    title: "Countdown anzeigen",
-    enabledKey: "showCountdown",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "brb-panel-uppercase",
-    title: "Titel Uppercase",
-    enabledKey: "uppercaseTitle",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "brb-panel-hide-idle",
-    title: "Ausblenden wenn Countdown idle",
-    enabledKey: "hideWhenCountdownIdle",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  appendAdvanced("brb-panel", propExtra, [
+    featureToggle("brb-panel-countdown", "Countdown anzeigen", "showCountdown", item, ctx),
+    featureToggle("brb-panel-uppercase", "Titel Uppercase", "uppercaseTitle", item, ctx),
+    featureToggle("brb-panel-hide-idle", "Ausblenden wenn Countdown idle", "hideWhenCountdownIdle", item, ctx)
+  ]);
 }
 
 export function appendAnnouncementBarProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -456,9 +424,8 @@ export function appendAnnouncementBarProps(item: LayoutItem, ctx: EditorContext,
     tall: { w: 1100, h: 88, label: "Tall" },
     banner: { w: 1400, h: 72, label: "Banner" }
   };
-  appendLookSection("announcement-bar", item, ctx, propExtra, variants, sizes);
 
-  const content = propSection("announcement-bar-content", "Inhalt");
+  const content = contentSection("announcement-bar");
   content.body.appendChild(textProp("message", "Nachricht", item, ctx, "Willkommen im Stream!"));
   content.body.appendChild(textProp("prefix", "Prefix", item, ctx, ""));
   content.body.appendChild(textProp("icon", "Icon", item, ctx, ""));
@@ -476,8 +443,9 @@ export function appendAnnouncementBarProps(item: LayoutItem, ctx: EditorContext,
     { value: "flex-end", label: "Rechts" }
   ], "center"));
   propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("announcement-bar", item, ctx, variants, sizes).root);
 
-  const style = propSection("announcement-bar-style", "Stil");
+  const style = styleSection("announcement-bar");
   style.body.appendChild(fontProp("fontFamily", "Schrift", item, ctx));
   style.body.appendChild(numProp("fontSizePx", "Schrift px", item, ctx, 18));
   style.body.appendChild(colorProp("color", "Text", item, ctx, "#ffffff"));
@@ -488,34 +456,12 @@ export function appendAnnouncementBarProps(item: LayoutItem, ctx: EditorContext,
   style.body.appendChild(numProp("paddingPx", "Padding px", item, ctx, 12));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "announcement-bar-scroll",
-    title: "Scroll / Marquee",
-    enabledKey: "scroll",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "announcement-bar-uppercase",
-    title: "Uppercase",
-    enabledKey: "uppercase",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "announcement-bar-accent",
-    title: "Akzent-Punkt",
-    enabledKey: "showAccentDot",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "announcement-bar-hide-empty",
-    title: "Leer ausblenden",
-    enabledKey: "hideWhenEmpty",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  appendAdvanced("announcement-bar", propExtra, [
+    featureToggle("announcement-bar-scroll", "Scroll / Marquee", "scroll", item, ctx),
+    featureToggle("announcement-bar-uppercase", "Uppercase", "uppercase", item, ctx),
+    featureToggle("announcement-bar-accent", "Akzent-Punkt", "showAccentDot", item, ctx),
+    featureToggle("announcement-bar-hide-empty", "Leer ausblenden", "hideWhenEmpty", item, ctx)
+  ]);
 }
 
 export function appendAnimatedBackgroundProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -540,7 +486,7 @@ export function appendAnimatedBackgroundProps(item: LayoutItem, ctx: EditorConte
     vertical: { w: 1080, h: 1920, label: "Vertical" }
   };
 
-  const look = propSection("animated-background-look", "Look");
+  const look = lookSection("animated-background");
   look.body.appendChild(
     selectProp(
       "variant",
@@ -576,34 +522,24 @@ export function appendAnimatedBackgroundProps(item: LayoutItem, ctx: EditorConte
   );
   propExtra.appendChild(look.root);
 
-  const motion = propSection("animated-background-motion", "Motion");
+  const motion = contentSection("animated-background", "Motion");
   motion.body.appendChild(numProp("speed", "Speed", item, ctx, 1));
   motion.body.appendChild(numProp("intensity", "Intensity", item, ctx, 0.85));
   motion.body.appendChild(numProp("density", "Density", item, ctx, 1));
   motion.body.appendChild(numProp("opacity", "Opacity", item, ctx, 1));
   propExtra.appendChild(motion.root);
 
-  const style = propSection("animated-background-style", "Farben");
+  const style = styleSection("animated-background", "Farben");
   style.body.appendChild(colorProp("color", "Farbe 1", item, ctx, "#00f0ff"));
   style.body.appendChild(colorProp("color2", "Farbe 2", item, ctx, "#ff00aa"));
   style.body.appendChild(colorProp("color3", "Farbe 3", item, ctx, "#7a00ff"));
   style.body.appendChild(numProp("borderRadiusPx", "Radius px", item, ctx, 0));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "animated-background-vignette",
-    title: "Vignette",
-    enabledKey: "vignette",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "animated-background-paused",
-    title: "Animation pausieren",
-    enabledKey: "paused",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  appendAdvanced("animated-background", propExtra, [
+    featureToggle("animated-background-vignette", "Vignette", "vignette", item, ctx),
+    featureToggle("animated-background-paused", "Animation pausieren", "paused", item, ctx)
+  ]);
 }
 
 export function appendDividerProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -615,9 +551,8 @@ export function appendDividerProps(item: LayoutItem, ctx: EditorContext, propExt
     standard: { w: 600, h: 16, label: "Standard" },
     ornate: { w: 800, h: 32, label: "Ornate" }
   };
-  appendLookSection("divider", item, ctx, propExtra, variants, sizes, "line", "standard");
 
-  const content = propSection("divider-content", "Inhalt");
+  const content = contentSection("divider");
   content.body.appendChild(selectProp("orientation", "Orientierung", item, ctx, [
     { value: "h", label: "Horizontal" },
     { value: "v", label: "Vertikal" }
@@ -643,20 +578,17 @@ export function appendDividerProps(item: LayoutItem, ctx: EditorContext, propExt
   ], "diamond"));
   content.body.appendChild(numProp("motifSize", "Motif px", item, ctx, 18));
   propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("divider", item, ctx, variants, sizes, "line", "standard").root);
 
-  const style = propSection("divider-style", "Stil");
+  const style = styleSection("divider");
   style.body.appendChild(colorProp("color", "Farbe", item, ctx, "#ff7a00"));
   style.body.appendChild(colorProp("color2", "Farbe 2", item, ctx, "#ffffff"));
   style.body.appendChild(numProp("opacity", "Opacity", item, ctx, 1));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "divider-shimmer",
-    title: "Shimmer",
-    enabledKey: "animateShimmer",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  appendAdvanced("divider", propExtra, [
+    featureToggle("divider-shimmer", "Shimmer", "animateShimmer", item, ctx)
+  ]);
 }
 
 export function appendCamRingProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -669,9 +601,8 @@ export function appendCamRingProps(item: LayoutItem, ctx: EditorContext, propExt
     "cam-lg": { w: 420, h: 420, label: "Cam L" },
     "cam-tall": { w: 280, h: 400, label: "Cam Tall" }
   };
-  appendLookSection("cam-ring", item, ctx, propExtra, variants, sizes, "ring", "cam-md");
 
-  const content = propSection("cam-ring-content", "Inhalt");
+  const content = contentSection("cam-ring");
   content.body.appendChild(numProp("strokeWidth", "Stroke px", item, ctx, 6));
   content.body.appendChild(numProp("gap", "Gap px", item, ctx, 8));
   content.body.appendChild(numProp("radius", "Radius px", item, ctx, 999));
@@ -691,28 +622,19 @@ export function appendCamRingProps(item: LayoutItem, ctx: EditorContext, propExt
   ], "tr"));
   content.body.appendChild(boolProp("showInnerGlow", "Inner Glow", item, ctx));
   propExtra.appendChild(content.root);
+  propExtra.appendChild(buildLookSection("cam-ring", item, ctx, variants, sizes, "ring", "cam-md").root);
 
-  const style = propSection("cam-ring-style", "Stil");
+  const style = styleSection("cam-ring");
   style.body.appendChild(colorProp("color", "Ring", item, ctx, "#ff7a00"));
   style.body.appendChild(colorProp("color2", "Glow", item, ctx, "#ffb36b"));
   style.body.appendChild(colorProp("badgeColor", "Badge BG", item, ctx, "#e10600"));
   style.body.appendChild(colorProp("badgeTextColor", "Badge Text", item, ctx, "#ffffff"));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "cam-ring-pulse",
-    title: "Pulse",
-    enabledKey: "pulse",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "cam-ring-rotate",
-    title: "Langsam drehen",
-    enabledKey: "rotateSlow",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); }
-  }));
+  appendAdvanced("cam-ring", propExtra, [
+    featureToggle("cam-ring-pulse", "Pulse", "pulse", item, ctx),
+    featureToggle("cam-ring-rotate", "Langsam drehen", "rotateSlow", item, ctx)
+  ]);
 }
 
 export function appendStickerProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {
@@ -723,7 +645,7 @@ export function appendStickerProps(item: LayoutItem, ctx: EditorContext, propExt
     "flat", "neon", "glass", "outline", "soft", "badge"
   ];
 
-  const look = propSection("sticker-look", "Look");
+  const look = lookSection("sticker");
   look.body.appendChild(selectProp("variant", "Hülle", item, ctx, variantOptions(variants), "flat"));
   look.body.appendChild(selectProp("preset", "Preset", item, ctx, variantOptions(presets), "heart"));
   look.body.appendChild(textProp("src", "Custom-URL", item, ctx, ""));
@@ -734,7 +656,7 @@ export function appendStickerProps(item: LayoutItem, ctx: EditorContext, propExt
   ], "contain"));
   propExtra.appendChild(look.root);
 
-  const style = propSection("sticker-style", "Stil");
+  const style = styleSection("sticker");
   style.body.appendChild(numProp("rotateDeg", "Rotation °", item, ctx, 0));
   style.body.appendChild(numProp("scale", "Scale", item, ctx, 1));
   style.body.appendChild(numProp("opacity", "Opacity", item, ctx, 1));
@@ -744,36 +666,17 @@ export function appendStickerProps(item: LayoutItem, ctx: EditorContext, propExt
   style.body.appendChild(colorProp("color2", "Akzent", item, ctx, "#ffb36b"));
   propExtra.appendChild(style.root);
 
-  propExtra.appendChild(featureSection({
-    id: "sticker-bob",
-    title: "Bob",
-    enabledKey: "bob",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); },
-    children: (body) => {
+  appendAdvanced("sticker", propExtra, [
+    featureToggle("sticker-bob", "Bob", "bob", item, ctx, (body) => {
       body.appendChild(numProp("bobAmplitude", "Amplitude", item, ctx, 6));
       body.appendChild(numProp("bobSpeed", "Speed", item, ctx, 1));
-    }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "sticker-spin",
-    title: "Spin",
-    enabledKey: "spin",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); },
-    children: (body) => {
+    }),
+    featureToggle("sticker-spin", "Spin", "spin", item, ctx, (body) => {
       body.appendChild(numProp("spinSpeed", "Speed", item, ctx, 1));
-    }
-  }));
-  propExtra.appendChild(featureSection({
-    id: "sticker-pulse",
-    title: "Pulse",
-    enabledKey: "pulse",
-    item,
-    commit: (apply) => { ctx.commitProp(item, apply as (live: LayoutItem) => void); },
-    children: (body) => {
+    }),
+    featureToggle("sticker-pulse", "Pulse", "pulse", item, ctx, (body) => {
       body.appendChild(numProp("pulseAmplitude", "Amplitude", item, ctx, 0.08));
       body.appendChild(numProp("pulseSpeed", "Speed", item, ctx, 1));
-    }
-  }));
+    })
+  ]);
 }

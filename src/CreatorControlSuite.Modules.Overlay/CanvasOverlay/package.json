@@ -6,10 +6,15 @@
   "scripts": {
     "build": "node esbuild.config.mjs",
     "build:watch": "node esbuild.config.mjs --watch",
-    "dev": "node dev/dev-server.mjs"
+    "dev": "node dev/dev-server.mjs",
+    "typecheck": "tsc -p tsconfig.quality.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
-    "typescript": "^5.7.3"
+    "jsdom": "^30.0.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.10"
   }
 }

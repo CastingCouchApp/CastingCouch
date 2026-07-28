@@ -78,7 +78,7 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("MUSIC_VARIANTS", editor);
         Assert.Contains("MUSIC_SIZE_PRESETS", editor);
         Assert.Contains("MUSIC_VARIANT_LABELS", editor);
-        Assert.Contains("music-look", editor);
+        Assert.Contains("lookSection(\"music\"", editor);
 
         Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
         Assert.Contains(".ccs-spotify", styles);
@@ -912,7 +912,7 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("type: \"animated-background\"", editor);
         Assert.Contains("Animated Background", editor);
         Assert.Contains("ANIMATED_BACKGROUND_VARIANTS", editor);
-        Assert.Contains("animated-background-look", editor);
+        Assert.Contains("lookSection(\"animated-background\")", editor);
 
         Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
         Assert.Contains(".ccs-animated-bg", styles);

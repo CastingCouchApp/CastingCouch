@@ -11,6 +11,7 @@ import { loadEditorPrefs, saveEditorPrefs, type EditorPrefs } from "./shell/edit
 import { applyEditorLayers, setupObsPreviewPolling } from "./shell/obs-preview";
 import { runEditorCommand } from "./shell/commands";
 import { setupContextMenu } from "./shell/context-menu";
+import { wireInspectorTabs } from "./shell/inspector-tabs";
 
 let editorRuntime: CreateRuntime;
 let editorCtx: EditorContext;
@@ -220,8 +221,8 @@ function wireToolbarPrefs(saveStatus: HTMLElement, onObsPreviewChanged: () => vo
     prefs = {
       obsPreview: obsToggle.checked,
       grid: gridToggle.checked,
-      gridH: Number(gridH.value) || 16,
-      gridV: Number(gridV.value) || 6,
+      gridH: Number(gridH.value) || 32,
+      gridV: Number(gridV.value) || 16,
       gridSnap: gridSnapToggle.checked,
       magnet: magnetToggle.checked
     };
@@ -348,47 +349,6 @@ function wrapGeometrySection(): void {
   const locked = layoutPane.querySelector("#propLocked")?.closest("label");
   if (locked) body.appendChild(locked);
   layoutPane.appendChild(root);
-}
-
-const TAB_STORAGE_KEY = "ccs-props-tab";
-
-function wireInspectorTabs(): void {
-  const tabsRoot = document.getElementById("propsTabs");
-  const form = document.getElementById("propsForm");
-  if (!tabsRoot || !form) return;
-
-  const tabs = Array.from(tabsRoot.querySelectorAll<HTMLButtonElement>(".ccs-props-tab"));
-  const panes = Array.from(form.querySelectorAll<HTMLElement>(".ccs-props-pane"));
-
-  function activate(tabId: string): void {
-    const next = tabs.some((t) => t.dataset.tab === tabId) ? tabId : "layout";
-    try {
-      sessionStorage.setItem(TAB_STORAGE_KEY, next);
-    } catch {
-      /* ignore */
-    }
-    for (const tab of tabs) {
-      const selected = tab.dataset.tab === next;
-      tab.setAttribute("aria-selected", selected ? "true" : "false");
-    }
-    for (const pane of panes) {
-      pane.hidden = pane.dataset.pane !== next;
-    }
-  }
-
-  let stored = "layout";
-  try {
-    stored = sessionStorage.getItem(TAB_STORAGE_KEY) || "layout";
-  } catch {
-    /* ignore */
-  }
-  activate(stored);
-
-  tabsRoot.addEventListener("click", (e) => {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".ccs-props-tab");
-    if (!btn || !btn.dataset.tab) return;
-    activate(btn.dataset.tab);
-  });
 }
 
 function addItem(type: string, kind: string, x: number, y: number): void {
