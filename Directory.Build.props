@@ -14,6 +14,6 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);**\artifacts\**</DefaultItemExcludes>
     <Company>CastingCouch</Company>
     <Product>CastingCouch</Product>
-    <Version>8.0.0-alpha102</Version>
+    <Version>8.0.0-beta1</Version>
   </PropertyGroup>
 </Project>
