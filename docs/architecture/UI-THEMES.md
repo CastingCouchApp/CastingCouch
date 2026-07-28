@@ -1,18 +1,18 @@
-# UI-Themes
+﻿# UI-Themes
 
-Die CastingCouch unterstützt austauschbare App-Shell-Themes (Farben + Fonts). Overlay-/Broadcast-Branding bleibt davon getrennt.
+Die CastingCouch unterst├╝tzt austauschbare App-Shell-Themes (Farben + Fonts). Overlay-/Broadcast-Branding bleibt davon getrennt.
 
 ## Auswahl und Persistenz
 
-- UI: **Einstellungen → Allgemein → Darstellung → Theme**
+- UI: **Einstellungen ÔåÆ Allgemein ÔåÆ Darstellung ÔåÆ Theme**
 - Setting: `General.ThemeId` in `%LocalAppData%\CreatorControlSuite\settings.json`
 - Default / Fallback: `classic`
 - Umschalten wirkt sofort (Preview); Speichern persistiert die Auswahl
 
-## Verfügbarkeit
+## Verf├╝gbarkeit
 
-Alle Themes sind ohne Editionen oder Feature-Gates verfügbar. Unbekannte
-Theme-IDs fallen weiterhin auf Classic zurück.
+Alle Themes sind ohne Editionen oder Feature-Gates verf├╝gbar. Unbekannte
+Theme-IDs fallen weiterhin auf Classic zur├╝ck.
 
 ## Theme-Ids
 
@@ -26,22 +26,23 @@ Theme-IDs fallen weiterhin auf Classic zurück.
 | `neon-night-market` | Neon Night Market |
 | `terminal-green-override` | Terminal Green Override |
 | `blood-moon-broadcast` | Blood Moon Broadcast |
-| `pastel-lofi-cafe` | Pastel Lo-Fi Café |
+| `pastel-lofi-cafe` | Pastel Lo-Fi Caf├® |
 | `gold-rush-studio` | Gold Rush Studio |
 | `arctic-glass-lab` | Arctic Glass Lab |
+| `biomilchs-bubatz-cantina` | biomilchs Bubatz Cantina |
 
 ## Technik
 
 - ResourceDictionaries unter `src/CreatorControlSuite.App/Themes/*.xaml`
-- Live-Swap über `IThemeService` / `ThemeService` (`Application.Resources.MergedDictionaries`)
-- Styles und Shell nutzen `{DynamicResource …}`-Tokens
+- Live-Swap ├╝ber `IThemeService` / `ThemeService` (`Application.Resources.MergedDictionaries`)
+- Styles und Shell nutzen `{DynamicResource ÔÇª}`-Tokens
 - Katalog: `ThemeCatalog` in der App-Assembly
 
 ### Wichtige Token-Keys
 
-Flächen: `WindowBackgroundBrush`, `PanelBackgroundBrush`, `SidebarBackgroundBrush`, `CardBackgroundBrush`, `ElevatedBackgroundBrush`, `InputBackgroundBrush`
+Fl├ñchen: `WindowBackgroundBrush`, `PanelBackgroundBrush`, `SidebarBackgroundBrush`, `CardBackgroundBrush`, `ElevatedBackgroundBrush`, `InputBackgroundBrush`
 
-Shell-Chrome: Custom Titlebar nutzt `TitleBarBackgroundBrush` (Vertikal-Gradient für leichten 3D-Effekt), `TitleBarHighlightBrush` (obere Highlight-Kante), `TitleBarDividerBrush` (Widget-Trenner), `SidebarBorderBrush`; Caption-Hover über Nav-/Danger-Tokens. TitleBar-Widgets default flach (`TitleBarWidgetStyle` / `TitleBarDividerStyle`); optional Cards über `General.TitleBarWidgetCardsEnabled`. Einzelne Widgets per Rechtsklick-Menü ein-/ausblendbar (`General.TitleBarHiddenWidgets`, Keys in `TitleBarWidgetVisibility`).
+Shell-Chrome: Custom Titlebar nutzt `TitleBarBackgroundBrush` (Vertikal-Gradient f├╝r leichten 3D-Effekt), `TitleBarHighlightBrush` (obere Highlight-Kante), `TitleBarDividerBrush` (Widget-Trenner), `SidebarBorderBrush`; Caption-Hover ├╝ber Nav-/Danger-Tokens. TitleBar-Widgets default flach (`TitleBarWidgetStyle` / `TitleBarDividerStyle`); optional Cards ├╝ber `General.TitleBarWidgetCardsEnabled`. Einzelne Widgets per Rechtsklick-Men├╝ ein-/ausblendbar (`General.TitleBarHiddenWidgets`, Keys in `TitleBarWidgetVisibility`).
 
 Text: `TextPrimaryBrush`, `TextSecondaryBrush`, `TextMutedBrush`, `TextOnAccentBrush`
 
@@ -51,4 +52,4 @@ Nav: `NavHoverBackgroundBrush`, `NavActiveBackgroundBrush`, `NavActiveForeground
 
 Font: `AppFontFamily`, `AppHeadingFontFamily`
 
-Legacy-Aliase (weiterhin gültig): `PanelBrush`, `CardBrush`, `MutedBrush`
+Legacy-Aliase (weiterhin g├╝ltig): `PanelBrush`, `CardBrush`, `MutedBrush`

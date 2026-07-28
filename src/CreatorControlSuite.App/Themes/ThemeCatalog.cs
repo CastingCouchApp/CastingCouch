@@ -60,7 +60,12 @@ public static class ThemeCatalog
             "arctic-glass-lab",
             "Arctic Glass Lab",
             "Eisblau und Frostweiß auf kühlen Glasflächen.",
-            "Themes/ArcticGlassLab.xaml")
+            "Themes/ArcticGlassLab.xaml"),
+        new(
+            "biomilchs-bubatz-cantina",
+            "biomilchs Bubatz Cantina",
+            "Orbit-Cantina für die große Liebe: Bubatz-Grün, Blue-Milk-Türkis und warmes Cantina-Gold auf Tiefraumblau.",
+            "Themes/BiomilchsBubatzCantina.xaml")
     ];
 
     public static ThemeDefinition Classic => All[0];
