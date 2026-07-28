@@ -70,28 +70,9 @@ public partial class MainWindow
 {
     private RunOfShowPlanSettings EnsureRunOfShowPlansInitialized()
     {
-        _settings.Workflow.RunOfShowPlans ??= [];
         _settings.Obs.AudioProfiles ??= [];
         RefreshObsAudioProfilesUi();
-        if (_settings.Workflow.RunOfShowPlans.Count == 0)
-        {
-            List<RunOfShowStepSettings> legacySteps = _settings.Workflow.RunOfShowSteps ?? [];
-            var initialPlan = new RunOfShowPlanSettings
-            {
-                Name = "Standard",
-                Steps = legacySteps
-            };
-            _settings.Workflow.RunOfShowPlans.Add(initialPlan);
-            _settings.Workflow.ActiveRunOfShowPlanId = initialPlan.Id;
-        }
-
-        RunOfShowPlanSettings active = _settings.Workflow.RunOfShowPlans.FirstOrDefault(x =>
-            string.Equals(x.Id, _settings.Workflow.ActiveRunOfShowPlanId, StringComparison.OrdinalIgnoreCase))
-            ?? _settings.Workflow.RunOfShowPlans[0];
-        active.Steps ??= [];
-        _settings.Workflow.ActiveRunOfShowPlanId = active.Id;
-        _settings.Workflow.RunOfShowSteps = active.Steps;
-        return active;
+        return RunOfShowPlanService.EnsureInitialized(_settings.Workflow);
     }
 
     private RunOfShowPlanSettings? CurrentRunOfShowPlan()
@@ -156,8 +137,7 @@ public partial class MainWindow
             await PersistRunOfShowAsync();
         }
 
-        _settings.Workflow.ActiveRunOfShowPlanId = selected.Id;
-        _settings.Workflow.RunOfShowSteps = selected.Steps ?? [];
+        RunOfShowPlanService.ActivatePlan(_settings.Workflow, selected);
         _runOfShowSteps.Clear();
         foreach (RunOfShowStepSettings step in _settings.Workflow.RunOfShowSteps)
         {
@@ -174,18 +154,8 @@ public partial class MainWindow
     private async Task CreateRunOfShowPlanAsync()
     {
         await PersistRunOfShowAsync();
-        string baseName = "Neuer Regieplan";
-        string name = baseName;
-        int counter = 2;
-        while (_settings.Workflow.RunOfShowPlans.Any(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)))
-        {
-            name = $"{baseName} {counter++}";
-        }
-
-        var plan = new RunOfShowPlanSettings { Name = name };
-        _settings.Workflow.RunOfShowPlans.Add(plan);
-        _settings.Workflow.ActiveRunOfShowPlanId = plan.Id;
-        _settings.Workflow.RunOfShowSteps = plan.Steps;
+        RunOfShowPlanSettings plan =
+            RunOfShowPlanService.CreateAndActivatePlan(_settings.Workflow);
         _runOfShowSteps.Clear();
         _runOfShowCurrentIndex = -1;
         RefreshRunOfShowPlanSelector();
@@ -204,21 +174,19 @@ public partial class MainWindow
             return;
         }
 
-        string name = WorkflowPageViewHost.RunOfShowViewHost.RunOfShowPlanBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(name))
+        string? error = RunOfShowPlanService.RenamePlan(
+            plan,
+            _settings.Workflow.RunOfShowPlans,
+            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowPlanBox.Text);
+        if (error is not null)
         {
-            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Bitte einen Namen für den Regieplan eingeben.";
+            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = error;
             return;
         }
-        if (_settings.Workflow.RunOfShowPlans.Any(x => x != plan && string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)))
-        {
-            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Ein Regieplan mit diesem Namen existiert bereits.";
-            return;
-        }
-        plan.Name = name;
+
         RefreshRunOfShowPlanSelector();
         await _settingsStore.SaveAsync(_settings);
-        WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = $"Regieplan in '{name}' umbenannt.";
+        WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = $"Regieplan in '{plan.Name}' umbenannt.";
     }
 
     private async Task DeleteRunOfShowPlanAsync()
@@ -237,10 +205,10 @@ public partial class MainWindow
         }
 
         StopAutomaticRunOfShow();
-        _settings.Workflow.RunOfShowPlans.Remove(plan);
-        RunOfShowPlanSettings next = _settings.Workflow.RunOfShowPlans[0];
-        _settings.Workflow.ActiveRunOfShowPlanId = next.Id;
-        _settings.Workflow.RunOfShowSteps = next.Steps;
+        RunOfShowPlanSettings next =
+            RunOfShowPlanService.DeletePlanAndActivateNext(
+                _settings.Workflow,
+                plan);
         _runOfShowSteps.Clear();
         foreach (RunOfShowStepSettings step in next.Steps)
         {
@@ -271,32 +239,10 @@ public partial class MainWindow
             return;
         }
 
-        var copy = new RunOfShowStepSettings
-        {
-            Name = source.Name + " (Kopie)",
-            Enabled = source.Enabled,
-            ObsScene = source.ObsScene,
-            TransitionName = source.TransitionName,
-            TransitionDurationMilliseconds = source.TransitionDurationMilliseconds,
-            SpotifyAction = source.SpotifyAction,
-            SpotifyVolumePercent = source.SpotifyVolumePercent,
-            SpotifyPlaylistUri = source.SpotifyPlaylistUri,
-            SpotifyPlaylistShuffle = source.SpotifyPlaylistShuffle,
-            SpotifyActionDelaySeconds = source.SpotifyActionDelaySeconds,
-            SpotifyFadeSeconds = source.SpotifyFadeSeconds,
-            SpotifyPriority = source.SpotifyPriority,
-            StreamerBotActionId = source.StreamerBotActionId,
-            StreamerBotActionName = source.StreamerBotActionName,
-            ActionDelayMilliseconds = source.ActionDelayMilliseconds,
-            ContinueOnActionError = source.ContinueOnActionError,
-            UpdateTwitchChannel = source.UpdateTwitchChannel,
-            TwitchTitle = source.TwitchTitle,
-            TwitchCategoryId = source.TwitchCategoryId,
-            TwitchCategoryName = source.TwitchCategoryName,
-            ContinueOnTwitchError = source.ContinueOnTwitchError,
-            AutoAdvance = source.AutoAdvance,
-            AutoAdvanceDelaySeconds = source.AutoAdvanceDelaySeconds
-        };
+        RunOfShowStepSettings copy =
+            RunOfShowPlanService.CloneStep(source);
+        copy.Id = Guid.NewGuid().ToString("N");
+        copy.Name = source.Name + " (Kopie)";
         int index = _runOfShowSteps.IndexOf(source) + 1;
         _settings.Workflow.RunOfShowSteps.Insert(index, copy);
         _runOfShowSteps.Insert(index, copy);
@@ -549,7 +495,8 @@ public partial class MainWindow
             var document = new RunOfShowExportDocument
             {
                 Name = CurrentRunOfShowPlan()?.Name ?? "Creator Control Suite Regieplan",
-                Steps = [.. _runOfShowSteps.Select(CloneRunOfShowStep)]
+                Steps = [.. _runOfShowSteps.Select(
+                    RunOfShowPlanService.CloneStep)]
             };
             string json = System.Text.Json.JsonSerializer.Serialize(document, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(dialog.FileName, json);
@@ -609,12 +556,8 @@ public partial class MainWindow
 
             foreach (RunOfShowStepSettings imported in document.Steps)
             {
-                RunOfShowStepSettings step = CloneRunOfShowStep(imported);
-                step.Id = Guid.NewGuid().ToString("N");
-                step.TransitionDurationMilliseconds = Math.Clamp(step.TransitionDurationMilliseconds, 0, 20000);
-                step.SpotifyVolumePercent = Math.Clamp(step.SpotifyVolumePercent, 0, 100);
-                step.ActionDelayMilliseconds = Math.Clamp(step.ActionDelayMilliseconds, 0, 60000);
-                step.AutoAdvanceDelaySeconds = Math.Clamp(step.AutoAdvanceDelaySeconds, 1, 86400);
+                RunOfShowStepSettings step =
+                    RunOfShowPlanService.PrepareImportedStep(imported);
                 _runOfShowSteps.Add(step);
             }
 
@@ -649,43 +592,13 @@ public partial class MainWindow
                 return;
             }
 
-            var issues = new List<string>();
-            IReadOnlyList<ObsSceneInfo> obsScenes = _obsClient.IsConnected ? await _obsClient.GetSceneListAsync() : [];
-            var sceneNames = obsScenes.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            IEnumerable<string> duplicateNames = _runOfShowSteps.Where(x => x.Enabled).GroupBy(x => x.Name.Trim(), StringComparer.OrdinalIgnoreCase).Where(x => !string.IsNullOrWhiteSpace(x.Key) && x.Count() > 1).Select(x => x.Key);
-            foreach (string name in duplicateNames)
-            {
-                issues.Add($"Doppelter Schrittname: {name}");
-            }
-
-            for (int i = 0; i < _runOfShowSteps.Count; i++)
-            {
-                RunOfShowStepSettings step = _runOfShowSteps[i];
-                string label = $"Schritt {i + 1} ({(string.IsNullOrWhiteSpace(step.Name) ? "ohne Name" : step.Name)})";
-                if (string.IsNullOrWhiteSpace(step.Name))
-                {
-                    issues.Add(label + ": Name fehlt.");
-                }
-
-                if (step.Enabled && string.IsNullOrWhiteSpace(step.ObsScene))
-                {
-                    issues.Add(label + ": Keine OBS-Szene ausgewählt.");
-                }
-                else if (step.Enabled && _obsClient.IsConnected && !sceneNames.Contains(step.ObsScene))
-                {
-                    issues.Add(label + $": OBS-Szene '{step.ObsScene}' wurde nicht gefunden.");
-                }
-
-                if (step.UpdateTwitchChannel && string.IsNullOrWhiteSpace(step.TwitchTitle) && string.IsNullOrWhiteSpace(step.TwitchCategoryId))
-                {
-                    issues.Add(label + ": Twitch-Aktualisierung ist aktiv, aber Titel und Kategorie fehlen.");
-                }
-
-                if (step.AutoAdvance && step.AutoAdvanceDelaySeconds < 1)
-                {
-                    issues.Add(label + ": Automatische Wartezeit muss mindestens 1 Sekunde betragen.");
-                }
-            }
+            IReadOnlyList<ObsSceneInfo> obsScenes = _obsClient.IsConnected
+                ? await _obsClient.GetSceneListAsync()
+                : [];
+            IReadOnlyList<string> issues = RunOfShowPlanService.Validate(
+                _runOfShowSteps,
+                obsScenes.Select(scene => scene.Name),
+                _obsClient.IsConnected);
 
             if (issues.Count == 0)
             {
@@ -706,268 +619,4 @@ public partial class MainWindow
         }
     }
 
-    private static RunOfShowStepSettings CloneRunOfShowStep(RunOfShowStepSettings source) => new()
-    {
-        Id = source.Id,
-        Name = source.Name,
-        Enabled = source.Enabled,
-        ObsScene = source.ObsScene,
-        TransitionName = source.TransitionName,
-        TransitionDurationMilliseconds = source.TransitionDurationMilliseconds,
-        SpotifyAction = source.SpotifyAction,
-        SpotifyVolumePercent = source.SpotifyVolumePercent,
-        StreamerBotActionId = source.StreamerBotActionId,
-        StreamerBotActionName = source.StreamerBotActionName,
-        ActionDelayMilliseconds = source.ActionDelayMilliseconds,
-        ContinueOnActionError = source.ContinueOnActionError,
-        UpdateTwitchChannel = source.UpdateTwitchChannel,
-        TwitchTitle = source.TwitchTitle,
-        TwitchCategoryId = source.TwitchCategoryId,
-        TwitchCategoryName = source.TwitchCategoryName,
-        ContinueOnTwitchError = source.ContinueOnTwitchError,
-        AutoAdvance = source.AutoAdvance,
-        AutoAdvanceDelaySeconds = source.AutoAdvanceDelaySeconds
-    };
-
-    private async Task ExecuteSelectedRunOfShowStepAsync()
-    {
-        if (WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStepsList.SelectedItem is not RunOfShowStepSettings step)
-        {
-            return;
-        }
-
-        ReadRunOfShowEditor(step);
-        await ExecuteRunOfShowStepAsync(step);
-        _runOfShowCurrentIndex = _runOfShowSteps.IndexOf(step);
-        UpdateRunOfShowStatus();
-    }
-
-    private async Task ExecuteNextRunOfShowStepAsync()
-    {
-        if (_runOfShowSteps.Count == 0) { WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Noch keine Regieschritte vorhanden."; return; }
-        int nextIndex = _runOfShowCurrentIndex + 1;
-        while (nextIndex < _runOfShowSteps.Count && !_runOfShowSteps[nextIndex].Enabled)
-        {
-            nextIndex++;
-        }
-
-        if (nextIndex >= _runOfShowSteps.Count) { WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Regieplan ist beendet."; return; }
-        RunOfShowStepSettings step = _runOfShowSteps[nextIndex];
-        WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStepsList.SelectedItem = step;
-        await ExecuteRunOfShowStepAsync(step);
-        _runOfShowCurrentIndex = nextIndex;
-        UpdateRunOfShowStatus();
-    }
-
-    private async Task ExecuteRunOfShowStepAsync(RunOfShowStepSettings step)
-    {
-        try
-        {
-            string? executionWarning = null;
-            if (!_obsClient.IsConnected)
-            {
-                throw new InvalidOperationException("OBS ist nicht verbunden.");
-            }
-
-            if (string.IsNullOrWhiteSpace(step.ObsScene))
-            {
-                throw new InvalidOperationException("Keine OBS-Szene ausgewählt.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(step.TransitionName))
-            {
-                await _obsClient.SetCurrentSceneTransitionAsync(step.TransitionName);
-                await _obsClient.SetCurrentSceneTransitionDurationAsync(step.TransitionDurationMilliseconds);
-            }
-            await _obsClient.SetCurrentProgramSceneAsync(step.ObsScene);
-            if (string.Equals(step.SpotifyAction, "Pause", StringComparison.OrdinalIgnoreCase))
-            {
-                await _spotifyModule.PauseAsync();
-            }
-            else if (string.Equals(step.SpotifyAction, "Resume", StringComparison.OrdinalIgnoreCase))
-            {
-                await _spotifyModule.ResumeAsync();
-            }
-            else if (string.Equals(step.SpotifyAction, "SetVolume", StringComparison.OrdinalIgnoreCase))
-            {
-                await _spotifyModule.SetVolumeImmediateAsync(step.SpotifyVolumePercent);
-            }
-
-            if (step.UpdateTwitchChannel)
-            {
-                try
-                {
-                    if (string.IsNullOrWhiteSpace(step.TwitchTitle) && string.IsNullOrWhiteSpace(step.TwitchCategoryId))
-                    {
-                        throw new InvalidOperationException("Für die Twitch-Aktualisierung ist weder ein Titel noch eine Kategorie eingetragen.");
-                    }
-
-                    await _twitchModule.UpdateChannelAsync(
-                        string.IsNullOrWhiteSpace(step.TwitchTitle) ? null : step.TwitchTitle,
-                        string.IsNullOrWhiteSpace(step.TwitchCategoryId) ? null : step.TwitchCategoryId);
-                    _appLogger.Write(AppLogLevel.Information, "RunOfShow.Twitch", $"{step.Name}: Twitch-Kanal aktualisiert.");
-                }
-                catch (Exception twitchException)
-                {
-                    _appLogger.Write(AppLogLevel.Error, "RunOfShow.Twitch", $"{step.Name}: {twitchException.Message}");
-                    if (!step.ContinueOnTwitchError)
-                    {
-                        throw;
-                    }
-
-                    executionWarning = string.IsNullOrWhiteSpace(executionWarning)
-                        ? "Twitch: " + twitchException.Message
-                        : executionWarning + " | Twitch: " + twitchException.Message;
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(step.StreamerBotActionId) || !string.IsNullOrWhiteSpace(step.StreamerBotActionName))
-            {
-                if (step.ActionDelayMilliseconds > 0)
-                {
-                    await Task.Delay(step.ActionDelayMilliseconds);
-                }
-
-                try
-                {
-                    if (!_streamerBotClient.IsConnected)
-                    {
-                        throw new InvalidOperationException("Streamer.bot ist nicht verbunden.");
-                    }
-
-                    var action = new { id = step.StreamerBotActionId, name = step.StreamerBotActionName };
-                    using JsonDocument response = await SendStreamerBotRequestAsync(new
-                    {
-                        request = "DoAction",
-                        action,
-                        args = new { source = "Creator Control Suite", runOfShowStep = step.Name }
-                    });
-                    string? status = response.RootElement.TryGetProperty("status", out JsonElement statusNode) ? statusNode.GetString() : null;
-                    if (!string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase))
-                    {
-                        throw new InvalidOperationException("Streamer.bot hat die Regieaktion nicht bestätigt.");
-                    }
-                }
-                catch (Exception actionException)
-                {
-                    _appLogger.Write(AppLogLevel.Error, "RunOfShow.StreamerBot", $"{step.Name}: {actionException.Message}");
-                    if (!step.ContinueOnActionError)
-                    {
-                        throw;
-                    }
-
-                    executionWarning = actionException.Message;
-                }
-            }
-            _appLogger.Write(AppLogLevel.Information, "RunOfShow", $"Regieschritt ausgeführt: {step.Name}");
-            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = executionWarning is null
-                ? $"Ausgeführt: {step.Name}"
-                : $"Ausgeführt mit Warnung: {step.Name} – {executionWarning}";
-        }
-        catch (Exception ex)
-        {
-            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Regieschritt fehlgeschlagen: " + ex.Message;
-            _appLogger.Write(AppLogLevel.Error, "RunOfShow", WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text);
-        }
-    }
-
-    private async Task StartAutomaticRunOfShowAsync()
-    {
-        if (_runOfShowAutoCts is not null)
-        {
-            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Der automatische Regieplan läuft bereits.";
-            return;
-        }
-        if (_runOfShowSteps.All(x => !x.Enabled))
-        {
-            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Es ist kein aktiver Regieschritt vorhanden.";
-            return;
-        }
-
-        _runOfShowAutoCts = new CancellationTokenSource();
-        CancellationToken token = _runOfShowAutoCts.Token;
-        WorkflowPageViewHost.RunOfShowViewHost.StartAutomaticRunOfShowButton.IsEnabled = false;
-        WorkflowPageViewHost.RunOfShowViewHost.StopAutomaticRunOfShowButton.IsEnabled = true;
-        WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Automatischer Regieplan gestartet.";
-
-        try
-        {
-            while (!token.IsCancellationRequested)
-            {
-                int nextIndex = _runOfShowCurrentIndex + 1;
-                while (nextIndex < _runOfShowSteps.Count && !_runOfShowSteps[nextIndex].Enabled)
-                {
-                    nextIndex++;
-                }
-
-                if (nextIndex >= _runOfShowSteps.Count)
-                {
-                    WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Automatischer Regieplan beendet.";
-                    break;
-                }
-
-                RunOfShowStepSettings step = _runOfShowSteps[nextIndex];
-                WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStepsList.SelectedItem = step;
-                WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStepsList.ScrollIntoView(step);
-                await ExecuteRunOfShowStepAsync(step);
-                _runOfShowCurrentIndex = nextIndex;
-                UpdateRunOfShowStatus();
-
-                if (!step.AutoAdvance)
-                {
-                    WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = $"Automatik wartet nach: {step.Name}. Nächsten Schritt manuell starten oder Automatik erneut starten.";
-                    break;
-                }
-
-                int delaySeconds = Math.Clamp(step.AutoAdvanceDelaySeconds, 1, 86400);
-                for (int remaining = delaySeconds; remaining > 0; remaining--)
-                {
-                    token.ThrowIfCancellationRequested();
-                    WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = $"{step.Name} ausgeführt. Nächster Schritt in {remaining} s.";
-                    await Task.Delay(TimeSpan.FromSeconds(1), token);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Automatischer Regieplan gestoppt.";
-        }
-        catch (Exception ex)
-        {
-            WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text = "Automatischer Regieplan fehlgeschlagen: " + ex.Message;
-            _appLogger.Write(AppLogLevel.Error, "RunOfShow.Auto", WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText.Text);
-        }
-        finally
-        {
-            _runOfShowAutoCts?.Dispose();
-            _runOfShowAutoCts = null;
-            WorkflowPageViewHost.RunOfShowViewHost.StartAutomaticRunOfShowButton.IsEnabled = true;
-            WorkflowPageViewHost.RunOfShowViewHost.StopAutomaticRunOfShowButton.IsEnabled = false;
-        }
-    }
-
-    private void StopAutomaticRunOfShow()
-    {
-        _runOfShowAutoCts?.Cancel();
-    }
-
-    private void ResetRunOfShow()
-    {
-        StopAutomaticRunOfShow();
-        _runOfShowCurrentIndex = -1;
-        UpdateRunOfShowStatus();
-    }
-
-    private void UpdateRunOfShowStatus()
-    {
-        if (WorkflowPageViewHost.RunOfShowViewHost.RunOfShowStatusText is null)
-        {
-            return;
-        }
-
-        RunOfShowStepSettings? next = _runOfShowSteps.Skip(_runOfShowCurrentIndex + 1).FirstOrDefault(x => x.Enabled);
-        WorkflowPageViewHost.RunOfShowViewHost.RunOfShowCurrentText.Text = _runOfShowCurrentIndex >= 0 && _runOfShowCurrentIndex < _runOfShowSteps.Count ? _runOfShowSteps[_runOfShowCurrentIndex].Name : "Noch nicht gestartet";
-        WorkflowPageViewHost.RunOfShowViewHost.RunOfShowNextText.Text = next?.Name ?? "Kein weiterer Schritt";
-        WorkflowPageViewHost.RunOfShowViewHost.RunOfShowProgressText.Text = _runOfShowSteps.Count == 0 ? "0 / 0" : $"{Math.Max(0, _runOfShowCurrentIndex + 1)} / {_runOfShowSteps.Count}";
-    }
 }
