@@ -141,12 +141,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        ServicesPageViewHost.ObsServiceViewHost.ServicesObsAutomationRulesList.ItemsSource = _settings.Workflow.TimedAutomations
-            .Where(rule => (string.Equals(rule.TriggerType, "SceneElapsed", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(rule.TriggerType, "StreamElapsed", StringComparison.OrdinalIgnoreCase))
-                && string.Equals(rule.ActionType, "SetSourceVisibility", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(rule => rule.DelaySeconds)
-            .ToList();
+        ServicesPageViewHost.ObsServiceViewHost
+            .ServicesObsAutomationRulesList.ItemsSource =
+            ObsDashboardApplicationService.SelectSimpleVisibilityRules(
+                _settings.Workflow.TimedAutomations);
     }
 
     private async Task RefreshSimpleObsAutomationSourcesAsync()
@@ -199,19 +197,12 @@ public partial class MainWindow : Window
         }
 
         bool show = string.Equals((ServicesPageViewHost.ObsServiceViewHost.ServicesObsAutomationActionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), "Show", StringComparison.OrdinalIgnoreCase);
-        var rule = new TimedAutomationRuleSettings
-        {
-            Name = $"{scene.Name} → {source}: nach {seconds} Sek. {(show ? "einblenden" : "ausblenden")}",
-            Enabled = true,
-            TriggerType = "SceneElapsed",
-            TriggerScene = scene.Name,
-            DelaySeconds = seconds,
-            ActionType = "SetSourceVisibility",
-            ObsScene = scene.Name,
-            ObsSource = source,
-            SourceVisible = show,
-            OncePerStream = true
-        };
+        TimedAutomationRuleSettings rule =
+            ObsDashboardApplicationService.CreateSimpleVisibilityRule(
+                scene.Name,
+                source,
+                seconds,
+                show);
         _settings.Workflow.TimedAutomations.Add(rule);
         await _settingsStore.SaveAsync(_settings);
         RefreshTimedAutomationRules();
@@ -395,9 +386,10 @@ public partial class MainWindow : Window
         {
             _automationCurrentScene = snapshot.CurrentProgramScene;
             _automationSceneActivatedAt = DateTimeOffset.UtcNow;
-            foreach (TimedAutomationRuleSettings? sceneRule in _settings.Workflow.TimedAutomations
-                         .Where(rule => string.Equals(rule.TriggerType, "SceneElapsed", StringComparison.OrdinalIgnoreCase)
-                                        && string.Equals(rule.TriggerScene, snapshot.CurrentProgramScene, StringComparison.OrdinalIgnoreCase)))
+            foreach (TimedAutomationRuleSettings sceneRule in
+                     ObsDashboardApplicationService.SelectSceneActivationRules(
+                         _settings.Workflow.TimedAutomations,
+                         snapshot.CurrentProgramScene))
             {
                 _executedTimedAutomationRuleIds.Remove(sceneRule.Id);
             }
@@ -463,11 +455,9 @@ public partial class MainWindow : Window
             $"Aktuelle Szene: {snapshot.CurrentProgramScene}";
 
         DashboardPageViewHost.DashboardCurrentSceneText.Text = snapshot.CurrentProgramScene;
-        var dashboardScenes = snapshot.Scenes
-            .Select(scene => scene.Name)
-            .Where(scene => !string.IsNullOrWhiteSpace(scene))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        IReadOnlyList<string> dashboardScenes =
+            ObsDashboardApplicationService.SelectDistinctSceneNames(
+                snapshot.Scenes);
 
         string? requestedSpotifyOverlayScene = ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlaySceneBox.Text?.Trim();
         string? requestedStartScene = SettingsPageViewHost.StartSceneBox.Text?.Trim();
@@ -508,28 +498,19 @@ public partial class MainWindow : Window
                 ? "■  STREAM BEENDEN"
                 : "●  LIVE GEHEN";
 
-        bool obsReportsStreamActive = snapshot.Stream?.OutputActive == true;
-        if (obsReportsStreamActive)
-        {
-            _consecutiveObsStreamInactivePolls = 0;
-        }
-        else if (snapshot.Connected && (_lastObsStreamActive || _streamSessionStartedAt.HasValue))
-        {
-            // Nur eine ausdrücklich verbundene OBS-Instanz darf einen laufenden
-            // Stream als inaktiv bestätigen. Ein nicht erreichbarer Remote-PC,
-            // ein Verbindungswechsel oder ein unvollständiger Snapshot ist kein
-            // Streamende und darf den Live-Latch nicht lösen.
-            _consecutiveObsStreamInactivePolls++;
-        }
+        ObsStreamObservation streamObservation =
+            ObsDashboardApplicationService.EvaluateStreamObservation(
+                snapshot.Stream?.OutputActive == true,
+                snapshot.Connected,
+                _lastObsStreamActive,
+                _streamSessionStartedAt.HasValue,
+                _consecutiveObsStreamInactivePolls,
+                ConfirmedObsOfflinePollsRequired);
+        _consecutiveObsStreamInactivePolls =
+            streamObservation.ConsecutiveInactivePolls;
+        bool streamActiveNow = streamObservation.IsActive;
 
-        // OBS liefert beim Aktualisieren des Output-Status gelegentlich einen
-        // leeren/false Zwischenwert. Erst nach fünf aufeinanderfolgenden
-        // bestätigten Offline-Abfragen wird der Stream als beendet behandelt.
-        // Während Verbindungsabbrüchen bleibt der zuletzt bestätigte Zustand bestehen.
-        bool streamActiveNow = obsReportsStreamActive ||
-            ((_lastObsStreamActive || _streamSessionStartedAt.HasValue) && _consecutiveObsStreamInactivePolls < ConfirmedObsOfflinePollsRequired);
-
-        if (streamActiveNow && !_lastObsStreamActive)
+        if (streamObservation.Started)
         {
             // Ein Stream kann auch direkt in OBS, über Streamer.bot oder über
             // einen anderen Steuerweg gestartet worden sein. In diesem Fall
@@ -543,7 +524,7 @@ public partial class MainWindow : Window
                 _ = PublishOverlayRealtimeEventAsync(OverlayEventBridge.AppStreamLive(true));
             }
         }
-        else if (!streamActiveNow && _lastObsStreamActive)
+        else if (streamObservation.Ended)
         {
             _streamStartAutomationCts?.Cancel();
             _streamSessionStartedAt = null;
@@ -617,298 +598,4 @@ public partial class MainWindow : Window
         });
     }
 
-    private static DateTimeOffset ResolveObservedObsStreamStartedAt(string? outputTimecode)
-    {
-        // OBS liefert üblicherweise HH:mm:ss.fff. Dadurch kann die Suite auch
-        // nach einem Neustart während eines laufenden Streams die bisherige
-        // Laufzeit rekonstruieren. Bei unbekanntem Format beginnt die Anzeige
-        // mit dem Zeitpunkt, zu dem der Stream erstmals erkannt wurde.
-        if (!string.IsNullOrWhiteSpace(outputTimecode) &&
-            TimeSpan.TryParse(outputTimecode, System.Globalization.CultureInfo.InvariantCulture, out TimeSpan elapsed) &&
-            elapsed >= TimeSpan.Zero && elapsed < TimeSpan.FromDays(30))
-        {
-            return DateTimeOffset.Now - elapsed;
-        }
-
-        return DateTimeOffset.Now;
-    }
-
-    private DateTimeOffset? ResolveLiveStreamStartedAt() =>
-        _twitchStreamStartedAt ?? _streamSessionStartedAt ?? _twitchSessionObservedAt;
-
-    private void ApplyTwitchLiveStreamStartedAt(DateTimeOffset? startedAt)
-    {
-        if (startedAt is null)
-        {
-            return;
-        }
-
-        _twitchStreamStartedAt = startedAt;
-
-        // Helix started_at ist maßgeblich für die Live-Dauer. Lokale Startzeiten
-        // (OBS-Timecode / Workflow) werden damit auf den Twitch-Start korrigiert.
-        _streamSessionStartedAt = startedAt;
-
-        StreamSessionStats stats = _workflowModule.Service.SessionStats;
-        if (stats.EndedAt is null)
-        {
-            stats.StartedAt = startedAt;
-        }
-    }
-
-    private async Task HandleObservedStreamStartAsync()
-    {
-        // Spotify muss sofort beim erkannten LIVE-Übergang starten und darf
-        // nicht hinter der Legacy-Intro-Automation (5-Minuten-Delay) warten.
-        if (!_spotifyStartPlaylistTriggeredForCurrentStream)
-        {
-            try
-            {
-                await StartConfiguredSpotifyPlaylistAtStreamStartAsync();
-            }
-            catch (Exception exception)
-            {
-                _appLogger.Write(AppLogLevel.Warning, "Spotify.StartPlaylist",
-                    "Ausgewählte Startplaylist konnte beim erkannten Streamstart nicht gestartet werden: " + exception.Message, exception);
-                AddDashboardNotification(
-                    "Spotify-Startplaylist konnte nicht gestartet werden: " + exception.Message,
-                    "Warnung");
-            }
-        }
-
-        // Legacy-Intro (Startszene/Testbild + Delay) parallel weiterlaufen lassen.
-        _ = StartLegacyStreamAutomationSafeAsync();
-    }
-
-    private async Task StartLegacyStreamAutomationSafeAsync()
-    {
-        try
-        {
-            await StartLegacyStreamAutomationAsync();
-        }
-        catch (Exception exception)
-        {
-            _appLogger.Write(AppLogLevel.Warning, "StreamStart",
-                "Streamstart-Automation konnte nicht vollständig gestartet werden: " + exception.Message, exception);
-        }
-    }
-
-    private async Task<bool> GetTrackedObsInputMuteAsync(
-        IReadOnlyList<ObsInputInfo> inputs,
-        string configuredSource,
-        IReadOnlyList<string> preferredExactNames,
-        IReadOnlyList<string> fallbackNameParts)
-    {
-        if (!_obsClient.IsConnected || inputs.Count == 0)
-        {
-            return false;
-        }
-
-        ObsInputInfo? input = null;
-
-        if (!string.IsNullOrWhiteSpace(configuredSource))
-        {
-            input = inputs.FirstOrDefault(candidate =>
-                string.Equals(candidate.Name, configuredSource.Trim(), StringComparison.OrdinalIgnoreCase));
-        }
-
-        input ??= preferredExactNames
-            .Select(name => inputs.FirstOrDefault(candidate =>
-                string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase)))
-            .FirstOrDefault(candidate => candidate is not null);
-
-        input ??= inputs.FirstOrDefault(candidate =>
-            fallbackNameParts.Any(part =>
-                candidate.Name.Contains(part, StringComparison.OrdinalIgnoreCase)));
-
-        if (input is null)
-        {
-            return false;
-        }
-
-        try
-        {
-            ObsInputAudioState state = await _obsClient.GetInputAudioStateAsync(input.Name);
-            return state.Muted;
-        }
-        catch (Exception exception)
-        {
-            _appLogger.Write(
-                AppLogLevel.Warning,
-                "OBS.MuteState",
-                $"Mute-Status für OBS-Quelle '{input.Name}' konnte nicht gelesen werden: {exception.Message}",
-                exception);
-            return false;
-        }
-    }
-
-    private async Task RefreshDashboardObsScenePreviewAsync(string? sceneName = null)
-    {
-        try
-        {
-            if (!_obsClient.IsConnected)
-            {
-                DashboardPageViewHost.DashboardObsScenePreviewImage.Source = null;
-                DashboardPageViewHost.DashboardObsScenePreviewPlaceholder.Visibility = Visibility.Visible;
-                return;
-            }
-
-            sceneName ??= await _obsClient.GetCurrentProgramSceneAsync();
-            if (string.IsNullOrWhiteSpace(sceneName))
-            {
-                return;
-            }
-
-            double previewWidth = GetDashboardObsScenePreviewWidth(
-                _settings.Dashboard.ObsScenePreviewSize);
-            byte[] bytes = await _obsClient.GetSourceScreenshotAsync(
-                sceneName,
-                (int)Math.Clamp(previewWidth, 160, 1920),
-                imageHeight: null);
-            if (bytes.Length == 0)
-            {
-                DashboardPageViewHost.DashboardObsScenePreviewImage.Source = null;
-                DashboardPageViewHost.DashboardObsScenePreviewPlaceholder.Visibility = Visibility.Visible;
-                return;
-            }
-
-            using var stream = new System.IO.MemoryStream(bytes);
-            var bitmap = new System.Windows.Media.Imaging.BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-            bitmap.StreamSource = stream;
-            bitmap.EndInit();
-            bitmap.Freeze();
-
-            if (bitmap.PixelWidth > 0 && bitmap.PixelHeight > 0)
-            {
-                _dashboardObsPreviewAspect = bitmap.PixelWidth / (double)bitmap.PixelHeight;
-                ApplyDashboardObsScenePreviewSize();
-            }
-
-            DashboardPageViewHost.DashboardObsScenePreviewImage.Source = bitmap;
-            DashboardPageViewHost.DashboardObsScenePreviewPlaceholder.Visibility = Visibility.Collapsed;
-        }
-        catch (Exception exception)
-        {
-            DashboardPageViewHost.DashboardObsScenePreviewImage.Source = null;
-            DashboardPageViewHost.DashboardObsScenePreviewPlaceholder.Visibility = Visibility.Visible;
-            _appLogger.Write(AppLogLevel.Warning, "OBS", "OBS-Szenenvorschau konnte nicht geladen werden.", exception);
-        }
-    }
-
-    private async Task SwitchObsSceneAsync()
-    {
-        if (SettingsPageViewHost.ObsScenesList.SelectedItem is not ObsSceneInfo scene)
-        {
-            MessageBox.Show(
-                "Bitte zuerst eine Szene auswählen.",
-                "OBS",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-
-            return;
-        }
-
-        await _obsClient.SetCurrentProgramSceneAsync(scene.Name);
-        await RefreshObsAsync();
-    }
-
-    private async Task ToggleDashboardHeaderStreamAsync()
-    {
-        try
-        {
-            if (!_obsClient.IsConnected)
-            {
-                AddDashboardNotification(
-                    "OBS ist nicht verbunden.",
-                    "Warnung");
-                return;
-            }
-
-            ObsSnapshot snapshot = await _obsClient.GetSnapshotAsync();
-
-            if (snapshot.Stream?.OutputActive == true)
-            {
-                await StopObsStreamAsync();
-            }
-            else
-            {
-                await StartObsStreamAsync();
-            }
-
-            await RefreshObsAsync();
-        }
-        catch (Exception ex)
-        {
-            AddDashboardNotification(
-                "Stream-Aktion fehlgeschlagen: " + ex.Message,
-                "Fehler");
-        }
-    }
-
-    private async Task StartConfiguredSpotifyPlaylistAtStreamStartAsync()
-    {
-        // Beim automatischen Streamstart niemals UI-Standardwerte zurück in die
-        // Einstellungen schreiben. Seit der Remote-PC-Erweiterung konnte dieser
-        // Hintergrundpfad noch nicht vollständig geladene Steuerelemente lesen und
-        // damit AutoStart bzw. die Playlist-URI wieder leeren. Maßgeblich ist die
-        // zuletzt dauerhaft gespeicherte Konfiguration.
-        AppSettings persisted = await _settingsStore.LoadAsync(CancellationToken.None);
-
-        if (!persisted.Workflow.AutoStartSpotifyPlaylist)
-        {
-            _appLogger.Write(AppLogLevel.Information, "Spotify.StartPlaylist",
-                "Automatischer Playliststart ist in den gespeicherten Einstellungen deaktiviert.");
-            return;
-        }
-
-        string playlistUri = persisted.Spotify.StartPlaylistUri?.Trim() ?? "";
-        if (string.IsNullOrWhiteSpace(playlistUri))
-        {
-            throw new InvalidOperationException(
-                "Für den Streamstart ist keine dauerhaft gespeicherte Spotify-Playlist ausgewählt.");
-        }
-
-        if (!_spotifyModule.GetSnapshot().Authenticated)
-        {
-            await _spotifyModule.ConnectAsync(CancellationToken.None);
-        }
-
-        // Spotify kann unmittelbar nach dem erkannten OBS-Start kurz noch kein
-        // aktives Wiedergabegerät melden. Deshalb wird der identische Start genau
-        // einmal verzögert wiederholt, ohne die Playlist mehrfach auszulösen.
-        Exception? firstFailure = null;
-        for (int attempt = 1; attempt <= 2; attempt++)
-        {
-            try
-            {
-                await _spotifyModule.StartPlaylistAsync(
-                    playlistUri,
-                    startVolumePercent: persisted.Spotify.StartVolumePercent,
-                    cancellationToken: CancellationToken.None);
-
-                _spotifyStartPlaylistTriggeredForCurrentStream = true;
-                AddDashboardNotification("Spotify-Startplaylist wurde gestartet.", "Info");
-                _appLogger.Write(AppLogLevel.Information, "Spotify.StartPlaylist",
-                    $"Gespeicherte Startplaylist wurde gestartet: {playlistUri}");
-                return;
-            }
-            catch (Exception exception) when (attempt == 1)
-            {
-                firstFailure = exception;
-                _appLogger.Write(AppLogLevel.Warning, "Spotify.StartPlaylist",
-                    "Erster Startversuch fehlgeschlagen; erneuter Versuch in 2 Sekunden: " + exception.Message, exception);
-                await Task.Delay(TimeSpan.FromSeconds(2));
-                if (!_spotifyModule.GetSnapshot().Authenticated)
-                {
-                    await _spotifyModule.ConnectAsync(CancellationToken.None);
-                }
-            }
-        }
-
-        throw new InvalidOperationException(
-            "Spotify konnte die gespeicherte Startplaylist auch nach dem Wiederholungsversuch nicht starten.",
-            firstFailure);
-    }
 }
