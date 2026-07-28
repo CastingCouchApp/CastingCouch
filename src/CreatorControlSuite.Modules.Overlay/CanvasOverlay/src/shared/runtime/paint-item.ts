@@ -1,4 +1,5 @@
 import type { LayoutItem } from "../types";
+import { getRegisteredWidget } from "../extensions/registry";
 import {
   updateOnline,
   updateSpotify,
@@ -44,6 +45,19 @@ export function paintItemContent(
   if (!el || !item) return;
   const type = item.type;
   const payload = data || {};
+
+  const custom = getRegisteredWidget(type);
+  if (custom?.update) {
+    try {
+      custom.update(el, item, payload, chatConfig);
+    } catch {
+      /* ignore pack update errors */
+    }
+    if (options?.seedDemo) {
+      seedDemoContent(el, item, options);
+    }
+    return;
+  }
 
   if (type === "online") updateOnline(el, item, payload);
   else if (type === "music" || type === "spotify") updateSpotify(el, item, payload);

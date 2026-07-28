@@ -85,13 +85,17 @@ export function applyItemEffects(wrapper: HTMLElement, item: LayoutItem): void {
 
     const target = resolveEffectTarget(effect, strategy);
     const host = target === "content" && content ? content : wrapper;
-    if (OUTER_FX.has(effect.type)) {
+    if (OUTER_FX.has(effect.type) || /:(glow|glitch|outline|drop-shadow)$/.test(effect.type)) {
       if (host === content) contentOuter = true;
       else boxOuter = true;
     }
 
     const layer = document.createElement("div");
-    strategy.apply(layer, effect, item, host);
+    try {
+      strategy.apply(layer, effect, item, host);
+    } catch {
+      continue;
+    }
     if (layer.dataset.fxHost === "wrapper") {
       continue;
     }

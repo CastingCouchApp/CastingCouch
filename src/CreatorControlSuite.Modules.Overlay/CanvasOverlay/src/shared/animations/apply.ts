@@ -32,8 +32,12 @@ export function applyItemAnimations(wrapper: HTMLElement, item: LayoutItem): voi
     if (animation.enabled === false) continue;
     const strategy = ANIMATION_STRATEGIES[animation.type];
     if (!strategy) continue;
-    const shorthand = strategy.apply(target, animation, item);
-    if (shorthand) parts.push(shorthand);
+    try {
+      const shorthand = strategy.apply(target, animation, item);
+      if (shorthand) parts.push(shorthand);
+    } catch {
+      /* pack/builtin strategy errors must not blank the overlay */
+    }
   }
 
   if (parts.length) {

@@ -1,6 +1,6 @@
 import { extUrl } from "./ext-url";
 
-interface PackFont {
+export interface PackFont {
   family?: string;
   Family?: string;
   src?: string;
@@ -11,19 +11,24 @@ interface PackFont {
   Style?: string;
 }
 
-interface PackWidget {
+export interface PackWidget {
   id?: string;
   Id?: string;
+  name?: string;
+  Name?: string;
   entry?: string;
   Entry?: string;
   css?: string;
   Css?: string;
   style?: string;
+  Style?: string;
 }
 
-interface PackEffect {
+export interface PackEffect {
   id?: string;
   Id?: string;
+  name?: string;
+  Name?: string;
   entry?: string;
   Entry?: string;
   style?: string;
@@ -32,11 +37,25 @@ interface PackEffect {
   Css?: string;
 }
 
-interface PackSummary {
+export interface PackAnimation {
+  id?: string;
+  Id?: string;
+  name?: string;
+  Name?: string;
+  entry?: string;
+  Entry?: string;
+  style?: string;
+  Style?: string;
+  css?: string;
+  Css?: string;
+}
+
+export interface PackSummary {
   id: string;
   name?: string;
   widgets?: PackWidget[];
   effects?: PackEffect[];
+  animations?: PackAnimation[];
   fonts?: PackFont[];
 }
 
@@ -61,13 +80,21 @@ function loadScript(url: string): Promise<void> {
   });
 }
 
-function loadStylesheet(url: string): void {
-  if (document.querySelector(`link[data-ccs-ext="${url}"]`)) return;
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = url;
-  link.dataset.ccsExt = url;
-  document.head.appendChild(link);
+function loadStylesheet(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const existing = document.querySelector(`link[data-ccs-ext="${url}"]`) as HTMLLinkElement | null;
+    if (existing) {
+      resolve();
+      return;
+    }
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = url;
+    link.dataset.ccsExt = url;
+    link.onload = () => resolve();
+    link.onerror = () => resolve(); // optional asset
+    document.head.appendChild(link);
+  });
 }
 
 function registerPackFonts(packId: string, fonts: PackFont[] | undefined): void {
@@ -97,45 +124,51 @@ function registerPackFonts(packId: string, fonts: PackFont[] | undefined): void 
   document.head.appendChild(styleEl);
 }
 
-export async function loadExtensions(): Promise<void> {
+async function loadPackEntries(
+  packId: string,
+  entries: Array<PackWidget | PackEffect | PackAnimation> | undefined
+): Promise<void> {
+  for (const entry of entries || []) {
+    const scriptPath = entry.entry || entry.Entry;
+    const css = entry.css || entry.Css || entry.style || entry.Style;
+    if (css) {
+      await loadStylesheet(extUrl(packId, css));
+    }
+    if (scriptPath) {
+      try {
+        await loadScript(extUrl(packId, scriptPath));
+      } catch {
+        /* optional */
+      }
+    }
+  }
+}
+
+/**
+ * Fetches `/extensions`, registers pack fonts, and loads widget/effect/animation
+ * entry scripts. Returns the catalog packs (empty on failure) for editor palettes.
+ */
+export async function loadExtensions(): Promise<PackSummary[]> {
   try {
     const res = await fetch("/extensions", { cache: "no-store" });
-    if (!res.ok) return;
+    if (!res.ok) return [];
     const data = (await res.json()) as CatalogResponse | PackSummary[];
     const packs = Array.isArray(data) ? data : (data.packs || []);
     for (const pack of packs) {
       if (!pack || !pack.id) continue;
       registerPackFonts(pack.id, pack.fonts);
-      for (const widget of pack.widgets || []) {
-        const entry = widget.entry || widget.Entry;
-        const css = widget.css || widget.Css || widget.style;
-        if (css) loadStylesheet(extUrl(pack.id, css));
-        if (entry) {
-          try {
-            await loadScript(extUrl(pack.id, entry));
-          } catch {
-            /* optional */
-          }
-        }
-      }
-      for (const effect of pack.effects || []) {
-        const entry = effect.entry || effect.Entry;
-        const css = effect.css || effect.Css || effect.style || effect.Style;
-        if (css) loadStylesheet(extUrl(pack.id, css));
-        if (entry) {
-          try {
-            await loadScript(extUrl(pack.id, entry));
-          } catch {
-            /* optional */
-          }
-        }
-      }
+      await loadPackEntries(pack.id, pack.widgets);
+      await loadPackEntries(pack.id, pack.effects);
+      await loadPackEntries(pack.id, pack.animations);
     }
+    return packs.filter((pack) => !!pack?.id);
   } catch {
     /* extensions endpoint optional */
+    return [];
   }
 }
 
 export { extUrl };
 export { registerWidget } from "./registry";
 export { registerEffect } from "../effects/registry";
+export { registerAnimation } from "../animations/registry";

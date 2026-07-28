@@ -536,6 +536,7 @@ public sealed class OverlayWebServer(
                 apiVersion = pack.ApiVersion,
                 widgets = pack.Widgets,
                 effects = pack.Effects,
+                animations = pack.Animations,
                 fonts = pack.Fonts,
                 assets = pack.Assets,
                 baseUrl = "/ext/" + pack.Id + "/"
@@ -586,6 +587,7 @@ public sealed class OverlayWebServer(
                     apiVersion = summary.ApiVersion,
                     widgets = summary.Widgets,
                     effects = summary.Effects,
+                    animations = summary.Animations,
                     fonts = summary.Fonts,
                     assets = summary.Assets
                 });

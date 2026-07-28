@@ -11,7 +11,7 @@
             <TextBlock Text="Extension Packs"
                        Foreground="{DynamicResource AccentBrush}"
                        FontWeight="Bold"/>
-            <TextBlock Text="ZIP-Pakete mit zusätzlichen Widgets, Effekten und Schriften. Installierte Packs werden unter /extensions und /ext/&lt;id&gt;/… ausgeliefert."
+            <TextBlock Text="ZIP-Pakete mit zusätzlichen Widgets, Effekten, Animationen und Schriften. Installierte Packs erscheinen automatisch in den Overlay-Editor-Paletten."
                        Foreground="{DynamicResource MutedBrush}"
                        TextWrapping="Wrap"
                        Margin="0,4,0,10"/>

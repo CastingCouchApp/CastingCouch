@@ -65,6 +65,7 @@ public sealed class OverlayExtensionPacksPageViewModel : ViewModelBase
                 $"{pack.Name} ({pack.Id}) · v{pack.Version} · " +
                 $"{pack.Widgets.Count} Widget(s), " +
                 $"{pack.Effects.Count} Effekt(e), " +
+                $"{pack.Animations.Count} Animation(en), " +
                 $"{pack.Fonts.Count} Font(s)"));
         }
 

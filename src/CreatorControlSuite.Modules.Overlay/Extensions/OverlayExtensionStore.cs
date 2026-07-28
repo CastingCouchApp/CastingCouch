@@ -304,6 +304,7 @@ public sealed class OverlayExtensionStore : IOverlayExtensionStore
 
         manifest.Widgets ??= [];
         manifest.Effects ??= [];
+        manifest.Animations ??= [];
         manifest.Fonts ??= [];
         manifest.Assets ??= [];
 
@@ -326,6 +327,17 @@ public sealed class OverlayExtensionStore : IOverlayExtensionStore
             {
                 throw new OverlayExtensionValidationException(
                     "Effect-Eintrag im Manifest unvollständig (id/name/entry erforderlich).");
+            }
+        }
+
+        foreach (OverlayExtensionAnimation animation in manifest.Animations)
+        {
+            if (string.IsNullOrWhiteSpace(animation.Id) ||
+                string.IsNullOrWhiteSpace(animation.Name) ||
+                string.IsNullOrWhiteSpace(animation.Entry))
+            {
+                throw new OverlayExtensionValidationException(
+                    "Animation-Eintrag im Manifest unvollständig (id/name/entry erforderlich).");
             }
         }
 
@@ -392,6 +404,7 @@ public sealed class OverlayExtensionStore : IOverlayExtensionStore
         ApiVersion = manifest.ApiVersion,
         Widgets = manifest.Widgets ?? [],
         Effects = manifest.Effects ?? [],
+        Animations = manifest.Animations ?? [],
         Fonts = manifest.Fonts ?? [],
         Assets = manifest.Assets ?? []
     };

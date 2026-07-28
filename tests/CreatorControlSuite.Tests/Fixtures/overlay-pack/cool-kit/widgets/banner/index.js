@@ -3,7 +3,8 @@
     return;
   }
 
-  window.CcsCanvas.registerWidget("cool-kit/banner", {
+  window.CcsCanvas.registerWidget("ext:cool-kit:banner", {
+    defaults: { w: 400, h: 120, props: { text: "Cool Banner" } },
     create() {
       var el = document.createElement("div");
       el.className = "cool-kit-banner";

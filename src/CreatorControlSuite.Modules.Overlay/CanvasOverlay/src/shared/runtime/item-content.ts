@@ -9,9 +9,30 @@ export type { PaintItemOptions } from "./paint-item";
 export function createItemContent(item: LayoutItem): HTMLElement {
   const custom = getRegisteredWidget(item.type);
   if (custom) {
-    return custom.create(item);
+    try {
+      return custom.create(item);
+    } catch {
+      /* fall through to unknown placeholder */
+    }
   }
   return createBuiltInContent(item);
+}
+
+/** Invokes pack widget update hooks (used by view/editor data refresh). */
+export function updateRegisteredWidget(
+  el: HTMLElement,
+  item: LayoutItem,
+  data?: Record<string, unknown>,
+  chatConfig?: unknown
+): boolean {
+  const custom = getRegisteredWidget(item.type);
+  if (!custom?.update) return false;
+  try {
+    custom.update(el, item, data, chatConfig);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function applyItemBox(wrapper: HTMLElement, item: LayoutItem): void {

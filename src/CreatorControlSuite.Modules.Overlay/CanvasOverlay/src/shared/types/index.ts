@@ -213,5 +213,12 @@ export interface CcsCanvasApi {
   listAnimationTypes: () => string[];
   ANIMATION_STRATEGIES: Record<string, AnimationStrategy>;
   extUrl: (packId: string, path: string) => string;
-  loadExtensions: () => Promise<void>;
+  loadExtensions: () => Promise<Array<{
+    id: string;
+    name?: string;
+    widgets?: Array<{ id?: string; name?: string; entry?: string; css?: string }>;
+    effects?: Array<{ id?: string; name?: string; entry?: string; css?: string }>;
+    animations?: Array<{ id?: string; name?: string; entry?: string; css?: string }>;
+    fonts?: Array<{ family?: string; src?: string; weight?: string; style?: string }>;
+  }>>;
 }

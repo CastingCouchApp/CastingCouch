@@ -40,6 +40,8 @@ public sealed class OverlayExtensionStoreTests
             Assert.Equal("banner", summary.Widgets[0].Id);
             Assert.Single(summary.Effects);
             Assert.Equal("sparkle", summary.Effects[0].Id);
+            Assert.Single(summary.Animations);
+            Assert.Equal("wobble", summary.Animations[0].Id);
             Assert.Single(summary.Fonts);
             Assert.Equal("CoolFont", summary.Fonts[0].Family);
             Assert.Contains("assets/icons/logo.svg", summary.Assets);
@@ -48,6 +50,7 @@ public sealed class OverlayExtensionStoreTests
             Assert.True(File.Exists(Path.Combine(packDir, "manifest.json")));
             Assert.True(File.Exists(Path.Combine(packDir, "widgets", "banner", "index.js")));
             Assert.True(File.Exists(Path.Combine(packDir, "effects", "sparkle", "index.js")));
+            Assert.True(File.Exists(Path.Combine(packDir, "animations", "wobble", "index.js")));
             Assert.True(File.Exists(Path.Combine(packDir, "fonts", "CoolFont.woff2")));
             Assert.True(File.Exists(Path.Combine(packDir, "assets", "icons", "logo.svg")));
         }
@@ -158,6 +161,37 @@ public sealed class OverlayExtensionStoreTests
             });
 
             await Assert.ThrowsAsync<OverlayExtensionValidationException>(() => store.InstallFromZipAsync(zip));
+            Assert.Empty(store.ListCatalog());
+        }
+        finally
+        {
+            Cleanup(root);
+        }
+    }
+
+    [Fact]
+    public async Task InstallFromZipAsync_RejectsIncompleteAnimationEntry()
+    {
+        string root = CreateTempRoot();
+        try
+        {
+            var store = new OverlayExtensionStore(root);
+            using MemoryStream zip = BuildZip(archive =>
+            {
+                AddEntry(archive, "manifest.json", """
+                    {
+                      "id": "bad-anim",
+                      "name": "Bad Anim",
+                      "version": "1.0.0",
+                      "apiVersion": 1,
+                      "animations": [{ "id": "wobble", "name": "Wobble" }]
+                    }
+                    """);
+            });
+
+            OverlayExtensionValidationException ex =
+                await Assert.ThrowsAsync<OverlayExtensionValidationException>(() => store.InstallFromZipAsync(zip));
+            Assert.Contains("Animation", ex.Message);
             Assert.Empty(store.ListCatalog());
         }
         finally

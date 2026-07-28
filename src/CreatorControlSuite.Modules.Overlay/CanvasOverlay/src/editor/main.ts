@@ -4,6 +4,7 @@ import type { EditorContext } from "./props/context";
 import { syncProps } from "./props/sync-props";
 import { propSection, featureSection } from "./sections/prop-section";
 import { fillCategorizedPalette, setupPaletteDrop, setupPaletteSearch, type PaletteEntry } from "./shell/palette";
+import { mergePaletteWithPackEntries, paletteEntriesFromPacks } from "./shell/pack-palette";
 import { createPalettePreviewController } from "./shell/palette-preview";
 import {
   applyPaletteDemoProps,
@@ -123,7 +124,7 @@ function bootEditor(): void {
   wrapGeometrySection();
   wireInspectorTabs();
 
-  const paletteItems: PaletteEntry[] = [
+  const builtinPaletteItems: PaletteEntry[] = [
     // Live
     { type: "online", label: "Online + Zeit", category: "Live", kind: "widget", keywords: "uptime clock status" },
     { type: "alert", label: "Alert", category: "Live", kind: "widget", keywords: "benachrichtigung" },
@@ -156,6 +157,7 @@ function bootEditor(): void {
     { type: "shape.divider", label: "Divider", category: "Deko", kind: "shape", keywords: "linie" },
     { type: "shape.sticker", label: "Sticker", category: "Deko", kind: "shape" }
   ];
+  let paletteItems: PaletteEntry[] = builtinPaletteItems.slice();
 
   const paletteRoot = document.getElementById("paletteRoot")!;
   const palettePreview = createPalettePreviewController({
@@ -179,6 +181,11 @@ function bootEditor(): void {
   const searchInput = document.getElementById("paletteSearch") as HTMLInputElement | null;
   if (searchInput) setupPaletteSearch(searchInput, renderPalette);
   setupPaletteDrop(stage, addItem, () => editorRuntime.getLayout());
+
+  function applyPackPalette(packs: Parameters<typeof paletteEntriesFromPacks>[0]): void {
+    paletteItems = mergePaletteWithPackEntries(builtinPaletteItems, paletteEntriesFromPacks(packs));
+    renderPalette(searchInput?.value || "");
+  }
 
   const canvasSize = setupCanvasSize(editorRuntime, saveStatus, scheduleSave);
   setupDrag(
@@ -228,7 +235,7 @@ function bootEditor(): void {
     syncSelection(item);
   });
 
-  void boot(instanceId, setInstanceLabel, () => {
+  void boot(instanceId, setInstanceLabel, applyPackPalette, () => {
     ws = window.CcsCanvas.connectWs((evt) => {
       editorRuntime.handleRealtime(evt);
     });
@@ -397,12 +404,18 @@ function addItem(type: string, kind: string, x: number, y: number): void {
 async function boot(
   instanceId: string,
   setInstanceLabel: (name?: string) => void,
+  onPacksLoaded: (packs: Parameters<typeof paletteEntriesFromPacks>[0]) => void,
   connect: () => void
 ): Promise<void> {
   if (!instanceId) {
     (document.getElementById("saveStatus")!).textContent = "URL: /editor/{instanceId}";
     return;
   }
+
+  // Pack scripts/CSS must register before the first layout render.
+  const packs = await window.CcsCanvas.loadExtensions();
+  onPacksLoaded(packs);
+
   try {
     const layout = (await window.CcsCanvas.fetchJson("/layout/" + encodeURIComponent(instanceId))) as LayoutItem & { items?: LayoutItem[]; name?: string };
     editorRuntime.setLayout(layout as never);
@@ -418,7 +431,6 @@ async function boot(
     editorRuntime.setChatConfig(await window.CcsCanvas.fetchJson("/chat/config"));
   } catch { /* optional */ }
   await editorRuntime.loadChatHistory();
-  await window.CcsCanvas.loadExtensions();
   applyEditorLayers(editorRuntime, prefs);
   connect();
   setInterval(async () => {

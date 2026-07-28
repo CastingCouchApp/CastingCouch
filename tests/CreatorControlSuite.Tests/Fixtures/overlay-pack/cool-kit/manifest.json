@@ -17,6 +17,13 @@
       "entry": "effects/sparkle/index.js"
     }
   ],
+  "animations": [
+    {
+      "id": "wobble",
+      "name": "Wobble",
+      "entry": "animations/wobble/index.js"
+    }
+  ],
   "fonts": [
     {
       "family": "CoolFont",

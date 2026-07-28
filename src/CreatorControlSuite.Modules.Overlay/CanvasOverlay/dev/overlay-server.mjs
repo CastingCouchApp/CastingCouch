@@ -196,6 +196,7 @@ export function createOverlayServer(opts) {
           apiVersion: manifest.apiVersion || 1,
           widgets: manifest.widgets || [],
           effects: manifest.effects || [],
+          animations: manifest.animations || [],
           fonts: manifest.fonts || [],
           assets: manifest.assets || [],
           baseUrl: `/ext/${id}/`

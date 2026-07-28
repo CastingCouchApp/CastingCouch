@@ -2,9 +2,10 @@
 import { DEFAULT_LAYOUT } from '../defaults/layout';
 import { WIDGET_DEFAULTS } from '../defaults/widgets';
 import { SHAPE_DEFAULTS } from '../defaults/shapes';
+import { getRegisteredWidget } from '../extensions/registry';
 import { uid } from '../utils/format';
 import { fetchJson } from '../net/fetch-json';
-import { createItemContent, applyItemBox } from './item-content';
+import { createItemContent, applyItemBox, updateRegisteredWidget } from './item-content';
 import { applyItemEffects } from '../effects/apply';
 import { applyItemAnimations } from '../animations/apply';
 import { applyCutoutStackMask } from '../shapes/cutout';
@@ -183,6 +184,9 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
       const node = itemNodes.get(id);
       if (!node) return;
       const item = node.item;
+      if (updateRegisteredWidget(node.content, item, data, chatConfig)) {
+        return;
+      }
       if (item.type === "online") updateOnline(node.content, item, data);
       if (item.type === "music" || item.type === "spotify") updateSpotify(node.content, item, data);
       if (item.type === "chat") updateChat(node.content, item, chatConfig);
@@ -379,6 +383,14 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
       defaultsFor(type, kind) {
         if (kind === "shape" || SHAPE_DEFAULTS[type]) {
           return SHAPE_DEFAULTS[type] || { w: 300, h: 300, props: { color: "#ff7a00" } };
+        }
+        const registered = getRegisteredWidget(type)?.defaults;
+        if (registered) {
+          return {
+            w: registered.w,
+            h: registered.h,
+            props: { ...(registered.props || {}) }
+          };
         }
         return WIDGET_DEFAULTS[type] || { w: 240, h: 120, props: {} };
       },

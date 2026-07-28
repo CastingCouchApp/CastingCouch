@@ -569,6 +569,9 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("effects: []", runtime);
         Assert.Contains("loadExtensions", runtime);
         Assert.Contains("extUrl", runtime);
+        Assert.Contains("/ext/", runtime);
+        Assert.Contains("pack.animations", runtime);
+        Assert.Contains("updateRegisteredWidget", runtime);
         Assert.Contains("resolveEffectTarget", runtime);
         Assert.Contains("effectTargets", runtime);
         Assert.Contains("fxTarget", runtime);
@@ -581,6 +584,9 @@ public sealed class CanvasOverlayAssetsTests
         Assert.Contains("effectTargets", editor);
         Assert.Contains("allowedTargets", editor);
         Assert.Contains("target: \"box\"", editor);
+        Assert.Contains("paletteEntriesFromPacks", editor);
+        Assert.Contains("applyPackPalette", editor);
+        Assert.Contains("Extension \\xB7", editor);
 
         Assert.True(CanvasOverlayAssets.TryGet("shared/styles.css", out string styles, out _));
         Assert.Contains("ccs-item-fx-layer", styles);

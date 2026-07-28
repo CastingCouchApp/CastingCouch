@@ -23,57 +23,58 @@
     }
   }
 
-  const kind = (type === "frame" || type.startsWith("frame.") || type.startsWith("shape.") || type === "shape.vignette" || type === "shape.scene-bg") ? "shape" : "widget";
-  const def = kind === "shape"
-    ? (CcsCanvas.SHAPE_DEFAULTS[type] || { w: 400, h: 300, props: {} })
-    : (CcsCanvas.WIDGET_DEFAULTS[type] || { w: 400, h: 200, props: {} });
+  async function boot(): Promise<void> {
+    // Pack registerWidget/CSS must run before the first render.
+    await CcsCanvas.loadExtensions();
 
-  const item = {
-    id: "solo",
-    kind,
-    type,
-    x: 0,
-    y: 0,
-    w: Number(params.get("w")) || def.w,
-    h: Number(params.get("h")) || def.h,
-    z: 1,
-    effects: [] as unknown[],
-    animations: [] as unknown[],
-    props: { ...(def.props || {}), ...props }
-  };
+    const kind = (type === "frame" || type.startsWith("frame.") || type.startsWith("shape.") || type === "shape.vignette" || type === "shape.scene-bg")
+      ? "shape"
+      : "widget";
 
-  const layout = {
-    version: 1,
-    canvasWidth: item.w,
-    canvasHeight: item.h,
-    items: [item]
-  };
+    const runtime = CcsCanvas.createRuntime({
+      root: document.getElementById("root")!,
+      editing: false,
+      center: true
+    });
+    const def = runtime.defaultsFor(type, kind);
+    const item = {
+      id: "solo",
+      kind,
+      type,
+      x: 0,
+      y: 0,
+      w: Number(params.get("w")) || def.w,
+      h: Number(params.get("h")) || def.h,
+      z: 1,
+      effects: [] as unknown[],
+      animations: [] as unknown[],
+      props: { ...(def.props || {}), ...props }
+    };
 
-  const runtime = CcsCanvas.createRuntime({
-    root: document.getElementById("root")!,
-    editing: false,
-    center: true,
-    layout: layout as never
-  });
-  runtime.setLayout(layout as never);
+    const layout = {
+      version: 1,
+      canvasWidth: item.w,
+      canvasHeight: item.h,
+      items: [item]
+    };
 
-  async function refreshData(): Promise<void> {
-    try {
-      runtime.setData(await CcsCanvas.fetchJson("/data/overlay-data.json") as Record<string, unknown>);
-    } catch { /* ignore */ }
-  }
+    runtime.setLayout(layout as never);
 
-  CcsCanvas.connectWs((evt) => runtime.handleRealtime(evt));
-  void refreshData();
-  setInterval(refreshData, 1500);
+    async function refreshData(): Promise<void> {
+      try {
+        runtime.setData(await CcsCanvas.fetchJson("/data/overlay-data.json") as Record<string, unknown>);
+      } catch { /* ignore */ }
+    }
 
-  async function loadChatConfig(): Promise<void> {
+    CcsCanvas.connectWs((evt) => runtime.handleRealtime(evt));
+    void refreshData();
+    setInterval(refreshData, 1500);
+
     try {
       runtime.setChatConfig(await CcsCanvas.fetchJson("/chat/config"));
     } catch { /* ignore */ }
+    await runtime.loadChatHistory();
   }
 
-  void CcsCanvas.loadExtensions().then(() => {
-    void Promise.all([loadChatConfig(), runtime.loadChatHistory()]);
-  });
+  void boot();
 })();
