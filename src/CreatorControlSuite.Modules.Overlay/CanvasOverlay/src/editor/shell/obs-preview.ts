@@ -40,7 +40,7 @@ export function applyEditorLayers(target: CreateRuntime | HTMLElement, prefs: Ed
   if (prefs.grid) {
     grid.style.display = "block";
     const h = Math.max(2, Math.min(64, prefs.gridH || 32));
-    const v = Math.max(2, Math.min(64, prefs.gridV || 16));
+    const v = Math.max(2, Math.min(64, prefs.gridV || 18));
     const xStep = 100 / h;
     const yStep = 100 / v;
     grid.style.backgroundImage = [

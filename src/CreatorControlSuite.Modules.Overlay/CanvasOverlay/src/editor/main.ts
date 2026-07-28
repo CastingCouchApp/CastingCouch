@@ -255,7 +255,7 @@ function wireToolbarPrefs(saveStatus: HTMLElement, onObsPreviewChanged: () => vo
       obsPreview: obsToggle.checked,
       grid: gridToggle.checked,
       gridH: Number(gridH.value) || 32,
-      gridV: Number(gridV.value) || 16,
+      gridV: Number(gridV.value) || 18,
       gridSnap: gridSnapToggle.checked,
       magnet: magnetToggle.checked
     };

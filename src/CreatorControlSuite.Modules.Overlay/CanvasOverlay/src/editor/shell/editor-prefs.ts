@@ -9,19 +9,37 @@ export interface EditorPrefs {
   magnet: boolean;
 }
 
-const DEFAULTS: EditorPrefs = {
-  obsPreview: false,
-  grid: true,
-  gridH: 32,
-  gridV: 16,
-  gridSnap: true,
-  magnet: true
-};
-
-function clampDivisions(n: number): number {
+export function clampGridDivisions(n: number): number {
   const v = Math.round(Number(n) || 0);
   return Math.min(64, Math.max(2, v));
 }
+
+/**
+ * Grid divisions matching the canvas aspect ratio.
+ * Base H=32 → 1920×1080 yields 32×18 (16:9).
+ */
+export function gridDivisionsForCanvas(
+  canvasWidth: number,
+  canvasHeight: number,
+  baseH = 32
+): { gridH: number; gridV: number } {
+  const w = Math.max(1, Number(canvasWidth) || 1920);
+  const h = Math.max(1, Number(canvasHeight) || 1080);
+  const gridH = clampGridDivisions(baseH);
+  const gridV = clampGridDivisions(Math.round(gridH * (h / w)));
+  return { gridH, gridV };
+}
+
+const DEFAULT_GRID = gridDivisionsForCanvas(1920, 1080);
+
+const DEFAULTS: EditorPrefs = {
+  obsPreview: false,
+  grid: true,
+  gridH: DEFAULT_GRID.gridH,
+  gridV: DEFAULT_GRID.gridV,
+  gridSnap: true,
+  magnet: true
+};
 
 export function loadEditorPrefs(): EditorPrefs {
   try {
@@ -31,8 +49,8 @@ export function loadEditorPrefs(): EditorPrefs {
     return {
       obsPreview: !!parsed.obsPreview,
       grid: parsed.grid !== false,
-      gridH: clampDivisions(parsed.gridH ?? DEFAULTS.gridH),
-      gridV: clampDivisions(parsed.gridV ?? DEFAULTS.gridV),
+      gridH: clampGridDivisions(parsed.gridH ?? DEFAULTS.gridH),
+      gridV: clampGridDivisions(parsed.gridV ?? DEFAULTS.gridV),
       gridSnap: parsed.gridSnap !== false,
       magnet: parsed.magnet !== false
     };
@@ -45,8 +63,8 @@ export function saveEditorPrefs(prefs: EditorPrefs): void {
   const next: EditorPrefs = {
     obsPreview: !!prefs.obsPreview,
     grid: !!prefs.grid,
-    gridH: clampDivisions(prefs.gridH),
-    gridV: clampDivisions(prefs.gridV),
+    gridH: clampGridDivisions(prefs.gridH),
+    gridV: clampGridDivisions(prefs.gridV),
     gridSnap: !!prefs.gridSnap,
     magnet: !!prefs.magnet
   };

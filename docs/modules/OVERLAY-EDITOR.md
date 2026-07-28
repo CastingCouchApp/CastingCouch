@@ -43,7 +43,7 @@ Beispiel: `/editor/default`, `/view/just-chatting`.
 - **OBS-Vorschau** / **Raster** / **Einrasten** / **Magnet** (Toolbar-Icon-Toggles; Tooltips per `title`; Prefs in `localStorage` `ccs-editor-prefs`).
 - **Widget-Palette**: Kategorien (Live, Interaktion, Content, Hintergrund, Frames, Masken, Deko) + Suche (Label/Typ/Kategorie/Keywords). Hover auf einer Karte zeigt eine Live-Vorschau mit Demodaten (skaliert).
 - **32px Padding** um die Zeichenfläche (Fit/Scale berücksichtigt den Abstand).
-- **Raster** Unterteilungen **H × V** (Default 32×16); liegt immer im Vordergrund über den Widgets (`pointer-events: none`). Editor-Layer (Grid/OBS-Vorschau) werden nach jedem `setLayout`/`renderItems` via `onAfterRender` neu gesetzt.
+- **Raster** Unterteilungen **H × V** (Default 32×18 für 16:9; `gridDivisionsForCanvas` leitet V aus dem Canvas-Seitenverhältnis ab); liegt immer im Vordergrund über den Widgets (`pointer-events: none`). Editor-Layer (Grid/OBS-Vorschau) werden nach jedem `setLayout`/`renderItems` via `onAfterRender` neu gesetzt.
 - **Einrasten**: Snap an Rasterlinien (H×V) beim Verschieben **und** Skalieren (nur die gezogene Handle-Kante); Threshold ~20 % der Zellengröße (min. 8px), inkl. Guide-Linien. Unabhängig von der Raster-Anzeige.
 - **Magnet**: Snap an Kanten/Mitten **anderer Widgets** (Threshold 8px) beim Verschieben/Skalieren, inkl. Guide-Linien. Bei gleichzeitigem Einrasten gewinnt der Magnet, wenn er greift.
 - **Rechtsklick-Menü** / Toolbar-Icons / **Entf** bzw. **Backspace**: Duplizieren, Sperren/Entsperren, Ganz nach oben/unten, Ebene rauf/runter, Löschen (nicht bei Fokus in Eingabefeldern; gesperrte Items bleiben).

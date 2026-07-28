@@ -7,7 +7,7 @@ import type { EditorPrefs } from "../src/editor/shell/editor-prefs";
 const prefs: EditorPrefs = {
   grid: true,
   gridH: 32,
-  gridV: 16,
+  gridV: 18,
   gridSnap: true,
   magnet: true,
   obsPreview: false
