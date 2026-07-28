@@ -17,8 +17,9 @@ $RequiredFiles = @(
     "CreatorControlSuite.deps.json"
 )
 
+# Canvas/Chat-Overlays liegen als Embedded Resources in der Overlay-DLL;
+# ein separater BundledOverlay-Ordner wird nicht mehr ausgeliefert.
 $RequiredDirectories = @(
-    "BundledOverlay",
     "Legal",
     "Keys"
 )

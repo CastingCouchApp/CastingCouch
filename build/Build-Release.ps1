@@ -59,11 +59,19 @@ Invoke-NativeChecked -FilePath $DotNet -Step "Updater Publish" -Arguments @(
 )
 
 & (Join-Path $PSScriptRoot "Test-ReleasePublishLayout.ps1") -PublishPath $Publish
+if ($LASTEXITCODE -ne 0) {
+    throw "Publish-Layout-Prüfung fehlgeschlagen."
+}
 
 & (Join-Path $PSScriptRoot "Test-InstallerPayload.ps1") -PublishPath $Publish
+if ($LASTEXITCODE -ne 0) {
+    throw "Installer-Payload-Prüfung fehlgeschlagen."
+}
 
 & (Join-Path $PSScriptRoot "SelfTest-WixValidators.ps1")
-
+if ($LASTEXITCODE -ne 0) {
+    throw "WiX-Validator-Selbsttest fehlgeschlagen."
+}
 
 & (Join-Path $PSScriptRoot "Generate-WixPayload.ps1") `
     -PublishPath $Publish `
@@ -73,13 +81,23 @@ $GeneratedWix = Join-Path $Root "installer\CreatorControlSuite.Installer\Files.w
 
 & (Join-Path $PSScriptRoot "Test-GeneratedWixDirectories.ps1") `
     -WixPath $GeneratedWix
+if ($LASTEXITCODE -ne 0) {
+    throw "WiX-Verzeichnisprüfung fehlgeschlagen."
+}
 
 & (Join-Path $PSScriptRoot "Test-WixShortNames.ps1") `
     -WixPath $GeneratedWix
+if ($LASTEXITCODE -ne 0) {
+    throw "WiX-ShortName-Prüfung fehlgeschlagen."
+}
 
 & (Join-Path $PSScriptRoot "Test-WixDuplicateTargetFiles.ps1") `
     -PackageWixPath (Join-Path $Root "installer\CreatorControlSuite.Installer\Package.wxs") `
     -GeneratedWixPath $GeneratedWix
+if ($LASTEXITCODE -ne 0) {
+    throw "WiX-Duplikatprüfung fehlgeschlagen."
+}
+
 $GeneratedComponentCount = @(
     Select-String -LiteralPath $GeneratedWix -Pattern '<Component Id=' -SimpleMatch
 ).Count
@@ -92,10 +110,6 @@ Write-Host "WiX-Komponentenprüfung: $GeneratedComponentCount Komponenten für $
 
 if ($GeneratedComponentCount -ne $PublishFileCount) {
     throw "Generierter WiX-Payload ist unvollständig: $GeneratedComponentCount von $PublishFileCount Dateien."
-}
-
-if ($LASTEXITCODE -ne 0) {
-    throw "Publish-Layout-Prüfung fehlgeschlagen."
 }
 
 & (Join-Path $PSScriptRoot "Test-WixFeatureAssignment.ps1") `

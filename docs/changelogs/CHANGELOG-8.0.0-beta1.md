@@ -24,6 +24,7 @@ Erster öffentlicher Beta-Release nach der Alpha-Serie (`8.0.0-alpha102`).
   (saubere CI-Checkouts behalten Runtime/Editor-Assets).
 - Twitch-History-Kennzahlen formatieren fest mit `de-DE` (kein CI-Culture-Drift mehr).
 - Overlay-Typecheck: entferntes TypeScript-`baseUrl` für TS 7.
+- Release-Layout: kein `BundledOverlay`-Ordner mehr erforderlich (Overlays embedded).
 
 ## Architektur
 
