@@ -126,5 +126,71 @@ export const SHAPE_DEFAULTS: Record<string, WidgetDefaults> = {
       particles: true,
       paused: false
     }
+  },
+  "shape.divider": {
+    w: 600,
+    h: 16,
+    props: {
+      variant: "line",
+      sizePreset: "standard",
+      orientation: "h",
+      thickness: 2,
+      lengthMode: "fill",
+      lengthPercent: 80,
+      align: "center",
+      showCenterMotif: false,
+      motif: "diamond",
+      motifSize: 18,
+      color: "#ff7a00",
+      color2: "#ffffff",
+      opacity: 1,
+      animateShimmer: false
+    }
+  },
+  "shape.cam-ring": {
+    w: 320,
+    h: 320,
+    props: {
+      variant: "ring",
+      sizePreset: "cam-md",
+      strokeWidth: 6,
+      gap: 8,
+      radius: 999,
+      badge: "live",
+      badgeText: "LIVE",
+      badgePosition: "tr",
+      color: "#ff7a00",
+      color2: "#ffb36b",
+      badgeColor: "#e10600",
+      badgeTextColor: "#ffffff",
+      pulse: false,
+      rotateSlow: false,
+      showInnerGlow: true
+    }
+  },
+  "shape.sticker": {
+    w: 120,
+    h: 120,
+    props: {
+      variant: "flat",
+      preset: "heart",
+      src: "",
+      fit: "contain",
+      rotateDeg: 0,
+      scale: 1,
+      opacity: 1,
+      flipX: false,
+      flipY: false,
+      color: "#ff7a00",
+      color2: "#ffb36b",
+      bob: false,
+      bobAmplitude: 6,
+      bobSpeed: 1,
+      spin: false,
+      spinSpeed: 1,
+      pulse: false,
+      pulseAmplitude: 0.08,
+      pulseSpeed: 1
+    }
   }
 };

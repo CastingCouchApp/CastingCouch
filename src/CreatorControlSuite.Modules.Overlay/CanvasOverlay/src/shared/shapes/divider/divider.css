@@ -1,0 +1,197 @@
+/* Decorative divider shape */
+.ccs-divider {
+  --ccs-divider-thickness: 2px;
+  --ccs-divider-opacity: 1;
+  --ccs-divider-color: #ff7a00;
+  --ccs-divider-color2: #ffffff;
+  --ccs-divider-align: center;
+  --ccs-divider-length: 100%;
+  --ccs-divider-motif-size: 18px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: var(--ccs-divider-align);
+  opacity: var(--ccs-divider-opacity);
+  pointer-events: none;
+  position: relative;
+}
+
+.ccs-divider-orient-v {
+  flex-direction: column;
+}
+
+.ccs-divider-line {
+  display: block;
+  background: var(--ccs-divider-color);
+  border-radius: 999px;
+}
+
+.ccs-divider-orient-h .ccs-divider-line {
+  width: var(--ccs-divider-length);
+  height: var(--ccs-divider-thickness);
+}
+
+.ccs-divider-orient-v .ccs-divider-line {
+  width: var(--ccs-divider-thickness);
+  height: var(--ccs-divider-length);
+}
+
+.ccs-divider-motif {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--ccs-divider-motif-size);
+  color: var(--ccs-divider-color2);
+  line-height: 1;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--ccs-divider-color) 60%, transparent);
+}
+
+/* Variants */
+.ccs-divider-v-line .ccs-divider-line { background: var(--ccs-divider-color); }
+
+.ccs-divider-v-dashed .ccs-divider-line {
+  background: none;
+  border: var(--ccs-divider-thickness) dashed var(--ccs-divider-color);
+  border-radius: 0;
+}
+
+.ccs-divider-orient-h.ccs-divider-v-dashed .ccs-divider-line {
+  height: 0;
+  border-width: 0 0 var(--ccs-divider-thickness) 0;
+  border-bottom-style: dashed;
+}
+
+.ccs-divider-orient-v.ccs-divider-v-dashed .ccs-divider-line {
+  width: 0;
+  border-width: 0 0 0 var(--ccs-divider-thickness);
+  border-left-style: dashed;
+}
+
+.ccs-divider-v-dotted .ccs-divider-line {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--ccs-divider-color) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.ccs-divider-orient-v.ccs-divider-v-dotted .ccs-divider-line {
+  background: repeating-linear-gradient(
+    180deg,
+    var(--ccs-divider-color) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.ccs-divider-v-double .ccs-divider-line {
+  background: none;
+  box-shadow:
+    0 calc(var(--ccs-divider-thickness) * -1.5) 0 var(--ccs-divider-color),
+    0 calc(var(--ccs-divider-thickness) * 1.5) 0 var(--ccs-divider-color);
+}
+
+.ccs-divider-v-gradient .ccs-divider-line {
+  background: linear-gradient(90deg, transparent, var(--ccs-divider-color), var(--ccs-divider-color2), transparent);
+}
+
+.ccs-divider-orient-v.ccs-divider-v-gradient .ccs-divider-line {
+  background: linear-gradient(180deg, transparent, var(--ccs-divider-color), var(--ccs-divider-color2), transparent);
+}
+
+.ccs-divider-v-glow .ccs-divider-line {
+  box-shadow: 0 0 12px var(--ccs-divider-color), 0 0 24px color-mix(in srgb, var(--ccs-divider-color) 50%, transparent);
+}
+
+.ccs-divider-v-flourish .ccs-divider-line {
+  background: none;
+  position: relative;
+}
+
+.ccs-divider-v-flourish .ccs-divider-line::before,
+.ccs-divider-v-flourish .ccs-divider-line::after {
+  content: "❧";
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ccs-divider-color2);
+  font-size: calc(var(--ccs-divider-motif-size) * 0.9);
+}
+
+.ccs-divider-v-flourish .ccs-divider-line::before { left: -1.2em; }
+.ccs-divider-v-flourish .ccs-divider-line::after { right: -1.2em; transform: translateY(-50%) scaleX(-1); }
+
+.ccs-divider-v-bracket .ccs-divider-line {
+  background: none;
+  border-top: var(--ccs-divider-thickness) solid var(--ccs-divider-color);
+  position: relative;
+}
+
+.ccs-divider-v-bracket .ccs-divider-line::before,
+.ccs-divider-v-bracket .ccs-divider-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  border: var(--ccs-divider-thickness) solid var(--ccs-divider-color);
+}
+
+.ccs-divider-v-bracket .ccs-divider-line::before {
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+}
+
+.ccs-divider-v-bracket .ccs-divider-line::after {
+  right: 0;
+  border-left: none;
+  border-bottom: none;
+}
+
+.ccs-divider-v-diamond .ccs-divider-line {
+  background: linear-gradient(90deg, transparent 45%, var(--ccs-divider-color) 50%, transparent 55%);
+}
+
+.ccs-divider-v-chevron .ccs-divider-line {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 8px,
+    var(--ccs-divider-color) 8px 16px,
+    transparent 16px 24px
+  );
+  clip-path: polygon(0 40%, 50% 0, 100% 40%, 100% 60%, 50% 100%, 0 60%);
+}
+
+.ccs-divider-v-wave .ccs-divider-line {
+  background: none;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 8'%3E%3Cpath d='M0 4 Q15 0 30 4 T60 4 T90 4 T120 4' stroke='white' fill='none' stroke-width='2'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  background: var(--ccs-divider-color);
+  height: calc(var(--ccs-divider-thickness) * 4);
+}
+
+.ccs-divider-v-pixel .ccs-divider-line {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--ccs-divider-color) 0 8px,
+    transparent 8px 12px
+  );
+  image-rendering: pixelated;
+}
+
+.ccs-divider-shimmer .ccs-divider-line {
+  background-size: 200% 100%;
+  animation: ccs-divider-shimmer 2.5s linear infinite;
+}
+
+@keyframes ccs-divider-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.ccs-divider-v-gradient.ccs-divider-shimmer .ccs-divider-line {
+  background: linear-gradient(90deg, transparent, var(--ccs-divider-color), var(--ccs-divider-color2), transparent);
+  background-size: 200% 100%;
+}

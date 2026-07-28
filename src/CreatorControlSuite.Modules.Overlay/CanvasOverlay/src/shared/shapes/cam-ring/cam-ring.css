@@ -1,0 +1,168 @@
+/* Webcam ring / frame shape — transparent center */
+.ccs-cam-ring {
+  --ccs-cam-stroke: 4px;
+  --ccs-cam-gap: 6px;
+  --ccs-cam-radius: 50%;
+  --ccs-cam-color: #ff7a00;
+  --ccs-cam-color2: #ffffff;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  position: relative;
+  pointer-events: none;
+  background: transparent;
+}
+
+.ccs-cam-ring-stroke {
+  position: absolute;
+  inset: var(--ccs-cam-gap);
+  border-radius: var(--ccs-cam-radius);
+  border: var(--ccs-cam-stroke) solid var(--ccs-cam-color);
+  box-sizing: border-box;
+  background: transparent;
+}
+
+.ccs-cam-ring.ccs-cam-inner-glow .ccs-cam-ring-stroke {
+  box-shadow:
+    inset 0 0 18px color-mix(in srgb, var(--ccs-cam-color) 35%, transparent),
+    0 0 16px color-mix(in srgb, var(--ccs-cam-color) 40%, transparent);
+}
+
+.ccs-cam-ring-badge {
+  position: absolute;
+  z-index: 2;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.ccs-cam-ring-badge.is-live {
+  background: #e91916;
+  border-color: #ff4444;
+  animation: ccs-cam-badge-pulse 1.4s ease-in-out infinite;
+}
+
+.ccs-cam-ring-badge.is-rec {
+  background: #c40000;
+  border-color: #ff6666;
+}
+
+.ccs-cam-badge-pos-tl { top: 8px; left: 8px; }
+.ccs-cam-badge-pos-tr { top: 8px; right: 8px; }
+.ccs-cam-badge-pos-bl { bottom: 8px; left: 8px; }
+.ccs-cam-badge-pos-br { bottom: 8px; right: 8px; }
+.ccs-cam-badge-pos-top { top: 0; left: 50%; transform: translateX(-50%); }
+
+@keyframes ccs-cam-badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.ccs-cam-ring-orbit {
+  position: absolute;
+  inset: 0;
+  animation: ccs-cam-orbit-spin 8s linear infinite;
+}
+
+.ccs-cam-ring-orbit-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ccs-cam-color2);
+  top: 50%;
+  left: 50%;
+  transform: rotate(calc(var(--i) * 120deg)) translateY(calc(-50% - 42%));
+}
+
+@keyframes ccs-cam-orbit-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ccs-cam-ring.ccs-cam-pulse .ccs-cam-ring-stroke {
+  animation: ccs-cam-ring-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ccs-cam-ring-pulse {
+  0%, 100% { box-shadow: 0 0 8px color-mix(in srgb, var(--ccs-cam-color) 40%, transparent); }
+  50% { box-shadow: 0 0 22px color-mix(in srgb, var(--ccs-cam-color) 70%, transparent); }
+}
+
+.ccs-cam-ring.ccs-cam-rotate .ccs-cam-ring-stroke {
+  animation: ccs-cam-ring-rotate 24s linear infinite;
+}
+
+@keyframes ccs-cam-ring-rotate {
+  to { transform: rotate(360deg); }
+}
+
+/* Variants */
+.ccs-cam-ring-v-ring .ccs-cam-ring-stroke { border-radius: 50%; }
+
+.ccs-cam-ring-v-double-ring .ccs-cam-ring-stroke {
+  border-width: calc(var(--ccs-cam-stroke) * 0.6);
+  box-shadow: 0 0 0 calc(var(--ccs-cam-stroke) * 1.2) var(--ccs-cam-color);
+}
+
+.ccs-cam-ring-v-hex .ccs-cam-ring-stroke {
+  border-radius: 0;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+.ccs-cam-ring-v-soft .ccs-cam-ring-stroke {
+  border-color: color-mix(in srgb, var(--ccs-cam-color) 55%, transparent);
+  filter: blur(0.5px);
+}
+
+.ccs-cam-ring-v-neon .ccs-cam-ring-stroke {
+  border-color: var(--ccs-cam-color);
+  box-shadow: 0 0 12px var(--ccs-cam-color), 0 0 28px color-mix(in srgb, var(--ccs-cam-color) 50%, transparent);
+}
+
+.ccs-cam-ring-v-cyber .ccs-cam-ring-stroke {
+  border-radius: 8px;
+  clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%);
+  border-color: var(--ccs-cam-color2);
+}
+
+.ccs-cam-ring-v-pixel .ccs-cam-ring-stroke {
+  border-radius: 0;
+  image-rendering: pixelated;
+  border-style: solid;
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--ccs-cam-color) 50%, #000);
+}
+
+.ccs-cam-ring-v-dashed .ccs-cam-ring-stroke {
+  border-style: dashed;
+}
+
+.ccs-cam-ring-v-corners .ccs-cam-ring-stroke {
+  border: none;
+  background:
+    linear-gradient(var(--ccs-cam-color), var(--ccs-cam-color)) left top / 28px var(--ccs-cam-stroke) no-repeat,
+    linear-gradient(var(--ccs-cam-color), var(--ccs-cam-color)) left top / var(--ccs-cam-stroke) 28px no-repeat,
+    linear-gradient(var(--ccs-cam-color), var(--ccs-cam-color)) right top / 28px var(--ccs-cam-stroke) no-repeat,
+    linear-gradient(var(--ccs-cam-color), var(--ccs-cam-color)) right top / var(--ccs-cam-stroke) 28px no-repeat,
+    linear-gradient(var(--ccs-cam-color), var(--ccs-cam-color)) left bottom / 28px var(--ccs-cam-stroke) no-repeat,
+    linear-gradient(var(--ccs-cam-color), var(--ccs-cam-color)) left bottom / var(--ccs-cam-stroke) 28px no-repeat,
+    linear-gradient(var(--ccs-cam-color), var(--ccs-cam-color)) right bottom / 28px var(--ccs-cam-stroke) no-repeat,
+    linear-gradient(var(--ccs-cam-color), var(--ccs-cam-color)) right bottom / var(--ccs-cam-stroke) 28px no-repeat;
+}
+
+.ccs-cam-ring-v-badge-only .ccs-cam-ring-stroke {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ccs-cam-ring-v-square-round .ccs-cam-ring-stroke {
+  border-radius: 18%;
+}
+
+.ccs-cam-ring-s-cam-sm .ccs-cam-ring-stroke { inset: 4px; }
+.ccs-cam-ring-s-cam-lg .ccs-cam-ring-stroke { inset: 10px; }
+.ccs-cam-ring-s-cam-tall .ccs-cam-ring-stroke { border-radius: 22%; }

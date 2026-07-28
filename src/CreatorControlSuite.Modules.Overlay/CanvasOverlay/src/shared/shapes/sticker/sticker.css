@@ -1,0 +1,136 @@
+/* Decorative sticker shape — inline SVG presets or custom image */
+.ccs-sticker {
+  --ccs-sticker-color: #ff7a00;
+  --ccs-sticker-color2: #ffffff;
+  --ccs-sticker-rotate: 0deg;
+  --ccs-sticker-scale: 1;
+  --ccs-sticker-opacity: 1;
+  --ccs-sticker-flip-x: 1;
+  --ccs-sticker-flip-y: 1;
+  --ccs-sticker-bob-amp: 8px;
+  --ccs-sticker-bob-speed: 2s;
+  --ccs-sticker-spin-speed: 4s;
+  --ccs-sticker-pulse-speed: 1.5s;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: var(--ccs-sticker-opacity);
+}
+
+.ccs-sticker-graphic {
+  width: 80%;
+  height: 80%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ccs-sticker-color);
+  transform: rotate(var(--ccs-sticker-rotate)) scale(calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-x)), calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-y)));
+  transform-origin: center center;
+}
+
+.ccs-sticker-svg,
+.ccs-sticker-svg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.ccs-sticker-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Variants */
+.ccs-sticker-v-flat .ccs-sticker-graphic {
+  filter: none;
+}
+
+.ccs-sticker-v-neon .ccs-sticker-graphic {
+  filter: drop-shadow(0 0 6px var(--ccs-sticker-color)) drop-shadow(0 0 14px color-mix(in srgb, var(--ccs-sticker-color) 60%, transparent));
+}
+
+.ccs-sticker-v-glass .ccs-sticker-graphic {
+  padding: 8%;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--ccs-sticker-color) 18%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.ccs-sticker-v-outline .ccs-sticker-graphic {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--ccs-sticker-color);
+}
+
+.ccs-sticker-v-outline .ccs-sticker-svg svg {
+  fill: none;
+  stroke: var(--ccs-sticker-color);
+  stroke-width: 1.5;
+}
+
+.ccs-sticker-v-soft .ccs-sticker-graphic {
+  filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--ccs-sticker-color) 35%, transparent));
+  color: color-mix(in srgb, var(--ccs-sticker-color) 80%, var(--ccs-sticker-color2));
+}
+
+.ccs-sticker-v-badge .ccs-sticker-graphic {
+  padding: 12%;
+  border-radius: 50%;
+  background: var(--ccs-sticker-color);
+  color: var(--ccs-sticker-color2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Motion features */
+.ccs-sticker-bob .ccs-sticker-graphic {
+  animation: ccs-sticker-bob var(--ccs-sticker-bob-speed) ease-in-out infinite;
+}
+
+@keyframes ccs-sticker-bob {
+  0%, 100% {
+    transform: rotate(var(--ccs-sticker-rotate))
+      scale(calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-x)), calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-y)))
+      translateY(0);
+  }
+  50% {
+    transform: rotate(var(--ccs-sticker-rotate))
+      scale(calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-x)), calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-y)))
+      translateY(calc(-1 * var(--ccs-sticker-bob-amp)));
+  }
+}
+
+.ccs-sticker-spin .ccs-sticker-graphic {
+  animation: ccs-sticker-spin var(--ccs-sticker-spin-speed) linear infinite;
+}
+
+@keyframes ccs-sticker-spin {
+  to {
+    transform: rotate(calc(var(--ccs-sticker-rotate) + 360deg))
+      scale(calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-x)), calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-y)));
+  }
+}
+
+.ccs-sticker-pulse .ccs-sticker-graphic {
+  animation: ccs-sticker-pulse var(--ccs-sticker-pulse-speed) ease-in-out infinite;
+}
+
+@keyframes ccs-sticker-pulse {
+  0%, 100% {
+    transform: rotate(var(--ccs-sticker-rotate))
+      scale(calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-x)), calc(var(--ccs-sticker-scale) * var(--ccs-sticker-flip-y)));
+  }
+  50% {
+    transform: rotate(var(--ccs-sticker-rotate))
+      scale(calc(var(--ccs-sticker-scale) * 1.12 * var(--ccs-sticker-flip-x)), calc(var(--ccs-sticker-scale) * 1.12 * var(--ccs-sticker-flip-y)));
+  }
+}
+
+.ccs-sticker-bob.ccs-sticker-spin .ccs-sticker-graphic {
+  animation: ccs-sticker-bob var(--ccs-sticker-bob-speed) ease-in-out infinite,
+    ccs-sticker-spin var(--ccs-sticker-spin-speed) linear infinite;
+}
