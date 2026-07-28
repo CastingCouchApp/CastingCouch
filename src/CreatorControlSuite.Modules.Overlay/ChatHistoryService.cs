@@ -14,14 +14,14 @@ public sealed class ChatHistoryService(
     private CancellationTokenSource? _debounceCts;
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromSeconds(2);
 
-    public int ResolveCapacity()
+    public async Task<int> ResolveCapacityAsync(CancellationToken cancellationToken = default)
     {
         int maxLines = 80;
         try
         {
             foreach (string instanceId in layoutStore.ListInstanceIds())
             {
-                OverlayLayout layout = layoutStore.LoadAsync(instanceId).GetAwaiter().GetResult();
+                OverlayLayout layout = await layoutStore.LoadAsync(instanceId, cancellationToken);
                 foreach (OverlayLayoutItem item in layout.Items)
                 {
                     if (!string.Equals(item.Type, "chat", StringComparison.OrdinalIgnoreCase))
@@ -50,13 +50,13 @@ public sealed class ChatHistoryService(
         return Math.Clamp(maxLines * 2, 0, 2000);
     }
 
-    public void SyncCapacityToHub()
+    public async Task SyncCapacityToHubAsync(CancellationToken cancellationToken = default)
     {
-        int capacity = ResolveCapacity();
+        int capacity = await ResolveCapacityAsync(cancellationToken);
         hub.ConfigureChatBuffer(capacity);
         try
         {
-            AppSettings settings = settingsStore.LoadAsync().GetAwaiter().GetResult();
+            AppSettings settings = await settingsStore.LoadAsync(cancellationToken);
             settings.Overlay.Chat.MaxBufferedMessages = capacity;
         }
         catch
@@ -67,7 +67,7 @@ public sealed class ChatHistoryService(
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        SyncCapacityToHub();
+        await SyncCapacityToHubAsync(cancellationToken);
         IReadOnlyList<OverlayRealtimeEvent> events = await store.LoadAsync(cancellationToken);
         hub.RestoreBufferedChatEvents(events);
         hub.ChatBufferChanged -= OnChatBufferChanged;

@@ -479,7 +479,7 @@ public partial class MainWindow
             _settings.Overlay.EnsureCanvasesMigrated();
             _overlayCanvasPageViewModel.UpdatePort(
                 _settings.Overlay.WebServerPort);
-            _overlayModule.ChatHistory.SyncCapacityToHub();
+            await _overlayModule.ChatHistory.SyncCapacityToHubAsync();
             await RefreshChatEmoteCatalogFromSettingsAsync();
 
             _settings.Workflow.EndSceneSeconds = int.Parse(SettingsPageViewHost.EndSceneSecondsBox.Text.Trim());

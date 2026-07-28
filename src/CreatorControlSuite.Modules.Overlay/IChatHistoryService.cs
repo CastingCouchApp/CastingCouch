@@ -2,9 +2,9 @@ namespace CreatorControlSuite.Modules.Overlay;
 
 public interface IChatHistoryService
 {
-    int ResolveCapacity();
+    Task<int> ResolveCapacityAsync(CancellationToken cancellationToken = default);
 
-    void SyncCapacityToHub();
+    Task SyncCapacityToHubAsync(CancellationToken cancellationToken = default);
 
     Task InitializeAsync(CancellationToken cancellationToken = default);
 
