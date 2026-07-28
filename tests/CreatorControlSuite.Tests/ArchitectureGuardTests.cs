@@ -77,6 +77,709 @@ public sealed class ArchitectureGuardTests
 
     [Fact]
     [Trait("Category", "Architecture")]
+    public void AgentProgram_ComposesObsEndpointsWithoutImplementingThem()
+    {
+        string root = FindRepositoryRoot();
+        string agentRoot = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.Agent");
+        string programPath = Path.Combine(agentRoot, "Program.cs");
+        string program = File.ReadAllText(programPath);
+        string endpointsPath = Path.Combine(
+            agentRoot,
+            "Endpoints",
+            "ObsEndpointMappings.cs");
+
+        Assert.True(
+            File.ReadLines(programPath).Count() < 600,
+            "Agent/Program.cs muss als Composition Root unter 600 Zeilen bleiben.");
+        Assert.Contains(
+            "app.MapObsEndpoints(",
+            program,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "\"/api/v1/obs/",
+            program,
+            StringComparison.Ordinal);
+        Assert.True(
+            File.Exists(endpointsPath),
+            "OBS-Endpunkte müssen in einer eigenen Mapping-Datei liegen.");
+        Assert.True(
+            File.ReadLines(endpointsPath).Count() < 1_000,
+            "OBS-Endpunkt-Mapping muss unter 1.000 Zeilen bleiben.");
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void AgentProgram_ComposesUpdateEndpointsWithoutImplementingThem()
+    {
+        string root = FindRepositoryRoot();
+        string agentRoot = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.Agent");
+        string programPath = Path.Combine(agentRoot, "Program.cs");
+        string program = File.ReadAllText(programPath);
+        string endpointsPath = Path.Combine(
+            agentRoot,
+            "Endpoints",
+            "UpdateEndpointMappings.cs");
+
+        Assert.True(
+            File.ReadLines(programPath).Count() < 325,
+            "Agent/Program.cs muss nach der Update-Extraktion unter 325 Zeilen bleiben.");
+        Assert.Contains(
+            "app.MapUpdateEndpoints(",
+            program,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "\"/api/v1/update/",
+            program,
+            StringComparison.Ordinal);
+        Assert.True(
+            File.Exists(endpointsPath),
+            "Update-Endpunkte müssen in einer eigenen Mapping-Datei liegen.");
+        Assert.True(
+            File.ReadLines(endpointsPath).Count() < 1_000,
+            "Update-Endpunkt-Mapping muss unter 1.000 Zeilen bleiben.");
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void AgentProgram_OnlyComposesEndpointGroups()
+    {
+        string root = FindRepositoryRoot();
+        string programPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.Agent",
+            "Program.cs");
+        string program = File.ReadAllText(programPath);
+
+        Assert.True(
+            File.ReadLines(programPath).Count() < 160,
+            "Agent/Program.cs muss als reiner Composition Root unter 160 Zeilen bleiben.");
+        Assert.Contains(
+            "app.MapOperationsEndpoints(",
+            program,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "app.MapSecurityEndpoints(",
+            program,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("app.MapGet(", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("app.MapPost(", program, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void AgentEndpoints_UseCentralProblemDetailsFactory()
+    {
+        string root = FindRepositoryRoot();
+        string endpointsRoot = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.Agent",
+            "Endpoints");
+        string[] prohibited =
+        [
+            "return Results.BadRequest(",
+            "return Results.Unauthorized(",
+            "return Results.NotFound(",
+            "return Results.StatusCode(",
+            "return Results.Problem("
+        ];
+        var violations = new List<string>();
+
+        foreach (string path in Directory.EnumerateFiles(
+                     endpointsRoot,
+                     "*.cs",
+                     SearchOption.AllDirectories))
+        {
+            string source = File.ReadAllText(path);
+            foreach (string token in prohibited)
+            {
+                if (source.Contains(token, StringComparison.Ordinal))
+                {
+                    violations.Add($"{Path.GetFileName(path)}: {token}");
+                }
+            }
+        }
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void RunOfShowShell_DelegatesPlanRulesToApplicationService()
+    {
+        string root = FindRepositoryRoot();
+        string shellPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Workflow",
+            "MainWindow.Workflow.RunOfShow.cs");
+        string servicePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Services",
+            "RunOfShowPlanService.cs");
+        string runtimePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Workflow",
+            "MainWindow.Workflow.RunOfShowRuntime.cs");
+        string shell = File.ReadAllText(shellPath);
+        string runtime = File.ReadAllText(runtimePath);
+
+        Assert.True(
+            File.ReadLines(shellPath).Count() < 650,
+            "Die Run-of-Show-Plan-/Editor-Shell muss unter 650 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(runtimePath).Count() < 400,
+            "Die Run-of-Show-Runtime-Shell muss unter 400 Zeilen bleiben.");
+        Assert.True(
+            File.Exists(servicePath),
+            "Regieplanregeln müssen in einem Anwendungsservice liegen.");
+        Assert.True(
+            File.ReadLines(servicePath).Count() < 310,
+            "Der Regieplanservice muss als begrenzte Einheit unter 310 Zeilen bleiben.");
+        Assert.Contains(
+            "RunOfShowPlanService.EnsureInitialized(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RunOfShowPlanService.Validate(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RunOfShowPlanService.CreateAndActivatePlan(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RunOfShowPlanService.ProjectRuntime(",
+            runtime,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private async Task ExecuteRunOfShowStepAsync(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "CloneRunOfShowStep",
+            shell,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void TimedAutomationShell_DelegatesRuleSelectionAndValidation()
+    {
+        string root = FindRepositoryRoot();
+        string shellPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Workflow",
+            "MainWindow.Workflow.TimedAutomationRuntime.cs");
+        string servicePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Services",
+            "TimedAutomationRuleService.cs");
+        string runtimeServicePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Services",
+            "TimedAutomationRuntimeService.cs");
+        string actionsPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Workflow",
+            "MainWindow.Workflow.TimedAutomationActions.cs");
+        string shell = File.ReadAllText(shellPath);
+        string actions = File.ReadAllText(actionsPath);
+
+        Assert.True(
+            File.ReadLines(shellPath).Count() < 600,
+            "Die Timed-Automation-Runtime muss unter 600 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(actionsPath).Count() < 475,
+            "Der Timed-Automation-Aktions-Slice muss unter 475 Zeilen bleiben.");
+        Assert.True(
+            File.Exists(servicePath),
+            "Auswahl und Validierung müssen in einem Anwendungsservice liegen.");
+        Assert.True(
+            File.ReadLines(servicePath).Count() < 350,
+            "Der Timed-Automation-Regelservice muss unter 350 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(runtimeServicePath).Count() < 100,
+            "Die Runtime-Entscheidungen müssen unter 100 Zeilen bleiben.");
+        Assert.Contains(
+            "TimedAutomationRuleService.SelectDueRules(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "TimedAutomationRuleService.SelectWorkflowSteps(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "TimedAutomationRuleService.Validate(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "TimedAutomationRuntimeService.EvaluateDependency(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "TimedAutomationRuntimeService.ResolveExecutionPolicy(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "private async Task ExecuteTimedAutomationActionAsync(",
+            actions,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private async Task ExecuteTimedAutomationActionAsync(",
+            shell,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void ObsDashboardShell_DelegatesStreamAndProjectionRules()
+    {
+        string root = FindRepositoryRoot();
+        string shellPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Obs",
+            "MainWindow.Services.Obs.ConnectionDashboard.cs");
+        string servicePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Services",
+            "ObsDashboardApplicationService.cs");
+        string streamObservationPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Obs",
+            "MainWindow.Services.Obs.StreamObservation.cs");
+        string shell = File.ReadAllText(shellPath);
+        string streamObservation = File.ReadAllText(streamObservationPath);
+
+        Assert.True(
+            File.ReadLines(shellPath).Count() < 620,
+            "Der OBS-Connection-/Dashboard-Slice muss unter 620 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(streamObservationPath).Count() < 330,
+            "Der OBS-Stream-Observation-Slice muss unter 330 Zeilen bleiben.");
+        Assert.True(
+            File.Exists(servicePath),
+            "OBS-Dashboard-Regeln müssen in einem Anwendungsservice liegen.");
+        Assert.True(
+            File.ReadLines(servicePath).Count() < 200,
+            "Der OBS-Dashboard-Service muss unter 200 Zeilen bleiben.");
+        Assert.Contains(
+            "ObsDashboardApplicationService.EvaluateStreamObservation(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ObsDashboardApplicationService.SelectTrackedInput(",
+            streamObservation,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ObsDashboardApplicationService.CreateSimpleVisibilityRule(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ObsDashboardApplicationService.SelectSceneActivationRules(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ObsDashboardApplicationService.ResolveLiveStartedAt(",
+            streamObservation,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private async Task HandleObservedStreamStartAsync(",
+            shell,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void TwitchDashboardShell_DelegatesRaidProjectionRules()
+    {
+        string root = FindRepositoryRoot();
+        string shellPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Twitch",
+            "MainWindow.Services.Twitch.DashboardRaid.cs");
+        string chatPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Twitch",
+            "MainWindow.Services.Twitch.DashboardChat.cs");
+        string metricsPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Twitch",
+            "MainWindow.Services.Twitch.DashboardMetrics.cs");
+        string servicePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Services",
+            "TwitchDashboardApplicationService.cs");
+        string shell = File.ReadAllText(shellPath);
+
+        Assert.True(
+            File.ReadLines(shellPath).Count() < 450,
+            "Der Twitch-Raid-Shell-Slice muss unter 450 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(chatPath).Count() < 220,
+            "Der Twitch-Chat-Shell-Slice muss unter 220 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(metricsPath).Count() < 300,
+            "Der Twitch-Metrik-Shell-Slice muss unter 300 Zeilen bleiben.");
+        Assert.True(
+            File.Exists(servicePath),
+            "Twitch-Raid-Regeln müssen in einem Anwendungsservice liegen.");
+        Assert.True(
+            File.ReadLines(servicePath).Count() < 250,
+            "Der Twitch-Dashboard-Service muss unter 250 Zeilen bleiben.");
+        Assert.Contains(
+            "TwitchDashboardApplicationService.BuildRaidSuggestions(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "TwitchDashboardApplicationService.ProjectRaidActions(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "TwitchDashboardApplicationService.NormalizeRaidChannels(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "TwitchDashboardApplicationService.BuildRaidStatusProbeLogins(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private static bool MatchesRaidQuery(",
+            shell,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void TwitchProfessionalShell_DelegatesHistoryProjection()
+    {
+        string root = FindRepositoryRoot();
+        string shellPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Twitch",
+            "MainWindow.Services.Twitch.ApiProfessional.cs");
+        string servicePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Services",
+            "TwitchProfessionalHistoryService.cs");
+        string connectionPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Twitch",
+            "MainWindow.Services.Twitch.ConnectionChannel.cs");
+        string moderationPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Twitch",
+            "MainWindow.Services.Twitch.ModerationChat.cs");
+        string shell = File.ReadAllText(shellPath);
+
+        Assert.True(
+            File.ReadLines(shellPath).Count() < 420,
+            "Der Twitch-Professional-Shell-Slice muss unter 420 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(connectionPath).Count() < 290,
+            "Der Twitch-Connection-Shell-Slice muss unter 290 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(moderationPath).Count() < 250,
+            "Der Twitch-Moderations-Shell-Slice muss unter 250 Zeilen bleiben.");
+        Assert.True(
+            File.Exists(servicePath),
+            "Twitch-Historienprojektion muss in einem Anwendungsservice liegen.");
+        Assert.True(
+            File.ReadLines(servicePath).Count() < 325,
+            "Der Twitch-History-Service muss unter 325 Zeilen bleiben.");
+        Assert.Contains(
+            "TwitchProfessionalHistoryService.LoadAsync(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "JsonDocument.Parse(line)",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "static string PercentTrend(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private async Task AuthorizeTwitchAsync(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private async Task ModerateTwitchUserAsync(",
+            shell,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void StreamDeckCatalogShell_DelegatesMetadataAndProjectionRules()
+    {
+        string root = FindRepositoryRoot();
+        string shellPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "StreamDeck",
+            "MainWindow.Services.StreamDeck.Catalog.cs");
+        string servicePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Services",
+            "StreamDeckCatalogApplicationService.cs");
+        string transferPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "StreamDeck",
+            "MainWindow.Services.StreamDeck.CatalogTransfer.cs");
+        string templatesPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "StreamDeck",
+            "MainWindow.Services.StreamDeck.Templates.cs");
+        string shell = File.ReadAllText(shellPath);
+
+        Assert.True(
+            File.ReadLines(shellPath).Count() < 600,
+            "Der Stream-Deck-Katalog-Shell-Slice muss unter 600 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(transferPath).Count() < 220,
+            "Der Stream-Deck-Transfer-Slice muss unter 220 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(templatesPath).Count() < 270,
+            "Der Stream-Deck-Vorlagen-Slice muss unter 270 Zeilen bleiben.");
+        Assert.True(
+            File.Exists(servicePath),
+            "Stream-Deck-Katalogregeln müssen in einem Anwendungsservice liegen.");
+        Assert.True(
+            File.ReadLines(servicePath).Count() < 350,
+            "Der Stream-Deck-Katalogservice muss unter 350 Zeilen bleiben.");
+        Assert.Contains(
+            "StreamDeckCatalogApplicationService.ProjectCatalog(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "StreamDeckCatalogApplicationService.FindFirstFreeSlot(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "StreamDeckCatalogApplicationService.CompareProfiles(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private static (string File, string Title",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private static (int DelayMs, int RetryCount",
+            shell,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void StreamDeckRuleShell_SeparatesActionAuthoring()
+    {
+        string root = FindRepositoryRoot();
+        string rulesPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "StreamDeck",
+            "MainWindow.Services.StreamDeck.Rules.cs");
+        string actionsPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "StreamDeck",
+            "MainWindow.Services.StreamDeck.Actions.cs");
+        string servicePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Services",
+            "StreamDeckAutomationRuleService.cs");
+        string rules = File.ReadAllText(rulesPath);
+        string actions = File.ReadAllText(actionsPath);
+
+        Assert.True(
+            File.ReadLines(rulesPath).Count() < 500,
+            "Der Stream-Deck-Regel-Slice muss unter 500 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(actionsPath).Count() < 380,
+            "Der Stream-Deck-Aktions-Slice muss unter 380 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(servicePath).Count() < 210,
+            "Der Stream-Deck-Regelservice muss unter 210 Zeilen bleiben.");
+        Assert.DoesNotContain(
+            "private async Task CreateStreamDeckActionAsync(",
+            rules,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "private async Task CreateStreamDeckActionAsync(",
+            actions,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "private static string FormatStreamDeckCommandArgs(",
+            actions,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "StreamDeckAutomationRuleService.IsRuleMatch(",
+            rules,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "StreamDeckAutomationRuleService.IsScheduleActive(",
+            rules,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private bool IsStreamDeckRuleMatch(",
+            rules,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void StreamerBotShell_DelegatesProtocolAndProjectionRules()
+    {
+        string root = FindRepositoryRoot();
+        string shellPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "StreamerBot",
+            "MainWindow.Services.StreamerBot.cs");
+        string servicePath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Services",
+            "StreamerBotApplicationService.cs");
+        string connectionPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "StreamerBot",
+            "MainWindow.Services.StreamerBot.ConnectionEvents.cs");
+        string shell = File.ReadAllText(shellPath);
+        string connection = File.ReadAllText(connectionPath);
+
+        Assert.True(
+            File.ReadLines(shellPath).Count() < 470,
+            "Der Streamer.bot-Aktions-Slice muss unter 470 Zeilen bleiben.");
+        Assert.True(
+            File.ReadLines(connectionPath).Count() < 480,
+            "Der Streamer.bot-Connection-Slice muss unter 480 Zeilen bleiben.");
+        Assert.True(
+            File.Exists(servicePath),
+            "Streamer.bot-Protokollregeln müssen in einem Anwendungsservice liegen.");
+        Assert.True(
+            File.ReadLines(servicePath).Count() < 225,
+            "Der Streamer.bot-Anwendungsservice muss unter 225 Zeilen bleiben.");
+        Assert.Contains(
+            "StreamerBotApplicationService.ParseActions(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "StreamerBotApplicationService.FilterActions(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "StreamerBotApplicationService.TryParseEvent(",
+            connection,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private async Task ConnectStreamerBotAsync(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private Dictionary<string, object?> ParseStreamerBotArguments(",
+            shell,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private static string BuildStreamerBotEventSummary(",
+            shell,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
     public void CoreAndModules_DoNotReferenceApp()
     {
         string root = FindRepositoryRoot();
