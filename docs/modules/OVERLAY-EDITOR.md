@@ -21,6 +21,14 @@ Siehe auch: [`OVERLAY-SYSTEM.md`](OVERLAY-SYSTEM.md)
 | `/w/countdown` | Solo Countdown (globaler App-State) |
 | `/w/socials` | Solo Socials (eine Plattform, Auswahl per Prop) |
 | `/w/partner-roulette` | Solo Partner Roulette (Partner-Logos rotieren) |
+| `/w/goal-bar` | Solo Goal Bar (Follower/Sub/Bit/Custom) |
+| `/w/event-ticker` | Solo Event Ticker |
+| `/w/viewer-count` | Solo Viewer Count |
+| `/w/lower-third` | Solo Lower Third |
+| `/w/qr-code` | Solo QR Code |
+| `/w/brb-panel` | Solo BRB / Starting Panel |
+| `/w/announcement-bar` | Solo Announcement Bar |
+| `/w/animated-background` | Solo Animated Background (34 Styles, inkl. Parallax-Berge) |
 | `/w/shape/{shapeId}` | Solo Frame/Shape, z. B. `/w/shape/frame` |
 | `GET/PUT /layout/{id}` | Layout laden/speichern (PUT nur Loopback) |
 | `/canvas/…` | Embedded Assets (CSS/JS) |
@@ -32,21 +40,42 @@ Beispiel: `/editor/default`, `/view/just-chatting`.
 ## Editor-Hilfen (nur `/editor`, nicht `/view`)
 
 - **32px Padding** um die Zeichenfläche (Fit/Scale berücksichtigt den Abstand).
-- **OBS-Vorschau** (Toolbar-Toggle, default aus): periodischer Screenshot nur auf `.ccs-canvas`; Prefs in `localStorage` (`ccs-editor-prefs`).
-- **Canvas-Größe von OBS**: Anzeige der Base-Auflösung + Button **Von OBS übernehmen** (`baseWidth`/`baseHeight`).
-- **Raster** ein/aus, Unterteilungen **H × V** (Default 16×6), nur visuell.
-- **Magnet** ein/aus: Snap an Kanten/Mitten **anderer Widgets** (Threshold 8px) inkl. Guide-Linien.
-- **Rechtsklick-Menü** / Toolbar: Duplizieren, Sperren/Entsperren, Ganz nach oben/unten, Ebene rauf/runter, Löschen.
+- **OBS-Vorschau** / **Raster** / **Einrasten** / **Magnet** (Toolbar-Icon-Toggles; Tooltips per `title`; Prefs in `localStorage` `ccs-editor-prefs`).
+- **Fenstergröße** (Palette, default eingeklappt): Preset / B×H, **Größe anwenden**, OBS-Base-Auflösung + **Von OBS übernehmen** (`baseWidth`/`baseHeight`).
+- **Raster** Unterteilungen **H × V** (Default 16×6); Editor-Layer (Grid/OBS-Vorschau) werden nach jedem `setLayout`/`renderItems` via `onAfterRender` neu gesetzt.
+- **Einrasten**: Snap an Rasterlinien (H×V) beim Verschieben **und** Skalieren (nur die gezogene Handle-Kante); Threshold ~20 % der Zellengröße (min. 8px), inkl. Guide-Linien. Unabhängig von der Raster-Anzeige.
+- **Magnet**: Snap an Kanten/Mitten **anderer Widgets** (Threshold 8px) beim Verschieben/Skalieren, inkl. Guide-Linien. Bei gleichzeitigem Einrasten gewinnt der Magnet, wenn er greift.
+- **Rechtsklick-Menü** / Toolbar-Icons / **Entf** bzw. **Backspace**: Duplizieren, Sperren/Entsperren, Ganz nach oben/unten, Ebene rauf/runter, Löschen (nicht bei Fokus in Eingabefeldern; gesperrte Items bleiben).
 
 ## Props-Panel
 
-Eigenschaften sind gruppiert (`propSection`, ein-/ausklappbar; **Position & Größe** default eingeklappt). Features nutzen LiveFX-artige `featureSection`-Toggles. Farben: `colorProp` (Picker + Swatches), Schriften: `fontProp` (Typeahead + Dropdown).
+Affinity-orientierter Inspector (Cool-Gray): Tabs **Layout** / **Widget** / **Effekte** / **Animationen**. Eigenschaften sind gruppiert (`propSection`, ein-/ausklappbar; **Position & Größe** default eingeklappt). Features nutzen LiveFX-artige `featureSection`-Toggles. Zahlenfelder (`numProp`) als kompakte Zeile Label | Slider | Wert. Farben: `colorProp` (Picker + Swatches), Schriften: `fontProp` (Typeahead + Dropdown). Aktiver Tab in `sessionStorage` (`ccs-props-tab`).
 
-**Effekte:** Jedes Item hat `effects[]` (Glow, Particles, Scanlines, Vignette, Blur, Noise). Im Props-Panel unten stapelbar, einzeln aktivierbar. Weitere Modifier: Skill `overlay-effect` / Packs: `overlay-extension-pack`.
+**Effekte:** Jedes Item hat `effects[]` — stapelbare Modifier (Glow, Particles, Scanlines, Vignette, Blur, Noise, Neon, Glitch, Sparkle, Aurora, Pulse Ring, Hologram, Outline, Drop Shadow, Rainbow, Spotlight). Pro Effekt optional **Ziel** `box`/`content` — nur wenn die Strategy `targets` inkl. `content` hat (Glow, Drop Shadow, Outline, Glitch); sonst kein Ziel-Select. Glow / Outline / Drop Shadow: **Animation** `Aus` / `Pulse` / `Atmen` + Tempo. Im Tab **Effekte**, einzeln aktivierbar. Weitere Modifier: Skill `overlay-effect` / Packs: `overlay-extension-pack`.
+
+**Animationen:** Jedes Item hat `animations[]` — Motion auf dem Content (Fade, Slide, Bounce, Pop, Shake, Float, Pulse, Spin, Wiggle, Flip). Im Tab **Animationen**; `loop` und Dauer steuerbar.
 
 ## TypeScript-Quellen
 
 Editor/Runtime liegen unter `src/CreatorControlSuite.Modules.Overlay/CanvasOverlay/src/` und werden per `npm run build` (MSBuild-Target) nach `shared/runtime.js` / `editor/editor.js` gebündelt. Die Bundles sind gitignored und entstehen lokal bzw. in CI beim Build.
+
+## Browser-Dev (ohne WPF-App)
+
+Cross-platform (Node 18+): simulierter Overlay-Webserver inkl. Editor, View, Solo-Widgets, Standalone-Chat, Layout-API, `overlay-data`, WebSocket-Events und Hot-Reload.
+
+```bash
+# aus Repo-Root
+make canvas-dev
+
+# oder
+cd src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+npm install
+npm run dev
+```
+
+Öffnen: `http://127.0.0.1:8765/` (gleiche Routen wie der App-Overlay-Server). Port: `CCS_DEV_PORT`, Sim aus: `CCS_DEV_SIM=0`.
+
+Persistenz: `CanvasOverlay/dev/.layouts/`, `dev/.data/` (gitignored). Extension-Packs optional unter `dev/extensions/{packId}/`.
 
 ## OBS-Setup
 
@@ -70,6 +99,14 @@ Standalone-Chat bleibt zusätzlich unter `/chat` verfügbar.
 | `image` | Bild aus URL (`src`, `fit`, Opacity, Radius) |
 | `countdown` | Globaler Countdown aus `countdown.*` (Dashboard / Workflow / Automationen); Props: `variant`, `format`, `showLabel`, `hideWhenIdle` |
 | `partner-roulette` | Partner-Logos/-Bilder rotieren; Props: `images[]`, `intervalMs`, `transition` (`fade`/`crossfade`/`slide`/`none`), `transitionMs`, `fit`, `borderRadiusPx` |
+| `goal-bar` | Live-Zielleiste (`followers`/`subs`/`bits`/`custom`); `variant` (≥12), `sizePreset`, Show-Toggles, `fillStyle`, `colorProp`/`fontProp`, Features `hideWhenComplete` / `pulseOnProgress` |
+| `event-ticker` | Event-Laufschrift aus Twitch-/Alert-Events; `variant`, Marquee/Fade/Liste, Template, Sources |
+| `viewer-count` | Live-Zuschauerzahl + Peak; `stream.viewerCount` / `stats.peakViewers` |
+| `lower-third` | Namenszeile (Name/Subtitle/Tag/Avatar); viele Broadcast-Looks |
+| `qr-code` | QR aus URL (clientseitig) + Caption/Logo; `errorCorrection`, `fg`/`bg` |
+| `brb-panel` | BRB/Starting/Tech-Pause Panel; optional globaler `countdown.*` |
+| `announcement-bar` | Ankündigungsbanner mit optionalem Marquee |
+| `animated-background` | Animierter Full-Bleed-Hintergrund mit **34 Styles**: CSS-Looks (`cyber` … `noir`), **JS-Matrix-Rain** (`hacker`: fallende Katakana/Symbole), plus **JS-Parallax-Berge** (`mountains` … `ridge-storm`); Props: `variant`, `sizePreset`, `color`/`color2`/`color3`, `speed`, `intensity`, `density`, `opacity`, Features `vignette` / `paused` |
 
 ## Globaler Countdown
 
@@ -86,7 +123,7 @@ Steuerung:
 
 ## Shapes / Frames
 
-`frame`, `frame.card`, `shape.vignette`, `shape.cutout`, `shape.scene-bg`.
+`frame`, `frame.card`, `shape.vignette`, `shape.cutout`, `shape.scene-bg`, `shape.divider`, `shape.cam-ring`, `shape.sticker`.
 
 Legacy-Typen `frame.rect` / `frame.circle` / `frame.corners` / `frame.bevel` / `frame.neon` / `frame.dashed` bleiben renderbar (Map auf `mode`), sind aber nicht mehr in der Palette.
 
@@ -130,6 +167,18 @@ Animierter Szenen-Hintergrund (Glow, Streifen, Partikel). Farben und Animation s
 Wichtige Props: `glow1`/`glow2`, `bgBase`/`bgMid`/`bgDeep`, `speed` (1 = normal), `driftDuration`/`particleDuration`, `stripes`/`particles`/`paused`, Opacity-Werte für Glow/Streifen/Partikel/Vignette/Scan.
 
 Solo-URL: `/w/shape/shape.scene-bg` (optional `?props={"preset":"aurora","speed":1.5}`).
+
+### Divider (`shape.divider`)
+
+Zierlinie mit ≥12 Styles (`line`/`dashed`/`glow`/`flourish`/…). Props: `orientation`, `thickness`, Motif, `color`/`color2`, Feature `animateShimmer`.
+
+### Cam Ring (`shape.cam-ring`)
+
+Webcam-Ring + Badge (`live`/`rec`/`custom`); Varianten `ring`/`hex`/`neon`/…; Features `pulse`/`rotateSlow`. Oft kombiniert mit `shape.cutout`.
+
+### Sticker (`shape.sticker`)
+
+Dekoratives Sticker-Item: Presets (heart/star/…) oder Custom-`src`, Hüllen-Varianten, Features `bob`/`spin`/`pulse`.
 
 ## Persistenz
 

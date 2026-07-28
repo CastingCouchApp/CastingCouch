@@ -22,6 +22,7 @@ Die Suite startet einen lokalen HTTP-Server auf `127.0.0.1` (Standard-Port **876
 - Optional: `GET /data/overlay-config.json`
 - Live-Events: WebSocket `ws://127.0.0.1:8765/ws`
 - Health: `GET /health` (inkl. Liste aller Canvases)
+- Optionaler Browser-Dev-Server (ohne WPF, Node 18+): `CanvasOverlay/` → `npm run dev` bzw. `make canvas-dev` — simuliert denselben Overlay-Webserver inkl. Hot-Reload.
 
 Layout-Dateien: `%LocalAppData%\CreatorControlSuite\Overlay\layouts\{id}.json`
 
@@ -83,6 +84,55 @@ Jedes Frame ist ein JSON-Objekt:
 | `app` | `app.overlay.layout` | Canvas-Layout gespeichert (`instanceId`) |
 | `app` | `app.ws.hello` | Willkommen beim Connect |
 | `editor` | `editor.layout.set` | Client→Server Layout speichern |
+
+## Built-in Effects (`item.effects[]`)
+
+Stapelbare Modifier auf allen Layout-Items. Registry: `EFFECT_STRATEGIES` / Skill `overlay-effect`.
+
+Jedes Effect-Objekt kann `target` setzen (nur wenn die Strategy es unterstützt):
+
+| target | Bedeutung |
+|--------|-----------|
+| `box` (Default) | Effekt auf die Item-Box / den Container |
+| `content` | Effekt auf das gezeichnete Element (`[data-role=content]`, z. B. Kreis/Text); Glow/Drop-Shadow nutzen `filter: drop-shadow` (Silhouette) |
+
+`content` ist freigeschaltet für: `glow`, `drop-shadow`, `outline`, `glitch`. Andere Built-ins sind **nur Box** (`strategy.targets`, Default `["box"]`).
+
+| type | Label | Kurzbeschreibung |
+|------|-------|------------------|
+| `glow` | Glow | Soft glow; Animation `pulse`/`breathe` (Inhalt: Silhouette bleibt, Box: Layer) |
+| `particles` | Particles | Partikel-Modi (ember, snow, …) |
+| `scanlines` | Scanlines | CRT-Linien |
+| `vignette` | Vignette | Abgedunkelte Ränder |
+| `blur` | Blur | Backdrop-Blur |
+| `noise` | Noise | Filmgrain |
+| `neon` | Neon | Pulsierender Neon-Rahmen |
+| `glitch` | Glitch | RGB-Split / Jitter |
+| `sparkle` | Sparkle | Funkeln (Subs/Hype) |
+| `aurora` | Aurora | Fließendes Nordlicht |
+| `pulse-ring` | Pulse Ring | Expandierende Alert-Ringe |
+| `hologram` | Hologram | Holo-Scan-Shimmer |
+| `outline` | Outline | Harter Contour-Stroke; optional `pulse`/`breathe` |
+| `drop-shadow` | Drop Shadow | Gerichteter Schatten; optional `pulse`/`breathe` |
+| `rainbow` | Rainbow | Animierter Regenbogen-Rand |
+| `spotlight` | Spotlight | Wandernder Lichtkegel |
+
+## Built-in Animations (`item.animations[]`)
+
+Motion auf dem Item-Content. Registry: `ANIMATION_STRATEGIES`.
+
+| type | Label | Kurzbeschreibung |
+|------|-------|------------------|
+| `fade` | Fade | Opacity-Pulse |
+| `slide` | Slide | Verschieben (Richtung) |
+| `bounce` | Bounce | Auf-und-ab |
+| `pop` | Pop | Scale-Pop |
+| `shake` | Shake | Rütteln (Attention) |
+| `float` | Float | Sanftes Schweben |
+| `pulse` | Pulse | Herzschlag-Scale |
+| `spin` | Spin | Rotation |
+| `wiggle` | Wiggle | Wackeln |
+| `flip` | Flip | 3D-Flip (X/Y) |
 
 ## Einstellungen
 
