@@ -3,19 +3,20 @@
 - Antworten auf Deutsch, kurz und direkt.
 - Agent-Skills so ablegen, dass Cursor und Codex denselben Skill nutzen (canonical unter `.agents/skills/`, Kompatibilität über Symlinks).
 - Overlay-Widget-Skill (`.agents/skills/overlay-widget/`) stets mitpflegen, wenn sich der Ablauf oder die Dateien zum Einführen von Overlay-Widgets/Shapes ändern. Effect-Modifier: `.agents/skills/overlay-effect/`; ZIP-Packs: `.agents/skills/overlay-extension-pack/`.
+- Overlay-Widgets/Shapes mit maximaler Flexibilität: viele Design-Variants, Size-Presets und Config-Props (`colorProp`/`fontProp`/`featureSection`); App generell erweiterbar halten.
 - Die App wird testgetrieben (TDD) entwickelt: zuerst Tests schreiben, dann Implementation; Änderungen ohne passende Tests vermeiden.
 - Projektdokumentation unter `docs/` halten und thematisch in Unterordner sortieren; Changelogs unter `docs/changelogs/`.
 - Root soll schlank bleiben (`README.md`); offene Docs und Notizen nicht im Repo-Root lassen.
-- Auf macOS fehlende Windows-/dotnet-Tools im Release-/Test-Flow überspringen und CI/Windows nutzen.
+- Auf macOS restore/format lokal möglich (`EnableWindowsTargeting`); Vollbuild, Test und Release über CI/Windows.
 
 
 
 ## Learned Workspace Facts
 
-- Creator Control Suite ist eine WPF-Desktop-App auf .NET 10 (`net10.0-windows`); lokaler Vollbuild/Test braucht Windows, CI läuft auf `windows-latest`.
+- Creator Control Suite ist eine WPF-Desktop-App auf .NET 10 (`net10.0-windows`); `Directory.Build.props` setzt `EnableWindowsTargeting` außerhalb von Windows (restore/format auf macOS); Vollbuild/Test braucht Windows, CI auf `windows-latest`.
 - GitHub-Remote: `frankhildebrandt/CreatorControlSuite`.
 - Versionsquelle ist `Directory.Build.props` (`<Version>`); Changelogs liegen als `docs/changelogs/CHANGELOG-<version>.md`.
-- Build-Ausgabe unter `artifacts/`; lokale Kurzbefehle über `Makefile` (`restore`/`build`/`test`/`publish`/`ci`/`release`).
+- Build-Ausgabe unter `artifacts/`; lokale Kurzbefehle über `Makefile` (`restore`/`build`/`test`/`publish`/`ci`/`release`/`format`).
 - CI: `.github/workflows/build.yml` (Push/PR), Release: `.github/workflows/release.yml` (Tags `v*` / manuell) über `build/Build-Release.ps1`.
 - Release-Skill canonical: `.agents/skills/release/`; Symlinks unter `.cursor/skills/release` und `.codex/skills/release`.
 - Overlay-Widget-Skill canonical: `.agents/skills/overlay-widget/`; Effect-Skill: `.agents/skills/overlay-effect/`; Extension-Pack-Skill: `.agents/skills/overlay-extension-pack/` (Symlinks unter `.cursor/skills/` und `.codex/skills/`).
