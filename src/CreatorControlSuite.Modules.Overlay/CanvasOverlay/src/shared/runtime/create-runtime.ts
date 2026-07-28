@@ -6,11 +6,15 @@ import { uid } from '../utils/format';
 import { fetchJson } from '../net/fetch-json';
 import { createItemContent, applyItemBox } from './item-content';
 import { applyItemEffects } from '../effects/apply';
+import { applyItemAnimations } from '../animations/apply';
 import { applyCutoutStackMask } from '../shapes/cutout';
 import {
   updateOnline, updateSpotify, updateChat, updateEndingStats, updateText, updateImage,
   updateCountdown, updateSocials, updatePartnerRoulette, paintSpotifyProgress, paintEndingStats, paintCountdown,
-  enqueueAlert, appendChatMessage, appendChatEvent, CHAT_EVENT_TYPES
+  enqueueAlert, appendChatMessage, appendChatEvent, CHAT_EVENT_TYPES,
+  updateGoalBar, updateEventTicker, pushEventTickerItem, updateViewerCount, updateLowerThird,
+  updateQrCode, updateBrbPanel, paintBrbPanel, updateAnnouncementBar, updateAnimatedBackground,
+  updateDivider, updateCamRing, updateSticker
 } from './core-functions';
 
 export function createRuntime(options: RuntimeOptions): CreateRuntime {
@@ -25,6 +29,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     let selectedId = null;
     let onSelect = opts.onSelect || null;
     let onChange = opts.onChange || null;
+    const onAfterRender = opts.onAfterRender || null;
     const chatHistory = [];
     const seenMessageIds = new Set();
     const CHAT_HISTORY_LIMIT = 200;
@@ -156,6 +161,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
         content.dataset.role = "content";
         wrapper.appendChild(content);
         applyItemEffects(wrapper, item);
+        applyItemAnimations(wrapper, item);
         if (editing) {
           ["nw", "ne", "sw", "se"].forEach((pos) => {
             const h = document.createElement("div");
@@ -170,6 +176,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
       }
       restoreAllChatWidgets();
       fit();
+      if (onAfterRender) onAfterRender({ canvas });
     }
 
     function refreshItemData(id) {
@@ -185,6 +192,17 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
       if (item.type === "countdown") updateCountdown(node.content, item, data);
       if (item.type === "socials") updateSocials(node.content, item);
       if (item.type === "partner-roulette") updatePartnerRoulette(node.content, item);
+      if (item.type === "goal-bar") updateGoalBar(node.content, item, data);
+      if (item.type === "event-ticker") updateEventTicker(node.content, item, data);
+      if (item.type === "viewer-count") updateViewerCount(node.content, item, data);
+      if (item.type === "lower-third") updateLowerThird(node.content, item);
+      if (item.type === "qr-code") updateQrCode(node.content, item);
+      if (item.type === "brb-panel") updateBrbPanel(node.content, item, data);
+      if (item.type === "announcement-bar") updateAnnouncementBar(node.content, item);
+      if (item.type === "animated-background") updateAnimatedBackground(node.content, item);
+      if (item.type === "shape.divider") updateDivider(node.content, item);
+      if (item.type === "shape.cam-ring") updateCamRing(node.content, item);
+      if (item.type === "shape.sticker") updateSticker(node.content, item);
     }
 
     function refreshAllData() {
@@ -254,13 +272,32 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
         return;
       }
       if (evt.type === "app.alert" || (evt.source === "twitch" && /follow|subscribe|cheer|raid/i.test(evt.type || ""))) {
+        const alertPayload = {
+          alertType: (evt.data && (evt.data.alertType || evt.type)) || evt.type,
+          user: (evt.data && (evt.data.user || evt.data.user_name || evt.data.userName)) || "",
+          summary: evt.summary || ""
+        };
+        const rawType = String(alertPayload.alertType || "").toLowerCase();
+        let tickerType = "custom";
+        if (rawType.includes("follow")) tickerType = "follow";
+        else if (rawType.includes("gift")) tickerType = "gift";
+        else if (rawType.includes("sub")) tickerType = "subscribe";
+        else if (rawType.includes("cheer") || rawType.includes("bit")) tickerType = "cheer";
+        else if (rawType.includes("raid")) tickerType = "raid";
+        else if (rawType.includes("host")) tickerType = "host";
+        else if (rawType.includes("redeem") || rawType.includes("redemption")) tickerType = "redemption";
         for (const node of itemNodes.values()) {
-          if (node.item.type !== "alert") continue;
-          enqueueAlert(node.content, node.item, {
-            alertType: (evt.data && (evt.data.alertType || evt.type)) || evt.type,
-            user: (evt.data && (evt.data.user || evt.data.user_name || evt.data.userName)) || "",
-            summary: evt.summary || ""
-          });
+          if (node.item.type === "alert") {
+            enqueueAlert(node.content, node.item, alertPayload);
+          }
+          if (node.item.type === "event-ticker") {
+            pushEventTickerItem(node.content, node.item, {
+              type: tickerType,
+              text: alertPayload.summary || `${alertPayload.user} ${tickerType}`.trim(),
+              user: alertPayload.user,
+              time: Date.now()
+            });
+          }
         }
       }
       if (evt.source === "twitch" && evt.type === "channel.chat.message") {
@@ -300,6 +337,9 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
           if (node.item.type === "countdown") {
             paintCountdown(node.content, node.item, data);
           }
+          if (node.item.type === "brb-panel") {
+            paintBrbPanel(node.content, node.item, data);
+          }
         }
       }
     }
@@ -310,6 +350,9 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
         if (node.item.type === "music" || node.item.type === "spotify") paintSpotifyProgress(node.content);
         if (node.item.type === "ending-stats") paintEndingStats(node.content, data);
         if (node.item.type === "countdown") paintCountdown(node.content, node.item, data);
+        if (node.item.type === "brb-panel") paintBrbPanel(node.content, node.item, data);
+        if (node.item.type === "goal-bar") updateGoalBar(node.content, node.item, data);
+        if (node.item.type === "viewer-count") updateViewerCount(node.content, node.item, data);
       }
     }
 
@@ -353,6 +396,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
           rotation: 0,
           locked: false,
           effects: [],
+          animations: [],
           props: { ...(def.props || {}) }
         };
       },

@@ -26,6 +26,78 @@ import {
   resolvePartnerRouletteImages,
   PARTNER_ROULETTE_TRANSITIONS
 } from '../widgets/partner-roulette';
+import {
+  createGoalBarEl,
+  updateGoalBar,
+  GOAL_BAR_VARIANTS,
+  GOAL_BAR_SIZE_PRESETS
+} from '../widgets/goal-bar';
+import {
+  createEventTickerEl,
+  updateEventTicker,
+  pushEventTickerItem,
+  EVENT_TICKER_VARIANTS,
+  EVENT_TICKER_SIZE_PRESETS,
+  EVENT_TICKER_SOURCES
+} from '../widgets/event-ticker';
+import {
+  createViewerCountEl,
+  updateViewerCount,
+  VIEWER_COUNT_VARIANTS,
+  VIEWER_COUNT_SIZE_PRESETS
+} from '../widgets/viewer-count';
+import {
+  createLowerThirdEl,
+  updateLowerThird,
+  LOWER_THIRD_VARIANTS,
+  LOWER_THIRD_SIZE_PRESETS
+} from '../widgets/lower-third';
+import {
+  createQrCodeEl,
+  updateQrCode,
+  QR_CODE_VARIANTS,
+  QR_CODE_SIZE_PRESETS
+} from '../widgets/qr-code';
+import {
+  createBrbPanelEl,
+  updateBrbPanel,
+  paintBrbPanel,
+  BRB_PANEL_VARIANTS,
+  BRB_PANEL_SIZE_PRESETS,
+  BRB_PANEL_MODES
+} from '../widgets/brb-panel';
+import {
+  createAnnouncementBarEl,
+  updateAnnouncementBar,
+  ANNOUNCEMENT_BAR_VARIANTS,
+  ANNOUNCEMENT_BAR_SIZE_PRESETS
+} from '../widgets/announcement-bar';
+import {
+  createAnimatedBackgroundEl,
+  updateAnimatedBackground,
+  ANIMATED_BACKGROUND_VARIANTS,
+  ANIMATED_BACKGROUND_SIZE_PRESETS,
+  ANIMATED_BACKGROUND_VARIANT_LABELS
+} from '../widgets/animated-background';
+import {
+  createDividerEl,
+  updateDivider,
+  DIVIDER_VARIANTS,
+  DIVIDER_STYLES,
+  DIVIDER_SIZE_PRESETS
+} from '../shapes/divider';
+import {
+  createCamRingEl,
+  updateCamRing,
+  CAM_RING_VARIANTS,
+  CAM_RING_SIZE_PRESETS
+} from '../shapes/cam-ring';
+import {
+  createStickerEl,
+  updateSticker,
+  STICKER_PRESETS,
+  STICKER_VARIANTS
+} from '../shapes/sticker';
 
 export {
   createSpotifyEl,
@@ -46,6 +118,59 @@ export {
   updatePartnerRoulette,
   resolvePartnerRouletteImages,
   PARTNER_ROULETTE_TRANSITIONS
+};
+
+export {
+  createGoalBarEl,
+  updateGoalBar,
+  GOAL_BAR_VARIANTS,
+  GOAL_BAR_SIZE_PRESETS,
+  createEventTickerEl,
+  updateEventTicker,
+  pushEventTickerItem,
+  EVENT_TICKER_VARIANTS,
+  EVENT_TICKER_SIZE_PRESETS,
+  EVENT_TICKER_SOURCES,
+  createViewerCountEl,
+  updateViewerCount,
+  VIEWER_COUNT_VARIANTS,
+  VIEWER_COUNT_SIZE_PRESETS,
+  createLowerThirdEl,
+  updateLowerThird,
+  LOWER_THIRD_VARIANTS,
+  LOWER_THIRD_SIZE_PRESETS,
+  createQrCodeEl,
+  updateQrCode,
+  QR_CODE_VARIANTS,
+  QR_CODE_SIZE_PRESETS,
+  createBrbPanelEl,
+  updateBrbPanel,
+  paintBrbPanel,
+  BRB_PANEL_VARIANTS,
+  BRB_PANEL_SIZE_PRESETS,
+  BRB_PANEL_MODES,
+  createAnnouncementBarEl,
+  updateAnnouncementBar,
+  ANNOUNCEMENT_BAR_VARIANTS,
+  ANNOUNCEMENT_BAR_SIZE_PRESETS,
+  createAnimatedBackgroundEl,
+  updateAnimatedBackground,
+  ANIMATED_BACKGROUND_VARIANTS,
+  ANIMATED_BACKGROUND_SIZE_PRESETS,
+  ANIMATED_BACKGROUND_VARIANT_LABELS,
+  createDividerEl,
+  updateDivider,
+  DIVIDER_VARIANTS,
+  DIVIDER_STYLES,
+  DIVIDER_SIZE_PRESETS,
+  createCamRingEl,
+  updateCamRing,
+  CAM_RING_VARIANTS,
+  CAM_RING_SIZE_PRESETS,
+  createStickerEl,
+  updateSticker,
+  STICKER_PRESETS,
+  STICKER_VARIANTS
 };
 
 export function createOnlineEl(item) {
@@ -904,6 +1029,9 @@ export function shapeClass(type, item) {
       case "shape.vignette": return "ccs-shape ccs-shape-vignette";
       case "shape.scene-bg": return "ccs-shape ccs-shape-scene-bg";
       case "shape.cutout": return "ccs-shape ccs-shape-cutout";
+      case "shape.divider": return "ccs-shape ccs-divider";
+      case "shape.cam-ring": return "ccs-shape ccs-cam-ring";
+      case "shape.sticker": return "ccs-shape ccs-sticker";
       default: return "ccs-shape ccs-frame ccs-frame-m-rect";
     }
   }
@@ -1037,6 +1165,15 @@ export function createShapeEl(item) {
     if (item.type === "shape.cutout") {
       return createCutoutEl(item);
     }
+    if (item.type === "shape.divider") {
+      return createDividerEl(item);
+    }
+    if (item.type === "shape.cam-ring") {
+      return createCamRingEl(item);
+    }
+    if (item.type === "shape.sticker") {
+      return createStickerEl(item);
+    }
     if (isUnifiedFrameType(item.type)) {
       return createFrameEl(item);
     }
@@ -1076,6 +1213,14 @@ export function createItemContent(item) {
     if (item.type === "countdown") return createCountdownEl(item);
     if (item.type === "socials") return createSocialsEl(item);
     if (item.type === "partner-roulette") return createPartnerRouletteEl(item);
+    if (item.type === "goal-bar") return createGoalBarEl(item);
+    if (item.type === "event-ticker") return createEventTickerEl(item);
+    if (item.type === "viewer-count") return createViewerCountEl(item);
+    if (item.type === "lower-third") return createLowerThirdEl(item);
+    if (item.type === "qr-code") return createQrCodeEl(item);
+    if (item.type === "brb-panel") return createBrbPanelEl(item);
+    if (item.type === "announcement-bar") return createAnnouncementBarEl(item);
+    if (item.type === "animated-background") return createAnimatedBackgroundEl(item);
     const unknown = document.createElement("div");
     unknown.textContent = item.type || "unknown";
     unknown.style.padding = "12px";

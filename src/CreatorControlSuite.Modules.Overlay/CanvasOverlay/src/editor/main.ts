@@ -56,7 +56,9 @@ function refreshSelectionUi(): void {
   const propsEmpty = document.getElementById("propsEmpty")!;
   const propsForm = document.getElementById("propsForm")!;
   const propExtra = document.getElementById("propExtra")!;
-  syncProps(item, editorCtx, propExtra, propsEmpty, propsForm, btnDelete);
+  const propEffects = document.getElementById("propEffects");
+  const propAnimations = document.getElementById("propAnimations");
+  syncProps(item, editorCtx, propExtra, propsEmpty, propsForm, btnDelete, propEffects, propAnimations);
 }
 
 function bootEditor(): void {
@@ -78,22 +80,22 @@ function bootEditor(): void {
   const propsEmpty = document.getElementById("propsEmpty")!;
   const propsForm = document.getElementById("propsForm")!;
   const propExtra = document.getElementById("propExtra")!;
+  const propEffects = document.getElementById("propEffects");
+  const propAnimations = document.getElementById("propAnimations");
   const btnDelete = document.getElementById("btnDelete") as HTMLButtonElement;
+
+  const syncSelection = (item: LayoutItem | null) =>
+    syncProps(item, editorCtx, propExtra, propsEmpty, propsForm, btnDelete, propEffects, propAnimations);
 
   editorRuntime = window.CcsCanvas.createRuntime({
     root: stage,
     editing: true,
     center: true,
     instanceId,
-    onSelect: (item) => syncProps(item, editorCtx, propExtra, propsEmpty, propsForm, btnDelete),
-    onChange: () => scheduleSave()
+    onSelect: (item) => syncSelection(item),
+    onChange: () => scheduleSave(),
+    onAfterRender: ({ canvas }) => applyEditorLayers(canvas, prefs)
   });
-
-  const originalRender = editorRuntime.renderItems.bind(editorRuntime);
-  editorRuntime.renderItems = () => {
-    originalRender();
-    applyEditorLayers(editorRuntime, prefs);
-  };
 
   const save = createSaveScheduler(editorRuntime, instanceId, saveStatus, () => ws);
   scheduleSave = save.scheduleSave;
@@ -108,6 +110,7 @@ function bootEditor(): void {
   };
 
   wrapGeometrySection();
+  wireInspectorTabs();
 
   const widgets: PaletteEntry[] = [
     { type: "online", label: "Online + Zeit" },
@@ -119,14 +122,25 @@ function bootEditor(): void {
     { type: "image", label: "Image" },
     { type: "countdown", label: "Countdown" },
     { type: "socials", label: "Socials" },
-    { type: "partner-roulette", label: "Partner Roulette" }
+    { type: "partner-roulette", label: "Partner Roulette" },
+    { type: "goal-bar", label: "Goal Bar" },
+    { type: "event-ticker", label: "Event Ticker" },
+    { type: "viewer-count", label: "Viewer Count" },
+    { type: "lower-third", label: "Lower Third" },
+    { type: "qr-code", label: "QR Code" },
+    { type: "brb-panel", label: "BRB Panel" },
+    { type: "announcement-bar", label: "Announcement Bar" },
+    { type: "animated-background", label: "Animated Background" }
   ];
   const shapes: PaletteEntry[] = [
     { type: "frame", label: "Frame" },
     { type: "frame.card", label: "Card Frame" },
     { type: "shape.vignette", label: "Vignette" },
     { type: "shape.cutout", label: "Cutout" },
-    { type: "shape.scene-bg", label: "Starting Hintergrund" }
+    { type: "shape.scene-bg", label: "Starting Hintergrund" },
+    { type: "shape.divider", label: "Divider" },
+    { type: "shape.cam-ring", label: "Cam Ring" },
+    { type: "shape.sticker", label: "Sticker" }
   ];
 
   fillPalette(document.getElementById("widgetPalette")!, widgets, "widget", addItem);
@@ -137,9 +151,13 @@ function bootEditor(): void {
   setupDrag(
     stage,
     editorRuntime,
-    (item) => syncProps(item, editorCtx, propExtra, propsEmpty, propsForm, btnDelete),
+    (item) => syncSelection(item),
     scheduleSave,
-    { isMagnetEnabled: () => prefs.magnet }
+    {
+      isMagnetEnabled: () => prefs.magnet,
+      isGridSnapEnabled: () => prefs.gridSnap,
+      getGridDivisions: () => ({ gridH: prefs.gridH, gridV: prefs.gridV })
+    }
   );
   setupContextMenu(stage, editorRuntime, scheduleSave, refreshSelectionUi);
 
@@ -173,7 +191,7 @@ function bootEditor(): void {
     if (!item) return;
     item.locked = (e.target as HTMLInputElement).checked;
     scheduleSave();
-    syncProps(item, editorCtx, propExtra, propsEmpty, propsForm, btnDelete);
+    syncSelection(item);
   });
 
   void boot(instanceId, setInstanceLabel, () => {
@@ -186,12 +204,14 @@ function bootEditor(): void {
 function wireToolbarPrefs(saveStatus: HTMLElement, onObsPreviewChanged: () => void): void {
   const obsToggle = document.getElementById("toggleObsPreview") as HTMLInputElement;
   const gridToggle = document.getElementById("toggleGrid") as HTMLInputElement;
+  const gridSnapToggle = document.getElementById("toggleGridSnap") as HTMLInputElement;
   const magnetToggle = document.getElementById("toggleMagnet") as HTMLInputElement;
   const gridH = document.getElementById("gridHInput") as HTMLInputElement;
   const gridV = document.getElementById("gridVInput") as HTMLInputElement;
 
   obsToggle.checked = prefs.obsPreview;
   gridToggle.checked = prefs.grid;
+  gridSnapToggle.checked = prefs.gridSnap;
   magnetToggle.checked = prefs.magnet;
   gridH.value = String(prefs.gridH);
   gridV.value = String(prefs.gridV);
@@ -202,6 +222,7 @@ function wireToolbarPrefs(saveStatus: HTMLElement, onObsPreviewChanged: () => vo
       grid: gridToggle.checked,
       gridH: Number(gridH.value) || 16,
       gridV: Number(gridV.value) || 6,
+      gridSnap: gridSnapToggle.checked,
       magnet: magnetToggle.checked
     };
     saveEditorPrefs(prefs);
@@ -216,9 +237,19 @@ function wireToolbarPrefs(saveStatus: HTMLElement, onObsPreviewChanged: () => vo
     }
   });
   gridToggle.addEventListener("change", persist);
+  gridSnapToggle.addEventListener("change", persist);
   magnetToggle.addEventListener("change", persist);
   gridH.addEventListener("change", persist);
   gridV.addEventListener("change", persist);
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  const el = target as HTMLElement;
+  const tag = (el.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea" || tag === "select") return true;
+  if (el.isContentEditable) return true;
+  return !!el.closest("input, textarea, select, [contenteditable='true']");
 }
 
 function wireCommands(): void {
@@ -241,6 +272,15 @@ function wireCommands(): void {
   });
   document.getElementById("btnLayerDown")?.addEventListener("click", () => {
     runEditorCommand("layerDown", editorRuntime, scheduleSave);
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Delete" && e.key !== "Backspace") return;
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (isEditableKeyboardTarget(e.target)) return;
+    if (!runEditorCommand("delete", editorRuntime, scheduleSave)) return;
+    e.preventDefault();
+    refreshSelectionUi();
   });
 }
 
@@ -294,10 +334,10 @@ function wireObsSize(
 }
 
 function wrapGeometrySection(): void {
-  const form = document.getElementById("propsForm");
-  if (!form) return;
+  const layoutPane = document.getElementById("propsPaneLayout");
+  if (!layoutPane) return;
   const ids = ["propX", "propY", "propW", "propH", "propZ"];
-  const labels = form.querySelectorAll("label");
+  const labels = layoutPane.querySelectorAll("label");
   const { root, body } = propSection("geometry", "Position & Größe", true);
   for (const label of Array.from(labels)) {
     const input = label.querySelector("input");
@@ -305,9 +345,50 @@ function wrapGeometrySection(): void {
       body.appendChild(label);
     }
   }
-  const locked = form.querySelector("#propLocked")?.closest("label");
+  const locked = layoutPane.querySelector("#propLocked")?.closest("label");
   if (locked) body.appendChild(locked);
-  form.insertBefore(root, document.getElementById("propExtra"));
+  layoutPane.appendChild(root);
+}
+
+const TAB_STORAGE_KEY = "ccs-props-tab";
+
+function wireInspectorTabs(): void {
+  const tabsRoot = document.getElementById("propsTabs");
+  const form = document.getElementById("propsForm");
+  if (!tabsRoot || !form) return;
+
+  const tabs = Array.from(tabsRoot.querySelectorAll<HTMLButtonElement>(".ccs-props-tab"));
+  const panes = Array.from(form.querySelectorAll<HTMLElement>(".ccs-props-pane"));
+
+  function activate(tabId: string): void {
+    const next = tabs.some((t) => t.dataset.tab === tabId) ? tabId : "layout";
+    try {
+      sessionStorage.setItem(TAB_STORAGE_KEY, next);
+    } catch {
+      /* ignore */
+    }
+    for (const tab of tabs) {
+      const selected = tab.dataset.tab === next;
+      tab.setAttribute("aria-selected", selected ? "true" : "false");
+    }
+    for (const pane of panes) {
+      pane.hidden = pane.dataset.pane !== next;
+    }
+  }
+
+  let stored = "layout";
+  try {
+    stored = sessionStorage.getItem(TAB_STORAGE_KEY) || "layout";
+  } catch {
+    /* ignore */
+  }
+  activate(stored);
+
+  tabsRoot.addEventListener("click", (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".ccs-props-tab");
+    if (!btn || !btn.dataset.tab) return;
+    activate(btn.dataset.tab);
+  });
 }
 
 function addItem(type: string, kind: string, x: number, y: number): void {

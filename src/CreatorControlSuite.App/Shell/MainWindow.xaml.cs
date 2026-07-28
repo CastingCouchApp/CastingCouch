@@ -10934,11 +10934,22 @@ public partial class MainWindow : Window
             ("Widget: Countdown", "countdown"),
             ("Widget: Socials", "socials"),
             ("Widget: Partner Roulette", "partner-roulette"),
+            ("Widget: Goal Bar", "goal-bar"),
+            ("Widget: Event Ticker", "event-ticker"),
+            ("Widget: Viewer Count", "viewer-count"),
+            ("Widget: Lower Third", "lower-third"),
+            ("Widget: QR Code", "qr-code"),
+            ("Widget: BRB Panel", "brb-panel"),
+            ("Widget: Announcement Bar", "announcement-bar"),
+            ("Widget: Animated Background", "animated-background"),
             ("Shape: Frame", "shape/frame"),
             ("Shape: Card Frame", "shape/frame.card"),
             ("Shape: Vignette", "shape/shape.vignette"),
             ("Shape: Cutout", "shape/shape.cutout"),
-            ("Shape: Starting Hintergrund", "shape/shape.scene-bg")
+            ("Shape: Starting Hintergrund", "shape/shape.scene-bg"),
+            ("Shape: Divider", "shape/shape.divider"),
+            ("Shape: Cam Ring", "shape/shape.cam-ring"),
+            ("Shape: Sticker", "shape/shape.sticker")
         };
 
         foreach ((string label, string path) in entries)

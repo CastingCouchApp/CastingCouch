@@ -8,6 +8,20 @@ import { fontProp } from "../controls/font-prop";
 import { colorProp } from "../controls/color-prop";
 import { propSection } from "../sections/prop-section";
 import { renderEffectsPanel } from "../effects/effects-panel";
+import { renderAnimationsPanel } from "../animations/animations-panel";
+import {
+  appendGoalBarProps,
+  appendEventTickerProps,
+  appendViewerCountProps,
+  appendLowerThirdProps,
+  appendQrCodeProps,
+  appendBrbPanelProps,
+  appendAnnouncementBarProps,
+  appendAnimatedBackgroundProps,
+  appendDividerProps,
+  appendCamRingProps,
+  appendStickerProps
+} from "./panels/new-streamer-widgets";
 
 export function syncProps(
   item: LayoutItem | null,
@@ -15,7 +29,9 @@ export function syncProps(
   propExtra: HTMLElement,
   propsEmpty: HTMLElement,
   propsForm: HTMLElement,
-  btnDelete: HTMLButtonElement
+  btnDelete: HTMLButtonElement,
+  propEffects?: HTMLElement | null,
+  propAnimations?: HTMLElement | null
 ): void {
   if (!item) {
     propsEmpty.hidden = false;
@@ -34,6 +50,10 @@ export function syncProps(
   (document.getElementById("propZ") as HTMLInputElement).value = String(item.z || 0);
   (document.getElementById("propLocked") as HTMLInputElement).checked = !!item.locked;
   propExtra.innerHTML = "";
+  const effectsPane = propEffects || document.getElementById("propEffects");
+  const animationsPane = propAnimations || document.getElementById("propAnimations");
+  if (effectsPane) effectsPane.innerHTML = "";
+  if (animationsPane) animationsPane.innerHTML = "";
 
   if (item.type === "online") {
     propExtra.appendChild(boolProp("showClock", "Uhr zeigen", item, ctx));
@@ -127,17 +147,40 @@ export function syncProps(
     appendSocialsProps(item, ctx, propExtra);
   } else if (item.type === "partner-roulette") {
     appendPartnerRouletteProps(item, ctx, propExtra);
+  } else if (item.type === "goal-bar") {
+    appendGoalBarProps(item, ctx, propExtra);
+  } else if (item.type === "event-ticker") {
+    appendEventTickerProps(item, ctx, propExtra);
+  } else if (item.type === "viewer-count") {
+    appendViewerCountProps(item, ctx, propExtra);
+  } else if (item.type === "lower-third") {
+    appendLowerThirdProps(item, ctx, propExtra);
+  } else if (item.type === "qr-code") {
+    appendQrCodeProps(item, ctx, propExtra);
+  } else if (item.type === "brb-panel") {
+    appendBrbPanelProps(item, ctx, propExtra);
+  } else if (item.type === "announcement-bar") {
+    appendAnnouncementBarProps(item, ctx, propExtra);
+  } else if (item.type === "animated-background") {
+    appendAnimatedBackgroundProps(item, ctx, propExtra);
   } else if (item.type === "frame.card") {
     appendFrameCardProps(item, ctx, propExtra);
   } else if (item.type === "frame" || (item.type || "").startsWith("frame.")) {
     appendFrameProps(item, ctx, propExtra);
   } else if (item.type === "shape.cutout") {
     propExtra.appendChild(numProp("radius", "Eckenradius px", item, ctx, 24));
+  } else if (item.type === "shape.divider") {
+    appendDividerProps(item, ctx, propExtra);
+  } else if (item.type === "shape.cam-ring") {
+    appendCamRingProps(item, ctx, propExtra);
+  } else if (item.type === "shape.sticker") {
+    appendStickerProps(item, ctx, propExtra);
   } else if (item.type === "shape.scene-bg") {
     appendSceneBgProps(item, ctx, propExtra);
   }
 
-  renderEffectsPanel(propExtra, item, ctx);
+  if (effectsPane) renderEffectsPanel(effectsPane, item, ctx);
+  if (animationsPane) renderAnimationsPanel(animationsPane, item, ctx);
 }
 
 function appendMusicProps(item: LayoutItem, ctx: EditorContext, propExtra: HTMLElement): void {

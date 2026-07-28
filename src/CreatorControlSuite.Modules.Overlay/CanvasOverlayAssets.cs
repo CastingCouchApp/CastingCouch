@@ -67,7 +67,15 @@ public static class CanvasOverlayAssets
         "image",
         "countdown",
         "socials",
-        "partner-roulette"
+        "partner-roulette",
+        "goal-bar",
+        "event-ticker",
+        "viewer-count",
+        "lower-third",
+        "qr-code",
+        "brb-panel",
+        "announcement-bar",
+        "animated-background"
     ];
 
     public static IReadOnlyList<string> ListShapeTypes() =>
@@ -76,7 +84,10 @@ public static class CanvasOverlayAssets
         "frame.card",
         "shape.vignette",
         "shape.scene-bg",
-        "shape.cutout"
+        "shape.cutout",
+        "shape.divider",
+        "shape.cam-ring",
+        "shape.sticker"
     ];
 
     private static string GuessContentType(string path)
