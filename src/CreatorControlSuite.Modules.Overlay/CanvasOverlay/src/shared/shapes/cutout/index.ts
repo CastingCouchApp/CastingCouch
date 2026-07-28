@@ -51,7 +51,16 @@ export function applyCutoutStackMask(
 ): HTMLElement | null {
   const move: Element[] = [];
   for (const child of Array.from(canvas.children)) {
-    if (child.classList.contains("ccs-cutout-defs")) continue;
+    if (!(child instanceof HTMLElement) && !(child instanceof SVGElement)) continue;
+    const cls = child.classList;
+    if (
+      cls.contains("ccs-cutout-defs")
+      || cls.contains("ccs-editor-grid")
+      || cls.contains("ccs-obs-preview")
+      || cls.contains("ccs-magnet-guides")
+    ) {
+      continue;
+    }
     move.push(child);
   }
   if (move.length === 0) return null;

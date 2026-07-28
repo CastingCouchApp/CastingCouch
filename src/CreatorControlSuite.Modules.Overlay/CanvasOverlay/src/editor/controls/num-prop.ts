@@ -84,15 +84,9 @@ export function numProp(
   const wrap = document.createElement("div");
   wrap.className = "ccs-num-prop";
 
-  const head = document.createElement("div");
-  head.className = "ccs-num-prop-head";
   const title = document.createElement("span");
+  title.className = "ccs-num-prop-label";
   title.textContent = label;
-  head.appendChild(title);
-  wrap.appendChild(head);
-
-  const row = document.createElement("div");
-  row.className = "ccs-num-prop-row";
 
   const slider = document.createElement("input");
   slider.type = "range";
@@ -141,8 +135,8 @@ export function numProp(
     applyValue(Number.isFinite(n) ? n : fallback, false);
   });
 
-  row.appendChild(slider);
-  row.appendChild(input);
-  wrap.appendChild(row);
+  wrap.appendChild(title);
+  wrap.appendChild(slider);
+  wrap.appendChild(input);
   return wrap;
 }

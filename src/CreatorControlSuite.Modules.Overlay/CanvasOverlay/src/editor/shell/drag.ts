@@ -1,9 +1,12 @@
 import type { CreateRuntime, LayoutItem } from "../../shared/types";
+import { activeEdgesFromHandle, applyGridSnap } from "./grid-snap";
 import { applyMagnetSnap, type MagnetGuide } from "./magnet";
 import { getStageMetrics } from "./stage-metrics";
 
 export interface DragOptions {
   isMagnetEnabled: () => boolean;
+  isGridSnapEnabled: () => boolean;
+  getGridDivisions: () => { gridH: number; gridV: number };
 }
 
 function otherRects(runtime: CreateRuntime, id: string): Array<{ x: number; y: number; w: number; h: number }> {
@@ -101,6 +104,7 @@ export function setupDrag(
     let w = drag.orig.w;
     let h = drag.orig.h;
     let mode: "move" | "resize" = "move";
+    const activeEdges = drag.mode === "move" ? undefined : activeEdgesFromHandle(drag.mode);
 
     if (drag.mode === "move") {
       x = drag.orig.x + dx;
@@ -120,13 +124,46 @@ export function setupDrag(
     }
 
     let guides: MagnetGuide[] = [];
-    if (options?.isMagnetEnabled()) {
-      const snapped = applyMagnetSnap({ x, y, w, h }, otherRects(runtime, item.id), 8, mode);
+    const layout = runtime.getLayout();
+    const canvasW = layout.canvasWidth || 1920;
+    const canvasH = layout.canvasHeight || 1080;
+
+    // Grid first, then magnet (magnet can pull off-grid when near other widgets).
+    if (options?.isGridSnapEnabled()) {
+      const div = options.getGridDivisions();
+      const snapped = applyGridSnap(
+        { x, y, w, h },
+        canvasW,
+        canvasH,
+        div.gridH,
+        div.gridV,
+        mode,
+        undefined,
+        undefined,
+        mode === "resize" ? activeEdges : undefined
+      );
       x = snapped.x;
       y = snapped.y;
       w = snapped.w;
       h = snapped.h;
       guides = snapped.guides;
+    }
+    if (options?.isMagnetEnabled()) {
+      const snapped = applyMagnetSnap(
+        { x, y, w, h },
+        otherRects(runtime, item.id),
+        8,
+        mode,
+        mode === "resize" ? activeEdges : undefined
+      );
+      x = snapped.x;
+      y = snapped.y;
+      w = snapped.w;
+      h = snapped.h;
+      if (snapped.guides.length) {
+        const axes = new Set(snapped.guides.map((g) => g.orientation));
+        guides = guides.filter((g) => !axes.has(g.orientation)).concat(snapped.guides);
+      }
     }
 
     item.x = x;
@@ -134,8 +171,7 @@ export function setupDrag(
     item.w = w;
     item.h = h;
 
-    const layout = runtime.getLayout();
-    paintGuides(runtime.canvas, guides, layout.canvasWidth || 1920, layout.canvasHeight || 1080);
+    paintGuides(runtime.canvas, guides, canvasW, canvasH);
 
     const node = runtime.itemNodes.get(item.id);
     if (node) {

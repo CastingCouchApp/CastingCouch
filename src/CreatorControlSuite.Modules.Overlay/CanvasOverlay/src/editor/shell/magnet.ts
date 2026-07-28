@@ -18,6 +18,13 @@ export interface MagnetResult {
   guides: MagnetGuide[];
 }
 
+export type SnapActiveEdges = {
+  left?: boolean;
+  right?: boolean;
+  top?: boolean;
+  bottom?: boolean;
+};
+
 const DEFAULT_THRESHOLD = 8;
 
 function edges(r: Rect): { left: number; right: number; top: number; bottom: number; cx: number; cy: number } {
@@ -49,7 +56,8 @@ export function applyMagnetSnap(
   rect: Rect,
   others: Rect[],
   threshold: number = DEFAULT_THRESHOLD,
-  mode: "move" | "resize" = "move"
+  mode: "move" | "resize" = "move",
+  activeEdges?: SnapActiveEdges
 ): MagnetResult {
   if (!others.length) {
     return { ...rect, guides: [] };
@@ -94,32 +102,38 @@ export function applyMagnetSnap(
       guides.push({ orientation: "h", position: optionsY[0].guide });
     }
   } else {
-    const leftSnap = nearestSnap(self.left, targetsX, threshold);
-    const rightSnap = nearestSnap(self.right, targetsX, threshold);
-    const leftDist = leftSnap != null ? Math.abs(leftSnap - self.left) : threshold + 1;
-    const rightDist = rightSnap != null ? Math.abs(rightSnap - self.right) : threshold + 1;
-    if (rightSnap != null && rightDist <= leftDist) {
-      w = Math.max(20, rightSnap - x);
-      guides.push({ orientation: "v", position: rightSnap });
-    } else if (leftSnap != null) {
-      const right = x + w;
-      x = leftSnap;
-      w = Math.max(20, right - x);
-      guides.push({ orientation: "v", position: leftSnap });
+    const active = activeEdges || { left: true, right: true, top: true, bottom: true };
+
+    if (active.right) {
+      const rightSnap = nearestSnap(self.right, targetsX, threshold);
+      if (rightSnap != null) {
+        w = Math.max(20, rightSnap - x);
+        guides.push({ orientation: "v", position: rightSnap });
+      }
+    } else if (active.left) {
+      const leftSnap = nearestSnap(self.left, targetsX, threshold);
+      if (leftSnap != null) {
+        const right = x + w;
+        x = leftSnap;
+        w = Math.max(20, right - x);
+        guides.push({ orientation: "v", position: leftSnap });
+      }
     }
 
-    const topSnap = nearestSnap(self.top, targetsY, threshold);
-    const bottomSnap = nearestSnap(self.bottom, targetsY, threshold);
-    const topDist = topSnap != null ? Math.abs(topSnap - self.top) : threshold + 1;
-    const bottomDist = bottomSnap != null ? Math.abs(bottomSnap - self.bottom) : threshold + 1;
-    if (bottomSnap != null && bottomDist <= topDist) {
-      h = Math.max(20, bottomSnap - y);
-      guides.push({ orientation: "h", position: bottomSnap });
-    } else if (topSnap != null) {
-      const bottom = y + h;
-      y = topSnap;
-      h = Math.max(20, bottom - y);
-      guides.push({ orientation: "h", position: topSnap });
+    if (active.bottom) {
+      const bottomSnap = nearestSnap(self.bottom, targetsY, threshold);
+      if (bottomSnap != null) {
+        h = Math.max(20, bottomSnap - y);
+        guides.push({ orientation: "h", position: bottomSnap });
+      }
+    } else if (active.top) {
+      const topSnap = nearestSnap(self.top, targetsY, threshold);
+      if (topSnap != null) {
+        const bottom = y + h;
+        y = topSnap;
+        h = Math.max(20, bottom - y);
+        guides.push({ orientation: "h", position: topSnap });
+      }
     }
   }
 

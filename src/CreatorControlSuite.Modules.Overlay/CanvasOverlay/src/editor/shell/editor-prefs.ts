@@ -5,6 +5,7 @@ export interface EditorPrefs {
   grid: boolean;
   gridH: number;
   gridV: number;
+  gridSnap: boolean;
   magnet: boolean;
 }
 
@@ -13,6 +14,7 @@ const DEFAULTS: EditorPrefs = {
   grid: true,
   gridH: 16,
   gridV: 6,
+  gridSnap: true,
   magnet: true
 };
 
@@ -31,6 +33,7 @@ export function loadEditorPrefs(): EditorPrefs {
       grid: parsed.grid !== false,
       gridH: clampDivisions(parsed.gridH ?? DEFAULTS.gridH),
       gridV: clampDivisions(parsed.gridV ?? DEFAULTS.gridV),
+      gridSnap: parsed.gridSnap !== false,
       magnet: parsed.magnet !== false
     };
   } catch {
@@ -44,6 +47,7 @@ export function saveEditorPrefs(prefs: EditorPrefs): void {
     grid: !!prefs.grid,
     gridH: clampDivisions(prefs.gridH),
     gridV: clampDivisions(prefs.gridV),
+    gridSnap: !!prefs.gridSnap,
     magnet: !!prefs.magnet
   };
   try {

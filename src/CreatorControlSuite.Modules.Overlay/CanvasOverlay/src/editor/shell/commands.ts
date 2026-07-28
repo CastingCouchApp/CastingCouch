@@ -52,6 +52,9 @@ export function runEditorCommand(
         props: { ...(item.props || {}) },
         effects: Array.isArray(item.effects)
           ? item.effects.map((e) => ({ ...e, settings: { ...(e.settings || {}) } }))
+          : [],
+        animations: Array.isArray(item.animations)
+          ? item.animations.map((a) => ({ ...a, settings: { ...(a.settings || {}) } }))
           : []
       };
       layout.items = [...items, copy];

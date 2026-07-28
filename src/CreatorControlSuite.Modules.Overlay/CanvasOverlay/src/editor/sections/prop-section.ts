@@ -20,7 +20,15 @@ export function propSection(
   root.open = !collapsed;
 
   const summary = document.createElement("summary");
-  summary.textContent = title;
+  summary.className = "ccs-prop-section-summary";
+  const chevron = document.createElement("span");
+  chevron.className = "ccs-prop-section-chevron";
+  chevron.setAttribute("aria-hidden", "true");
+  const label = document.createElement("span");
+  label.className = "ccs-prop-section-title";
+  label.textContent = title;
+  summary.appendChild(chevron);
+  summary.appendChild(label);
   root.appendChild(summary);
 
   const body = document.createElement("div");
@@ -58,6 +66,7 @@ export function featureSection(options: {
   checkbox.type = "checkbox";
   checkbox.checked = enabled;
   const label = document.createElement("span");
+  label.className = "ccs-feature-title";
   label.textContent = title;
   header.appendChild(checkbox);
   header.appendChild(label);

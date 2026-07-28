@@ -1,8 +1,12 @@
 import type { CreateRuntime } from "../../shared/types";
 import type { EditorPrefs } from "./editor-prefs";
 
+function resolveCanvas(target: CreateRuntime | HTMLElement): HTMLElement {
+  return "canvas" in target ? target.canvas : target;
+}
+
 function ensureLayer(canvas: HTMLElement, className: string): HTMLElement {
-  let el = canvas.querySelector("." + className) as HTMLElement | null;
+  let el = canvas.querySelector(":scope > ." + className) as HTMLElement | null;
   if (!el) {
     el = document.createElement("div");
     el.className = className;
@@ -12,8 +16,8 @@ function ensureLayer(canvas: HTMLElement, className: string): HTMLElement {
   return el;
 }
 
-export function applyEditorLayers(runtime: CreateRuntime, prefs: EditorPrefs): void {
-  const canvas = runtime.canvas;
+export function applyEditorLayers(target: CreateRuntime | HTMLElement, prefs: EditorPrefs): void {
+  const canvas = resolveCanvas(target);
   const preview = ensureLayer(canvas, "ccs-obs-preview");
   const grid = ensureLayer(canvas, "ccs-editor-grid");
 
