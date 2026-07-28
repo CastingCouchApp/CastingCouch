@@ -139,6 +139,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -188,6 +190,40 @@ jobs:
             throw "Coverage-Datei fehlt."
           }
           ./build/Test-CoverageBaseline.ps1 -CoveragePath $coverage.FullName
+
+      - name: Test critical coverage gate
+        run: node --test build/tests/Test-CriticalCoverage.test.mjs
+
+      - name: Determine changed files
+        shell: pwsh
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          $base = $env:BASE_SHA
+          if ([string]::IsNullOrWhiteSpace($base) -or $base -match '^0+$') {
+            $base = git rev-parse HEAD^ 2>$null
+          }
+          if ([string]::IsNullOrWhiteSpace($base)) {
+            git show --pretty="" --name-only HEAD |
+              Set-Content artifacts/test-results/changed-files.txt
+          }
+          else {
+            git diff --name-only $base $env:GITHUB_SHA |
+              Set-Content artifacts/test-results/changed-files.txt
+          }
+
+      - name: Enforce critical coverage
+        shell: pwsh
+        run: |
+          $coverage = Get-ChildItem artifacts/test-results -Recurse -Filter coverage.cobertura.xml |
+            Select-Object -First 1
+          if ($null -eq $coverage) {
+            throw "Coverage-Datei fehlt."
+          }
+          node build/Test-CriticalCoverage.mjs `
+            $coverage.FullName `
+            build/coverage-critical.json `
+            artifacts/test-results/changed-files.txt
 
       - name: Upload test results
         if: always()

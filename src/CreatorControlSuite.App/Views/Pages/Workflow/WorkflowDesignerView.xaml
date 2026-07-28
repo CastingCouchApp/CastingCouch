@@ -1,0 +1,26 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Workflow.WorkflowDesignerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+                        <Grid Margin="12" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <WrapPanel Margin="0,0,0,10">
+                                <TextBlock Text="Workflow-Gruppe" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <ComboBox x:Name="WorkflowDesignerGroupBox" x:FieldModifier="public" Width="230" IsEditable="True"/>
+                                <Button x:Name="RefreshWorkflowDesignerButton" x:FieldModifier="public" Content="AKTUALISIEREN"/>
+                                <Button x:Name="AutoLayoutWorkflowDesignerButton" x:FieldModifier="public" Content="AUTO-LAYOUT"/>
+                                <Button x:Name="ValidateWorkflowDesignerButton" x:FieldModifier="public" Content="GRAPH PRÜFEN" Background="#315B72"/>
+                                <Button x:Name="ZoomInWorkflowDesignerButton" x:FieldModifier="public" Content="＋" ToolTip="Vergrößern"/>
+                                <Button x:Name="ZoomOutWorkflowDesignerButton" x:FieldModifier="public" Content="－" ToolTip="Verkleinern"/>
+                                <Button x:Name="ResetZoomWorkflowDesignerButton" x:FieldModifier="public" Content="100 %"/>
+                            </WrapPanel>
+                            <Border Grid.Row="1" Background="{DynamicResource WindowBackgroundBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+                                <ScrollViewer x:Name="WorkflowDesignerScrollViewer" x:FieldModifier="public" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                    <Canvas x:Name="WorkflowDesignerCanvas" x:FieldModifier="public" Width="1800" Height="1000" Background="{DynamicResource WindowBackgroundBrush}">
+                                        <Canvas.LayoutTransform><ScaleTransform x:Name="WorkflowDesignerScale" x:FieldModifier="public" ScaleX="1" ScaleY="1"/></Canvas.LayoutTransform>
+                                    </Canvas>
+                                </ScrollViewer>
+                            </Border>
+                            <TextBlock x:Name="WorkflowDesignerStatusText" x:FieldModifier="public" Grid.Row="2" Text="Wähle eine Workflow-Gruppe aus." Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                        </Grid>
+</UserControl>

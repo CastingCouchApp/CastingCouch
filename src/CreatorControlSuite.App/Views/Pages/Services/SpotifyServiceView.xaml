@@ -1,0 +1,230 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Services.SpotifyServiceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:spotify="clr-namespace:CreatorControlSuite.App.Views.Pages.Spotify">
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                            <StackPanel Margin="18" Style="{StaticResource CCSDarkSettingsContentStyle}">
+                                <Border x:Name="ServicesSpotifyInactiveBanner" x:FieldModifier="public" Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,14" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock Text="Spotify ist nicht der aktive Music-Player." FontWeight="Bold"/>
+                                        <TextBlock Text="Aktiviere Spotify unter Einstellungen → Music Player, oder öffne die Player-Seite für YouTube Music." TextWrapping="Wrap" Margin="0,6,0,0" Foreground="{DynamicResource TextMutedBrush}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                            <Button x:Name="ServicesSpotifyOpenMusicSettingsButton" x:FieldModifier="public" Content="Einstellungen öffnen" Margin="0,0,8,0"/>
+                                            <Button x:Name="ServicesSpotifyOpenPlayerButton" x:FieldModifier="public" Content="Player öffnen"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Text="Spotify-Steuerung" FontSize="22" FontWeight="Bold"/>
+                                <Border Width="180" Height="180" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="#444" BorderThickness="1" HorizontalAlignment="Left" Margin="0,12,0,10">
+                                    <Image x:Name="ServicesSpotifyAlbumCoverImage" x:FieldModifier="public" Stretch="UniformToFill"/>
+                                </Border>
+                                <TextBlock x:Name="ServicesSpotifyNowPlayingText" x:FieldModifier="public" Text="Kein Titel geladen" Foreground="{DynamicResource AccentBrush}" FontSize="17" Margin="0,12,0,4"/>
+                                <TextBlock x:Name="ServicesSpotifyAlbumText" x:FieldModifier="public" Text="Album: -" Margin="0,0,0,8" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <Slider x:Name="ServicesSpotifyProgressBar" x:FieldModifier="public" Minimum="0" Maximum="1" Value="0" Width="420" HorizontalAlignment="Left" IsMoveToPointEnabled="True" ToolTip="Im aktuellen Titel vor- oder zurückspringen"/>
+                                <Grid Width="420" HorizontalAlignment="Left" Margin="0,2,0,10">
+                                    <TextBlock x:Name="ServicesSpotifyProgressText" x:FieldModifier="public" Text="00:00" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Left"/>
+                                    <TextBlock x:Name="ServicesSpotifyDurationText" x:FieldModifier="public" Text="00:00" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <WrapPanel>
+                                    <Button x:Name="ServicesSpotifyLaunchButton" x:FieldModifier="public" Content="Spotify starten"/>
+                                    <Button x:Name="ServicesSpotifyPreviousButton" x:FieldModifier="public" Content="Zurück"/>
+                                    <Button x:Name="ServicesSpotifyPlayButton" x:FieldModifier="public" Content="Play"/>
+                                    <Button x:Name="ServicesSpotifyPauseButton" x:FieldModifier="public" Content="Pause"/>
+                                    <Button x:Name="ServicesSpotifyNextButton" x:FieldModifier="public" Content="Weiter"/>
+                                    <Button x:Name="ServicesSpotifyShuffleButton" x:FieldModifier="public" Content="Shuffle" ToolTip="Zufallswiedergabe ein- oder ausschalten"/>
+                                    <Button x:Name="ServicesSpotifyRepeatButton" x:FieldModifier="public" Content="Wiederholung: Aus" ToolTip="Wiederholungsmodus umschalten"/>
+                                    <Button x:Name="ServicesSpotifyRefreshButton" x:FieldModifier="public" Content="Aktualisieren"/>
+                                </WrapPanel>
+                                <TextBlock Text="Wiedergabegerät" Margin="4,16,0,6"/>
+                                <ComboBox x:Name="ServicesSpotifyDeviceBox" x:FieldModifier="public" DisplayMemberPath="Name" MinWidth="360" HorizontalAlignment="Left"/>
+                                <TextBlock x:Name="ServicesSpotifyDeviceStatusText" x:FieldModifier="public" Text="Kein Gerät ausgewählt." Foreground="{DynamicResource TextSecondaryBrush}" Margin="4,6,0,0" TextWrapping="Wrap"/>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button x:Name="ServicesSpotifyRefreshDevicesButton" x:FieldModifier="public" Content="GERÄTE AKTUALISIEREN"/>
+                                    <Button x:Name="ServicesSpotifyTransferDeviceButton" x:FieldModifier="public" Content="WIEDERGABE ÜBERTRAGEN"/>
+                                    <Button x:Name="ServicesSpotifyTransferAndPlayDeviceButton" x:FieldModifier="public" Content="ÜBERTRAGEN UND ABSPIELEN"/>
+                                    <Button x:Name="ServicesSpotifySetPreferredDeviceButton" x:FieldModifier="public" Content="ALS STANDARDGERÄT SPEICHERN"/>
+                                    <Button x:Name="ServicesSpotifyActivatePreferredDeviceButton" x:FieldModifier="public" Content="STANDARDGERÄT AKTIVIEREN"/>
+                                </WrapPanel>
+                                <CheckBox x:Name="ServicesSpotifyAutoTransferPreferredBox" x:FieldModifier="public" Content="Standardgerät vor Spotify-Aktionen automatisch aktivieren" Margin="4,8,0,0"/>
+                                <CheckBox x:Name="ServicesSpotifyUseActiveFallbackBox" x:FieldModifier="public" Content="Aktives Gerät verwenden, wenn das Standardgerät nicht erreichbar ist" Margin="4,5,0,0"/>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Smart Spotify Automation" FontSize="16" FontWeight="SemiBold"/>
+                                        <TextBlock x:Name="ServicesSpotifyAutomationStatusText" x:FieldModifier="public" Text="Deaktiviert" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,5,0,8"/>
+                                        <CheckBox x:Name="ServicesSpotifySmartAutomationBox" x:FieldModifier="public" Content="Szenenabhängige Spotify-Regeln aktivieren"/>
+                                        <CheckBox x:Name="ServicesSpotifyHealthMonitorBox" x:FieldModifier="public" Content="Spotify Health Monitor aktivieren" Margin="0,5,0,0"/>
+                                        <CheckBox x:Name="ServicesSpotifyAutoRecoverBox" x:FieldModifier="public" Content="Nicht erreichbares Wiedergabegerät automatisch wiederherstellen" Margin="0,5,0,0"/>
+                                        <TextBlock x:Name="ServicesSpotifyHealthStatusText" x:FieldModifier="public" Text="Noch nicht geprüft" Foreground="{DynamicResource TextMutedBrush}" Margin="0,7,0,8"/>
+                                        <WrapPanel>
+                                            <Button x:Name="ServicesSpotifyCreateDefaultRulesButton" x:FieldModifier="public" Content="STANDARDREGELN ERSTELLEN"/>
+                                            <Button x:Name="ServicesSpotifyTestAutomationButton" x:FieldModifier="public" Content="AKTUELLE SZENE TESTEN"/>
+                                            <Button x:Name="ServicesSpotifyClearAutomationLogButton" x:FieldModifier="public" Content="PROTOKOLL LEEREN"/>
+                                        </WrapPanel>
+                                        <TextBlock Text="Aktive Regeln" FontWeight="SemiBold" Margin="0,12,0,5"/>
+                                        <ListBox x:Name="ServicesSpotifyAutomationRulesList" x:FieldModifier="public" MaxHeight="150" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <TextBlock Text="Aktionsprotokoll" FontWeight="SemiBold" Margin="0,12,0,5"/>
+                                        <ListBox x:Name="ServicesSpotifyAutomationLogList" x:FieldModifier="public" MaxHeight="220" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Titel suchen und vormerken" FontSize="16" FontWeight="SemiBold"/>
+                                        <Grid Margin="0,10,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="ServicesSpotifyTrackSearchBox" x:FieldModifier="public" ToolTip="Titel, Interpret oder Album suchen"/>
+                                            <Button x:Name="ServicesSpotifyTrackSearchButton" x:FieldModifier="public" Grid.Column="1" Content="SUCHEN" Margin="8,0,0,0" Padding="12,4"/>
+                                        </Grid>
+                                        <ListBox x:Name="ServicesSpotifyTrackSearchResultsList" x:FieldModifier="public" MaxHeight="220" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button x:Name="ServicesSpotifyPlaySelectedSearchResultButton" x:FieldModifier="public" Content="AUSGEWÄHLTEN TITEL ABSPIELEN"/>
+                                            <Button x:Name="ServicesSpotifyAddSelectedToQueueButton" x:FieldModifier="public" Content="ZUR WARTESCHLANGE HINZUFÜGEN"/>
+                                        </WrapPanel>
+                                        <TextBlock x:Name="ServicesSpotifyTrackSearchStatusText" x:FieldModifier="public" Text="" Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <DockPanel LastChildFill="True">
+                                            <TextBlock Text="Warteschlange" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <Button x:Name="ServicesSpotifyRefreshQueueButton" x:FieldModifier="public" Content="AKTUALISIEREN" DockPanel.Dock="Right" Padding="10,3"/>
+                                        </DockPanel>
+                                        <TextBlock x:Name="ServicesSpotifyQueueCurrentText" x:FieldModifier="public" Text="Aktuell: -" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,6" TextWrapping="Wrap"/>
+                                        <ListBox x:Name="ServicesSpotifyQueueList" x:FieldModifier="public" MaxHeight="220" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button x:Name="ServicesSpotifyPlayQueueItemButton" x:FieldModifier="public" Content="AUSGEWÄHLTEN TITEL JETZT ABSPIELEN"/>
+                                            <Button x:Name="ServicesSpotifySkipCurrentButton" x:FieldModifier="public" Content="AKTUELLEN TITEL ÜBERSPRINGEN"/>
+                                        </WrapPanel>
+                                        <TextBlock x:Name="ServicesSpotifyQueueStatusText" x:FieldModifier="public" Text="" Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="ServicesSpotifyQueueEmptyText" x:FieldModifier="public" Text="Keine weiteren Titel in der Warteschlange." Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <DockPanel LastChildFill="True">
+                                            <TextBlock Text="Zuletzt gespielt" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <Button x:Name="ServicesSpotifyRefreshHistoryButton" x:FieldModifier="public" Content="AKTUALISIEREN" DockPanel.Dock="Right" Padding="10,3"/>
+                                        </DockPanel>
+                                        <ListBox x:Name="ServicesSpotifyHistoryList" x:FieldModifier="public" MaxHeight="240" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button x:Name="ServicesSpotifyPlayHistoryButton" x:FieldModifier="public" Content="AUSGEWÄHLTEN TITEL ABSPIELEN"/>
+                                            <Button x:Name="ServicesSpotifyQueueHistoryButton" x:FieldModifier="public" Content="ZUR WARTESCHLANGE"/>
+                                        </WrapPanel>
+                                        <TextBlock x:Name="ServicesSpotifyHistoryStatusText" x:FieldModifier="public" Text="" Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <DockPanel LastChildFill="True">
+                                            <TextBlock Text="Gespeicherte Titel (Gefällt mir)" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <Button x:Name="ServicesSpotifyRefreshSavedTracksButton" x:FieldModifier="public" Content="AKTUALISIEREN" DockPanel.Dock="Right" Padding="10,3"/>
+                                        </DockPanel>
+                                        <ListBox x:Name="ServicesSpotifySavedTracksList" x:FieldModifier="public" MaxHeight="260" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button x:Name="ServicesSpotifyPlaySavedTrackButton" x:FieldModifier="public" Content="AUSGEWÄHLTEN TITEL ABSPIELEN"/>
+                                            <Button x:Name="ServicesSpotifyRemoveSavedTrackButton" x:FieldModifier="public" Content="AUS FAVORITEN ENTFERNEN" Background="#7A3838"/>
+                                            <Button x:Name="ServicesSpotifyToggleCurrentSavedButton" x:FieldModifier="public" Content="AKTUELLEN TITEL SPEICHERN" Background="#416B3C"/>
+                                        </WrapPanel>
+                                        <TextBlock x:Name="ServicesSpotifySavedTracksStatusText" x:FieldModifier="public" Text="" Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <DockPanel LastChildFill="True">
+                                            <TextBlock Text="Lokale Hörstatistik" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <Button x:Name="ServicesSpotifyResetStatisticsButton" x:FieldModifier="public" Content="ZURÜCKSETZEN" DockPanel.Dock="Right" Padding="10,3" Background="#7A3838"/>
+                                        </DockPanel>
+                                        <TextBlock x:Name="ServicesSpotifyStatisticsSummaryText" x:FieldModifier="public" Text="0 erkannte Titelstarts · 00:00:00 Wiedergabezeit" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,8"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                            <StackPanel Margin="0,0,6,0">
+                                                <TextBlock Text="Meistgespielte Titel" FontWeight="SemiBold"/>
+                                                <ListBox x:Name="ServicesSpotifyTopTracksList" x:FieldModifier="public" MaxHeight="220" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                                <TextBlock Text="Meistgespielte Künstler" FontWeight="SemiBold"/>
+                                                <ListBox x:Name="ServicesSpotifyTopArtistsList" x:FieldModifier="public" MaxHeight="220" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <TextBlock x:Name="ServicesSpotifyStatisticsEmptyText" x:FieldModifier="public" Text="Die Statistik beginnt automatisch, sobald Spotify-Titel erkannt werden." Foreground="{DynamicResource TextMutedBrush}" Margin="0,7,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock Text="Die Daten bleiben ausschließlich lokal auf diesem PC und werden nicht an Spotify oder andere Dienste übertragen." Foreground="{DynamicResource TextMutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Playlists" FontSize="16" FontWeight="SemiBold"/>
+                                        <TextBox x:Name="ServicesSpotifyPlaylistFilterBox" x:FieldModifier="public" Margin="0,10,0,8" ToolTip="Eigene Playlists nach Name oder Besitzer filtern"/>
+                                        <ComboBox x:Name="ServicesSpotifyPlaylistBox" x:FieldModifier="public" DisplayMemberPath="Name" MinWidth="360" HorizontalAlignment="Left"/>
+                                        <WrapPanel Margin="0,10,0,0">
+                                            <Button x:Name="ServicesSpotifyStartPlaylistButton" x:FieldModifier="public" Content="PLAYLIST STARTEN"/>
+                                            <Button x:Name="ServicesSpotifyLoadPlaylistTracksButton" x:FieldModifier="public" Content="TITEL LADEN"/>
+                                            <Button x:Name="ServicesSpotifyToggleFavoritePlaylistButton" x:FieldModifier="public" Content="☆ FAVORIT" ToolTip="Ausgewählte Playlist als Favorit markieren oder entfernen"/>
+                                        </WrapPanel>
+                                        <TextBlock Text="Favoriten &amp; zuletzt verwendet" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,5"/>
+                                        <ComboBox x:Name="ServicesSpotifyQuickPlaylistBox" x:FieldModifier="public" DisplayMemberPath="Name" MinWidth="360" HorizontalAlignment="Left"/>
+                                        <Button x:Name="ServicesSpotifyStartQuickPlaylistButton" x:FieldModifier="public" Content="SCHNELL STARTEN" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+                                        <ListBox x:Name="ServicesSpotifyPlaylistTracksList" x:FieldModifier="public" MaxHeight="260" Margin="0,10,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button x:Name="ServicesSpotifyPlayPlaylistTrackButton" x:FieldModifier="public" Content="TITEL ABSPIELEN"/>
+                                            <Button x:Name="ServicesSpotifyQueuePlaylistTrackButton" x:FieldModifier="public" Content="ZUR WARTESCHLANGE"/>
+                                        </WrapPanel>
+                                        <TextBlock x:Name="ServicesSpotifyPlaylistStatusText" x:FieldModifier="public" Text="" Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,0"/>
+                                        <CheckBox x:Name="ServicesSpotifyShufflePlaylistBox" x:FieldModifier="public" Content="Zufällige Songwiedergabe innerhalb der gewählten Playlist" Foreground="#FFFFFF" Margin="0,12,0,0"/>
+                                        <TextBlock Text="Ist diese Option aktiv, wird Spotify-Shuffle vor dem Start der ausgewählten Playlist eingeschaltet." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="22,4,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Text="Lautstärke" Margin="4,16,0,6"/>
+                                <Slider x:Name="ServicesSpotifyVolumeSlider" x:FieldModifier="public" Minimum="0" Maximum="100" Value="100" TickFrequency="1" IsSnapToTickEnabled="False" Width="420" HorizontalAlignment="Left" ToolTip="Spotify-Lautstärke wird während des Verschiebens live geändert"/>
+                                <TextBlock x:Name="ServicesSpotifyVolumeText" x:FieldModifier="public" Text="100 %" Foreground="{DynamicResource MutedBrush}" Margin="4,4,0,0"/>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <spotify:SpotifyAutomationView x:Name="SpotifyAutomationViewHost" x:FieldModifier="public"/>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Spotify-Overlay" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="17"/>
+                                        <TextBlock Text="Die Suite schreibt die aktuellen Spotify-Daten direkt in die gewählte JSON-Datei. Beim Speichern werden die Anzeige-Schalter einmalig mit der vorhandenen spotify.html verknüpft; das Design bleibt unverändert." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                        <CheckBox x:Name="ServicesSpotifyOverlayEnabledBox" x:FieldModifier="public" Content="Spotify-Daten immer automatisch in JSON schreiben" Foreground="#FFFFFF" Margin="0,12,0,0" IsChecked="True" IsEnabled="False"/>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="JSON-Datei" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="ServicesSpotifyDataJsonPathBox" x:FieldModifier="public" Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" Foreground="#FFFFFF" BorderBrush="#3A4650" Padding="7,5"/>
+                                            <Button x:Name="ServicesSpotifyBrowseDataJsonButton" x:FieldModifier="public" Grid.Column="2" Content="AUSWÄHLEN" Margin="8,0,0,0"/>
+                                        </Grid>
+                                        <TextBlock Text="Wähle genau die JSON-Datei, die deine Spotify-HTML bereits lädt. Ist noch keine vorhanden, wird beim Speichern eine neue overlay-data.json angelegt." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                        <Grid Visibility="Collapsed" Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="OBS-Szene" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+                                            <ComboBox x:Name="ServicesSpotifyOverlaySceneBox" x:FieldModifier="public" Grid.Column="1" IsEditable="True" Background="{DynamicResource ElevatedBackgroundBrush}" Foreground="#FFFFFF"/>
+                                        </Grid>
+                                        <Grid Visibility="Collapsed" Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="Browserquelle" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+                                            <ComboBox x:Name="ServicesSpotifyOverlaySourceBox" x:FieldModifier="public" Grid.Column="1" IsEditable="True" Text="ccs_spotify" Background="{DynamicResource ElevatedBackgroundBrush}" Foreground="#FFFFFF"/>
+                                        </Grid>
+                                        <TextBlock x:Name="ServicesSpotifyOverlayPathText" x:FieldModifier="public" Text="Keine HTML-Datei ausgewählt." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                        <TextBlock x:Name="ServicesSpotifyOverlayStatusText" x:FieldModifier="public" Text="Overlay-Verknüpfung nicht geprüft." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <Button x:Name="ServicesSpotifySaveOverlayButton" x:FieldModifier="public" Content="JSON-PFAD SPEICHERN"/>
+                                            <Button x:Name="ServicesSpotifySyncOverlayButton" x:FieldModifier="public" Content="JSON JETZT SCHREIBEN" Background="#416B3C"/>
+                                            <Button x:Name="ServicesSpotifyReloadOverlayButton" x:FieldModifier="public" Content="JSON-ORDNER ÖFFNEN"/>
+                                            <Button x:Name="ServicesSpotifyPreviewOverlayButton" x:FieldModifier="public" Content="JSON-DATEI ÖFFNEN"/>
+                                        </WrapPanel>
+                                        <Separator Margin="0,14,0,12"/>
+                                        <TextBlock Text="Anzeigeinhalt" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Titel, Interpret, Album-Cover und Fortschritt werden immer angezeigt." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        <CheckBox x:Name="ServicesSpotifyHideMutedBox" x:FieldModifier="public" Content="Bei stummgeschalteter Musik ausblenden" Foreground="#FFFFFF" Margin="0,10,0,0"/>
+                                        <StackPanel Margin="22,6,0,0">
+                                            <TextBlock Text="Mute erkannt über:" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <CheckBox x:Name="ServicesSpotifyDetectObsMuteBox" x:FieldModifier="public" Content="OBS-Audioquelle" Foreground="#FFFFFF" Margin="0,5,0,0"/>
+                                            <ComboBox x:Name="ServicesSpotifyObsAudioSourceBox" x:FieldModifier="public" IsEditable="True" Width="360" HorizontalAlignment="Left" Margin="22,5,0,0" Background="{DynamicResource ElevatedBackgroundBrush}" Foreground="#FFFFFF" ToolTip="OBS-Audioquelle, über deren Mute-Status das Spotify-Overlay gesteuert wird"/>
+                                            <CheckBox x:Name="ServicesSpotifyDetectVolumeMuteBox" x:FieldModifier="public" Content="Spotify-Lautstärke" Foreground="#FFFFFF" Margin="0,5,0,0"/>
+                                        </StackPanel>
+                                        <CheckBox x:Name="ServicesSpotifyHidePausedBox" x:FieldModifier="public" Content="Zusätzlich bei pausierter Musik ausblenden" Foreground="#FFFFFF" Margin="0,10,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+</UserControl>

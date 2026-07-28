@@ -1,0 +1,265 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Workflow.TimedAutomationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+                        <Grid Margin="12" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Regeln" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="18"/>
+                                <ListBox x:Name="TimedAutomationRulesList" x:FieldModifier="public" Height="430" Margin="0,10,0,10" DisplayMemberPath="Name" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <WrapPanel><Button x:Name="NewTimedAutomationButton" x:FieldModifier="public" Content="NEU"/><Button x:Name="DeleteTimedAutomationButton" x:FieldModifier="public" Content="LÖSCHEN" Background="#7A3838"/></WrapPanel>
+                                <WrapPanel Margin="0,8,0,0"><Button x:Name="ImportTimedAutomationsButton" x:FieldModifier="public" Content="IMPORT"/><Button x:Name="ExportTimedAutomationsButton" x:FieldModifier="public" Content="EXPORT"/><Button x:Name="AddTimedAutomationTemplateButton" x:FieldModifier="public" Content="VORLAGE" Background="#315B72"/></WrapPanel>
+                            </StackPanel>
+                            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                                <StackPanel TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                                    <TextBlock Text="Regel bearbeiten" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="18"/>
+                                    <CheckBox x:Name="TimedAutomationEnabledBox" x:FieldModifier="public" Content="Regel aktiv" IsChecked="True" Margin="0,10,0,0"/>
+                                    <TextBlock Text="Name" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationNameBox" x:FieldModifier="public" Text="Neue Automatisierung"/>
+                                    <TextBlock Text="Auslöser" Margin="0,10,0,4"/>
+                                    <ComboBox x:Name="TimedAutomationTriggerTypeBox" x:FieldModifier="public" SelectedIndex="1"><ComboBoxItem Content="Nach Streamstart (unabhängig von aktueller Szene)" Tag="StreamElapsed"/><ComboBoxItem Content="Nach Zeit in einer bestimmten Szene" Tag="SceneElapsed"/><ComboBoxItem Content="Direkt beim Streamstart" Tag="StreamStarted"/><ComboBoxItem Content="Direkt beim Szenenwechsel" Tag="SceneActivated"/><ComboBoxItem Content="Täglich zu einer Uhrzeit" Tag="DailySchedule"/><ComboBoxItem Content="An ausgewählten Wochentagen" Tag="WeeklySchedule"/><ComboBoxItem Content="Einmaliger Termin" Tag="OneTimeSchedule"/></ComboBox>
+                                    <TextBlock Text="Von Szene" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationTriggerSceneBox" x:FieldModifier="public" IsEditable="True" ToolTip="Der Timer läuft nur, solange diese Szene aktiv ist."/>
+                                    <TextBlock Text="Zeit in Sekunden" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationDelayBox" x:FieldModifier="public" Text="10"/><TextBlock Text="Geplante Uhrzeit (HH:mm)" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationScheduleTimeBox" x:FieldModifier="public" Text="20:00"/><TextBlock Text="Wochentage (z. B. Monday,Wednesday,Friday)" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationScheduleDaysBox" x:FieldModifier="public" Text="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday"/><TextBlock Text="Einmaliges Datum (JJJJ-MM-TT)" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationScheduleDateBox" x:FieldModifier="public"/><WrapPanel Margin="0,8,0,0"><TextBlock Text="Aktiv von" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationActiveFromBox" x:FieldModifier="public" Width="110" Margin="8,0,18,0"/><TextBlock Text="bis" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationActiveUntilBox" x:FieldModifier="public" Width="110" Margin="8,0,0,0"/></WrapPanel><TextBlock Text="Ausnahmetage (JJJJ-MM-TT, kommagetrennt)" Margin="0,10,0,4"/><TextBox x:Name="TimedAutomationExcludedDatesBox" x:FieldModifier="public"/><TextBlock Text="Sperrzeiträume (z. B. 2026-07-20..2026-07-31;2026-12-24..2026-12-26)" Margin="0,10,0,4" TextWrapping="Wrap"/><TextBox x:Name="TimedAutomationBlackoutRangesBox" x:FieldModifier="public"/><TextBlock Text="Nachholverhalten bei verpasster Uhrzeit" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationMissedRunBehaviorBox" x:FieldModifier="public" SelectedIndex="2"><ComboBoxItem Content="Nicht nachholen" Tag="Skip"/><ComboBoxItem Content="Nur innerhalb der Nachholfrist" Tag="WithinGrace"/><ComboBoxItem Content="Am selben Tag nachholen" Tag="SameDay"/></ComboBox><WrapPanel Margin="0,8,0,0"><TextBlock Text="Nachholfrist" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationCatchUpGraceBox" x:FieldModifier="public" Width="70" Text="30" Margin="8,0"/><TextBlock Text="Minuten" VerticalAlignment="Center"/></WrapPanel><TextBlock x:Name="TimedAutomationNextRunText" x:FieldModifier="public" Text="Nächster geplanter Lauf: –" Foreground="#7EC8F5" Margin="0,8,0,0"/>
+                                    <TextBlock Text="Aktion" Margin="0,10,0,4"/>
+                                    <ComboBox x:Name="TimedAutomationActionTypeBox" x:FieldModifier="public" SelectedIndex="0"><ComboBoxItem Content="OBS-Szene wechseln" Tag="SwitchScene"/><ComboBoxItem Content="OBS-Quelle ein-/ausblenden" Tag="SetSourceVisibility"/><ComboBoxItem Content="OBS-Audioquelle muten/aktivieren" Tag="SetInputMute"/><ComboBoxItem Content="OBS-Stream starten" Tag="StartObsStream"/><ComboBoxItem Content="OBS-Stream stoppen" Tag="StopObsStream"/><ComboBoxItem Content="Streamer.bot-Aktion ausführen" Tag="StreamerBotAction"/><ComboBoxItem Content="Overlay-Countdown" Tag="OverlayCountdown"/><ComboBoxItem Content="Nur Spotify steuern" Tag="SpotifyOnly"/></ComboBox>
+                                    <TextBlock Text="Zu Szene" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationTargetSceneBox" x:FieldModifier="public" IsEditable="True"/>
+                                    <TextBlock Text="OBS-Übergang (leer = aktueller Standard)" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationTransitionBox" x:FieldModifier="public" IsEditable="True"/>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Übergangsdauer" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationTransitionDurationBox" x:FieldModifier="public" Width="80" Text="1000" Margin="8,0"/><TextBlock Text="ms" VerticalAlignment="Center"/></WrapPanel>
+                                    <TextBlock Text="Overlay-Countdown" Margin="0,12,0,4" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold"/>
+                                    <ComboBox x:Name="TimedAutomationOverlayCountdownActionBox" x:FieldModifier="public" SelectedIndex="0"><ComboBoxItem Content="Starten" Tag="Start"/><ComboBoxItem Content="Stoppen" Tag="Stop"/></ComboBox>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Dauer" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationOverlayCountdownSecondsBox" x:FieldModifier="public" Width="80" Text="0" Margin="8,0"/><TextBlock Text="Sekunden (0 = Dashboard-/Workflow-Dauer)" VerticalAlignment="Center"/></WrapPanel>
+                                    <TextBlock Text="Szene der Quelle" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationSourceSceneBox" x:FieldModifier="public" IsEditable="True"/>
+                                    <TextBlock Text="OBS-Quelle" Margin="0,10,0,4"/><ComboBox x:Name="TimedAutomationSourceBox" x:FieldModifier="public" IsEditable="True"/>
+                                    <CheckBox x:Name="TimedAutomationSourceVisibleBox" x:FieldModifier="public" Content="Quelle nach Ausführung sichtbar" Margin="0,8,0,0"/>
+                                    <CheckBox x:Name="TimedAutomationResetSourceBox" x:FieldModifier="public" Content="Quelle am Streamende zurücksetzen" Margin="0,8,0,0"/>
+                                    <CheckBox x:Name="TimedAutomationResetVisibleBox" x:FieldModifier="public" Content="Quelle beim Zurücksetzen sichtbar" IsChecked="True" Margin="0,6,0,0"/>
+                                    <TextBlock Text="OBS-Audioquelle" Margin="0,12,0,4"/><ComboBox x:Name="TimedAutomationInputBox" x:FieldModifier="public" IsEditable="True"/>
+                                    <CheckBox x:Name="TimedAutomationInputMutedBox" x:FieldModifier="public" Content="Audioquelle muten" IsChecked="True" Margin="0,6,0,0"/>
+                                    <TextBlock Text="Streamer.bot-Aktion" Margin="0,12,0,4"/><ComboBox x:Name="TimedAutomationStreamerBotActionBox" x:FieldModifier="public" IsEditable="True" DisplayMemberPath="DisplayName"/>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Bedingung" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <ComboBox x:Name="TimedAutomationConditionTypeBox" x:FieldModifier="public" Margin="0,8,0,0" SelectedIndex="0"><ComboBoxItem Content="Keine Bedingung" Tag="None"/><ComboBoxItem Content="OBS ist verbunden" Tag="ObsConnected"/><ComboBoxItem Content="Streamer.bot ist verbunden" Tag="StreamerBotConnected"/><ComboBoxItem Content="Stream läuft" Tag="StreamActive"/><ComboBoxItem Content="Aktuelle OBS-Szene entspricht" Tag="CurrentScene"/></ComboBox>
+                                    <TextBlock Text="Bedingungswert (z. B. Szenenname)" Margin="0,8,0,4"/><TextBox x:Name="TimedAutomationConditionValueBox" x:FieldModifier="public"/>
+                                    <CheckBox x:Name="TimedAutomationConditionNegatedBox" x:FieldModifier="public" Content="Bedingung umkehren" Margin="0,6,0,0"/>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Regelkette" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <TextBlock Text="Nächste Regel nach erfolgreicher Ausführung" Margin="0,8,0,4"/><ComboBox x:Name="TimedAutomationNextRuleBox" x:FieldModifier="public" IsEditable="True" DisplayMemberPath="Name"/>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Verzögerung" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationNextRuleDelayBox" x:FieldModifier="public" Width="70" Text="0" Margin="8,0"/><TextBlock Text="Sekunden" VerticalAlignment="Center"/></WrapPanel>
+                                    <CheckBox x:Name="TimedAutomationContinueChainOnErrorBox" x:FieldModifier="public" Content="Kette auch bei Fehler fortsetzen" Margin="0,6,0,0"/>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Laufzeitsteuerung" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Priorität" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationPriorityBox" x:FieldModifier="public" Width="70" Text="0" Margin="8,0,18,0"/><TextBlock Text="Timeout" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationTimeoutBox" x:FieldModifier="public" Width="70" Text="60" Margin="8,0"/><TextBlock Text="Sekunden" VerticalAlignment="Center"/></WrapPanel>
+                                    <TextBlock Text="Verhalten bei erneutem Start" Margin="0,8,0,4"/>
+                                    <ComboBox x:Name="TimedAutomationExecutionModeBox" x:FieldModifier="public" SelectedIndex="0"><ComboBoxItem Content="Überspringen, wenn bereits aktiv" Tag="SkipIfRunning"/><ComboBoxItem Content="Laufenden Durchlauf abbrechen und neu starten" Tag="Restart"/><ComboBoxItem Content="Parallel ausführen" Tag="Parallel"/></ComboBox>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Abhängigkeit und Fehlerbehandlung" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <TextBlock Text="Nur ausführen, wenn diese Regel zuletzt erfolgreich war" Margin="0,8,0,4"/><ComboBox x:Name="TimedAutomationDependencyRuleBox" x:FieldModifier="public" IsEditable="True" DisplayMemberPath="Name"/>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Wiederholungen" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationRetryCountBox" x:FieldModifier="public" Width="70" Text="0" Margin="8,0,18,0"/><TextBlock Text="Pause" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationRetryDelayBox" x:FieldModifier="public" Width="70" Text="5" Margin="8,0"/><TextBlock Text="Sekunden" VerticalAlignment="Center"/></WrapPanel>
+                                    <TextBlock Text="Ersatzregel nach endgültigem Fehler" Margin="0,8,0,4"/><ComboBox x:Name="TimedAutomationFailureRuleBox" x:FieldModifier="public" IsEditable="True" DisplayMemberPath="Name"/>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Ablaufgruppe und Rückabwicklung" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <TextBlock Text="Gruppenname" Margin="0,8,0,4"/><TextBox x:Name="TimedAutomationWorkflowGroupBox" x:FieldModifier="public"/>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Reihenfolge" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationWorkflowOrderBox" x:FieldModifier="public" Width="70" Text="0" Margin="8,0,18,0"/><CheckBox x:Name="TimedAutomationStartWorkflowBox" x:FieldModifier="public" Content="Beim Auslösen die gesamte Gruppe starten" VerticalAlignment="Center"/></WrapPanel>
+                                    <TextBlock Text="Verhalten bei Gruppenfehler" Margin="0,8,0,4"/><ComboBox x:Name="TimedAutomationWorkflowFailureModeBox" x:FieldModifier="public" SelectedIndex="0"><ComboBoxItem Content="Gruppe stoppen" Tag="Stop"/><ComboBoxItem Content="Mit nächstem Schritt fortfahren" Tag="Continue"/><ComboBoxItem Content="Ausgeführte Schritte zurückrollen" Tag="Rollback"/></ComboBox>
+                                    <TextBlock Text="Rückabwicklungsregel für diesen Schritt" Margin="0,8,0,4"/><ComboBox x:Name="TimedAutomationRollbackRuleBox" x:FieldModifier="public" IsEditable="True" DisplayMemberPath="Name"/>
+                                    <WrapPanel Margin="0,10,0,0"><Button x:Name="StopAllTimedAutomationsButton" x:FieldModifier="public" Content="ALLE LAUFENDEN ABBRECHEN" Background="#7A3838"/><TextBlock x:Name="TimedAutomationRuntimeStatusText" x:FieldModifier="public" Text="Keine laufende Automation." Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="10,0,0,0"/></WrapPanel>
+                                    <Border Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="#315B72" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0"><StackPanel><TextBlock Text="Ausführungsverlauf" Foreground="#7EC8F5" FontWeight="Bold"/><TextBlock x:Name="TimedAutomationHistoryText" x:FieldModifier="public" Text="Noch keine Ausführung." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel></Border>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Spotify beim Szenenwechsel / nach Timer" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <ComboBox x:Name="TimedAutomationSpotifyActionBox" x:FieldModifier="public" Margin="0,8,0,0" SelectedIndex="0"><ComboBoxItem Content="Nicht ändern" Tag="None"/><ComboBoxItem Content="Musik pausieren" Tag="Pause"/><ComboBoxItem Content="Lautstärke setzen" Tag="SetVolume"/><ComboBoxItem Content="Wiedergabe fortsetzen" Tag="Resume"/><ComboBoxItem Content="Playlist starten" Tag="StartPlaylist"/><ComboBoxItem Content="Vorherige Wiedergabe wiederherstellen" Tag="RestorePrevious"/></ComboBox>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Spotify-Lautstärke" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationSpotifyVolumeBox" x:FieldModifier="public" Width="70" Text="35" Margin="8,0,0,0"/><TextBlock Text="%" VerticalAlignment="Center" Margin="4,0,0,0"/></WrapPanel>
+                                    <TextBlock Text="Spotify-Playlist-URI (bei Playlist starten)" Margin="0,8,0,4"/><TextBox x:Name="TimedAutomationSpotifyPlaylistUriBox" x:FieldModifier="public" ToolTip="Beispiel: spotify:playlist:37i9dQZF1DX..."/>
+                                    <CheckBox x:Name="TimedAutomationSpotifyPlaylistShuffleBox" x:FieldModifier="public" Content="Playlist im Shuffle-Modus starten" IsChecked="True" Margin="0,8,0,0"/>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Spotify-Aktion verzögern" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationSpotifyDelayBox" x:FieldModifier="public" Width="70" Text="0" Margin="8,0,4,0"/><TextBlock Text="Sekunden" VerticalAlignment="Center"/></WrapPanel>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Lautstärke weich einblenden" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationSpotifyFadeBox" x:FieldModifier="public" Width="70" Text="0" Margin="8,0,4,0"/><TextBlock Text="Sekunden (0 = sofort)" VerticalAlignment="Center"/></WrapPanel>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Spotify-Priorität" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationSpotifyPriorityBox" x:FieldModifier="public" Width="70" Text="0" Margin="8,0,4,0"/><TextBlock Text="höher schützt vor niedrigeren Regeln" VerticalAlignment="Center"/></WrapPanel>
+                                    <TextBlock Text="Spotify-Automationsgruppe" Margin="0,8,0,4"/><TextBox x:Name="TimedAutomationSpotifyGroupBox" x:FieldModifier="public" Text="Standard" ToolTip="Regeln derselben Gruppe ersetzen sich gegenseitig."/>
+                                    <CheckBox x:Name="TimedAutomationSpotifyExclusiveGroupBox" x:FieldModifier="public" Content="Andere Spotify-Gruppen während der Ausführung sperren" IsChecked="True" Margin="0,8,0,0"/>
+                                    <CheckBox x:Name="TimedAutomationSpotifySavePreviousBox" x:FieldModifier="public" Content="Aktuelle Wiedergabe für diese Gruppe sichern" Margin="0,8,0,0" ToolTip="Speichert Titel bzw. Playlist, Position, Lautstärke, Shuffle, Wiederholung und Wiedergabestatus. Eine spätere Aktion derselben Gruppe kann den Zustand wiederherstellen."/>
+                                    <CheckBox x:Name="TimedAutomationSpotifyAutoRestoreBox" x:FieldModifier="public" Content="Vorherige Wiedergabe automatisch wiederherstellen" Margin="0,8,0,0" ToolTip="Stellt den für diese Gruppe gesicherten Zustand nach Ablauf der angegebenen Dauer automatisch wieder her."/>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Automatische Rückkehr nach" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationSpotifyAutoRestoreDelayBox" x:FieldModifier="public" Width="70" Text="30" Margin="8,0,4,0"/><TextBlock Text="Sekunden" VerticalAlignment="Center"/></WrapPanel>
+                                    <CheckBox x:Name="TimedAutomationSpotifyAutoRestoreSameSceneBox" x:FieldModifier="public" Content="Nur zurückkehren, wenn die Szene noch unverändert ist" IsChecked="True" Margin="0,8,0,0"/>
+                                    <CheckBox x:Name="TimedAutomationSpotifyAutoRestoreSameGroupBox" x:FieldModifier="public" Content="Nur zurückkehren, wenn dieselbe Spotify-Gruppe noch aktiv ist" IsChecked="True" Margin="0,6,0,0"/>
+                                    <CheckBox x:Name="TimedAutomationSpotifyAutoRestoreUnchangedPlaybackBox" x:FieldModifier="public" Content="Nur zurückkehren, wenn die gestartete Wiedergabe nicht manuell geändert wurde" IsChecked="True" Margin="0,6,0,0"/>
+                                    <Border Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="#315B72" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Gespeicherter Spotify-Zustand" Foreground="#7EC8F5" FontWeight="Bold"/>
+                                            <TextBlock x:Name="TimedAutomationSpotifySavedStateText" x:FieldModifier="public" Text="Für die aktuelle Gruppe ist kein Zustand gespeichert." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,8"/>
+                                            <WrapPanel>
+                                                <Button x:Name="RefreshSpotifySavedStateButton" x:FieldModifier="public" Content="STATUS PRÜFEN"/>
+                                                <Button x:Name="RestoreSpotifySavedStateNowButton" x:FieldModifier="public" Content="JETZT WIEDERHERSTELLEN" Background="#416B3C"/>
+                                                <Button x:Name="DiscardSpotifySavedStateButton" x:FieldModifier="public" Content="ZUSTAND VERWERFEN" Background="#7A3838"/>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="#315B72" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Alle gespeicherten Spotify-Zustände" Foreground="#7EC8F5" FontWeight="Bold"/>
+                                            <TextBlock Text="Zeigt sämtliche Gruppen mit gesicherter Wiedergabe. Ein Zustand kann direkt ausgewählt, wiederhergestellt oder verworfen werden." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,8"/>
+                                            <ListBox x:Name="SpotifySavedStatesOverviewList" x:FieldModifier="public" Height="140" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="#D7E0E5" DisplayMemberPath="Summary"/>
+                                            <WrapPanel Margin="0,8,0,0">
+                                                <TextBlock Text="Zustand gilt als abgelaufen nach" VerticalAlignment="Center"/>
+                                                <TextBox x:Name="SpotifySavedStateMaxAgeBox" x:FieldModifier="public" Width="70" Text="180" Margin="8,0,4,0" ToolTip="1 bis 10080 Minuten"/>
+                                                <TextBlock Text="Minuten" VerticalAlignment="Center"/>
+                                            </WrapPanel>
+                                            <WrapPanel Margin="0,8,0,0">
+                                                <CheckBox x:Name="SpotifySavedStateCleanupOnStartupBox" x:FieldModifier="public" Content="Abgelaufene Zustände beim Programmstart bereinigen" IsChecked="True"/>
+                                            </WrapPanel>
+                                            <WrapPanel Margin="0,6,0,0">
+                                                <CheckBox x:Name="SpotifySavedStateCleanupOnSaveBox" x:FieldModifier="public" Content="Vor jedem neuen Speichern abgelaufene Zustände bereinigen" IsChecked="True"/>
+                                            </WrapPanel>
+                                            <WrapPanel Margin="0,6,0,0">
+                                                <CheckBox x:Name="SpotifySavedStateCleanupIntervalBox" x:FieldModifier="public" Content="Automatisch in festen Intervallen bereinigen"/>
+                                                <TextBlock Text="alle" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                                <TextBox x:Name="SpotifySavedStateCleanupIntervalMinutesBox" x:FieldModifier="public" Width="60" Text="15" Margin="6,0,4,0" ToolTip="1 bis 1440 Minuten"/>
+                                                <TextBlock Text="Minuten" VerticalAlignment="Center"/>
+                                            </WrapPanel>
+                                            <WrapPanel Margin="0,8,0,0">
+                                                <Button x:Name="RefreshSpotifySavedStatesOverviewButton" x:FieldModifier="public" Content="ÜBERSICHT AKTUALISIEREN"/>
+                                                <Button x:Name="RestoreSelectedSpotifySavedStateButton" x:FieldModifier="public" Content="AUSWAHL WIEDERHERSTELLEN" Background="#416B3C"/>
+                                                <Button x:Name="DiscardSelectedSpotifySavedStateButton" x:FieldModifier="public" Content="AUSWAHL VERWERFEN" Background="#7A3838"/>
+                                                <Button x:Name="DiscardExpiredSpotifySavedStatesButton" x:FieldModifier="public" Content="ABGELAUFENE BEREINIGEN" Background="#7A5538"/>
+                                                <Button x:Name="DiscardAllSpotifySavedStatesButton" x:FieldModifier="public" Content="ALLE VERWERFEN" Background="#7A3838"/>
+                                            </WrapPanel>
+                                            <TextBlock x:Name="SpotifySavedStatesOverviewStatusText" x:FieldModifier="public" Text="Noch keine Übersicht geladen." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="#315B72" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Spotify-Zustandsstatistik und Verlauf" Foreground="#7EC8F5" FontWeight="Bold"/>
+                                            <TextBlock x:Name="SpotifySavedStateStatisticsText" x:FieldModifier="public" Text="Gespeichert: 0 · Wiederhergestellt: 0 · Verworfen: 0 · Automatisch bereinigt: 0 · Aktuell vorhanden: 0" Foreground="#D7E0E5" TextWrapping="Wrap" Margin="0,6,0,8"/>
+                                            <WrapPanel Margin="0,0,0,8">
+                                                <TextBlock Text="Suche" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <TextBox x:Name="SpotifySavedStateHistorySearchBox" x:FieldModifier="public" Width="190" ToolTip="Nach Gruppe, Aktion oder Text suchen"/>
+                                                <TextBlock Text="Aktion" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                                                <ComboBox x:Name="SpotifySavedStateHistoryActionFilterBox" x:FieldModifier="public" Width="160" SelectedIndex="0">
+                                                    <ComboBoxItem Content="Alle Aktionen" Tag="all"/>
+                                                    <ComboBoxItem Content="Gespeichert" Tag="save"/>
+                                                    <ComboBoxItem Content="Wiederhergestellt" Tag="restore"/>
+                                                    <ComboBoxItem Content="Verworfen" Tag="discard"/>
+                                                    <ComboBoxItem Content="Bereinigt" Tag="cleanup"/>
+                                                </ComboBox>
+                                                <TextBlock Text="Sortierung" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                                                <ComboBox x:Name="SpotifySavedStateHistorySortBox" x:FieldModifier="public" Width="155" SelectedIndex="0">
+                                                    <ComboBoxItem Content="Neueste zuerst" Tag="newest"/>
+                                                    <ComboBoxItem Content="Älteste zuerst" Tag="oldest"/>
+                                                    <ComboBoxItem Content="Aktion A–Z" Tag="action"/>
+                                                    <ComboBoxItem Content="Gruppe A–Z" Tag="group"/>
+                                                </ComboBox>
+                                                <CheckBox x:Name="SpotifySavedStateHistoryFavoritesOnlyBox" x:FieldModifier="public" Content="Nur Favoriten" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                <Button x:Name="ResetSpotifySavedStateHistoryFilterButton" x:FieldModifier="public" Content="FILTER ZURÜCKSETZEN"/>
+                                            </WrapPanel>
+                                            <ListBox x:Name="SpotifySavedStateHistoryList" x:FieldModifier="public" Height="140" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="#D7E0E5" SelectionMode="Extended" ToolTip="Mehrere Einträge mit Strg oder Umschalt auswählen"/>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,8,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="Details zum ausgewählten Eintrag" Foreground="#7EC8F5" FontWeight="Bold"/>
+                                                    <TextBlock x:Name="SpotifySavedStateHistoryDetailText" x:FieldModifier="public" Text="Kein Verlaufseintrag ausgewählt." Foreground="#D7E0E5" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                    <TextBlock Text="Eigene Notiz" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,3"/>
+                                                    <TextBox x:Name="SpotifySavedStateHistoryNoteBox" x:FieldModifier="public" MinHeight="48" TextWrapping="Wrap" AcceptsReturn="True"/>
+                                                    <WrapPanel Margin="0,6,0,0">
+                                                        <Button x:Name="ToggleSpotifySavedStateHistoryFavoriteButton" x:FieldModifier="public" Content="ALS FAVORIT MARKIEREN" Background="#7A6538"/>
+                                                        <Button x:Name="SaveSpotifySavedStateHistoryNoteButton" x:FieldModifier="public" Content="NOTIZ SPEICHERN" Background="#315B72"/>
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </Border>
+                                            <WrapPanel Margin="0,8,0,0">
+                                                <Button x:Name="ExportSpotifySavedStateHistoryButton" x:FieldModifier="public" Content="JSON EXPORTIEREN" Background="#315B72"/>
+                                                <Button x:Name="ExportSpotifySavedStateHistoryCsvButton" x:FieldModifier="public" Content="CSV EXPORTIEREN" Background="#315B72"/>
+                                                <Button x:Name="ImportSpotifySavedStateHistoryButton" x:FieldModifier="public" Content="VERLAUF IMPORTIEREN" Background="#315B72"/>
+                                                <Button x:Name="SelectVisibleSpotifySavedStateHistoryButton" x:FieldModifier="public" Content="SICHTBARE AUSWÄHLEN" Background="#38536A"/>
+                                                <Button x:Name="ExportSelectedSpotifySavedStateHistoryButton" x:FieldModifier="public" Content="AUSWAHL JSON" Background="#315B72"/>
+                                                <Button x:Name="ExportSelectedSpotifySavedStateHistoryCsvButton" x:FieldModifier="public" Content="AUSWAHL CSV" Background="#315B72"/>
+                                                <Button x:Name="RemoveSelectedSpotifySavedStateHistoryButton" x:FieldModifier="public" Content="AUSWAHL ENTFERNEN" Background="#7A3838"/>
+                                                <Button x:Name="ClearSpotifySavedStateHistoryButton" x:FieldModifier="public" Content="VERLAUF LEEREN"/>
+                                            </WrapPanel>
+                                            <WrapPanel Margin="0,6,0,0">
+                                                <Button x:Name="CreateSpotifySavedStateHistoryBackupButton" x:FieldModifier="public" Content="SICHERUNG ERSTELLEN" Background="#315B72" ToolTip="Erstellt einen manuellen Wiederherstellungspunkt"/>
+                                                <Button x:Name="RefreshSpotifySavedStateHistoryBackupsButton" x:FieldModifier="public" Content="SICHERUNGEN AKTUALISIEREN" Background="#38536A"/>
+                                                <Button x:Name="PreviewSelectedSpotifySavedStateHistoryBackupButton" x:FieldModifier="public" Content="VORSCHAU" Background="#38536A" ToolTip="Analysiert Inhalt und Unterschiede der ausgewählten Sicherung"/>
+                                                <Button x:Name="RestoreSelectedSpotifySavedStateHistoryBackupButton" x:FieldModifier="public" Content="AUSWAHL LADEN" Background="#7A6538" ToolTip="Stellt den ausgewählten Wiederherstellungspunkt wieder her"/>
+                                                <Button x:Name="DeleteSelectedSpotifySavedStateHistoryBackupButton" x:FieldModifier="public" Content="AUSWAHL LÖSCHEN" Background="#7A3838"/>
+                                                <Button x:Name="OpenSpotifySavedStateHistoryBackupFolderButton" x:FieldModifier="public" Content="SICHERUNGSORDNER ÖFFNEN" Background="#38536A"/>
+                                            </WrapPanel>
+                                            <ListBox x:Name="SpotifySavedStateHistoryBackupsList" x:FieldModifier="public" Height="110" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="#D7E0E5" DisplayMemberPath="DisplayName" ToolTip="Wiederherstellungspunkt auswählen"/>
+                                            <TextBlock x:Name="SpotifySavedStateHistoryBackupDetailText" x:FieldModifier="public" Text="Noch keine Sicherung ausgewählt." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="Selektive Wiederherstellung" Foreground="#7EC8F5" FontWeight="Bold"/>
+                                                    <TextBlock Text="Nur ausgewählte Bereiche aus der Sicherung übernehmen. Der aktuelle Zustand wird vorher automatisch gesichert." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,3,0,6"/>
+                                                    <WrapPanel Margin="0,0,0,6">
+                                                        <ComboBox x:Name="SpotifyHistoryRestoreProfileBox" x:FieldModifier="public" Width="220" DisplayMemberPath="Name" ToolTip="Wiederherstellungsprofil auswählen"/>
+                                                        <Button x:Name="ApplySpotifyHistoryRestoreProfileButton" x:FieldModifier="public" Content="PROFIL ANWENDEN" Background="#38536A"/>
+                                                        <TextBox x:Name="SpotifyHistoryRestoreProfileNameBox" x:FieldModifier="public" Width="180" Margin="8,0,0,0" ToolTip="Name für ein eigenes Wiederherstellungsprofil"/>
+                                                        <Button x:Name="SaveSpotifyHistoryRestoreProfileButton" x:FieldModifier="public" Content="PROFIL SPEICHERN" Background="#315B72"/>
+                                                        <Button x:Name="DeleteSpotifyHistoryRestoreProfileButton" x:FieldModifier="public" Content="PROFIL LÖSCHEN" Background="#7A3838"/>
+                                                        <Button x:Name="ExportSpotifyHistoryRestoreProfilesButton" x:FieldModifier="public" Content="PROFILE EXPORTIEREN" Background="#38536A" ToolTip="Eigene Wiederherstellungsprofile als JSON-Datei sichern"/>
+                                                        <Button x:Name="ImportSpotifyHistoryRestoreProfilesButton" x:FieldModifier="public" Content="IMPORTDATEI PRÜFEN" Background="#315B72" ToolTip="Wiederherstellungsprofile prüfen, bevor Änderungen übernommen werden"/>
+                                                        <Button x:Name="ConfirmSpotifyHistoryRestoreProfilesImportButton" x:FieldModifier="public" Content="IMPORT ÜBERNEHMEN" Background="#416B3C" IsEnabled="False" ToolTip="Die zuvor geprüften Profiländerungen übernehmen"/>
+                                                    </WrapPanel>
+                                                    <Border Background="{DynamicResource WindowBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="5" Padding="7" Margin="0,0,0,7">
+                                                        <StackPanel>
+                                                            <TextBlock Text="Importprüfung" Foreground="#7EC8F5" FontWeight="Bold"/>
+                                                            <TextBlock x:Name="SpotifyHistoryRestoreProfileImportPreviewText" x:FieldModifier="public" Text="Noch keine Importdatei geprüft." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,3,0,4"/>
+                                                            <ListBox x:Name="SpotifyHistoryRestoreProfileImportPreviewList" x:FieldModifier="public" Height="120" Background="{DynamicResource WindowBackgroundBrush}" Foreground="#D7E0E5" ToolTip="Importregel für neue und geänderte Profile festlegen">
+                                                                <ListBox.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Grid Margin="2,3,2,4">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="*"/>
+                                                                                <ColumnDefinition Width="175"/>
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock Grid.Column="0" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0">
+                                                                                <Run Text="{Binding Status}" FontWeight="Bold"/>
+                                                                                <Run Text=" · "/>
+                                                                                <Run Text="{Binding Profile.Name}"/>
+                                                                                <Run Text=" · "/>
+                                                                                <Run Text="{Binding Description}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                            </TextBlock>
+                                                                            <ComboBox Grid.Column="1" ItemsSource="{Binding ActionOptions}" SelectedItem="{Binding SelectedAction, Mode=TwoWay}" IsEnabled="{Binding CanSelect}" ToolTip="Importregel für dieses Profil"/>
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </ListBox.ItemTemplate>
+                                                            </ListBox>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <WrapPanel>
+                                                        <CheckBox x:Name="RestoreSpotifyHistoryEntriesBox" x:FieldModifier="public" Content="Verlaufseinträge" IsChecked="True" Margin="0,0,14,4"/>
+                                                        <CheckBox x:Name="RestoreSpotifyHistoryFavoritesBox" x:FieldModifier="public" Content="Favoriten" IsChecked="True" Margin="0,0,14,4"/>
+                                                        <CheckBox x:Name="RestoreSpotifyHistoryNotesBox" x:FieldModifier="public" Content="Notizen" IsChecked="True" Margin="0,0,14,4"/>
+                                                        <CheckBox x:Name="RestoreSpotifyHistoryCountersBox" x:FieldModifier="public" Content="Statistikzähler" Margin="0,0,14,4"/>
+                                                        <CheckBox x:Name="RestoreSpotifyHistoryFiltersBox" x:FieldModifier="public" Content="Filter und Sortierung" Margin="0,0,14,4"/>
+                                                    </WrapPanel>
+                                                    <WrapPanel Margin="0,4,0,0">
+                                                        <CheckBox x:Name="MergeSpotifyHistoryEntriesBox" x:FieldModifier="public" Content="Verlauf zusammenführen statt ersetzen" IsChecked="True" Margin="0,0,14,4" ToolTip="Einträge aus der Sicherung werden ergänzt; vorhandene Einträge bleiben erhalten."/>
+                                                        <Button x:Name="RestoreSelectedSpotifySavedStateHistoryPartsButton" x:FieldModifier="public" Content="AUSGEWÄHLTE BEREICHE LADEN" Background="#7A6538"/>
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="Sicherungsvorschau und Vergleich" Foreground="#7EC8F5" FontWeight="Bold"/>
+                                                    <TextBlock x:Name="SpotifySavedStateHistoryBackupPreviewText" x:FieldModifier="public" Text="Sicherung auswählen, um Inhalt und Unterschiede zum aktuellen Verlauf anzuzeigen." Foreground="#D7E0E5" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                    <TextBlock Text="Eintragsdetails" Foreground="#7EC8F5" FontWeight="Bold" Margin="0,10,0,4"/>
+                                                    <ListBox x:Name="SpotifySavedStateHistoryBackupDifferencesList" x:FieldModifier="public" Height="150" Background="{DynamicResource WindowBackgroundBrush}" Foreground="#D7E0E5" ToolTip="Konkrete Unterschiede zwischen Sicherung und aktuellem Verlauf"/>
+                                                    <TextBlock Text="Legende: + kommt hinzu · − wird ersetzt · = bleibt unverändert" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <TextBlock x:Name="SpotifySavedStateHistoryStatusText" x:FieldModifier="public" Text="Noch keine Zustandsaktionen in dieser Programmsitzung." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <CheckBox x:Name="TimedAutomationOncePerStreamBox" x:FieldModifier="public" Content="Nur einmal pro Stream ausführen" IsChecked="True" Margin="0,10,0,0"/>
+                                    <WrapPanel Margin="0,16,0,0"><Button x:Name="SaveTimedAutomationButton" x:FieldModifier="public" Content="REGEL SPEICHERN" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}"/><Button x:Name="RefreshTimedAutomationObsButton" x:FieldModifier="public" Content="OBS-LISTEN AKTUALISIEREN"/></WrapPanel>
+                                    <Border Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="#315B72" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Testlauf und Simulation" Foreground="#7EC8F5" FontWeight="Bold"/>
+                                            <CheckBox x:Name="TimedAutomationSimulationBox" x:FieldModifier="public" Content="Nur simulieren – keine Aktion in OBS, Spotify oder Streamer.bot ausführen" IsChecked="True" Margin="0,6,0,8"/>
+                                            <TextBlock Text="Die Simulation protokolliert Bedingungen, Aktionen und Regelketten ohne externe Änderungen. Wird sie deaktiviert, läuft die Regel real; ein OBS-Streamstart bleibt im Kurztest gesperrt." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,5,0,8"/>
+                                            <WrapPanel><TextBlock Text="Testdauer" VerticalAlignment="Center"/><TextBox x:Name="TimedAutomationTestSecondsBox" x:FieldModifier="public" Width="60" Text="3" Margin="8,0"/><TextBlock Text="Sekunden" VerticalAlignment="Center"/><Button x:Name="TestTimedAutomationButton" x:FieldModifier="public" Content="IN OBS TESTEN" Background="#416B3C" Margin="12,0,0,0"/><Button x:Name="CancelTimedAutomationTestButton" x:FieldModifier="public" Content="TEST ABBRECHEN" Background="#7A3838"/></WrapPanel>
+                                            <TextBlock x:Name="TimedAutomationTestStatusText" x:FieldModifier="public" Text="Bereit." Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                            <WrapPanel Margin="0,10,0,0"><Button x:Name="ValidateTimedAutomationsButton" x:FieldModifier="public" Content="ALLE REGELN PRÜFEN" Background="#315B72"/><Button x:Name="ClearTimedAutomationDiagnosticsButton" x:FieldModifier="public" Content="DIAGNOSE LEEREN"/></WrapPanel>
+                                            <ListBox x:Name="TimedAutomationDiagnosticsList" x:FieldModifier="public" Height="150" Margin="0,10,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="#D7E0E5"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+</UserControl>

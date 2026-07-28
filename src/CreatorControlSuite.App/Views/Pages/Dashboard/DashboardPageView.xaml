@@ -1,0 +1,657 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Dashboard.DashboardPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
+    <Grid Background="{DynamicResource WindowBackgroundBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <!-- NEXORA is a working product name and can later be replaced centrally. -->
+                <Grid Margin="0,0,0,14" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Dashboard" FontSize="27" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Dein Streaming Command Center" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button x:Name="DashboardHeaderStopStreamButtonLegacy" x:FieldModifier="public" Content="■  STREAM BEENDEN" Style="{StaticResource OrangeActionButtonStyle}" Margin="0,0,8,0" Padding="18,11"/>
+                        <Button x:Name="DashboardEditLayoutButton" x:FieldModifier="public" Content="⚙  LAYOUT" Padding="14,11" Margin="0,0,6,0"/>
+                        <Button x:Name="DashboardRestoreHiddenModulesButton" x:FieldModifier="public" Content="MODULE" Padding="14,11" Margin="0"/>
+                        <ComboBox x:Name="DashboardQuickPresetBox" x:FieldModifier="public" Visibility="Collapsed">
+                            <ComboBoxItem Content="Command Center"/>
+                        </ComboBox>
+                        <Button x:Name="DashboardQuickApplyPresetButton" x:FieldModifier="public" Visibility="Collapsed" Content="PRESET"/>
+                        <Button x:Name="DashboardFocusModeButton" x:FieldModifier="public" Visibility="Collapsed" Content="FOKUSMODUS"/>
+                        <ComboBox x:Name="DashboardDirectSizeBox" x:FieldModifier="public" Visibility="Collapsed"/>
+                        <Button x:Name="DashboardDirectApplySizeButton" x:FieldModifier="public" Visibility="Collapsed" Content="GRÖSSE"/>
+                    </StackPanel>
+                </Grid>
+                <Grid Grid.Row="1" ClipToBounds="True">
+                    <Grid x:Name="DashboardScrollRoot" x:FieldModifier="public" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <Grid x:Name="DashboardContentStack" x:FieldModifier="public" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0">
+                             <Grid.RowDefinitions>
+                                 <RowDefinition Height="Auto"/>
+                                 <RowDefinition Height="Auto"/>
+                                 <RowDefinition Height="*"/>
+                                 <RowDefinition Height="Auto"/>
+                             </Grid.RowDefinitions>
+                            <Border x:Name="DashboardTwitchChannelWidget" x:FieldModifier="public"
+                                    Grid.Row="0"
+                                    Margin="0,0,0,12"
+                                    Padding="14,10"
+                                    Background="{DynamicResource ElevatedBackgroundBrush}"
+                                    BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Cursor="Hand"
+                                    ToolTip="Streamtitel, Kategorie und Live-Benachrichtigung bearbeiten">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="1.5*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="38" Height="38" CornerRadius="8" Background="#9146FF" Margin="0,0,12,0">
+                                        <TextBlock Text="T" Foreground="White" FontWeight="Bold" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="TWITCH-KANAL" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold"/>
+                                        <TextBlock x:Name="DashboardTwitchChannelTitleText" x:FieldModifier="public" Text="Kein Streamtitel gesetzt" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="18,0">
+                                        <TextBlock Text="KATEGORIE · LIVE-BENACHRICHTIGUNG" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"/>
+                                        <TextBlock x:Name="DashboardTwitchChannelDetailsText" x:FieldModifier="public" Text="- · nicht gesetzt" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="3" Text="BEARBEITEN  ›" Foreground="{DynamicResource AccentHoverBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <Border Grid.Row="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardStreamControlModule" x:FieldModifier="public" Margin="0,0,0,12" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+                                             <StackPanel>
+                                                <TextBlock Text="SCHNELLZUGRIFF" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                                <UniformGrid Columns="6" Rows="1" Margin="0,12,0,8">
+                                                    <Button x:Name="DashboardPrepareStreamButton" x:FieldModifier="public" ToolTip="Konfigurierte Streaming-Dienste starten und den Stream vorbereiten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="🚀  STREAM VORBEREITEN" Style="{StaticResource OrangeActionButtonStyle}" FontWeight="Bold" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardObsStartStreamButton" x:FieldModifier="public" ToolTip="OBS-Stream starten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="▷  STREAM STARTEN" FontWeight="Bold" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardObsStopStreamButton" x:FieldModifier="public" Content="■  STREAM BEENDEN" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardQuickAccessAlertButton" x:FieldModifier="public" ToolTip="Einen Test-Alert auslösen" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="♧  TEST-ALERT" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardQuickAccessOverlayButton" x:FieldModifier="public" ToolTip="Overlay-Einstellungen öffnen" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="▱  OVERLAY EIN/AUS" Margin="3" Padding="8,4"/>
+                                                    <Button x:Name="DashboardShortStreamTestButton" x:FieldModifier="public" ToolTip="Automatisierung öffnen und einen kurzen Testlauf ohne Stream starten" MinHeight="48" MinWidth="0" HorizontalContentAlignment="Left" Content="⚙  STREAM-KURZTEST" Margin="3" Padding="8,4"/>
+                                                </UniformGrid>
+                                                <Border x:Name="DashboardPrepareProgressPanel" x:FieldModifier="public" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource StrongBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10" Margin="3,2,3,10" Visibility="Collapsed">
+                                                    <StackPanel>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="STREAM WIRD VORBEREITET" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                            <TextBlock x:Name="DashboardPrepareProgressPercentText" x:FieldModifier="public" Grid.Column="1" Text="0 %" Foreground="{DynamicResource AccentHoverBrush}" FontWeight="Bold"/>
+                                                        </Grid>
+                                                        <ProgressBar x:Name="DashboardPrepareProgressBar" x:FieldModifier="public" Minimum="0" Maximum="100" Value="0" Height="12" Margin="0,8,0,0"/>
+                                                        <TextBlock x:Name="DashboardPrepareProgressText" x:FieldModifier="public" Text="Programme werden gestartet …" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <TextBlock Text="Streamtitel" Visibility="Collapsed"/>
+                                                <Grid Visibility="Collapsed">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="DashboardTwitchTitleBox" x:FieldModifier="public"/>
+                                                    <Button x:Name="DashboardSaveTwitchChannelButton" x:FieldModifier="public" Grid.Column="1" Content="Titel/Kategorie ändern" Margin="8,0,0,0"/>
+                                                </Grid>
+                                                <Grid Margin="0,8,0,0" Visibility="Collapsed">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="1.2*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="1.2*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="DashboardTwitchCategorySearchBox" x:FieldModifier="public" ToolTip="Kategorie suchen"/>
+                                                    <Button x:Name="DashboardSearchTwitchCategoryButton" x:FieldModifier="public" Grid.Column="1" Content="Suchen" Margin="8,0"/>
+                                                    <ComboBox x:Name="DashboardTwitchCategoryResultsBox" x:FieldModifier="public" Grid.Column="2" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                </Grid>
+                                                <Border x:Name="DashboardRaidControlModule" x:FieldModifier="public" Visibility="Collapsed"/>
+                                                <!-- Kompatibilität: Streamende-Controls (UI läuft über StreamEndDialogWindow) -->
+                                                <StackPanel Visibility="Collapsed" IsHitTestVisible="False">
+                                                    <Border x:Name="DashboardStreamEndModule" x:FieldModifier="public"/>
+                                                    <Button x:Name="DashboardStreamEndToggleButton" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardStreamEndExpandGlyph" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardStreamEndStatusText" x:FieldModifier="public" Text="Bereit"/>
+                                                    <StackPanel x:Name="DashboardStreamEndContentPanel" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardStreamEndTargetText" x:FieldModifier="public"/>
+                                                    <CheckBox x:Name="DashboardRaidEnabledBox" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardRaidTargetStatusText" x:FieldModifier="public"/>
+                                                    <Grid x:Name="DashboardRaidSelectionPanel" x:FieldModifier="public"/>
+                                                    <ComboBox x:Name="DashboardRaidChannelBox" x:FieldModifier="public"/>
+                                                    <Button x:Name="DashboardOpenRaidChannelButton" x:FieldModifier="public"/>
+                                                    <TextBox x:Name="DashboardPlannedStreamEndSecondsBox" x:FieldModifier="public"/>
+                                                    <Button x:Name="DashboardPlanStreamEndButton" x:FieldModifier="public"/>
+                                                    <Button x:Name="DashboardCancelPlannedStreamEndButton" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardStreamEndCountdownLabel" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardStreamEndCountdownText" x:FieldModifier="public" Text="—"/>
+                                                    <ProgressBar x:Name="DashboardStreamEndCountdownProgress" x:FieldModifier="public" Minimum="0" Maximum="1" Value="0"/>
+                                                    <Border x:Name="DashboardRaidStatusPanel" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardRaidCountdownTitleText" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardRaidCountdownTargetText" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardRaidCountdownText" x:FieldModifier="public"/>
+                                                    <TextBlock x:Name="DashboardRaidViewerText" x:FieldModifier="public"/>
+                                                    <ProgressBar x:Name="DashboardRaidCountdownProgress" x:FieldModifier="public" Minimum="0" Maximum="90" Value="0"/>
+                                                    <Button x:Name="DashboardStartRaidButton" x:FieldModifier="public"/>
+                                                    <Button x:Name="DashboardCancelRaidButton" x:FieldModifier="public"/>
+                                                    <Button x:Name="DashboardSkipRaidAndStopButton" x:FieldModifier="public"/>
+                                                </StackPanel>
+                                             </StackPanel>
+                            </Border>
+                            <Grid x:Name="DashboardPrimaryRow" x:FieldModifier="public" Grid.Row="2" Margin="0" VerticalAlignment="Stretch">
+                                <Grid.RowDefinitions>
+                                    <!-- Normal: Content in Zeile 0 (*); Groß-Vorschau: Content in Zeile 1 (*), gesetzt per Code -->
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" MinWidth="0"/>
+                                    <ColumnDefinition Width="*" MinWidth="280"/>
+                                </Grid.ColumnDefinitions>
+                                    <Grid x:Name="DashboardObsSceneColumn" x:FieldModifier="public" Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Stretch" HorizontalAlignment="Left">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*" MinHeight="120"/>
+                                        </Grid.RowDefinitions>
+                                        <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardObsSceneControlModule" x:FieldModifier="public" Margin="0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <StackPanel x:Name="DashboardObsSceneControlContent" x:FieldModifier="public" MaxWidth="400">
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="AKTUELLE SZENE (OBS)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
+                                                    <ComboBox x:Name="DashboardObsScenePreviewSizeBox" x:FieldModifier="public" Grid.Column="1" MinWidth="100" VerticalAlignment="Center" SelectedIndex="1" ToolTip="Vorschau-Größe">
+                                                        <ComboBoxItem Content="Kompakt" Tag="Kompakt"/>
+                                                        <ComboBoxItem Content="Standard" Tag="Standard"/>
+                                                        <ComboBoxItem Content="Groß" Tag="Groß"/>
+                                                    </ComboBox>
+                                                </Grid>
+                                                <Border x:Name="DashboardObsScenePreviewBorder" x:FieldModifier="public" Width="400" Height="225" MinWidth="400" MinHeight="225" MaxWidth="400" MaxHeight="225" Background="{DynamicResource WindowBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,8" ClipToBounds="True" HorizontalAlignment="Left">
+                                                    <Grid>
+                                                        <Rectangle Fill="{DynamicResource PanelBackgroundBrush}"/>
+                                                        <Image x:Name="DashboardObsScenePreviewImage" x:FieldModifier="public" Stretch="Uniform"/>
+                                                        <Border x:Name="DashboardObsScenePreviewPlaceholder" x:FieldModifier="public" Background="{DynamicResource WindowBackgroundBrush}">
+                                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                <TextBlock Text="OBS" Foreground="{DynamicResource AccentBrush}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="Vorschau wird nach der OBS-Verbindung geladen" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0" TextAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <Border Background="#A0000000" VerticalAlignment="Bottom" Padding="8,4">
+                                                            <TextBlock x:Name="DashboardCurrentSceneText" x:FieldModifier="public" Text="AKTUELLE SZENE" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                                <WrapPanel x:Name="DashboardSceneButtonsPanel" x:FieldModifier="public" MaxWidth="400"/>
+                                                <Button x:Name="DashboardAddSceneButton" x:FieldModifier="public" Content="+ Button hinzufügen" HorizontalAlignment="Left" Margin="0,6,0,0" Padding="12,6"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border x:Name="DashboardTwitchUsersModule" x:FieldModifier="public" Grid.Row="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,8,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="Auto" MinWidth="0">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="*"/>
+                                                </Grid.RowDefinitions>
+                                                <TextBlock x:Name="DashboardTwitchUsersHeaderText" x:FieldModifier="public" Text="TWITCH · USER (0)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                <ListBox x:Name="DashboardTwitchUsersList" x:FieldModifier="public" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Stretch">
+                                                    <ListBox.ItemContainerStyle>
+                                                        <Style TargetType="ListBoxItem">
+                                                            <Setter Property="Background" Value="Transparent"/>
+                                                            <Setter Property="BorderThickness" Value="0"/>
+                                                            <Setter Property="Padding" Value="0"/>
+                                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                            <Setter Property="Focusable" Value="False"/>
+                                                        </Style>
+                                                    </ListBox.ItemContainerStyle>
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding}" Foreground="{Binding Converter={StaticResource TwitchRoleToBrushConverter}}" TextWrapping="Wrap" Margin="4,2"/>
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                     <Grid x:Name="DashboardPrimaryContentColumn" x:FieldModifier="public" Grid.Column="1" VerticalAlignment="Stretch">
+                                         <Grid Margin="0,0,0,0" VerticalAlignment="Stretch">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardTwitchEventsModule" x:FieldModifier="public" Margin="0,0,4,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="*"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="LETZTE EVENTS" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                        <Button x:Name="DashboardJoinStreamTogetherButton" x:FieldModifier="public" Grid.Column="1" Content="BEITRETEN" Padding="8,4" Visibility="Collapsed"/>
+                                                    </Grid>
+                                                    <ListBox x:Name="DashboardTwitchEventsList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Stretch"/>
+                                                </Grid>
+                                            </Border>
+                                            <Border Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10" x:Name="DashboardTwitchChatModule" x:FieldModifier="public" Margin="4,0,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition x:Name="DashboardTwitchChatHeaderRow" x:FieldModifier="public" Height="Auto"/>
+                                                        <RowDefinition Height="*"/>
+                                                        <RowDefinition x:Name="DashboardTwitchChatControlsRow" x:FieldModifier="public" Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+                                                    <DockPanel x:Name="DashboardTwitchChatHeader" x:FieldModifier="public">
+                                                        <TextBlock Text="CHAT (TWITCH)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                                        <TextBlock Text="LIVE" Foreground="#9B5CFF" HorizontalAlignment="Right"/>
+                                                    </DockPanel>
+                                                    <Grid x:Name="DashboardTwitchChatContentHost" x:FieldModifier="public" Grid.Row="1" Margin="0,8,0,8">
+                                                        <ListBox x:Name="DashboardTwitchChatList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" VerticalAlignment="Stretch">
+                                                            <ListBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <TextBlock Text="{Binding}" Foreground="{Binding Converter={StaticResource TwitchRoleToBrushConverter}}" TextWrapping="Wrap" Margin="3,2"/>
+                                                                </DataTemplate>
+                                                            </ListBox.ItemTemplate>
+                                                        </ListBox>
+                                                        <wv2:WebView2 x:Name="DashboardTwitchWebChat" x:FieldModifier="public"
+                                                                      Visibility="Collapsed"
+                                                                      DefaultBackgroundColor="Transparent"/>
+                                                    </Grid>
+                                                    <StackPanel x:Name="DashboardTwitchChatControls" x:FieldModifier="public" Grid.Row="2">
+                                                        <Grid x:Name="DashboardTwitchBuiltInSendRow" x:FieldModifier="public">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBox x:Name="DashboardTwitchChatMessageBox" x:FieldModifier="public"/>
+                                                            <Button x:Name="DashboardSendTwitchChatButton" x:FieldModifier="public" Grid.Column="1" Content="SENDEN" Margin="8,0,0,0"/>
+                                                            <Button x:Name="DashboardOpenTwitchChatButton" x:FieldModifier="public" Grid.Column="2" Content="CHAT ÖFFNEN" Margin="8,0,0,0"/>
+                                                        </Grid>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                            <TextBox x:Name="DashboardModerationUserBox" x:FieldModifier="public" Width="150" ToolTip="Benutzername"/>
+                                                            <Button x:Name="DashboardTimeoutUserButton" x:FieldModifier="public" Content="TIMEOUT 10 MIN" Margin="8,0,0,0"/>
+                                                            <Button x:Name="DashboardBanUserButton" x:FieldModifier="public" Content="BANNEN" Margin="8,0,0,0"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </Grid>
+                            </Grid>
+                            <!-- Entfernte Dashboard-Widgets (Kompatibilität für Code-Behind) -->
+                            <Grid Grid.Row="3" Visibility="Collapsed">
+                                <Grid x:Name="DashboardStreamingServicesRow" x:FieldModifier="public"/>
+                                <Grid x:Name="DashboardRemainingWidgetsRow" x:FieldModifier="public">
+                                    <Border x:Name="DashboardNextAutomationModule" x:FieldModifier="public">
+                                        <StackPanel>
+                                            <ListBox x:Name="DashboardAutomationList" x:FieldModifier="public"/>
+                                            <Button x:Name="DashboardManageAutomationsButton" x:FieldModifier="public" Content="AUTOMATISIERUNGEN VERWALTEN"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="DashboardSystemResourcesModule" x:FieldModifier="public">
+                                        <StackPanel>
+                                            <TextBlock x:Name="DashboardCpuText" x:FieldModifier="public" Text="CPU: –"/>
+                                            <ProgressBar x:Name="DashboardCpuBar" x:FieldModifier="public" Minimum="0" Maximum="100"/>
+                                            <TextBlock x:Name="DashboardRamText" x:FieldModifier="public" Text="RAM: –"/>
+                                            <ProgressBar x:Name="DashboardRamBar" x:FieldModifier="public" Minimum="0" Maximum="100"/>
+                                            <Button x:Name="DashboardOpenDiagnosticsButton" x:FieldModifier="public" Content="DETAILS ANZEIGEN"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                                <!-- Unsichtbarer Kompatibilitätsbereich für bestehende Eventhandler -->
+                                <Grid>
+                                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardLiveEventsModule" x:FieldModifier="public" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Visibility="Collapsed">
+                                        <StackPanel>
+                                            <TextBlock x:Name="DashboardSelectedStatisticLabel" x:FieldModifier="public" Text="ZUSCHAUERZAHL"/>
+                                            <TextBlock x:Name="DashboardSelectedStatisticValue" x:FieldModifier="public" Text="0"/>
+                                            <Button x:Name="DashboardOpenEventsButton" x:FieldModifier="public" Content="DETAILLIERTE STATISTIK ÖFFNEN"/>
+                                            <ListBox x:Name="DashboardEventCenterList" x:FieldModifier="public" Visibility="Collapsed"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardSpotifyPlayerModule" x:FieldModifier="public" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Visibility="Collapsed">
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <TextBlock x:Name="DashboardMusicModuleTitle" x:FieldModifier="public" Text="MUSIC PLAYER" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                                <TextBlock x:Name="DashboardMusicModuleProvider" x:FieldModifier="public" Text="Spotify" Foreground="{DynamicResource SuccessBrush}" HorizontalAlignment="Right"/>
+                                            </DockPanel>
+                                            <TextBlock x:Name="DashboardMusicNowPlayingText" x:FieldModifier="public" Text="Kein Titel"/>
+                                            <TextBlock x:Name="DashboardMusicStatusText" x:FieldModifier="public" Text="Nicht verbunden"/>
+                                            <Button x:Name="DashboardOpenMusicPlayerButton" x:FieldModifier="public" Content="ZUM PLAYER"/>
+                                            <Image x:Name="DashboardSpotifyAlbumCoverImage" x:FieldModifier="public"/>
+                                            <TextBlock x:Name="DashboardSpotifyTrackText" x:FieldModifier="public"/>
+                                            <TextBlock x:Name="DashboardSpotifyAlbumText" x:FieldModifier="public"/>
+                                            <TextBlock x:Name="DashboardSpotifyPlaybackStateText" x:FieldModifier="public"/>
+                                            <TextBlock x:Name="DashboardSpotifyDeviceText" x:FieldModifier="public"/>
+                                            <Button x:Name="DashboardSpotifyShuffleButton" x:FieldModifier="public"/>
+                                            <Button x:Name="DashboardSpotifyPreviousButton" x:FieldModifier="public"/>
+                                            <Button x:Name="DashboardSpotifyPlayButton" x:FieldModifier="public"/>
+                                            <Button x:Name="DashboardSpotifyPauseButton" x:FieldModifier="public"/>
+                                            <Button x:Name="DashboardSpotifyNextButton" x:FieldModifier="public"/>
+                                            <Button x:Name="DashboardSpotifyRepeatButton" x:FieldModifier="public"/>
+                                            <ComboBox x:Name="DashboardSpotifyPlaylistBox" x:FieldModifier="public" DisplayMemberPath="Name"/>
+                                            <Button x:Name="DashboardSpotifyStartPlaylistButton" x:FieldModifier="public"/>
+                                            <ComboBox x:Name="DashboardSpotifyQuickPlaylistBox" x:FieldModifier="public" DisplayMemberPath="Name"/>
+                                            <Button x:Name="DashboardSpotifyStartQuickPlaylistButton" x:FieldModifier="public"/>
+                                            <Slider x:Name="DashboardSpotifyProgressBar" x:FieldModifier="public"/>
+                                            <TextBlock x:Name="DashboardSpotifyProgressText" x:FieldModifier="public"/>
+                                            <TextBlock x:Name="DashboardSpotifyDurationText" x:FieldModifier="public"/>
+                                            <TextBlock x:Name="DashboardSpotifyVolumeText" x:FieldModifier="public"/>
+                                            <Slider x:Name="DashboardSpotifyVolumeSlider" x:FieldModifier="public"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardAutomationModule" x:FieldModifier="public" Margin="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Visibility="Collapsed">
+                                        <StackPanel>
+                                            <TextBlock Text="DIENSTE" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                            <UniformGrid Columns="3" Margin="0,10,0,0">
+                                                <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="4" x:Name="DashboardQuickObsModule" x:FieldModifier="public" MinHeight="108" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                    <StackPanel>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Image Source="Assets/Brand/obs.png" Width="42" Height="42" Margin="0,0,9,0"/>
+                                                            <TextBlock Text="OBS Studio" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <TextBlock x:Name="DashboardQuickObsStatusText" x:FieldModifier="public" Text="Streaming &amp; Szenen" Foreground="{DynamicResource TextMutedBrush}" Margin="0,3,0,8"/>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Button x:Name="DashboardServiceConnectObsButton" x:FieldModifier="public" Content="VERBINDEN" Margin="0,0,5,0"/>
+                                                            <Button x:Name="DashboardQuickStartObsButton" x:FieldModifier="public" Content="STARTEN"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="4" x:Name="DashboardQuickTwitchModule" x:FieldModifier="public" MinHeight="108" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                    <StackPanel>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Image Source="Assets/Brand/twitch.png" Width="42" Height="42" Margin="0,0,9,0"/>
+                                                            <TextBlock Text="Twitch" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <TextBlock Text="Creator Dashboard" Foreground="{DynamicResource TextMutedBrush}" Margin="0,3,0,8"/>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Button x:Name="DashboardServiceConnectTwitchButton" x:FieldModifier="public" Content="VERBINDEN" Margin="0,0,5,0"/>
+                                                            <Button x:Name="DashboardQuickOpenTwitchButton" x:FieldModifier="public" Content="ÖFFNEN"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="4" x:Name="DashboardQuickSpotifyModule" x:FieldModifier="public" MinHeight="108" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                    <StackPanel>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock x:Name="DashboardQuickMusicTitle" x:FieldModifier="public" Text="Spotify" FontWeight="Bold" VerticalAlignment="Center" FontSize="16"/>
+                                                        </StackPanel>
+                                                        <TextBlock x:Name="DashboardQuickMusicDetail" x:FieldModifier="public" Text="Player &amp; Playlists" Foreground="{DynamicResource TextMutedBrush}" Margin="0,3,0,8"/>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Button x:Name="DashboardServiceConnectSpotifyButton" x:FieldModifier="public" Content="VERBINDEN" Margin="0,0,5,0"/>
+                                                            <Button x:Name="DashboardQuickStartSpotifyButton" x:FieldModifier="public" Content="STARTEN"/>
+                                                            <Button x:Name="DashboardQuickOpenMusicPlayerButton" x:FieldModifier="public" Content="PLAYER" Margin="5,0,0,0"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="4" x:Name="DashboardQuickStreamerBotModule" x:FieldModifier="public" MinHeight="108" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                    <StackPanel>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Image Source="Assets/Brand/streamerbot.png" Width="42" Height="42" Margin="0,0,9,0"/>
+                                                            <TextBlock Text="Streamer.bot" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <TextBlock Text="Automationen" Foreground="{DynamicResource TextMutedBrush}" Margin="0,3,0,8"/>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Button x:Name="DashboardServiceConnectStreamerBotButton" x:FieldModifier="public" Content="VERBINDEN" Margin="0,0,5,0"/>
+                                                            <Button x:Name="DashboardQuickStartStreamerBotButton" x:FieldModifier="public" Content="STARTEN"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="4" x:Name="DashboardQuickAlertsModule" x:FieldModifier="public" MinHeight="108" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                    <StackPanel>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Image Source="Assets/Brand/alerts.png" Width="42" Height="42" Margin="0,0,9,0"/>
+                                                            <TextBlock Text="Alerts" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <TextBlock Text="Alert-Queue testen" Foreground="{DynamicResource TextMutedBrush}" Margin="0,3,0,8"/>
+                                                        <Button x:Name="DashboardQuickTestAlertButton" x:FieldModifier="public" Content="TEST-ALERT"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="4" x:Name="DashboardQuickOverlayModule" x:FieldModifier="public" MinHeight="108" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                    <StackPanel>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Image Source="Assets/Brand/streamdeck.png" Width="44" Height="34" Margin="0,0,9,0"/>
+                                                            <TextBlock Text="Stream Deck" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <TextBlock Text="Konfiguration &amp; Aktionen" Foreground="{DynamicResource TextMutedBrush}" Margin="0,3,0,8"/>
+                                                        <Button x:Name="DashboardServicesStreamDeckButton" x:FieldModifier="public" Content="ÖFFNEN"/>
+                                                        <Button x:Name="DashboardQuickOpenOverlayButton" x:FieldModifier="public" Visibility="Collapsed" Content="OVERLAY ÖFFNEN"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                        <StackPanel x:Name="DashboardLegacyModuleHost" x:FieldModifier="public" Visibility="Collapsed">
+                            <!-- Service status strip -->
+                            <!-- Main command row -->
+                            <Grid x:Name="DashboardStreamControlsSection" x:FieldModifier="public" Visibility="Collapsed" Margin="3,0,3,10"/>
+                            <!-- Live content -->
+                            <Grid x:Name="DashboardLivePanelsSection" x:FieldModifier="public" Visibility="Collapsed" Margin="3,0,3,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.55*"/>
+                                    <ColumnDefinition Width="1.05*"/>
+                                    <ColumnDefinition Width="1.15*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid Grid.Column="1" Margin="5,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                </Grid>
+                            </Grid>
+                            <!-- Secondary command center row inspired by the approved dashboard concept -->
+                            <Grid x:Name="DashboardQuickServicesSection" x:FieldModifier="public" Visibility="Collapsed" Margin="3,0,3,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.35*"/>
+                                    <ColumnDefinition Width="0.95*"/>
+                                    <ColumnDefinition Width="0.95*"/>
+                                </Grid.ColumnDefinitions>
+                            </Grid>
+                            <Grid Margin="3,0,3,18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1*"/>
+                                    <ColumnDefinition Width="1.35*"/>
+                                </Grid.ColumnDefinitions>
+                            </Grid>
+                            <Border x:Name="DashboardWorkflowRailSection" x:FieldModifier="public" Visibility="Collapsed" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3,0,3,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.4*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="1.4*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="STREAM COMMAND CENTER" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                        <TextBlock x:Name="DashboardCommandCenterSummaryText" x:FieldModifier="public" Text="Bereit für den nächsten Stream." Foreground="{DynamicResource TextMutedBrush}" Margin="0,5,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0">
+                                        <Border x:Name="WorkflowPrepareNode" x:FieldModifier="public" Background="{DynamicResource SuccessBrush}" CornerRadius="14" Padding="9,4">
+                                            <TextBlock Text="VORBEREITEN" FontWeight="Bold" Foreground="{DynamicResource TextOnAccentBrush}"/>
+                                        </Border>
+                                        <TextBlock Text="  →  " Foreground="{DynamicResource TextMutedBrush}"/>
+                                        <Border x:Name="WorkflowReadyNode" x:FieldModifier="public" Background="{DynamicResource BorderBrush}" CornerRadius="14" Padding="9,4">
+                                            <TextBlock Text="BEREIT" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </Border>
+                                        <TextBlock Text="  →  " Foreground="{DynamicResource TextMutedBrush}"/>
+                                        <Border x:Name="WorkflowStartNode" x:FieldModifier="public" Background="{DynamicResource BorderBrush}" CornerRadius="14" Padding="9,4">
+                                            <TextBlock Text="START" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </Border>
+                                        <TextBlock Text="  →  " Foreground="{DynamicResource TextMutedBrush}"/>
+                                        <Border x:Name="WorkflowLiveNode" x:FieldModifier="public" Background="{DynamicResource BorderBrush}" CornerRadius="14" Padding="9,4">
+                                            <TextBlock Text="LIVE" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </Border>
+                                        <TextBlock Text="  →  " Foreground="{DynamicResource TextMutedBrush}"/>
+                                        <Border x:Name="WorkflowEndNode" x:FieldModifier="public" Background="{DynamicResource BorderBrush}" CornerRadius="14" Padding="9,4">
+                                            <TextBlock Text="ENDE" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </Border>
+                                        <TextBlock Text="  →  " Foreground="{DynamicResource TextMutedBrush}"/>
+                                        <Border x:Name="WorkflowRaidNode" x:FieldModifier="public" Background="{DynamicResource BorderBrush}" CornerRadius="14" Padding="9,4">
+                                            <TextBlock Text="RAID" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <Button x:Name="DashboardCommandPrepareButton" x:FieldModifier="public" Content="STREAM VORBEREITEN" Margin="3"/>
+                                        <Button x:Name="DashboardCommandStartButton" x:FieldModifier="public" Content="STREAM STARTEN" Margin="3"/>
+                                        <Button x:Name="DashboardCommandStopButton" x:FieldModifier="public" Content="STREAM BEENDEN" Margin="3"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <!-- Advanced command center: workflow, preflight, scene shortcuts, audio, raid assistant, history and notifications -->
+                            <Grid x:Name="DashboardAdvancedToolsSection" x:FieldModifier="public" Visibility="Collapsed" Margin="3,0,3,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.15*"/>
+                                    <ColumnDefinition Width="1.15*"/>
+                                    <ColumnDefinition Width="1.15*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                    <Border x:Name="DashboardWorkflowStatusModule" x:FieldModifier="public" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,5">
+                                        <StackPanel>
+                                            <TextBlock Text="WORKFLOW-STATUS" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                            <TextBlock x:Name="DashboardWorkflowStageText" x:FieldModifier="public" Text="VORBEREITEN → BEREIT → START → LIVE → ENDE → RAID" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,7,0,10"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="DashboardPreflightModule" x:FieldModifier="public" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,5,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="PREFLIGHT" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,8"/>
+                                            <Button x:Name="DashboardRunPreflightButton" x:FieldModifier="public" Content="PREFLIGHT-CHECK AUSFÜHREN" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
+                                            <ListBox x:Name="DashboardPreflightList" x:FieldModifier="public" Height="150" Margin="0,10,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="5,0">
+                                    <Border x:Name="DashboardScenesModule" x:FieldModifier="public" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,5">
+                                        <StackPanel>
+                                            <TextBlock Text="SZENEN-SCHNELLWAHL" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                            <UniformGrid Columns="2" Margin="0,10,0,0">
+                                                <Button x:Name="DashboardSceneStartButton" x:FieldModifier="public" Content="START" Margin="3"/>
+                                                <Button x:Name="DashboardSceneLiveButton" x:FieldModifier="public" Content="LIVE / GAME" Margin="3"/>
+                                                <Button x:Name="DashboardScenePauseButton" x:FieldModifier="public" Content="METASCHUTZ / PAUSE" Margin="3"/>
+                                                <Button x:Name="DashboardSceneEndButton" x:FieldModifier="public" Content="ENDE" Margin="3"/>
+                                            </UniformGrid>
+                                            <TextBlock Text="Die Szenennamen werden aus den OBS-Einstellungen übernommen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="3,8,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="DashboardAudioMixerModule" x:FieldModifier="public" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,5,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="OBS AUDIO-MIXER" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                            <ComboBox x:Name="DashboardObsAudioInputBox" x:FieldModifier="public" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,7,0,5"/>
+                                            <TextBlock x:Name="DashboardObsAudioStateText" x:FieldModifier="public" Text="Audioquelle auswählen" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+                                            <WrapPanel Margin="0,7,0,0">
+                                                <Button x:Name="DashboardObsAudioMuteButton" x:FieldModifier="public" Content="MUTE" Margin="2"/>
+                                                <Button x:Name="DashboardObsAudioUnmuteButton" x:FieldModifier="public" Content="UNMUTE" Margin="2"/>
+                                                <TextBox x:Name="DashboardObsAudioVolumeBox" x:FieldModifier="public" Width="60" Text="0" Foreground="{DynamicResource TextPrimaryBrush}" Margin="2"/>
+                                                <Button x:Name="DashboardObsAudioSetVolumeButton" x:FieldModifier="public" Content="dB SETZEN" Margin="2"/>
+                                            </WrapPanel>
+                                            <Button x:Name="DashboardOpenObsMixerButton" x:FieldModifier="public" Content="VOLLSTÄNDIGEN OBS-MIXER ÖFFNEN" Margin="0,7,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                                <Border Grid.Column="2" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="5,0,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="RAID-ASSISTENT" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                        <Grid Margin="0,8,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="72"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="64" Height="64" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="32" x:Name="DashboardRaidAssistantModule" x:FieldModifier="public">
+                                                <Image x:Name="DashboardRaidProfileImage" x:FieldModifier="public" Stretch="UniformToFill"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                                <TextBlock x:Name="DashboardRaidAssistantText" x:FieldModifier="public" Text="Wähle oben ein Raid-Ziel. Status, Kategorie und Streamtitel werden automatisch geprüft." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+                                                <TextBlock x:Name="DashboardRaidLiveDurationText" x:FieldModifier="public" Text="Live-Dauer: -" Foreground="{DynamicResource TextMutedBrush}" Margin="0,5,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Button x:Name="DashboardRefreshRaidAssistantButton" x:FieldModifier="public" Content="RAID-ZIEL JETZT PRÜFEN"/>
+                                        <Separator Margin="0,12"/>
+                                        <TextBlock Text="STREAM-HISTORIE &amp; PROFILE" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Schnellprofil" Foreground="{DynamicResource TextMutedBrush}" Margin="0,8,0,4"/>
+                                        <ComboBox x:Name="DashboardProfileBox" x:FieldModifier="public" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <Button x:Name="DashboardApplyProfileButton" x:FieldModifier="public" Content="PROFIL ANWENDEN &amp; VORBEREITEN" Margin="0,8,0,4"/>
+                                        <UniformGrid Columns="2" Margin="0,4,0,0">
+                                            <Button x:Name="DashboardOpenProfilesButton" x:FieldModifier="public" Content="PROFILE VERWALTEN" Margin="3"/>
+                                            <Button x:Name="DashboardOpenWorkflowButton" x:FieldModifier="public" Content="WORKFLOW" Margin="3"/>
+                                        </UniformGrid>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                            <Grid x:Name="DashboardNotificationsSection" x:FieldModifier="public" Visibility="Collapsed" Margin="3,0,3,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.2*"/>
+                                    <ColumnDefinition Width="1.2*"/>
+                                    <ColumnDefinition Width="1.2*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,5,0" x:Name="DashboardNotificationCenterModule" x:FieldModifier="public">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <TextBlock Text="NOTIFICATION CENTER" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                            <TextBlock x:Name="DashboardNotificationCountText" x:FieldModifier="public" Text="0" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right"/>
+                                        </DockPanel>
+                                        <ComboBox x:Name="DashboardNotificationFilterBox" x:FieldModifier="public" Foreground="{DynamicResource TextPrimaryBrush}" SelectedIndex="0" Margin="0,8,0,0">
+                                            <ComboBoxItem Content="Alle"/>
+                                            <ComboBoxItem Content="Info"/>
+                                            <ComboBoxItem Content="Warnungen"/>
+                                            <ComboBoxItem Content="Fehler"/>
+                                        </ComboBox>
+                                        <ListBox x:Name="DashboardNotificationList" x:FieldModifier="public" Height="170" Margin="0,8,0,8" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <UniformGrid Columns="2">
+                                            <Button x:Name="DashboardMarkNotificationsReadButton" x:FieldModifier="public" Content="ALS GELESEN MARKIEREN" Margin="3"/>
+                                            <Button x:Name="DashboardClearNotificationsButton" x:FieldModifier="public" Content="MELDUNGEN LEEREN" Margin="3"/>
+                                        </UniformGrid>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="5,0" x:Name="DashboardStreamDeckRemoteModule" x:FieldModifier="public">
+                                    <StackPanel>
+                                        <TextBlock Text="STREAM DECK &amp; REMOTE CONTROL" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                        <TextBlock Text="Zentrale Steuerung für Stream vorbereiten, Start/Stop, Szenen, Spotify, Audio und Raid." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,10"/>
+                                        <Button x:Name="DashboardOpenStreamDeckSettingsButton" x:FieldModifier="public" Content="STREAM-DECK-EINSTELLUNGEN"/>
+                                        <TextBlock Text="Die vorhandene Stream-Deck-Konfiguration bleibt aktiv und kann über die Einstellungen verwaltet werden." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="5,0,0,0" x:Name="DashboardAdvancedShortcutsModule" x:FieldModifier="public">
+                                    <StackPanel>
+                                        <TextBlock Text="DASHBOARD-MODULE" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                        <TextBlock Text="Schnellzugriff auf die bestehenden Spezialbereiche." Foreground="{DynamicResource TextMutedBrush}" Margin="0,8,0,10"/>
+                                        <UniformGrid Columns="2">
+                                            <Button x:Name="DashboardOpenServicesAdvancedButton" x:FieldModifier="public" Content="DIENSTE" Margin="3"/>
+                                            <Button x:Name="DashboardOpenDiagnosticsAdvancedButton" x:FieldModifier="public" Content="DIAGNOSE" Margin="3"/>
+                                            <Button x:Name="DashboardOpenSettingsAdvancedButton" x:FieldModifier="public" Content="EINSTELLUNGEN" Margin="3"/>
+                                            <Button x:Name="DashboardOpenProfilesAdvancedButton" x:FieldModifier="public" Content="PROFILE" Margin="3"/>
+                                        </UniformGrid>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                            <Border x:Name="DashboardStreamHistorySection" x:FieldModifier="public" Visibility="Collapsed" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="3,0,3,10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <DockPanel>
+                                        <TextBlock Text="STREAM-HISTORIE" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                        <TextBlock Text="lokal gespeichert" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right"/>
+                                    </DockPanel>
+                                    <ListBox x:Name="DashboardStreamHistoryList" x:FieldModifier="public" Grid.Row="1" Height="150" Margin="0,10,0,8" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button x:Name="DashboardRefreshHistoryButton" x:FieldModifier="public" Content="AKTUALISIEREN" Margin="4,0"/>
+                                        <Button x:Name="DashboardOpenHistoryFolderButton" x:FieldModifier="public" Content="ORDNER ÖFFNEN" Margin="4,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+    </Grid>
+</UserControl>

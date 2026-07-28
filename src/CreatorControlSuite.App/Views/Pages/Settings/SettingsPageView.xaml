@@ -1,0 +1,490 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Settings.SettingsPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:settings="clr-namespace:CreatorControlSuite.App.Views.Pages.Settings"
+             xmlns:legal="clr-namespace:CreatorControlSuite.App.Views.Pages.Legal"
+             xmlns:updates="clr-namespace:CreatorControlSuite.App.Views.Pages.Updates"
+             xmlns:migration="clr-namespace:CreatorControlSuite.App.Views.Pages.Migration">
+    <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Einstellungen" FontSize="30" FontWeight="Bold" FontFamily="{DynamicResource AppHeadingFontFamily}"/>
+                    <TextBlock Text="Grundeinstellungen, Zugangsdaten und Standardwerte konfigurieren" Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
+                </StackPanel>
+                <TabControl x:Name="SettingsTabControl" Grid.Row="1" Margin="0,18,0,18" Background="{DynamicResource SettingsTabBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}">
+                    <TabItem Header="Allgemein">
+                        <settings:GeneralSettingsView x:Name="GeneralSettingsViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="Dashboard" Visibility="Collapsed">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="18">
+                                <TextBlock Text="Dashboard-Module" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+                                <TextBlock Text="Stream-Fokusmodus" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                                <CheckBox x:Name="DashboardAutoFocusOnStreamStartBox" x:FieldModifier="public" Content="Fokusmodus automatisch beim Streamstart aktivieren" Margin="0,5"/>
+                                <CheckBox x:Name="DashboardAutoExitFocusOnStreamEndBox" x:FieldModifier="public" Content="Fokusmodus nach Streamende automatisch verlassen" Margin="0,5,0,14"/>
+                                <TextBlock Text="Layout-Preset" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                                <TextBlock Text="Mit einem Preset kannst du das Dashboard schnell für verschiedene Arbeitsweisen umstellen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <WrapPanel>
+                                    <ComboBox x:Name="DashboardPresetBox" x:FieldModifier="public" Width="220" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0">
+                                        <ComboBoxItem Content="Command Center"/>
+                                        <ComboBoxItem Content="Kompakt"/>
+                                        <ComboBoxItem Content="Twitch Fokus"/>
+                                        <ComboBoxItem Content="OBS Fokus"/>
+                                        <ComboBoxItem Content="Minimal"/>
+                                    </ComboBox>
+                                    <Button x:Name="DashboardApplyPresetButton" x:FieldModifier="public" Content="PRESET ANWENDEN"/>
+                                </WrapPanel>
+                                <TextBlock Text="Lege fest, welche Bereiche im Command Center angezeigt werden. Die Auswahl wird dauerhaft gespeichert." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,6,0,16"/>
+                                <CheckBox x:Name="DashboardShowServiceStatusBox" x:FieldModifier="public" Content="Statuskarten in der Titelleiste anzeigen" Margin="0,5"/>
+                                <CheckBox x:Name="DashboardShowStreamControlsBox" x:FieldModifier="public" Content="Stream-, Szenen- und Raid-Steuerung anzeigen" Margin="0,5"/>
+                                <CheckBox x:Name="DashboardShowLivePanelsBox" x:FieldModifier="public" Content="Twitch Chat, User, Events und Spotify anzeigen" Margin="0,5"/>
+                                <CheckBox x:Name="DashboardShowQuickServicesBox" x:FieldModifier="public" Content="Dienste-Schnellzugriff und Übersichten anzeigen" Margin="0,5"/>
+                                <CheckBox x:Name="DashboardShowWorkflowRailBox" x:FieldModifier="public" Content="Workflow-Leiste Vorbereiten → Raid anzeigen" Margin="0,5"/>
+                                <CheckBox x:Name="DashboardShowAdvancedToolsBox" x:FieldModifier="public" Content="Preflight, Szenen-Schnellwahl, Audiomixer und Raid-Assistent anzeigen" Margin="0,5"/>
+                                <CheckBox x:Name="DashboardShowNotificationsBox" x:FieldModifier="public" Content="Notification Center und Remote-Schnellzugriffe anzeigen" Margin="0,5"/>
+                                <CheckBox x:Name="DashboardShowStreamHistoryBox" x:FieldModifier="public" Content="Stream-Historie im Dashboard anzeigen" Margin="0,5"/>
+                                <TextBlock Text="Reihenfolge der Dashboard-Module" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,22,0,6"/>
+                                <TextBlock Text="Ziehe Module mit der Maus an die gewünschte Position oder verwende die Pfeiltasten." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <ListBox x:Name="DashboardModuleOrderList" x:FieldModifier="public" Visibility="Collapsed" Height="230" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" AllowDrop="True"/>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button x:Name="DashboardModuleMoveUpButton" x:FieldModifier="public" Content="▲ NACH OBEN" Margin="0,0,8,0"/>
+                                    <Button x:Name="DashboardModuleMoveDownButton" x:FieldModifier="public" Content="▼ NACH UNTEN" Margin="0,0,8,0"/>
+                                    <Button x:Name="DashboardModuleOrderResetButton" x:FieldModifier="public" Content="REIHENFOLGE ZURÜCKSETZEN"/>
+                                </WrapPanel>
+                                <TextBlock Text="Größe des ausgewählten Moduls" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,20,0,6"/>
+                                <TextBlock Text="Kompakt reduziert die Breite, Standard nutzt eine mittlere Breite und Groß die volle Dashboard-Breite." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <ComboBox x:Name="DashboardModuleSizeBox" x:FieldModifier="public" Foreground="{DynamicResource TextPrimaryBrush}" Width="180" HorizontalAlignment="Left">
+                                    <ComboBoxItem Content="Kompakt"/>
+                                    <ComboBoxItem Content="Standard"/>
+                                    <ComboBoxItem Content="Groß"/>
+                                </ComboBox>
+                                <Button x:Name="DashboardApplyModuleSizeButton" x:FieldModifier="public" Content="GRÖSSE AUF AUSGEWÄHLTES MODUL ANWENDEN" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+                                <WrapPanel Margin="0,16,0,0">
+                                    <Button x:Name="DashboardApplyLayoutButton" x:FieldModifier="public" Content="LAYOUT JETZT ANWENDEN" Margin="0,0,8,0"/>
+                                    <Button x:Name="DashboardResetLayoutButton" x:FieldModifier="public" Content="STANDARD WIEDERHERSTELLEN"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="OBS">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="18">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Host" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="ObsHostBox" x:FieldModifier="public" Grid.Column="1"/>
+                                    <TextBlock Text="Port" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    <TextBox x:Name="ObsPortBox" x:FieldModifier="public" Grid.Column="3"/>
+                                </Grid>
+                                <TextBlock Text="WebSocket-Passwort" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                                <PasswordBox x:Name="ObsPasswordBox" x:FieldModifier="public"/>
+                                <TextBlock Text="Programmpfad zu OBS" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                                <DockPanel>
+                                    <Button x:Name="BrowseObsExecutableButton" x:FieldModifier="public" Content="Durchsuchen…" DockPanel.Dock="Right" Margin="8,0,0,0"/>
+                                    <TextBox x:Name="ObsExecutablePathBox" x:FieldModifier="public"/>
+                                </DockPanel>
+                                <CheckBox x:Name="ObsAutoConnectBox" x:FieldModifier="public" Content="OBS automatisch verbinden" Margin="0,12,0,0"/>
+                                <CheckBox x:Name="ObsConnectOnPrepareBox" x:FieldModifier="public" Content="Bei Stream vorbereiten OBS verbinden" Margin="0,8,0,0"/>
+                                <Grid Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="ConnectObsButton" x:FieldModifier="public" Content="OBS verbinden" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
+                                    <Button x:Name="DisconnectObsButton" x:FieldModifier="public" Grid.Column="1" Content="Trennen"/>
+                                    <Button x:Name="RefreshObsButton" x:FieldModifier="public" Grid.Column="2" Content="Szenen und Quellen laden"/>
+                                    <TextBlock x:Name="ObsConnectionStatusText" x:FieldModifier="public" Grid.Column="3" Text="Nicht verbunden" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                                </Grid>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Szenen" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                            <ListBox x:Name="ObsScenesList" x:FieldModifier="public" Height="220" Margin="0,9,0,0" Background="{DynamicResource WindowBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="Name"/>
+                                            <Button x:Name="SwitchObsSceneButton" x:FieldModifier="public" Content="Ausgewählte Szene aktivieren" HorizontalAlignment="Left" Margin="0,9,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                            <TextBlock Text="Quellen" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                            <ListBox x:Name="ObsInputsList" x:FieldModifier="public" Height="220" Margin="0,9,0,0" Background="{DynamicResource WindowBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="Name"/>
+                                            <TextBlock x:Name="ObsServerInfoText" x:FieldModifier="public" Text="OBS-Informationen erscheinen nach der Verbindung." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,9,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Grid Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="StartObsStreamButton" x:FieldModifier="public" Content="Stream starten" Background="#416B3C"/>
+                                    <Button x:Name="StopObsStreamButton" x:FieldModifier="public" Grid.Column="1" Content="Stream beenden" Background="#7A3838"/>
+                                    <TextBlock x:Name="ObsStreamStatusText" x:FieldModifier="public" Grid.Column="2" Text="Streamstatus unbekannt" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="Twitch">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="18">
+                                <TextBlock Text="Client-ID" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
+                                <TextBox x:Name="TwitchClientIdBox" x:FieldModifier="public"/>
+                                <TextBlock Text="Client-ID: Im Twitch Developer Console eine Anwendung anlegen. Entwicklerportal: https://dev.twitch.tv/console/apps" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                <TextBlock Text="Kanalname" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                                <TextBox x:Name="TwitchChannelBox" x:FieldModifier="public"/>
+                                <TextBlock Text="Creator-Dashboard-URL" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                                <TextBox x:Name="TwitchCreatorDashboardUrlBox" x:FieldModifier="public"/>
+                                <TextBlock Text="Diese URL wird über Dienste → Twitch → Creator Dashboard öffnen im Standardbrowser geöffnet." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                <CheckBox x:Name="TwitchAutoConnectBox" x:FieldModifier="public" Content="Twitch automatisch verbinden" Margin="0,12,0,0"/>
+                                <CheckBox x:Name="TwitchConnectOnPrepareBox" x:FieldModifier="public" Content="Bei Stream vorbereiten Twitch verbinden" Margin="0,8,0,0"/>
+                                <CheckBox x:Name="TwitchChatEnabledBox" x:FieldModifier="public" Content="Live-Chat aktivieren" Margin="0,8,0,0"/>
+                                <TextBlock Text="Chat-Anzeige" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="TwitchChatUiBuiltInRadio" x:FieldModifier="public" GroupName="TwitchChatUiMode" Content="Eingebauter Chat" IsChecked="True" Margin="0,0,24,0" VerticalAlignment="Center"/>
+                                    <RadioButton x:Name="TwitchChatUiEmbeddedWebRadio" x:FieldModifier="public" GroupName="TwitchChatUiMode" Content="Web-Chat (eingebettet)" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBlock Text="Der Web-Chat nutzt einen eingebetteten Browser. Die Anmeldung dort ist unabhängig von der Device-Code-API-Anmeldung und wird lokal im WebView2-Profil gespeichert."
+                                           Foreground="{DynamicResource MutedBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,6,0,0"/>
+                                <Button x:Name="TwitchWebLoginButton" x:FieldModifier="public"
+                                        Content="Twitch Web-Login"
+                                        HorizontalAlignment="Left"
+                                        Margin="0,10,0,0"
+                                        Padding="14,6"/>
+                                <CheckBox x:Name="TwitchEventSubEnabledBox" x:FieldModifier="public" Content="Follower, Subs, Raids und Cheers empfangen" Margin="0,8,0,0"/>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Userliste &amp; Live-Daten" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Die Zuschauerzahl kommt von der Streams-API und bleibt unabhängig aktuell. Die Userliste sind Chat-Verbundene und wird adaptiv aktualisiert."
+                                                   Foreground="{DynamicResource MutedBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,8,0,0"/>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="Userliste-Aktualisierung unter Schwelle (Sekunden)" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="TwitchChattersRefreshLowBox" x:FieldModifier="public" Grid.Column="1" Width="70" Margin="12,0,0,0" ToolTip="5–120 Sekunden"/>
+                                            <TextBlock Grid.Row="1" Text="Userliste-Aktualisierung ab Schwelle (Sekunden)" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                            <TextBox x:Name="TwitchChattersRefreshHighBox" x:FieldModifier="public" Grid.Row="1" Grid.Column="1" Width="70" Margin="12,10,0,0" ToolTip="15–600 Sekunden"/>
+                                            <TextBlock Grid.Row="2" Text="Zuschauer-Schwelle für langsamere Userliste" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                            <TextBox x:Name="TwitchChattersRefreshThresholdBox" x:FieldModifier="public" Grid.Row="2" Grid.Column="1" Width="70" Margin="12,10,0,0" ToolTip="Ab dieser Zuschauerzahl gilt das langsamere Intervall"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Twitch-Autorisierung" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Für die Desktop-Anwendung wird der Twitch-Gerätecode verwendet. Ein Client-Secret ist nicht erforderlich." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="AuthorizeTwitchButton" x:FieldModifier="public" Content="Twitch autorisieren" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
+                                            <Button x:Name="ConnectTwitchButton" x:FieldModifier="public" Grid.Column="1" Content="Verbinden"/>
+                                            <Button x:Name="DisconnectTwitchButton" x:FieldModifier="public" Grid.Column="2" Content="Trennen"/>
+                                            <TextBlock x:Name="TwitchConnectionStatusText" x:FieldModifier="public" Grid.Column="3" Text="Nicht verbunden" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Kanal" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                            <TextBlock Text="Streamtitel" Margin="0,10,0,6"/>
+                                            <TextBox x:Name="TwitchTitleBox" x:FieldModifier="public"/>
+                                            <TextBlock Text="Kategorie suchen" Margin="0,12,0,6"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox x:Name="TwitchCategorySearchBox" x:FieldModifier="public"/>
+                                                <Button x:Name="SearchTwitchCategoryButton" x:FieldModifier="public" Grid.Column="1" Content="Suchen"/>
+                                            </Grid>
+                                            <ComboBox x:Name="TwitchCategoryResultsBox" x:FieldModifier="public" DisplayMemberPath="Name" Margin="0,8,0,0"/>
+                                            <Button x:Name="SaveTwitchChannelButton" x:FieldModifier="public" Content="Titel und Kategorie speichern" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                            <TextBlock Text="Live Twitch Chat" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                            <StackPanel x:Name="TwitchBuiltInChatPanel" x:FieldModifier="public">
+                                                <ListBox x:Name="TwitchChatList" x:FieldModifier="public" Height="260" Margin="0,10,0,0" Background="{DynamicResource WindowBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <Grid Margin="0,8,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="TwitchChatMessageBox" x:FieldModifier="public"/>
+                                                    <Button x:Name="SendTwitchChatButton" x:FieldModifier="public" Grid.Column="1" Content="Senden"/>
+                                                </Grid>
+                                            </StackPanel>
+                                            <TextBlock x:Name="TwitchWebChatSettingsHint" x:FieldModifier="public"
+                                                       Text="Web-Chat aktiv – Anzeige im Dashboard und unter Dienste → Twitch. Nutze „Twitch Web-Login“, um die Browser-Session anzumelden."
+                                                       Foreground="{DynamicResource MutedBrush}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,10,0,0"
+                                                       Visibility="Collapsed"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Letzte Twitch-Events" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                        <ListBox x:Name="TwitchEventsList" x:FieldModifier="public" Height="150" Margin="0,10,0,0" Background="{DynamicResource WindowBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="Music Player">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                            <StackPanel Margin="18" Style="{StaticResource CCSDarkSettingsContentStyle}">
+                                <TextBlock Text="Aktiver Music Player" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+                                <TextBlock Text="Es ist immer nur ein Music-Player aktiv. Die Wahl gilt für Title-Bar, Player-Seite, Overlay und Connection-Widget." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,6,0,12"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                    <RadioButton x:Name="MusicProviderSpotifyRadio" x:FieldModifier="public" GroupName="MusicPlayerProvider" Content="Spotify" IsChecked="True" Margin="0,0,24,0" VerticalAlignment="Center"/>
+                                    <RadioButton x:Name="MusicProviderYouTubeMusicRadio" x:FieldModifier="public" GroupName="MusicPlayerProvider" Content="YouTube Music" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="SpotifyMusicSettingsPanel" x:FieldModifier="public">
+                                <TextBlock Text="Spotify" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,10"/>
+                                <TextBlock Text="Client-ID" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
+                                <TextBox x:Name="SpotifyClientIdBox" x:FieldModifier="public"/>
+                                <TextBlock Text="Client-ID: Im Spotify Developer Dashboard eine App anlegen. Entwicklerportal: https://developer.spotify.com/dashboard" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                <TextBlock Text="Redirect-URI" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                                <TextBox x:Name="SpotifyRedirectUriBox" x:FieldModifier="public"/>
+                                <TextBlock Text="Programmpfad zu Spotify" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,6"/>
+                                <DockPanel>
+                                    <Button x:Name="BrowseSpotifyExecutableButton" x:FieldModifier="public" Content="Durchsuchen…" DockPanel.Dock="Right" Margin="8,0,0,0"/>
+                                    <TextBox x:Name="SpotifyExecutablePathBox" x:FieldModifier="public"/>
+                                </DockPanel>
+                                <CheckBox x:Name="SpotifyAutoConnectBox" x:FieldModifier="public" Content="Spotify automatisch verbinden" Margin="0,12,0,0"/>
+                                <CheckBox x:Name="SpotifyConnectOnPrepareBox" x:FieldModifier="public" Content="Bei Stream vorbereiten Spotify verbinden" Margin="0,8,0,0"/>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Spotify-Autorisierung" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Die Desktop-Anwendung verwendet Authorization Code mit PKCE. Ein Client-Secret wird nicht gespeichert." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="AuthorizeSpotifyButton" x:FieldModifier="public" Content="Spotify autorisieren" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
+                                            <Button x:Name="ConnectSpotifyButton" x:FieldModifier="public" Grid.Column="1" Content="Verbinden"/>
+                                            <Button x:Name="DisconnectSpotifyButton" x:FieldModifier="public" Grid.Column="2" Content="Trennen"/>
+                                            <Button x:Name="RefreshSpotifyButton" x:FieldModifier="public" Grid.Column="3" Content="Aktualisieren"/>
+                                            <TextBlock x:Name="SpotifyConnectionStatusText" x:FieldModifier="public" Grid.Column="4" Text="Nicht verbunden" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Spotify öffnen" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                        <TextBlock Text="Hier wird nur die Verbindung eingerichtet. Die laufende Wiedergabe, Titelinformationen und Player-Steuerung befinden sich unter Player bzw. Dienste → Spotify." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        <Button x:Name="OpenSpotifyFromSettingsButton" x:FieldModifier="public" Content="Spotify öffnen" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <!-- Diese Controls bleiben ausschließlich als unsichtbare Kompatibilitätsfelder bestehen,
+                                     damit bestehende Einstellungs- und Aktualisierungslogik nicht unterbrochen wird. -->
+                                <Grid Visibility="Collapsed" IsHitTestVisible="False">
+                                    <ComboBox x:Name="SpotifyDeviceBox" x:FieldModifier="public" DisplayMemberPath="Name"/>
+                                    <ComboBox x:Name="SpotifyPlaylistBox" x:FieldModifier="public" DisplayMemberPath="Name"/>
+                                    <TextBox x:Name="SpotifyVolumeBox" x:FieldModifier="public"/>
+                                    <Button x:Name="StartSpotifyPlaylistButton" x:FieldModifier="public"/>
+                                    <Image x:Name="SpotifyAlbumCoverImage" x:FieldModifier="public"/>
+                                    <TextBlock x:Name="SpotifyTrackText" x:FieldModifier="public"/>
+                                    <TextBlock x:Name="SpotifyAlbumText" x:FieldModifier="public"/>
+                                    <TextBlock x:Name="SpotifyPlaybackDetailText" x:FieldModifier="public"/>
+                                    <Button x:Name="SpotifyPreviousButton" x:FieldModifier="public"/>
+                                    <Button x:Name="SpotifyPlayButton" x:FieldModifier="public"/>
+                                    <Button x:Name="SpotifyPauseButton" x:FieldModifier="public"/>
+                                    <Button x:Name="SpotifyNextButton" x:FieldModifier="public"/>
+                                    <Slider x:Name="SpotifyVolumeSlider" x:FieldModifier="public" Minimum="0" Maximum="100" Value="100"/>
+                                    <TextBlock x:Name="SpotifyVolumeValueText" x:FieldModifier="public"/>
+                                </Grid>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Automatischer Szenenwechsel" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                        <CheckBox x:Name="SpotifyFadeOutBox" x:FieldModifier="public" Content="Beim Wechsel von Start auf Live herunterfaden" Margin="0,10,0,0"/>
+                                        <CheckBox x:Name="SpotifyPauseAfterFadeBox" x:FieldModifier="public" Content="Nach dem Fade-Out pausieren" Margin="0,8,0,0"/>
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Fade-Out Sekunden" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="SpotifyFadeOutSecondsBox" x:FieldModifier="public" Grid.Column="1"/>
+                                            <TextBlock Text="Fade-In Sekunden" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                                            <TextBox x:Name="SpotifyFadeInSecondsBox" x:FieldModifier="public" Grid.Column="3"/>
+                                            <Button x:Name="TestSpotifyFadeButton" x:FieldModifier="public" Grid.Column="4" Content="Fade-Out testen" HorizontalAlignment="Left" Margin="12,0,0,0"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Text="Hinweis: Spotify-Playersteuerung erfordert in der Regel Spotify Premium. Spotify-Inhalte dürfen nicht über den Stream ausgestrahlt werden." Foreground="#FFB347" TextWrapping="Wrap" Margin="0,14,0,0"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="YouTubeMusicSettingsPanel" x:FieldModifier="public" Visibility="Collapsed">
+                                    <TextBlock Text="YouTube Music" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,10"/>
+                                    <TextBlock Text="YouTube Music wird über ein Bookmarklet und eine lokale Bridge angebunden. Setup und Steuern findest du auch auf der Player-Seite." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Bridge-Port" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
+                                    <TextBox x:Name="YouTubeMusicBridgePortBox" x:FieldModifier="public" Text="43831"/>
+                                    <CheckBox x:Name="YouTubeMusicAutoConnectBox" x:FieldModifier="public" Content="YouTube Music Bridge automatisch starten" Margin="0,12,0,0"/>
+                                    <CheckBox x:Name="YouTubeMusicConnectOnPrepareBox" x:FieldModifier="public" Content="Bei Stream vorbereiten Bridge starten" Margin="0,8,0,0"/>
+                                    <Button x:Name="OpenMusicPlayerFromSettingsButton" x:FieldModifier="public" Content="Player-Seite öffnen" HorizontalAlignment="Left" Margin="0,16,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="Streamer.bot">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                            <StackPanel Margin="18" Style="{StaticResource CCSDarkSettingsContentStyle}" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                                <TextBlock Text="Verbindung zu Streamer.bot" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+                                <Grid Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Host" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="StreamerBotHostBox" x:FieldModifier="public" Grid.Column="1"/>
+                                    <TextBlock Text="Port" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    <TextBox x:Name="StreamerBotPortBox" x:FieldModifier="public" Grid.Column="3"/>
+                                </Grid>
+                                <TextBlock Text="Endpoint" Margin="0,12,0,5"/>
+                                <TextBox x:Name="StreamerBotEndpointBox" x:FieldModifier="public"/>
+                                <TextBlock Text="WebSocket-Passwort" Margin="0,12,0,5"/>
+                                <PasswordBox x:Name="StreamerBotPasswordBox" x:FieldModifier="public"/>
+                                <TextBlock Text="Programmpfad zu Streamer.bot" Margin="0,12,0,5"/>
+                                <DockPanel>
+                                    <Button x:Name="BrowseStreamerBotExecutableButton" x:FieldModifier="public" Content="Durchsuchen…" DockPanel.Dock="Right" Margin="8,0,0,0"/>
+                                    <TextBox x:Name="StreamerBotExecutablePathBox" x:FieldModifier="public"/>
+                                </DockPanel>
+                                <CheckBox x:Name="StreamerBotAutoConnectBox" x:FieldModifier="public" Content="Streamer.bot automatisch verbinden" Margin="0,10,0,0"/>
+                                <CheckBox x:Name="StreamerBotConnectOnPrepareBox" x:FieldModifier="public" Content="Bei Stream vorbereiten Streamer.bot verbinden" Margin="0,8,0,0"/>
+                                <TextBlock Text="Alert-Steuerung" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" Margin="0,18,0,6"/>
+                                <TextBlock Text="Die eigentliche Auswahl, Aktivierung und Gestaltung erfolgt auf der Seite Alerts. Hier werden nur die Namen der beiden Streamer.bot-Hilfsaktionen hinterlegt." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"/>
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Alerts deaktivieren" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="SettingsStreamerBotDisableAlertsActionBox" x:FieldModifier="public" Grid.Column="1" IsEditable="True" DisplayMemberPath="DisplayName" SelectedValuePath="Id" Text="{Binding DisableActionName, UpdateSourceTrigger=PropertyChanged}" SelectedValue="{Binding DisableActionId, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Alerts aktivieren" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="SettingsStreamerBotEnableAlertsActionBox" x:FieldModifier="public" Grid.Column="1" IsEditable="True" DisplayMemberPath="DisplayName" SelectedValuePath="Id" Text="{Binding EnableActionName, UpdateSourceTrigger=PropertyChanged}" SelectedValue="{Binding EnableActionId, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
+                                <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Kurzanleitung" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="1. Streamer.bot starten.&#10;2. Den WebSocket-Server in Streamer.bot aktivieren.&#10;3. Host, Port und Endpoint prüfen.&#10;4. Dieselben Werte hier eintragen.&#10;5. Unter Dienste → Streamer.bot auf Verbinden klicken.&#10;&#10;Website: https://streamer.bot/&#10;Dokumentation: https://docs.streamer.bot/" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="Stream-Workflow">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="18">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="Startszene" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="StartSceneBox" x:FieldModifier="public" Grid.Column="1" IsEditable="True" DisplayMemberPath="Name" SelectedValuePath="Name"/>
+                                    <TextBlock Text="Live-Szene" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    <ComboBox x:Name="LiveSceneBox" x:FieldModifier="public" Grid.Column="3" IsEditable="True" DisplayMemberPath="Name" SelectedValuePath="Name"/>
+                                    <TextBlock Text="Pausenszene" Grid.Row="1" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                    <ComboBox x:Name="PauseSceneBox" x:FieldModifier="public" Grid.Row="1" Grid.Column="1" Margin="0,10,0,0" IsEditable="True" DisplayMemberPath="Name" SelectedValuePath="Name"/>
+                                    <TextBlock Text="Endszene" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="12,10,0,0"/>
+                                    <ComboBox x:Name="EndSceneBox" x:FieldModifier="public" Grid.Row="1" Grid.Column="3" Margin="0,10,0,0" IsEditable="True" DisplayMemberPath="Name" SelectedValuePath="Name"/>
+                                    <TextBlock Text="Endszene-Dauer" Grid.Row="2" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                    <TextBox x:Name="EndSceneSecondsBox" x:FieldModifier="public" Grid.Row="2" Grid.Column="1" Margin="0,10,0,0"/>
+                                </Grid>
+                                <Button x:Name="RefreshWorkflowScenesButton" x:FieldModifier="public" Content="OBS-Szenen neu laden" HorizontalAlignment="Left" Margin="0,14,0,0"/>
+                                <TextBlock Text="Die Szenenauswahl gehört zum Stream-Workflow. Beim Streamstart wechselt die Suite die gewählte OBS-Szene per WebSocket. In den HTML-Overlays wird kein OBS-Szenenname gespeichert." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                            
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="Stream Deck">
+                        <StackPanel Margin="18">
+                            <CheckBox x:Name="StreamDeckEnabledBox" x:FieldModifier="public" Content="Stream-Deck-Unterstützung aktivieren"/>
+                            <CheckBox x:Name="StreamDeckProfileBox" x:FieldModifier="public" Content="Standardprofil automatisch installieren" Margin="0,8,0,0"/>
+                            <TextBlock Text="Das Standardprofil enthält Tasten für Vorbereiten, Countdown, Live, Pause, Fortsetzen und Beenden." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,14,0,0"/>
+                            <WrapPanel Margin="0,14,0,0">
+                                <Button x:Name="InstallStreamDeckButton" x:FieldModifier="public" Content="Standardprofil exportieren" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
+                                <Button x:Name="OpenStreamDeckFolderButton" x:FieldModifier="public" Content="Exportordner öffnen"/>
+                            </WrapPanel>
+                            <TextBlock x:Name="StreamDeckStatusText" x:FieldModifier="public" Text="Bereit." Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                            <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Lokale Suite-Verbindung" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <TextBlock x:Name="IpcStatusText" x:FieldModifier="public" Text="IPC wird beim Start aktiviert." Foreground="{DynamicResource MutedBrush}" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </TabItem>
+                    <TabItem Header="Rechtliches">
+                        <legal:LegalSettingsView x:Name="LegalSettingsViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="Updates">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="18">
+                                <updates:UpdateSettingsView x:Name="UpdateSettingsViewHost" x:FieldModifier="public"/>
+                                <migration:MigrationSettingsView x:Name="MigrationSettingsViewHost" x:FieldModifier="public"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="SettingsStatusText" Text="Bereit." Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center"/>
+                    <Button x:Name="SaveSettingsButton" Grid.Column="1" Content="Einstellungen speichern" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}" FontWeight="Bold"/>
+                </Grid>
+    </Grid>
+</UserControl>

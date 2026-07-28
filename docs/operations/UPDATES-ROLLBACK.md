@@ -8,6 +8,14 @@
 - Download mit Fortschritt, SHA-256- und Signaturprüfung
 - Optional Backup der Nutzerdaten vor dem Apply
 - Apply über `CreatorControlSuite.Updater.exe` (transaktional)
+- Write-ahead-Journal für Prozess-/Stromabbruch zwischen Kopie und
+  Journal-Commit
+- Automatische Recovery unvollständiger Transaktionen beim nächsten
+  Updater-Start
+- Wiederholbarer Rollback nach temporären Dateisperren
+
+Die vollständige Nachweismatrix steht unter
+[`UPDATE-FAILURE-MATRIX.md`](UPDATE-FAILURE-MATRIX.md).
 
 ## Backups
 

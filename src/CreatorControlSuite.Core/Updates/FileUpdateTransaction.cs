@@ -75,8 +75,11 @@ public sealed class FileUpdateTransaction(
                     install,
                     relative);
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                journal.PendingFile = relative;
+                await SaveAsync(journalPath, journal, cancellationToken);
                 File.Copy(source, destination, overwrite: true);
                 journal.AppliedFiles.Add(relative);
+                journal.PendingFile = null;
                 await SaveAsync(journalPath, journal, cancellationToken);
                 if (afterFileApplied is not null)
                 {
@@ -85,6 +88,7 @@ public sealed class FileUpdateTransaction(
             }
 
             journal.State = "Completed";
+            journal.PendingFile = null;
             journal.CompletedAt = DateTimeOffset.UtcNow;
             await SaveAsync(journalPath, journal, cancellationToken);
             return journal;
@@ -94,7 +98,7 @@ public sealed class FileUpdateTransaction(
             journal.State = "RollingBack";
             journal.Error = exception.ToString();
             await SaveWithoutCancellationAsync(journalPath, journal);
-            foreach (string relative in journal.AppliedFiles.AsEnumerable().Reverse())
+            foreach (string relative in GetRollbackFiles(journal))
             {
                 try
                 {
@@ -123,6 +127,11 @@ public sealed class FileUpdateTransaction(
             journal.State = journal.RollbackErrors.Count == 0
                 ? "RolledBack"
                 : "RollbackFailed";
+            if (journal.State == "RolledBack")
+            {
+                journal.PendingFile = null;
+            }
+
             journal.CompletedAt = DateTimeOffset.UtcNow;
             await SaveWithoutCancellationAsync(journalPath, journal);
             throw new UpdateTransactionException(
@@ -158,7 +167,8 @@ public sealed class FileUpdateTransaction(
         journal.Error = string.IsNullOrWhiteSpace(journal.Error)
             ? "Unvollständige Update-Transaktion beim Start erkannt."
             : journal.Error;
-        foreach (string relative in journal.AppliedFiles.AsEnumerable().Reverse())
+        journal.RollbackErrors.Clear();
+        foreach (string relative in GetRollbackFiles(journal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -188,9 +198,35 @@ public sealed class FileUpdateTransaction(
         journal.State = journal.RollbackErrors.Count == 0
             ? "RolledBack"
             : "RollbackFailed";
+        if (journal.State == "RolledBack")
+        {
+            journal.PendingFile = null;
+        }
+
         journal.CompletedAt = DateTimeOffset.UtcNow;
         await SaveAsync(journalPath, journal, cancellationToken);
         return journal;
+    }
+
+    private static IEnumerable<string> GetRollbackFiles(
+        UpdateTransactionJournal journal)
+    {
+        if (!string.IsNullOrWhiteSpace(journal.PendingFile))
+        {
+            yield return journal.PendingFile;
+        }
+
+        foreach (string relative in journal.AppliedFiles
+                     .AsEnumerable()
+                     .Reverse()
+                     .Where(relative =>
+                         !string.Equals(
+                             relative,
+                             journal.PendingFile,
+                             StringComparison.OrdinalIgnoreCase)))
+        {
+            yield return relative;
+        }
     }
 
     private static async Task SaveAsync(
@@ -231,5 +267,6 @@ public sealed class UpdateTransactionJournal
     public string Error { get; set; } = "";
     public List<string> BackedUpFiles { get; set; } = [];
     public List<string> AppliedFiles { get; set; } = [];
+    public string? PendingFile { get; set; }
     public List<string> RollbackErrors { get; set; } = [];
 }

@@ -1,0 +1,82 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Workflow.RunOfShowView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+                        <Grid Margin="12" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Szenenablauf" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="18"/>
+                                <TextBlock Text="Lege die Reihenfolge deines Streams fest und führe die Schritte einzeln oder nacheinander aus. Ein Live-Stream wird dadurch nicht automatisch gestartet." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,10"/>
+                                <TextBlock Text="Regieplan" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="RunOfShowPlanBox" x:FieldModifier="public" IsEditable="True" DisplayMemberPath="Name" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <WrapPanel Margin="0,8,0,10">
+                                    <Button x:Name="NewRunOfShowPlanButton" x:FieldModifier="public" Content="NEUER PLAN"/>
+                                    <Button x:Name="RenameRunOfShowPlanButton" x:FieldModifier="public" Content="UMBENENNEN"/>
+                                    <Button x:Name="DeleteRunOfShowPlanButton" x:FieldModifier="public" Content="PLAN LÖSCHEN" Background="#7A3838"/>
+                                </WrapPanel>
+                                <ListBox x:Name="RunOfShowStepsList" x:FieldModifier="public" Height="350" DisplayMemberPath="Name" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button x:Name="NewRunOfShowStepButton" x:FieldModifier="public" Content="NEUER SCHRITT"/>
+                                    <Button x:Name="DuplicateRunOfShowStepButton" x:FieldModifier="public" Content="DUPLIZIEREN"/>
+                                    <Button x:Name="MoveRunOfShowStepUpButton" x:FieldModifier="public" Content="▲" ToolTip="Schritt nach oben"/>
+                                    <Button x:Name="MoveRunOfShowStepDownButton" x:FieldModifier="public" Content="▼" ToolTip="Schritt nach unten"/>
+                                    <Button x:Name="DeleteRunOfShowStepButton" x:FieldModifier="public" Content="LÖSCHEN" Background="#7A3838"/>
+                                </WrapPanel>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button x:Name="ImportRunOfShowButton" x:FieldModifier="public" Content="IMPORTIEREN"/>
+                                    <Button x:Name="ExportRunOfShowButton" x:FieldModifier="public" Content="EXPORTIEREN"/>
+                                    <Button x:Name="ValidateRunOfShowButton" x:FieldModifier="public" Content="PLAN PRÜFEN" Background="#315B72"/>
+                                </WrapPanel>
+                            </StackPanel>
+                            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <Border Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="#315B72" BorderThickness="1" CornerRadius="8" Padding="14">
+                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <StackPanel><TextBlock Text="Aktueller Schritt" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="RunOfShowCurrentText" x:FieldModifier="public" Text="Noch nicht gestartet" FontSize="20" FontWeight="Bold"/></StackPanel>
+                                            <StackPanel Grid.Column="1"><TextBlock Text="Nächster Schritt" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="RunOfShowNextText" x:FieldModifier="public" Text="Kein weiterer Schritt" FontSize="20" FontWeight="Bold"/></StackPanel>
+                                            <TextBlock x:Name="RunOfShowProgressText" x:FieldModifier="public" Grid.Column="2" Text="0 / 0" FontSize="22" FontWeight="Bold" VerticalAlignment="Center" Margin="20,0,0,0"/>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Text="Regieschritt bearbeiten" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="18" Margin="0,18,0,0"/>
+                                    <CheckBox x:Name="RunOfShowEnabledBox" x:FieldModifier="public" Content="Schritt aktiv" IsChecked="True" Margin="0,10,0,0"/>
+                                    <TextBlock Text="Name" Margin="0,10,0,4"/><TextBox x:Name="RunOfShowNameBox" x:FieldModifier="public" Text="Neuer Regieschritt"/>
+                                    <TextBlock Text="OBS-Szene" Margin="0,10,0,4"/><ComboBox x:Name="RunOfShowSceneBox" x:FieldModifier="public" IsEditable="True"/>
+                                    <TextBlock Text="OBS-Übergang" Margin="0,10,0,4"/><ComboBox x:Name="RunOfShowTransitionBox" x:FieldModifier="public" IsEditable="True"/>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Übergangsdauer" VerticalAlignment="Center"/><TextBox x:Name="RunOfShowTransitionDurationBox" x:FieldModifier="public" Width="80" Text="1000" Margin="8,0"/><TextBlock Text="ms" VerticalAlignment="Center"/></WrapPanel>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Spotify-Aktion" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <ComboBox x:Name="RunOfShowSpotifyActionBox" x:FieldModifier="public" Margin="0,8,0,0" SelectedIndex="0"><ComboBoxItem Content="Nicht ändern" Tag="None"/><ComboBoxItem Content="Musik pausieren" Tag="Pause"/><ComboBoxItem Content="Wiedergabe fortsetzen" Tag="Resume"/><ComboBoxItem Content="Lautstärke setzen" Tag="SetVolume"/></ComboBox>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Spotify-Lautstärke" VerticalAlignment="Center"/><TextBox x:Name="RunOfShowSpotifyVolumeBox" x:FieldModifier="public" Width="70" Text="35" Margin="8,0,0,0"/><TextBlock Text="%" VerticalAlignment="Center" Margin="4,0,0,0"/></WrapPanel>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Streamer.bot-Aktion" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <TextBlock Text="Optional wird nach dem OBS- und Spotify-Schritt eine vorhandene Streamer.bot-Aktion ausgeführt." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,8"/>
+                                    <ComboBox x:Name="RunOfShowStreamerBotActionBox" x:FieldModifier="public" IsEditable="True" DisplayMemberPath="DisplayName"/>
+                                    <WrapPanel Margin="0,8,0,0">
+                                        <Button x:Name="RefreshRunOfShowStreamerBotActionsButton" x:FieldModifier="public" Content="STREAMER.BOT-AKTIONEN LADEN"/>
+                                        <CheckBox x:Name="RunOfShowContinueOnActionErrorBox" x:FieldModifier="public" Content="Bei Fehler trotzdem fortfahren" IsChecked="False" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                    </WrapPanel>
+                                    <WrapPanel Margin="0,10,0,0"><TextBlock Text="Wartezeit vor Aktion" VerticalAlignment="Center"/><TextBox x:Name="RunOfShowActionDelayBox" x:FieldModifier="public" Width="70" Text="0" Margin="8,0"/><TextBlock Text="ms" VerticalAlignment="Center"/></WrapPanel>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Twitch-Kanal" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <CheckBox x:Name="RunOfShowUpdateTwitchBox" x:FieldModifier="public" Content="Titel und/oder Kategorie bei diesem Schritt aktualisieren" Margin="0,8,0,0"/>
+                                    <TextBlock Text="Streamtitel (leer = unverändert)" Margin="0,10,0,4"/><TextBox x:Name="RunOfShowTwitchTitleBox" x:FieldModifier="public"/>
+                                    <TextBlock Text="Kategorie suchen" Margin="0,10,0,4"/>
+                                    <DockPanel>
+                                        <Button x:Name="SearchRunOfShowTwitchCategoryButton" x:FieldModifier="public" Content="SUCHEN" DockPanel.Dock="Right" Margin="8,0,0,0"/>
+                                        <TextBox x:Name="RunOfShowTwitchCategorySearchBox" x:FieldModifier="public"/>
+                                    </DockPanel>
+                                    <ComboBox x:Name="RunOfShowTwitchCategoryResultsBox" x:FieldModifier="public" Margin="0,8,0,0" DisplayMemberPath="Name"/>
+                                    <CheckBox x:Name="RunOfShowContinueOnTwitchErrorBox" x:FieldModifier="public" Content="Bei Twitch-Fehler trotzdem fortfahren" Margin="0,8,0,0"/>
+                                    <Separator Margin="0,16,0,12"/>
+                                    <TextBlock Text="Automatischer Ablauf" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                    <CheckBox x:Name="RunOfShowAutoAdvanceBox" x:FieldModifier="public" Content="Nach diesem Schritt automatisch fortfahren" Margin="0,8,0,0"/>
+                                    <WrapPanel Margin="0,8,0,0"><TextBlock Text="Wartezeit bis zum nächsten Schritt" VerticalAlignment="Center"/><TextBox x:Name="RunOfShowAutoAdvanceDelayBox" x:FieldModifier="public" Width="70" Text="10" Margin="8,0"/><TextBlock Text="Sekunden" VerticalAlignment="Center"/></WrapPanel>
+                                    <TextBlock Text="Ist die Option ausgeschaltet, pausiert der automatische Regieplan nach diesem Schritt und kann später fortgesetzt werden." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                    <WrapPanel Margin="0,18,0,0"><Button x:Name="SaveRunOfShowStepButton" x:FieldModifier="public" Content="SCHRITT SPEICHERN" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource TextOnAccentBrush}"/><Button x:Name="RefreshRunOfShowObsButton" x:FieldModifier="public" Content="OBS-LISTEN LADEN"/></WrapPanel>
+                                    <Border Background="{DynamicResource InputAltBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                        <StackPanel><TextBlock Text="Regie ausführen" Foreground="#7EC8F5" FontWeight="Bold"/><TextBlock Text="Die Aktionen werden direkt in OBS, Spotify und optional Streamer.bot ausgeführt. Der OBS-Stream wird nicht gestartet oder beendet." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,5,0,10"/><WrapPanel><Button x:Name="ExecuteRunOfShowStepButton" x:FieldModifier="public" Content="AUSGEWÄHLTEN SCHRITT" Background="#315B72"/><Button x:Name="ExecuteNextRunOfShowStepButton" x:FieldModifier="public" Content="NÄCHSTEN SCHRITT" Background="#416B3C"/><Button x:Name="StartAutomaticRunOfShowButton" x:FieldModifier="public" Content="AUTOMATIK STARTEN" Background="#416B3C"/><Button x:Name="StopAutomaticRunOfShowButton" x:FieldModifier="public" Content="AUTOMATIK STOPPEN" Background="#7A3838" IsEnabled="False"/><Button x:Name="ResetRunOfShowButton" x:FieldModifier="public" Content="REGIEPLAN ZURÜCKSETZEN" Background="#66502F"/></WrapPanel><TextBlock x:Name="RunOfShowStatusText" x:FieldModifier="public" Text="Bereit." Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/></StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+</UserControl>

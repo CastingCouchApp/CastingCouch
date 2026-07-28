@@ -7,8 +7,7 @@ public sealed class ArchitectureGuardTests
     private static readonly IReadOnlyDictionary<string, int> OversizedFileBaseline =
         new Dictionary<string, int>(StringComparer.Ordinal)
         {
-            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml.cs"] = 23_655,
-            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml"] = 3_881
+            ["src/CreatorControlSuite.App/Shell/MainWindow.xaml.cs"] = 495
         };
 
     [Fact]
@@ -47,6 +46,32 @@ public sealed class ArchitectureGuardTests
         Assert.True(
             violations.Count == 0,
             "Architekturgrößen-Gate verletzt:" + Environment.NewLine +
+            string.Join(Environment.NewLine, violations));
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void OverlayTypeScriptFiles_RemainBelowOneThousandLines()
+    {
+        string root = FindRepositoryRoot();
+        string overlaySourceRoot = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.Modules.Overlay",
+            "CanvasOverlay",
+            "src");
+        string[] violations = Directory
+            .EnumerateFiles(overlaySourceRoot, "*.ts", SearchOption.AllDirectories)
+            .Where(path => File.ReadLines(path).Count() >= 1_000)
+            .Select(path =>
+                $"{Path.GetRelativePath(root, path).Replace('\\', '/')}: " +
+                $"{File.ReadLines(path).Count()} Zeilen")
+            .ToArray();
+
+        Assert.True(
+            violations.Length == 0,
+            "Overlay-TypeScript-Dateien müssen unter 1.000 Zeilen bleiben:" +
+            Environment.NewLine +
             string.Join(Environment.NewLine, violations));
     }
 
@@ -206,6 +231,369 @@ public sealed class ArchitectureGuardTests
             "Kommerzielle Laufzeit-Lizenzierung gefunden:"
             + Environment.NewLine
             + string.Join(Environment.NewLine, violations));
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void MusicPlayerPage_IsEncapsulatedBehindItsViewApi()
+    {
+        string root = FindRepositoryRoot();
+        string mainWindowCode = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml.cs"));
+        string mainWindowXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml"));
+        string[] leakedControlAccesses =
+        [
+            ".MusicPlayerPreviousButton",
+            ".MusicPlayerPlayPauseButton",
+            ".MusicPlayerNextButton",
+            ".MusicPlayerConnectButton",
+            ".MusicPlayerDisconnectButton",
+            ".MusicPlayerProgressBar",
+            ".MusicPlayerVolumeSlider",
+            ".MusicPlayerBookmarkletBox",
+            ".MusicPlayerBookmarkletDragChip",
+            ".MusicPlayerBridgeStatusText",
+            ".MusicPlayerCoverImage"
+        ];
+
+        Assert.Contains(
+            "<music:MusicPlayerPageView x:Name=\"MusicPlayerPageViewHost\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "x:Name=\"MusicPlayerPreviousButton\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        foreach (string controlAccess in leakedControlAccesses)
+        {
+            Assert.DoesNotContain(
+                controlAccess,
+                mainWindowCode,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void WorkflowPage_IsSplitIntoBoundedViews()
+    {
+        string root = FindRepositoryRoot();
+        string mainWindowCode = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml.cs"));
+        string mainWindowXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml"));
+        string workflowPageXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Views",
+            "Pages",
+            "Workflow",
+            "WorkflowPageView.xaml"));
+
+        Assert.Contains(
+            "<workflow:WorkflowPageView x:Name=\"WorkflowPageViewHost\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "x:Name=\"RunOfShowPlanBox\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.Contains("<workflow:RunOfShowView", workflowPageXaml);
+        Assert.Contains("<workflow:TimedAutomationView", workflowPageXaml);
+        Assert.Contains("<workflow:WorkflowDesignerView", workflowPageXaml);
+        Assert.Contains("<workflow:ShortStreamTestView", workflowPageXaml);
+
+        string[] leakedPageControls =
+        [
+            ".PrepareStreamButton",
+            ".StartCountdownButton",
+            ".StopCountdownButton",
+            ".GoLiveButton",
+            ".PauseStreamButton",
+            ".ResumeStreamButton",
+            ".EndStreamButton",
+            ".WorkflowStatusText",
+            ".WorkflowTabControl"
+        ];
+        foreach (string controlAccess in leakedPageControls)
+        {
+            Assert.DoesNotContain(
+                controlAccess,
+                mainWindowCode,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void SettingsPage_IsEncapsulatedBehindItsViewApi()
+    {
+        string root = FindRepositoryRoot();
+        string mainWindowCode = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml.cs"));
+        string mainWindowXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml"));
+        string settingsPageXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Views",
+            "Pages",
+            "Settings",
+            "SettingsPageView.xaml"));
+
+        Assert.Contains(
+            "<settings:SettingsPageView x:Name=\"SettingsPageViewHost\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "x:Name=\"ObsHostBox\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.Contains("<settings:GeneralSettingsView", settingsPageXaml);
+        Assert.Contains("<legal:LegalSettingsView", settingsPageXaml);
+        Assert.Contains("<updates:UpdateSettingsView", settingsPageXaml);
+        Assert.Contains("<migration:MigrationSettingsView", settingsPageXaml);
+        Assert.DoesNotContain(
+            "ElementName=AlertRuntimeViewHost",
+            settingsPageXaml,
+            StringComparison.Ordinal);
+
+        string[] leakedPageControls =
+        [
+            ".SettingsTabControl",
+            ".SettingsStatusText",
+            ".SaveSettingsButton"
+        ];
+        foreach (string controlAccess in leakedPageControls)
+        {
+            Assert.DoesNotContain(
+                controlAccess,
+                mainWindowCode,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void ServicesPage_IsSplitByServiceBoundary()
+    {
+        string root = FindRepositoryRoot();
+        string mainWindowCode = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml.cs"));
+        string mainWindowXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml"));
+        string servicesPageXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Views",
+            "Pages",
+            "Services",
+            "ServicesPageView.xaml"));
+
+        Assert.Contains(
+            "<services:ServicesPageView x:Name=\"ServicesPageViewHost\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "x:Name=\"ServicesSpotifyNowPlayingText\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.Contains("<services:SpotifyServiceView", servicesPageXaml);
+        Assert.Contains("<services:TwitchServiceView", servicesPageXaml);
+        Assert.Contains("<services:ObsServiceView", servicesPageXaml);
+        Assert.Contains("<services:StreamerBotServiceView", servicesPageXaml);
+        Assert.Contains("<services:StreamDeckServiceView", servicesPageXaml);
+
+        string[] leakedPageControls =
+        [
+            ".ServicesOverviewPanel",
+            ".ServicesTabControl",
+            ".ServicesOverviewSpotifyButton",
+            ".ServicesOverviewTwitchButton",
+            ".ServicesOverviewObsButton",
+            ".ServicesOverviewStreamerBotButton",
+            ".ServicesOverviewStreamDeckButton"
+        ];
+        foreach (string controlAccess in leakedPageControls)
+        {
+            Assert.DoesNotContain(
+                controlAccess,
+                mainWindowCode,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void ServiceShellLogic_IsSplitIntoBoundedPartials()
+    {
+        string root = FindRepositoryRoot();
+        string shellRoot = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell");
+        string mainWindowCode = File.ReadAllText(Path.Combine(
+            shellRoot,
+            "MainWindow.xaml.cs"));
+        string[] extractedMethodDefinitions =
+        [
+            "private async Task AuthorizeSpotifyAsync()",
+            "private async Task AuthorizeTwitchAsync()",
+            "private async Task ConnectObsAsync(bool showErrorDialog = true)",
+            "private async Task StartObsStreamAsync()",
+            "private string GetSpotifyAutomationEditorGroup()",
+            "private async Task ConnectStreamerBotAsync()",
+            "private async Task RunDiagnosticsAsync()",
+            "private async Task RefreshCreatorIntelligenceAsync()",
+            "private async Task EvaluateTimedAutomationRulesAsync()",
+            "private bool IsSpotifyMusicProvider()",
+            "private string ResolveActiveOverlayDataPath()",
+            "private void InitializeDashboardBindings()",
+            "private void InitializeServiceBindings()",
+            "private void InitializeTimedAutomationBindings()"
+        ];
+
+        foreach (string methodDefinition in extractedMethodDefinitions)
+        {
+            Assert.DoesNotContain(
+                methodDefinition,
+                mainWindowCode,
+                StringComparison.Ordinal);
+        }
+
+        string[] serviceDirectories =
+            ["Spotify", "Twitch", "Obs", "StreamerBot", "CreatorIntelligence"];
+        foreach (string serviceDirectory in serviceDirectories)
+        {
+            string directory = Path.Combine(
+                shellRoot,
+                "Services",
+                serviceDirectory);
+            string[] partials = Directory.GetFiles(
+                directory,
+                "MainWindow.Services.*.cs",
+                SearchOption.TopDirectoryOnly);
+
+            Assert.NotEmpty(partials);
+            Assert.All(
+                partials,
+                path => Assert.True(
+                    File.ReadLines(path).Count() < 1_000,
+                    $"{Path.GetFileName(path)} muss unter 1.000 Zeilen bleiben."));
+        }
+
+        string[] shellSliceDirectories =
+        [
+            "Alerts",
+            "Dashboard",
+            "Diagnostics",
+            "Initialization",
+            "Lifecycle",
+            "MultiPc",
+            "Music",
+            "Navigation",
+            "Overlay",
+            "Workflow"
+        ];
+        foreach (string shellSliceDirectory in shellSliceDirectories)
+        {
+            string directory = Path.Combine(shellRoot, shellSliceDirectory);
+            string[] partials = Directory.GetFiles(
+                directory,
+                "MainWindow.*.cs",
+                SearchOption.TopDirectoryOnly);
+
+            Assert.NotEmpty(partials);
+            Assert.All(
+                partials,
+                path => Assert.True(
+                    File.ReadLines(path).Count() < 1_000,
+                    $"{Path.GetFileName(path)} muss unter 1.000 Zeilen bleiben."));
+        }
+
+        Assert.True(
+            File.ReadLines(Path.Combine(shellRoot, "MainWindow.xaml.cs")).Count()
+            < 500,
+            "MainWindow.xaml.cs muss dauerhaft unter 500 Zeilen bleiben.");
+    }
+
+    [Fact]
+    [Trait("Category", "Architecture")]
+    public void DashboardPage_IsHostedOutsideMainWindowXaml()
+    {
+        string root = FindRepositoryRoot();
+        string mainWindowXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml"));
+        string dashboardPageXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Views",
+            "Pages",
+            "Dashboard",
+            "DashboardPageView.xaml"));
+
+        Assert.Contains(
+            "<dashboard:DashboardPageView x:Name=\"DashboardPageViewHost\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "x:Name=\"DashboardStreamControlModule\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "x:Name=\"DashboardStreamControlModule\"",
+            dashboardPageXaml,
+            StringComparison.Ordinal);
+        Assert.True(
+            File.ReadLines(Path.Combine(
+                root,
+                "src",
+                "CreatorControlSuite.App",
+                "Shell",
+                "MainWindow.xaml")).Count() < 1_000,
+            "MainWindow.xaml muss dauerhaft unter 1.000 Zeilen bleiben.");
     }
 
     private static string FindRepositoryRoot()

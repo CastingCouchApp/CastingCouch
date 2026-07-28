@@ -1,0 +1,92 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Services.ServicesPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:CreatorControlSuite.App.Views.Pages.Services">
+    <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Dienste" FontSize="30" FontWeight="Bold"/>
+                    <TextBlock Text="Laufende Steuerung und Detailansicht der verbundenen Streaming-Dienste" Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
+                </StackPanel>
+                <ScrollViewer x:Name="ServicesOverviewPanel" Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Dienste auswählen" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Wähle einen Dienst aus, um dessen Live-Steuerung und Status zu öffnen. Die Dienstliste in der linken Navigation bleibt dabei ebenfalls verfügbar." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,16"/>
+                        <UniformGrid Columns="2" Rows="3">
+                            <Button x:Name="ServicesOverviewSpotifyButton" Margin="0,0,10,10" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" MinHeight="125">
+                                    <StackPanel>
+                                        <TextBlock Text="●  Spotify" Foreground="{DynamicResource AccentBrush}" FontSize="20" FontWeight="Bold"/>
+                                        <TextBlock Text="Wiedergabe, Playlist, Lautstärke, Automatisierung und Overlay verwalten" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                        <TextBlock Text="ÖFFNEN  →" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" Margin="0,14,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Button>
+                            <Button x:Name="ServicesOverviewTwitchButton" Margin="10,0,0,10" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" MinHeight="125">
+                                    <StackPanel>
+                                        <TextBlock Text="▣  Twitch" Foreground="{DynamicResource AccentBrush}" FontSize="20" FontWeight="Bold"/>
+                                        <TextBlock Text="Chat, Events, Streamdaten, Ziele, Moderation und Raid-Steuerung" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                        <TextBlock Text="ÖFFNEN  →" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" Margin="0,14,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Button>
+                            <Button x:Name="ServicesOverviewObsButton" Margin="0,10,10,10" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" MinHeight="125">
+                                    <StackPanel>
+                                        <TextBlock Text="◉  OBS" Foreground="{DynamicResource AccentBrush}" FontSize="20" FontWeight="Bold"/>
+                                        <TextBlock Text="Szenen, Quellen, Audiomixer, Streamingstatus und Browserquellen steuern" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                        <TextBlock Text="ÖFFNEN  →" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" Margin="0,14,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Button>
+                            <Button x:Name="ServicesOverviewStreamerBotButton" Margin="10,10,0,10" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" MinHeight="125">
+                                    <StackPanel>
+                                        <TextBlock Text="⚙  Streamer.bot" Foreground="{DynamicResource AccentBrush}" FontSize="20" FontWeight="Bold"/>
+                                        <TextBlock Text="Verbindung, Aktionen, Trigger und verfügbare Dienste verwalten" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                        <TextBlock Text="ÖFFNEN  →" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" Margin="0,14,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Button>
+                            <Button x:Name="ServicesOverviewStreamDeckButton" Margin="0,10,10,0" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" MinHeight="125">
+                                    <StackPanel>
+                                        <TextBlock Text="▦  Stream Deck" Foreground="{DynamicResource AccentBrush}" FontSize="20" FontWeight="Bold"/>
+                                        <TextBlock Text="Tastenbelegung und Schnellaktionen für Stream, OBS und Spotify verwalten" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                        <TextBlock Text="ÖFFNEN  →" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" Margin="0,14,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Button>
+                        </UniformGrid>
+                    </StackPanel>
+                </ScrollViewer>
+                <TabControl x:Name="ServicesTabControl" Grid.Row="1" Margin="0,18,0,0" Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Visibility="Collapsed">
+                    <TabControl.Template>
+                        <ControlTemplate TargetType="{x:Type TabControl}">
+                            <Border Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                                <ContentPresenter ContentSource="SelectedContent" Margin="0"/>
+                            </Border>
+                        </ControlTemplate>
+                    </TabControl.Template>
+                    <TabItem Header="Spotify">
+                        <services:SpotifyServiceView x:Name="SpotifyServiceViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="Twitch">
+                        <services:TwitchServiceView x:Name="TwitchServiceViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="OBS">
+                        <services:ObsServiceView x:Name="ObsServiceViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="Streamer.bot">
+                        <services:StreamerBotServiceView x:Name="StreamerBotServiceViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="Stream Deck">
+                        <services:StreamDeckServiceView x:Name="StreamDeckServiceViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                </TabControl>
+    </Grid>
+</UserControl>

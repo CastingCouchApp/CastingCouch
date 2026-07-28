@@ -1,0 +1,107 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Services.StreamerBotServiceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <Grid Margin="18" MinWidth="900" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="12"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Streamer.bot Professional Control" FontSize="22" FontWeight="Bold"/>
+                                        <TextBlock x:Name="ServicesStreamerBotStatusText" x:FieldModifier="public" Text="Nicht verbunden" Margin="0,8,0,0"/>
+                                        <TextBlock x:Name="ServicesStreamerBotDiagnosticText" x:FieldModifier="public" Text="Diagnose noch nicht ausgeführt." Foreground="#9AA6AE" Margin="0,5,0,0"/>
+                                    </StackPanel>
+                                    <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <Button x:Name="ServicesStreamerBotLaunchButton" x:FieldModifier="public" Content="STARTEN"/>
+                                        <Button x:Name="ServicesStreamerBotConnectButton" x:FieldModifier="public" Content="VERBINDEN" Margin="6,0,0,0"/>
+                                        <Button x:Name="ServicesStreamerBotDisconnectButton" x:FieldModifier="public" Content="TRENNEN" Margin="6,0,0,0"/>
+                                        <Button x:Name="ServicesStreamerBotDiagnoseButton" x:FieldModifier="public" Content="DIAGNOSE" Margin="6,0,0,0"/><Button x:Name="ServicesStreamerBotReconnectButton" x:FieldModifier="public" Content="NEU VERBINDEN" Margin="6,0,0,0"/>
+                                    </WrapPanel>
+                                </Grid>
+                            </Border>
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14">
+                                    <Grid>
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                        <TextBlock Text="DIENSTE / INTEGRATIONEN" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                        <ListBox x:Name="ServicesStreamerBotServicesList" x:FieldModifier="public" Grid.Row="1" Margin="0,10,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" MinHeight="180"/>
+                                        <Grid Grid.Row="3">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="LIVE-EREIGNISSE" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                            <Button x:Name="ServicesStreamerBotClearLiveEventsButton" x:FieldModifier="public" Grid.Column="1" Content="LEEREN" Padding="8,2"/>
+                                        </Grid>
+                                        <ListBox x:Name="ServicesStreamerBotLiveEventsList" x:FieldModifier="public" Grid.Row="4" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" MinHeight="160" DisplayMemberPath="DisplayName" HorizontalContentAlignment="Stretch"/>
+                                        <TextBlock x:Name="ServicesStreamerBotLiveEventStatusText" x:FieldModifier="public" Grid.Row="5" Text="Warte auf Streamer.bot-Ereignisse …" Foreground="#9AA6AE" Margin="0,7,0,0" TextWrapping="Wrap"/>
+                                    </Grid>
+                                </Border>
+                                <Border Grid.Column="2" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14">
+                                    <Grid>
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBox x:Name="ServicesStreamerBotActionSearchBox" x:FieldModifier="public" ToolTip="Aktionen nach Name oder Gruppe filtern"/>
+                                            <Button x:Name="ServicesStreamerBotRefreshActionsButton" x:FieldModifier="public" Grid.Column="1" Content="AKTIONEN LADEN" Margin="8,0,0,0"/>
+                                        </Grid>
+                                        <ListBox x:Name="ServicesStreamerBotActionsList" x:FieldModifier="public" Grid.Row="1" Margin="0,10,0,10" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayName"/>
+                                        <Grid Grid.Row="2">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock x:Name="ServicesStreamerBotSelectedActionText" x:FieldModifier="public" Text="Keine Aktion ausgewählt." FontWeight="SemiBold"/>
+                                                <TextBlock x:Name="ServicesStreamerBotActionDetailsText" x:FieldModifier="public" Text="Wähle eine Aktion aus, um Details und Parameter zu sehen." Foreground="#9AA6AE" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                                <Grid Margin="0,10,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Parameter als JSON" Foreground="#FF7A18" FontWeight="SemiBold"/><Button x:Name="ServicesStreamerBotFormatArgumentsButton" x:FieldModifier="public" Grid.Column="1" Content="JSON FORMATIEREN" Padding="8,2"/></Grid>
+                                                <TextBox x:Name="ServicesStreamerBotActionArgumentsBox" x:FieldModifier="public" Text="{}" AcceptsReturn="True" MinHeight="58" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" ToolTip="Beispiel: { &quot;user&quot;: &quot;DenverJohn&quot;, &quot;amount&quot;: 100 }"/>
+                                                <TextBlock x:Name="ServicesStreamerBotActionResultText" x:FieldModifier="public" Text="Bereit." Foreground="#9AA6AE" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                                <TextBlock Text="Letzte Streamer.bot-Antwort" Foreground="#FF7A18" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                                                <TextBox x:Name="ServicesStreamerBotLastResponseBox" x:FieldModifier="public" Text="Noch keine Antwort." IsReadOnly="True" AcceptsReturn="True" MinHeight="58" MaxHeight="120" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Bottom">
+                                                <Button x:Name="ServicesStreamerBotFavoriteActionButton" x:FieldModifier="public" Content="☆ FAVORIT" IsEnabled="False" Margin="0,0,0,6"/>
+                                                <Button x:Name="ServicesStreamerBotRunActionButton" x:FieldModifier="public" Content="AKTION AUSFÜHREN" IsEnabled="False" Margin="0,0,0,6"/>
+                                                <Button x:Name="ServicesStreamerBotScheduleActionButton" x:FieldModifier="public" Content="GEPLANT STARTEN" IsEnabled="False"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Border Grid.Row="3" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0">
+                                            <StackPanel>
+                                                <TextBlock Text="AUSFÜHRUNGSHISTORIE" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                                <ListBox x:Name="ServicesStreamerBotHistoryList" x:FieldModifier="public" Margin="0,8,0,0" MinHeight="92" MaxHeight="150" Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayName"/>
+                                                <WrapPanel HorizontalAlignment="Right" Margin="0,8,0,0"><Button x:Name="ServicesStreamerBotExportHistoryButton" x:FieldModifier="public" Content="CSV EXPORTIEREN"/><Button x:Name="ServicesStreamerBotClearHistoryButton" x:FieldModifier="public" Content="HISTORIE LEEREN" Margin="6,0,0,0"/></WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Row="4" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,12,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="AKTIONSVORLAGEN" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                                    <TextBox x:Name="ServicesStreamerBotTemplateNameBox" x:FieldModifier="public" Margin="0,7,0,0" ToolTip="Name der Vorlage"/>
+                                                    <ComboBox x:Name="ServicesStreamerBotTemplateBox" x:FieldModifier="public" Margin="0,7,0,0" DisplayMemberPath="DisplayName"/>
+                                                    <WrapPanel Margin="0,7,0,0">
+                                                        <Button x:Name="ServicesStreamerBotSaveTemplateButton" x:FieldModifier="public" Content="SPEICHERN"/>
+                                                        <Button x:Name="ServicesStreamerBotLoadTemplateButton" x:FieldModifier="public" Content="LADEN"/>
+                                                        <Button x:Name="ServicesStreamerBotDeleteTemplateButton" x:FieldModifier="public" Content="LÖSCHEN"/>
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="TEST &amp; PLANUNG" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                                                    <TextBlock Text="Wiederholungen" Foreground="#9AA6AE" Margin="0,7,0,3"/>
+                                                    <TextBox x:Name="ServicesStreamerBotRepeatCountBox" x:FieldModifier="public" Text="1" HorizontalContentAlignment="Center"/>
+                                                    <TextBlock Text="Pause zwischen Tests (ms)" Foreground="#9AA6AE" Margin="0,7,0,3"/>
+                                                    <TextBox x:Name="ServicesStreamerBotRepeatDelayBox" x:FieldModifier="public" Text="500" HorizontalContentAlignment="Center"/>
+                                                    <TextBlock Text="Start in Minuten" Foreground="#9AA6AE" Margin="0,7,0,3"/>
+                                                    <TextBox x:Name="ServicesStreamerBotScheduleMinutesBox" x:FieldModifier="public" Text="1" HorizontalContentAlignment="Center"/>
+                                                    <Button x:Name="ServicesStreamerBotCancelScheduleButton" x:FieldModifier="public" Content="PLANUNG ABBRECHEN" IsEnabled="False" Margin="0,7,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                        </ScrollViewer>
+</UserControl>

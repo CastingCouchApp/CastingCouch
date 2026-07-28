@@ -1,0 +1,256 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Services.StreamDeckServiceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <Grid Margin="18" MinWidth="1000" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="420"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="Eigene Aktionstaste erstellen" FontSize="22" FontWeight="Bold"/>
+                                    <TextBlock Text="Erzeugt eine ausführbare Taste im festgelegten Suite-Ordner. Diese Datei kann anschließend in Elgato Stream Deck einer Taste zugeordnet werden." Foreground="#9AA6AE" TextWrapping="Wrap" Margin="0,6,0,16"/>
+                                    <TextBlock Text="Beschriftung" Foreground="#FF7A18" FontWeight="SemiBold"/>
+                                    <TextBox x:Name="StreamDeckActionTitleBox" x:FieldModifier="public" Margin="0,6,0,12" Text="Neue Aktion"/>
+                                    <TextBlock Text="Aktion" Foreground="#FF7A18" FontWeight="SemiBold"/>
+                                    <ComboBox x:Name="StreamDeckActionCommandBox" x:FieldModifier="public" Margin="0,6,0,12" SelectedIndex="0">
+                                        <ComboBoxItem Content="Stream vorbereiten" Tag="workflow.prepare"/>
+                                        <ComboBoxItem Content="Stream starten" Tag="stream.start"/>
+                                        <ComboBoxItem Content="Stream beenden" Tag="stream.stop"/>
+                                        <ComboBoxItem Content="Start-Countdown" Tag="workflow.countdown"/>
+                                        <ComboBoxItem Content="Pausenszene" Tag="workflow.pause"/>
+                                        <ComboBoxItem Content="Live-Szene" Tag="workflow.live"/>
+                                        <ComboBoxItem Content="Spotify Play/Pause" Tag="spotify.toggle"/>
+                                        <ComboBoxItem Content="Spotify nächster Titel" Tag="spotify.next"/>
+                                        <ComboBoxItem Content="Spotify vorheriger Titel" Tag="spotify.previous"/>
+                                        <ComboBoxItem Content="Spotify lauter" Tag="spotify.volumeup"/>
+                                        <ComboBoxItem Content="Spotify leiser" Tag="spotify.volumedown"/>
+                                        <ComboBoxItem Content="Spotify Lautstärke setzen" Tag="spotify.volume"/>
+                                        <ComboBoxItem Content="Spotify Playlist starten" Tag="spotify.playlist"/>
+                                        <ComboBoxItem Content="OBS Szene wechseln" Tag="obs.scene"/>
+                                        <ComboBoxItem Content="OBS Quelle umschalten" Tag="obs.source.toggle"/>
+                                        <ComboBoxItem Content="OBS Audioquelle muten" Tag="obs.audio.toggle"/>
+                                        <ComboBoxItem Content="Stream-Deck Profil aktivieren" Tag="streamdeck.profile.activate"/>
+                                        <ComboBoxItem Content="Stream-Deck Seite öffnen" Tag="streamdeck.page.open"/>
+                                        <ComboBoxItem Content="Twitch Raid" Tag="twitch.raid"/>
+                                        <ComboBoxItem Content="Twitch Marker setzen" Tag="twitch.marker"/>
+                                        <ComboBoxItem Content="Overlay umschalten" Tag="overlay.toggle"/>
+                                        <ComboBoxItem Content="Test-Alert" Tag="alerts.test"/>
+                                        <ComboBoxItem Content="Streamer.bot Aktion" Tag="streamerbot.action"/>
+                                    </ComboBox>
+                                    <TextBlock Text="Parameter / Ziel" Foreground="#FF7A18" FontWeight="SemiBold"/>
+                                    <TextBox x:Name="StreamDeckActionParameterBox" x:FieldModifier="public" Margin="0,6,0,4"/>
+                                    <TextBlock Text="Zum Beispiel Szenenname, Spotify-Lautstärke (0–100), Playlist-URI, Quellenname oder Raid-Kanal." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock Text="Profil" Foreground="#FF7A18" FontWeight="SemiBold"/><TextBox x:Name="StreamDeckProfileNameBox" x:FieldModifier="public" Text="Standard" Margin="0,6,0,0"/></StackPanel>
+                                        <StackPanel Grid.Column="2"><TextBlock Text="Seite / Ordner" Foreground="#FF7A18" FontWeight="SemiBold"/><TextBox x:Name="StreamDeckPageNameBox" x:FieldModifier="public" Text="Hauptseite" Margin="0,6,0,0"/></StackPanel>
+                                        <StackPanel Grid.Column="4"><TextBlock Text="Position" Foreground="#FF7A18" FontWeight="SemiBold"/><TextBox x:Name="StreamDeckSlotBox" x:FieldModifier="public" Text="1" Margin="0,6,0,0"/></StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="Mehrfachaktion (optional)" Foreground="#FF7A18" FontWeight="SemiBold"/>
+                                    <TextBox x:Name="StreamDeckMultiActionBox" x:FieldModifier="public" Height="86" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="0,6,0,4"/>
+                                    <TextBlock Text="Eine Aktion pro Zeile: befehl|parameter. Bleibt das Feld leer, wird die oben gewählte Einzelaktion verwendet." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                    <TextBlock Text="Zustandsabhängige Beschriftung (optional)" Foreground="#FF7A18" FontWeight="SemiBold"/>
+                                    <ComboBox x:Name="StreamDeckStateConditionBox" x:FieldModifier="public" Margin="0,6,0,8" SelectedIndex="0">
+                                        <ComboBoxItem Content="Keine Zustandsbindung" Tag=""/>
+                                        <ComboBoxItem Content="Stream ist live" Tag="stream.live"/>
+                                        <ComboBoxItem Content="OBS ist verbunden" Tag="obs.connected"/>
+                                        <ComboBoxItem Content="Spotify spielt" Tag="spotify.playing"/>
+                                    </ComboBox>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock Text="Beschriftung AUS" Foreground="#9AA6AE"/><TextBox x:Name="StreamDeckFalseLabelBox" x:FieldModifier="public" Text="Starten" Margin="0,5,0,0"/></StackPanel>
+                                        <StackPanel Grid.Column="2"><TextBlock Text="Beschriftung AN" Foreground="#9AA6AE"/><TextBox x:Name="StreamDeckTrueLabelBox" x:FieldModifier="public" Text="Beenden" Margin="0,5,0,0"/></StackPanel>
+                                    </Grid>
+                                    <CheckBox x:Name="StreamDeckToggleModeBox" x:FieldModifier="public" Content="Zustandsabhängige Toggle-Taste mit zweitem Befehl" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Befehl bei Zustand AN" Foreground="#FF7A18" FontWeight="SemiBold"/>
+                                            <ComboBox x:Name="StreamDeckAlternateCommandBox" x:FieldModifier="public" Margin="0,6,0,0" SelectedIndex="0">
+                                                <ComboBoxItem Content="Stream beenden" Tag="stream.stop"/><ComboBoxItem Content="Stream starten" Tag="stream.start"/>
+                                                <ComboBoxItem Content="Spotify Play/Pause" Tag="spotify.toggle"/><ComboBoxItem Content="OBS Szene wechseln" Tag="obs.scene"/>
+                                                <ComboBoxItem Content="OBS Quelle umschalten" Tag="obs.source.toggle"/><ComboBoxItem Content="OBS Audioquelle muten" Tag="obs.audio.toggle"/>
+                                                <ComboBoxItem Content="Streamer.bot Aktion" Tag="streamerbot.action"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Parameter bei Zustand AN" Foreground="#FF7A18" FontWeight="SemiBold"/>
+                                            <TextBox x:Name="StreamDeckAlternateParameterBox" x:FieldModifier="public" Margin="0,6,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="Ausführungssteuerung" Foreground="#FF7A18" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock Text="Schrittverzögerung (ms)" Foreground="#9AA6AE"/><TextBox x:Name="StreamDeckStepDelayBox" x:FieldModifier="public" Text="250" Margin="0,5,0,0"/></StackPanel>
+                                        <StackPanel Grid.Column="2"><TextBlock Text="Wiederholungen bei Fehler" Foreground="#9AA6AE"/><TextBox x:Name="StreamDeckRetryCountBox" x:FieldModifier="public" Text="1" Margin="0,5,0,0"/></StackPanel>
+                                        <StackPanel Grid.Column="4"><TextBlock Text="Tastensperre (ms)" Foreground="#9AA6AE"/><TextBox x:Name="StreamDeckCooldownBox" x:FieldModifier="public" Text="1000" Margin="0,5,0,0"/></StackPanel>
+                                    </Grid>
+                                    <CheckBox x:Name="StreamDeckSimulationModeBox" x:FieldModifier="public" Content="Testsimulation: Befehle nur protokollieren, nicht ausführen" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10"/>
+                                    <TextBlock Text="Globale Aktionsvorlagen" Foreground="#FF7A18" FontWeight="SemiBold"/>
+                                    <Grid Margin="0,6,0,10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <TextBox x:Name="StreamDeckTemplateNameBox" x:FieldModifier="public" ToolTip="Name für eine neue Vorlage"/>
+                                        <ComboBox x:Name="StreamDeckTemplateBox" x:FieldModifier="public" Grid.Column="2" DisplayMemberPath="Name" ToolTip="Gespeicherte Vorlage auswählen"/>
+                                    </Grid>
+                                    <WrapPanel Margin="0,0,0,10">
+                                        <Button x:Name="SaveStreamDeckTemplateButton" x:FieldModifier="public" Content="VORLAGE SPEICHERN"/>
+                                        <Button x:Name="LoadStreamDeckTemplateButton" x:FieldModifier="public" Content="VORLAGE LADEN"/>
+                                        <Button x:Name="DeleteStreamDeckTemplateButton" x:FieldModifier="public" Content="VORLAGE LÖSCHEN"/>
+                                    </WrapPanel>
+                                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="Automatische Profil- und Seitenregeln" Foreground="#FF7A18" FontWeight="SemiBold"/>
+                                            <TextBlock Text="Schaltet die aktive Stream-Deck-Ansicht abhängig von Stream-, OBS- oder Spotify-Zuständen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,3,0,8"/>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="90"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="StreamDeckRuleConditionBox" x:FieldModifier="public" SelectedIndex="0">
+                                                    <ComboBoxItem Content="Stream wird live" Tag="stream.live"/><ComboBoxItem Content="Stream wird offline" Tag="stream.offline"/><ComboBoxItem Content="OBS verbunden" Tag="obs.connected"/><ComboBoxItem Content="OBS getrennt" Tag="obs.disconnected"/><ComboBoxItem Content="Spotify spielt" Tag="spotify.playing"/><ComboBoxItem Content="Spotify pausiert" Tag="spotify.paused"/><ComboBoxItem Content="Uhrzeit erreicht" Tag="time.reached"/>
+                                                </ComboBox>
+                                                <ComboBox x:Name="StreamDeckRuleOperatorBox" x:FieldModifier="public" Grid.Column="2" SelectedIndex="0"><ComboBoxItem Content="UND" Tag="and"/><ComboBoxItem Content="ODER" Tag="or"/></ComboBox>
+                                                <ComboBox x:Name="StreamDeckRuleCondition2Box" x:FieldModifier="public" Grid.Column="4" SelectedIndex="0">
+                                                    <ComboBoxItem Content="Keine zweite Bedingung" Tag=""/><ComboBoxItem Content="Stream wird live" Tag="stream.live"/><ComboBoxItem Content="Stream wird offline" Tag="stream.offline"/><ComboBoxItem Content="OBS verbunden" Tag="obs.connected"/><ComboBoxItem Content="OBS getrennt" Tag="obs.disconnected"/><ComboBoxItem Content="Spotify spielt" Tag="spotify.playing"/><ComboBoxItem Content="Spotify pausiert" Tag="spotify.paused"/>
+                                                </ComboBox>
+                                            </Grid>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <TextBox x:Name="StreamDeckRuleProfileBox" x:FieldModifier="public" Text="Standard" ToolTip="Zielprofil"/>
+                                                <TextBox x:Name="StreamDeckRulePageBox" x:FieldModifier="public" Grid.Column="2" Text="Hauptseite" ToolTip="Zielseite"/>
+                                            </Grid>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <TextBox x:Name="StreamDeckRulePriorityBox" x:FieldModifier="public" Text="100" ToolTip="Priorität, höhere Zahl gewinnt"/>
+                                                <TextBox x:Name="StreamDeckRuleDelayBox" x:FieldModifier="public" Grid.Column="2" Text="0" ToolTip="Verzögerung in Sekunden"/>
+                                                <TextBox x:Name="StreamDeckRuleTimeBox" x:FieldModifier="public" Grid.Column="4" Text="20:00" ToolTip="Uhrzeit HH:mm, nur für Zeitregel"/>
+                                            </Grid>
+                                            <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><CheckBox x:Name="StreamDeckRuleFallbackBox" x:FieldModifier="public" Content="Als Fallback verwenden" Foreground="{DynamicResource TextPrimaryBrush}"/><StackPanel Grid.Column="2"><TextBlock Text="Sperrzeit nach Umschaltung (Sek.)" Foreground="#9AA6AE"/><TextBox x:Name="StreamDeckRuleHoldBox" x:FieldModifier="public" Text="10" Margin="0,3,0,0"/></StackPanel></Grid>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <TextBox x:Name="StreamDeckRuleGroupBox" x:FieldModifier="public" Text="Standard" ToolTip="Regelgruppe"/>
+                                                <TextBox x:Name="StreamDeckRuleDaysBox" x:FieldModifier="public" Grid.Column="2" Text="Mo,Di,Mi,Do,Fr,Sa,So" ToolTip="Aktive Wochentage"/>
+                                                <TextBox x:Name="StreamDeckRuleWindowBox" x:FieldModifier="public" Grid.Column="4" Text="00:00-23:59" ToolTip="Aktivitätszeitraum HH:mm-HH:mm"/>
+                                            </Grid>
+                                            <WrapPanel Margin="0,0,0,6">
+                                                <CheckBox x:Name="StreamDeckAutomationManualLockBox" x:FieldModifier="public" Content="Automatische Umschaltung manuell sperren" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <Button x:Name="ClearStreamDeckRuleHistoryButton" x:FieldModifier="public" Content="VERLAUF LEEREN"/>
+                                            </WrapPanel>
+                                            <WrapPanel>
+                                                <Button x:Name="AddStreamDeckRuleButton" x:FieldModifier="public" Content="REGEL HINZUFÜGEN"/>
+                                                <Button x:Name="DeleteStreamDeckRuleButton" x:FieldModifier="public" Content="REGEL LÖSCHEN"/>
+                                                <Button x:Name="EvaluateStreamDeckRulesButton" x:FieldModifier="public" Content="REGELN JETZT PRÜFEN"/>
+                                                <Button x:Name="PreviewStreamDeckRulesButton" x:FieldModifier="public" Content="ENTSCHEIDUNG VORSCHAUEN"/>
+                                                <Button x:Name="TestStreamDeckRulesButton" x:FieldModifier="public" Content="REGELN TESTEN"/>
+                                            </WrapPanel>
+                                            <WrapPanel Margin="0,6,0,0">
+                                                <Button x:Name="SaveStreamDeckRuleTemplateButton" x:FieldModifier="public" Content="ALS REGELVORLAGE"/>
+                                                <Button x:Name="LoadStreamDeckRuleTemplateButton" x:FieldModifier="public" Content="VORLAGE LADEN"/>
+                                                <Button x:Name="ExportStreamDeckRuleSetButton" x:FieldModifier="public" Content="REGELSET EXPORTIEREN"/>
+                                                <Button x:Name="ImportStreamDeckRuleSetButton" x:FieldModifier="public" Content="REGELSET IMPORTIEREN"/>
+                                                <Button x:Name="AnalyzeStreamDeckRuleConflictsButton" x:FieldModifier="public" Content="KONFLIKTE PRÜFEN"/>
+                                                <Button x:Name="RestoreStableStreamDeckStateButton" x:FieldModifier="public" Content="STABILES PROFIL WIEDERHERSTELLEN"/>
+                                            </WrapPanel>
+                                            <Grid Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <CheckBox x:Name="StreamDeckRuleNotifyOnSwitchBox" x:FieldModifier="public" Content="Bei automatischer Umschaltung im Statusbereich benachrichtigen" IsChecked="True" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <CheckBox x:Name="StreamDeckRuleAutoDisableBox" x:FieldModifier="public" Content="Fehlerhafte Regeln automatisch deaktivieren" IsChecked="True" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="Fehlergrenze" Foreground="#9AA6AE"/>
+                                                    <TextBox x:Name="StreamDeckRuleFailureThresholdBox" x:FieldModifier="public" Text="3" Margin="0,3,0,0" ToolTip="Nach so vielen aufeinanderfolgenden Fehlern wird die Regel deaktiviert."/>
+                                                </StackPanel>
+                                            </Grid>
+                                            <WrapPanel Margin="0,6,0,0">
+                                                <Button x:Name="ShowStreamDeckRuleStatisticsButton" x:FieldModifier="public" Content="STATISTIK ANZEIGEN"/>
+                                                <Button x:Name="ExportStreamDeckRuleDiagnosticsButton" x:FieldModifier="public" Content="DIAGNOSE EXPORTIEREN"/>
+                                                <Button x:Name="ResetStreamDeckRuleStatisticsButton" x:FieldModifier="public" Content="STATISTIK ZURÜCKSETZEN"/>
+                                            </WrapPanel>
+                                            <ListBox x:Name="StreamDeckRulesList" x:FieldModifier="public" MinHeight="70" MaxHeight="150" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="StreamDeckRuleStatusText" x:FieldModifier="public" Text="Noch keine Regel ausgeführt." Foreground="#9AA6AE" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                            <TextBlock Text="Entscheidungsverlauf" Foreground="#FF7A18" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                            <TextBox x:Name="StreamDeckRuleHistoryBox" x:FieldModifier="public" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="70" MaxHeight="130" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="#DCE4E8"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Button x:Name="CreateStreamDeckActionButton" x:FieldModifier="public" Content="AKTIONSTASTE ERSTELLEN" Height="38" Background="{DynamicResource AccentMutedBrush}" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold"/>
+                                    <TextBlock x:Name="StreamDeckActionCreateStatusText" x:FieldModifier="public" Foreground="#9AA6AE" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Erstellte Stream-Deck-Tasten" FontSize="22" FontWeight="Bold"/>
+                                        <TextBlock x:Name="StreamDeckActionsFolderText" x:FieldModifier="public" Foreground="#9AA6AE" TextWrapping="Wrap" Margin="0,6,0,8"/>
+                                        <WrapPanel Margin="0,0,0,10">
+                                            <TextBlock Text="Profil:" VerticalAlignment="Center" Foreground="#9AA6AE" Margin="0,0,6,0"/>
+                                            <ComboBox x:Name="StreamDeckProfileFilterBox" x:FieldModifier="public" Width="150" SelectedIndex="0"><ComboBoxItem Content="Alle Profile" Tag=""/></ComboBox>
+                                            <TextBlock Text="Seite:" VerticalAlignment="Center" Foreground="#9AA6AE" Margin="12,0,6,0"/>
+                                            <ComboBox x:Name="StreamDeckPageFilterBox" x:FieldModifier="public" Width="150" SelectedIndex="0"><ComboBoxItem Content="Alle Seiten" Tag=""/></ComboBox>
+                                            <Button x:Name="ApplyStreamDeckFilterButton" x:FieldModifier="public" Content="ANZEIGEN" Margin="8,0,0,0" Padding="10,4"/>
+                                            <TextBlock x:Name="StreamDeckOccupancyText" x:FieldModifier="public" Foreground="#FFB36B" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                    <Grid Grid.Row="1" Margin="0,0,0,12">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="3*"/></Grid.ColumnDefinitions>
+                                            <ListBox x:Name="StreamDeckCreatedActionsList" x:FieldModifier="public" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}"/>
+                                            <Border Grid.Column="2" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10">
+                                                <StackPanel>
+                                                    <TextBlock Text="Visuelle Belegung (8 × 4)" Foreground="#FF7A18" FontWeight="Bold"/>
+                                                    <TextBlock Text="Taste auswählen und anschließend ein Feld anklicken, um die Position zu ändern." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,3,0,8"/>
+                                                    <UniformGrid x:Name="StreamDeckSlotGrid" x:FieldModifier="public" Columns="8" Rows="4"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                        <Border Grid.Row="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10" Margin="0,10,0,0">
+                                            <StackPanel>
+                                                <TextBlock Text="AUSGEWÄHLTE TASTE" Foreground="#FF7A18" FontWeight="Bold"/>
+                                                <TextBlock x:Name="StreamDeckSelectedActionDetailsText" x:FieldModifier="public" Text="Keine Taste ausgewählt." Foreground="#B8C2C9" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                                <TextBlock Text="DIAGNOSE" Foreground="#FF7A18" FontWeight="Bold" Margin="0,10,0,0"/>
+                                                <TextBox x:Name="StreamDeckDiagnosticsBox" x:FieldModifier="public" Text="Noch keine Diagnose ausgeführt." IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="55" MaxHeight="120" VerticalScrollBarVisibility="Auto" Margin="0,5,0,0"/>
+                                                <TextBlock Text="Ausführungsprotokoll" Foreground="#FF7A18" FontWeight="SemiBold" Margin="0,10,0,0"/>
+                                                <TextBox x:Name="StreamDeckExecutionLogBox" x:FieldModifier="public" Text="Noch keine Aktion ausgeführt." IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" MaxHeight="150" VerticalScrollBarVisibility="Auto" Margin="0,5,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                    <WrapPanel Grid.Row="2">
+                                        <Button x:Name="TestStreamDeckActionButton" x:FieldModifier="public" Content="TESTEN" Background="{DynamicResource AccentMutedBrush}"/>
+                                        <Button x:Name="DuplicateStreamDeckActionButton" x:FieldModifier="public" Content="DUPLIZIEREN"/>
+                                        <Button x:Name="DuplicateStreamDeckProfileButton" x:FieldModifier="public" Content="PROFIL KOPIEREN"/>
+                                        <Button x:Name="ResolveStreamDeckConflictsButton" x:FieldModifier="public" Content="KONFLIKTE LÖSEN"/>
+                                        <Button x:Name="ActivateStreamDeckViewButton" x:FieldModifier="public" Content="PROFIL/SEITE AKTIVIEREN"/>
+                                        <Button x:Name="LockStreamDeckActionButton" x:FieldModifier="public" Content="TASTE SPERREN"/>
+                                        <Button x:Name="BackupStreamDeckConfigurationButton" x:FieldModifier="public" Content="BACKUP"/>
+                                        <Button x:Name="RestoreStreamDeckConfigurationButton" x:FieldModifier="public" Content="WIEDERHERSTELLEN"/>
+                                        <Button x:Name="ExportStreamDeckActionsButton" x:FieldModifier="public" Content="KATALOG EXPORTIEREN"/>
+                                        <Button x:Name="ImportStreamDeckActionsButton" x:FieldModifier="public" Content="KATALOG IMPORTIEREN"/>
+                                        <Button x:Name="ExportSingleStreamDeckActionButton" x:FieldModifier="public" Content="TASTE EXPORTIEREN"/>
+                                        <Button x:Name="ImportSingleStreamDeckActionButton" x:FieldModifier="public" Content="TASTE IMPORTIEREN"/>
+                                        <Button x:Name="QuickAssignStreamDeckActionButton" x:FieldModifier="public" Content="NÄCHSTER FREIER PLATZ"/>
+                                        <Button x:Name="CompareStreamDeckProfilesButton" x:FieldModifier="public" Content="PROFILE VERGLEICHEN"/>
+                                        <Button x:Name="OpenStreamDeckActionsFolderButton" x:FieldModifier="public" Content="ORDNER ÖFFNEN"/>
+                                        <Button x:Name="DeleteStreamDeckActionButton" x:FieldModifier="public" Content="AUSGEWÄHLTE LÖSCHEN" Background="#713838"/>
+                                        <Button x:Name="RefreshStreamDeckActionsButton" x:FieldModifier="public" Content="LISTE AKTUALISIEREN"/>
+                                        <Button x:Name="SyncStreamDeckStateButton" x:FieldModifier="public" Content="STATUS SYNCHRONISIEREN" Background="#244B63"/>
+                                        <Button x:Name="DiagnoseStreamDeckActionsButton" x:FieldModifier="public" Content="AKTIONEN PRÜFEN" Background="#5A3D71"/>
+                                        <Button x:Name="SimulateStreamDeckActionButton" x:FieldModifier="public" Content="SIMULIEREN" Background="#315D4A"/>
+                                        <Button x:Name="ClearStreamDeckExecutionLogButton" x:FieldModifier="public" Content="PROTOKOLL LEEREN"/>
+                                        <CheckBox x:Name="AutoSyncStreamDeckStateBox" x:FieldModifier="public" Content="Live-Sync" IsChecked="True" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                        <TextBlock x:Name="StreamDeckLiveSyncStatusText" x:FieldModifier="public" Text="Statusdatei noch nicht geschrieben." Foreground="#9AA6AE" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                    </WrapPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        </ScrollViewer>
+</UserControl>

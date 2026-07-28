@@ -1,0 +1,38 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Workflow.WorkflowPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:workflow="clr-namespace:CreatorControlSuite.App.Views.Pages.Workflow">
+    <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Automatisierung" FontSize="30" FontWeight="Bold"/>
+                    <TextBlock x:Name="WorkflowStatusText" Text="Idle · Bereit" Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
+                </StackPanel>
+                <UniformGrid Grid.Row="1" Columns="7" Margin="0,20,0,18">
+                    <Button x:Name="PrepareStreamButton" Content="1. Vorbereiten" Background="#315B72"/>
+                    <Button x:Name="StartCountdownButton" Content="2. Countdown" Background="#6A5A2D"/>
+                    <Button x:Name="StopCountdownButton" Content="Countdown stoppen" Background="#7A3838"/>
+                    <Button x:Name="GoLiveButton" Content="3. Live" Background="#416B3C"/>
+                    <Button x:Name="PauseStreamButton" Content="Pause" Background="#66502F"/>
+                    <Button x:Name="ResumeStreamButton" Content="Fortsetzen" Background="#3A6058"/>
+                    <Button x:Name="EndStreamButton" Content="Stream beenden" Background="#7A3838"/>
+                </UniformGrid>
+                <TabControl x:Name="WorkflowTabControl" Grid.Row="2" Background="{DynamicResource SettingsTabBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}">
+                    <TabItem Header="Session">
+                        <workflow:WorkflowSessionView x:Name="WorkflowSessionViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="Regieplan">
+                        <workflow:RunOfShowView x:Name="RunOfShowViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="Zeitgesteuerte OBS-Aktionen">
+                        <workflow:TimedAutomationView x:Name="TimedAutomationViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="Workflow-Designer">
+                        <workflow:WorkflowDesignerView x:Name="WorkflowDesignerViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                    <TabItem Header="Stream-Kurztest">
+                        <workflow:ShortStreamTestView x:Name="ShortStreamTestViewHost" x:FieldModifier="public"/>
+                    </TabItem>
+                </TabControl>
+    </Grid>
+</UserControl>

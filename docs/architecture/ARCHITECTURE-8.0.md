@@ -92,6 +92,9 @@ Handshake, Authentifizierung, Request-Status und Events abgesichert. Ein
 zentraler Codec validiert Envelope-Struktur und ein 4-MiB-Payload-Limit.
 OBS-Transport, Twitch-API-Verträge und Spotify-Token-/Playback-Helfer liegen in
 separaten Dateien; keine dieser Integrationsdateien überschreitet 1.000 Zeilen.
+Das Größen-Gate umfasst auch die TypeScript-Produktionsquellen des Overlays.
+Die frühere 1.232-zeilige Runtime-Sammlung ist in einen 719-zeiligen
+Kompositionskern sowie eigenständige Chat- und Socials-Widgets zerlegt.
 Canary-Steuerung, Fehlergrenze, Wartungsfenster und Agent-Transport für
 Multi-PC-Updates liegen im testbaren `RemoteUpdateRolloutService` und nicht mehr
 im Window-Code.
@@ -161,5 +164,65 @@ Die Stream-Statistik ist als `StatisticsPageView` und
 und projiziert Kennzahlen, Kategorien sowie Verlauf ohne WPF-Abhängigkeit.
 `MainWindow` stellt nur noch Historienpfad, Ordneröffnung und die
 Dashboard-Kennzahl-Aktualisierung als Plattformcallbacks bereit.
+Die Music-Player-Oberfläche liegt analog vollständig in
+`MusicPlayerPageView`. `MusicPlayerPageActions` bildet die schmale Grenze für
+Wiedergabe, Verbindung, Seek, Lautstärke sowie YouTube-Music-Bookmarklets.
+Die Shell übergibt Zustände und Anwendungs-Callbacks, kennt aber keine
+Steuerelemente oder Drag-and-drop-Details der Seite.
+Die Workflow-Seite ist als `WorkflowPageView` aus der Shell gelöst und
+vertikal in `RunOfShowView`, `TimedAutomationView`, `WorkflowDesignerView`
+und `ShortStreamTestView` gegliedert. Der Seitenrahmen delegiert Prepare,
+Countdown, Live, Pause, Resume und Ende über `WorkflowPageActions`.
+Die umfangreichen Regieplan- und Automationseingaben bleiben während der
+Strangler-Migration über explizite Komponentenhosts kompatibel und werden
+anschließend in eigene ViewModels und Anwendungsservices überführt.
+Die zugehörigen Legacy-Orchestrierungen sind bis dahin physisch in
+`MainWindow.Workflow.RunOfShow.cs`,
+`MainWindow.Workflow.AutomationEditor.cs` und
+`MainWindow.Workflow.Designer.cs` begrenzt. Keine dieser Partial-Dateien
+überschreitet 1.000 Zeilen; sie bilden ausdrücklich keine endgültige
+Domänengrenze.
+Die Einstellungen-Seite wird durch `SettingsPageView` gehostet. Sie komponiert
+die bereits extrahierten General-, Legal-, Update- und Migration-Views und
+kapselt Save, Status und Tabnavigation. Die verbleibende kompatible
+Load-/Migrations-/Save-Orchestrierung liegt in
+`MainWindow.Settings.Persistence.cs` unterhalb des 1.000-Zeilen-Gates; die
+fachlichen Settings-Modelle und Migrationen bleiben in ihren vorhandenen
+testbaren Services.
+Die Dienste-Seite ist über `ServicesPageView` nach Integrationsgrenzen
+gegliedert: Spotify, Twitch, OBS, Streamer.bot und Stream Deck besitzen eigene
+Views. Die Host-View verantwortet ausschließlich Übersicht und Navigation.
+Der umfangreiche Legacy-Code für Stream-Deck-Katalog/Runtime und
+Regelverwaltung liegt vor der weiteren Service-Migration in zwei
+Partial-Dateien unterhalb des 1.000-Zeilen-Gates.
+Auch die verbleibende Shell-Orchestrierung für Twitch, Spotify und OBS ist
+nach Integrations- und Ablaufgrenzen in begrenzte Partial-Dateien unter
+`Shell/Services/` verschoben. Twitch trennt Dashboard/Raid, Engagement und
+API/Professional; Spotify trennt Verbindung, Katalog/Geräte, Runtime-Overlay,
+Sichtbarkeit, Overlay-Einstellungen und Saved-State-Lifecycle; OBS trennt
+Verbindung/Dashboard, Streamstart, Streamende und Service-Steuerung. Keine
+dieser Dateien überschreitet 1.000 Zeilen. Ein Architekturtest verhindert,
+dass die extrahierten Einstiegsmethoden wieder in `MainWindow.xaml.cs`
+zurückwandern.
+Streamer.bot und Creator Intelligence besitzen ebenfalls eigene
+Integrations-Partials. Diagnose/Logs, Alert-Editor, Music-Runtime,
+Overlay-Runtime/Extensions und Dashboard-Runtime/Verbindungen sind als
+separate Shell-Slices organisiert. Workflow-Vorbereitung und die
+Timed-Automation-Runtime liegen neben den bereits extrahierten
+Workflow-Editor-Partials. Diese Dateien sind weiterhin Strangler-Grenzen:
+UI-unabhängige Fachlogik wird in den folgenden Schritten aus ihnen in
+Anwendungsservices verschoben.
+Das Konstruktor-Wiring ist nach Dashboard, Diagnose, OBS, Twitch, Spotify,
+Services, Workflow und Stream Deck in Initializer-Partials aufgeteilt.
+Navigation, Window-Lifecycle, Release-Readiness und Dashboard-Layout liegen
+ebenfalls außerhalb der Hauptdatei. Die bestehende Multi-PC-Alpha-Logik wurde
+ohne Verhaltensänderung in zwei begrenzte Partials verschoben.
+Das Command-Center-Dashboard liegt vollständig in `DashboardPageView`.
+`MainWindow.xaml` enthält nur noch Shell, Navigation und Seitenhosts und
+unterschreitet mit 943 Zeilen erstmals das allgemeine 1.000-Zeilen-Gate.
+Für die Shell-XAML existiert daher keine Legacy-Größenbaseline mehr.
+`MainWindow.xaml.cs` liegt mit 495 Zeilen erstmals unter dem Zielwert von
+500 Zeilen. Architekturtests blockieren sowohl ein erneutes Wachstum als
+auch neue Partial-Dateien ab 1.000 Zeilen.
 Der Agent-Composition-Root liegt unter 1.000 Zeilen; Hosting, Discovery und
 Datei-/Update-Helfer sind in `AgentUtilities` isoliert.

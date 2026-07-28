@@ -1,0 +1,388 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Services.TwitchServiceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:twitchgoals="clr-namespace:CreatorControlSuite.App.Views.Pages.Twitch"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="18">
+                                <TextBlock Text="Twitch-Steuerung" FontSize="22" FontWeight="Bold"/>
+                                <TextBlock x:Name="ServicesTwitchStatusText" x:FieldModifier="public" Text="Nicht verbunden" Margin="0,10,0,12"/>
+                                <WrapPanel>
+                                    <Button x:Name="ServicesTwitchDashboardButton" x:FieldModifier="public" Content="Creator Dashboard öffnen"/>
+                                    <Button x:Name="ServicesTwitchConnectButton" x:FieldModifier="public" Content="Verbinden"/>
+                                    <Button x:Name="ServicesTwitchDisconnectButton" x:FieldModifier="public" Content="Trennen"/>
+                                </WrapPanel>
+                                <TextBlock Text="Titel und Kategorie werden weiterhin über die Twitch-Dienstansicht verwaltet; Zugangsdaten bleiben unter Einstellungen." TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="4,14,0,0"/>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Left">
+                                                <TextBlock Text="Twitch Professional · Live-Analyse" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
+                                                <TextBlock Text="Aktuelle Streamwerte und lokale Session-Auswertung" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                                            </StackPanel>
+                                            <Button x:Name="ServicesRefreshTwitchProfessionalButton" x:FieldModifier="public" Content="AKTUALISIEREN" DockPanel.Dock="Right" HorizontalAlignment="Right"/>
+                                        </DockPanel>
+                                        <WrapPanel Margin="0,14,0,0">
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="115"><StackPanel><TextBlock Text="Status" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalLiveText" x:FieldModifier="public" Text="OFFLINE" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="115"><StackPanel><TextBlock Text="Zuschauer" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalViewerText" x:FieldModifier="public" Text="0" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="115"><StackPanel><TextBlock Text="Peak" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalPeakText" x:FieldModifier="public" Text="0" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="115"><StackPanel><TextBlock Text="Ø Zuschauer" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalAverageText" x:FieldModifier="public" Text="0,0" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="130"><StackPanel><TextBlock Text="Live-Dauer" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalDurationText" x:FieldModifier="public" Text="00:00:00" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="115"><StackPanel><TextBlock Text="Chatnachrichten" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalChatText" x:FieldModifier="public" Text="0" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="135"><StackPanel><TextBlock Text="Aktive Chatter" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalUniqueChattersText" x:FieldModifier="public" Text="0" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="115"><StackPanel><TextBlock Text="Events" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalEventsText" x:FieldModifier="public" Text="0" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="130"><StackPanel><TextBlock Text="Neue Follower" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalFollowersText" x:FieldModifier="public" Text="0" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                        </WrapPanel>
+                                        <Grid Margin="0,6,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="1*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
+                                            <StackPanel Margin="0,0,12,0"><TextBlock Text="Kategorie" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalCategoryText" x:FieldModifier="public" Text="-" TextWrapping="Wrap" FontWeight="SemiBold"/></StackPanel>
+                                            <StackPanel Grid.Column="1"><TextBlock Text="Streamtitel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalTitleText" x:FieldModifier="public" Text="-" TextWrapping="Wrap" FontWeight="SemiBold"/></StackPanel>
+                                        </Grid>
+                                        <Separator Margin="0,14,0,12"/>
+                                        <DockPanel>
+                                            <TextBlock Text="Stream-Historie und Bestwerte" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16" DockPanel.Dock="Left"/>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button x:Name="ServicesCreateTwitchProfessionalReportButton" x:FieldModifier="public" Content="STREAM-REPORT" Margin="0,0,8,0"/>
+                                                <Button x:Name="ServicesCopyTwitchProfessionalSummaryButton" x:FieldModifier="public" Content="ZUSAMMENFASSUNG KOPIEREN" Margin="0,0,8,0"/>
+                                                <Button x:Name="ServicesExportTwitchProfessionalHistoryButton" x:FieldModifier="public" Content="CSV EXPORTIEREN" Margin="0,0,8,0"/>
+                                                <Button x:Name="ServicesOpenTwitchProfessionalHistoryButton" x:FieldModifier="public" Content="ORDNER ÖFFNEN"/>
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <WrapPanel Margin="0,10,0,0">
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="115"><StackPanel><TextBlock Text="Streams gesamt" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalTotalStreamsText" x:FieldModifier="public" Text="0" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="115"><StackPanel><TextBlock Text="Rekord-Peak" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalRecordPeakText" x:FieldModifier="public" Text="0" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="125"><StackPanel><TextBlock Text="Bestes Ø" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalRecordAverageText" x:FieldModifier="public" Text="0,0" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="135"><StackPanel><TextBlock Text="Livezeit gesamt" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalTotalDurationText" x:FieldModifier="public" Text="00:00" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="135"><StackPanel><TextBlock Text="Follower gesamt" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalTotalFollowersText" x:FieldModifier="public" Text="0" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                        </WrapPanel>
+                                        <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,6,0,10">
+                                            <StackPanel>
+                                                <TextBlock Text="Trends der letzten Streams" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                <TextBlock x:Name="ServicesTwitchProfessionalViewerTrendText" x:FieldModifier="public" Text="Zuschauertrend: Noch keine Daten" Margin="0,6,0,0"/>
+                                                <TextBlock x:Name="ServicesTwitchProfessionalFollowerTrendText" x:FieldModifier="public" Text="Followertrend: Noch keine Daten" Margin="0,3,0,0"/>
+                                                <TextBlock x:Name="ServicesTwitchProfessionalCategoryTrendText" x:FieldModifier="public" Text="Häufigste Kategorie: -" Margin="0,3,0,0"/>
+                                                <TextBlock x:Name="ServicesTwitchProfessionalDurationTrendText" x:FieldModifier="public" Text="Ø Streamdauer: 00:00" Margin="0,3,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <WrapPanel Margin="0,2,0,8">
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="135"><StackPanel><TextBlock Text="Peak-Trend" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalPeakTrendText" x:FieldModifier="public" Text="-" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="135"><StackPanel><TextBlock Text="Ø-Trend" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalAverageTrendText" x:FieldModifier="public" Text="-" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="150"><StackPanel><TextBlock Text="Chat pro Stunde" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalChatRateText" x:FieldModifier="public" Text="0" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="150"><StackPanel><TextBlock Text="Beste Kategorie" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalBestCategoryText" x:FieldModifier="public" Text="-" FontSize="18" FontWeight="Bold" TextWrapping="Wrap"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="150"><StackPanel><TextBlock Text="Engagement / Std." Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalEngagementRateText" x:FieldModifier="public" Text="0" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="150"><StackPanel><TextBlock Text="Follower / Std." Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalFollowerRateText" x:FieldModifier="public" Text="0" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="150"><StackPanel><TextBlock Text="Zuschauer-Konstanz" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalConsistencyText" x:FieldModifier="public" Text="-" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                        </WrapPanel>
+                                        <TextBlock x:Name="ServicesTwitchProfessionalSummaryText" x:FieldModifier="public" Text="Noch keine Trenddaten verfügbar." Foreground="#D7DEE3" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                        <ListBox x:Name="ServicesTwitchProfessionalHistoryList" x:FieldModifier="public" Height="170" Margin="0,4,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="#4F46E5" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Left">
+                                                <TextBlock Text="Creator Intelligence · Lokale Analyse" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
+                                                <TextBlock x:Name="ServicesCreatorIntelligenceStatusText" x:FieldModifier="public" Text="Noch keine Creator-Intelligence-Session vorhanden." Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                                <Button x:Name="ServicesCreatorIntelligenceRefreshButton" x:FieldModifier="public" Content="AUSWERTEN" Padding="12,5"/>
+                                                <Button x:Name="ServicesCreatorIntelligenceOpenFolderButton" x:FieldModifier="public" Content="DATENORDNER" Padding="12,5" Margin="8,0,0,0"/>
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <WrapPanel Margin="0,12,0,4">
+                                            <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="135"><StackPanel><TextBlock Text="Creator Score" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesCreatorIntelligenceScoreText" x:FieldModifier="public" Text="–" FontSize="26" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="135"><StackPanel><TextBlock Text="Bindung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesCreatorIntelligenceRetentionText" x:FieldModifier="public" Text="–" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="135"><StackPanel><TextBlock Text="Chataktivität" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesCreatorIntelligenceEngagementText" x:FieldModifier="public" Text="–" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                            <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,8,8" MinWidth="135"><StackPanel><TextBlock Text="Follower-Rate" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesCreatorIntelligenceGrowthText" x:FieldModifier="public" Text="–" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                        </WrapPanel>
+                                        <TextBlock x:Name="ServicesCreatorIntelligenceContextText" x:FieldModifier="public" Text="0 Szenen · 0 Songs · 0 Chatnachrichten" Foreground="#D7DEE3" Margin="0,0,0,8"/>
+                                        <Border Background="{DynamicResource SidebarBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,6,0,12">
+                                            <StackPanel>
+                                                <DockPanel>
+                                                    <TextBlock Text="Creator-Dashboard · 30 Tage" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16"/>
+                                                    <TextBlock x:Name="ServicesCreatorIntelligenceDashboardStatusText" x:FieldModifier="public" Text="Noch keine Langzeitauswertung" Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Right"/>
+                                                </DockPanel>
+                                                <WrapPanel Margin="0,10,0,2">
+                                                    <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="125"><StackPanel><TextBlock Text="Qualitätsindex" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesCreatorIntelligenceQualityIndexText" x:FieldModifier="public" Text="–" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                                    <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="125"><StackPanel><TextBlock Text="Engagement-Index" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesCreatorIntelligenceEngagementIndexText" x:FieldModifier="public" Text="–" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                                    <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="125"><StackPanel><TextBlock Text="Wachstumsindex" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesCreatorIntelligenceGrowthIndexText" x:FieldModifier="public" Text="–" FontSize="20" FontWeight="Bold"/></StackPanel></Border>
+                                                    <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,8,8" MinWidth="145"><StackPanel><TextBlock Text="Prognose nächster Stream" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesCreatorIntelligenceForecastText" x:FieldModifier="public" Text="–" FontSize="18" FontWeight="Bold"/></StackPanel></Border>
+                                                </WrapPanel>
+                                                <TextBlock x:Name="ServicesCreatorIntelligencePeriodText" x:FieldModifier="public" Text="Woche: – · Monat: –" Foreground="#D7DEE3" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                <TextBlock x:Name="ServicesCreatorIntelligenceTrendText" x:FieldModifier="public" Text="Trend: Noch keine Daten" Foreground="#D7DEE3" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                                <TextBlock x:Name="ServicesCreatorIntelligenceBestTimeText" x:FieldModifier="public" Text="Beste Startzeit: –" Foreground="#D7DEE3" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                                <TextBlock x:Name="ServicesCreatorIntelligenceBestCategoryText" x:FieldModifier="public" Text="Beste Kategorie: –" Foreground="#D7DEE3" TextWrapping="Wrap" Margin="0,3,0,8"/>
+                                                <TextBlock Text="Letzte Sessions" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                <ListBox x:Name="ServicesCreatorIntelligenceRecentSessionsList" x:FieldModifier="public" Height="110" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                                <Grid Margin="0,12,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Margin="0,0,6,0">
+                                                        <TextBlock Text="Stärkste OBS-Szenen" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                        <ListBox x:Name="ServicesCreatorIntelligenceScenesList" x:FieldModifier="public" Height="130" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="6,0">
+                                                        <TextBlock Text="Spotify-Wirkung" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                        <ListBox x:Name="ServicesCreatorIntelligenceTracksList" x:FieldModifier="public" Height="130" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2" Margin="6,0,0,0">
+                                                        <TextBlock Text="Zuschauer-Heatmap" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                        <ListBox x:Name="ServicesCreatorIntelligenceHeatmapList" x:FieldModifier="public" Height="130" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                                <Grid Margin="0,12,0,0">
+                                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                                    <StackPanel Margin="0,0,8,0">
+                                                        <TextBlock Text="Event-Korrelation" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                        <ListBox x:Name="ServicesCreatorIntelligenceCorrelationList" x:FieldModifier="public" Height="130" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="8,0">
+                                                        <TextBlock Text="Raid-Bindung" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                        <ListBox x:Name="ServicesCreatorIntelligenceRaidList" x:FieldModifier="public" Height="130" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2" Margin="8,0,0,0">
+                                                        <TextBlock Text="Nächste Maßnahmen" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                        <ListBox x:Name="ServicesCreatorIntelligenceActionsList" x:FieldModifier="public" Height="130" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                                <WrapPanel Margin="0,12,0,0">
+                                                    <Button x:Name="ServicesCreatorIntelligenceWeeklyReportButton" x:FieldModifier="public" Content="WOCHENBERICHT ERSTELLEN" Width="220" Padding="10,6" Background="{DynamicResource HighlightItemBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource HoverBorderBrush}"/>
+                                                    <Button x:Name="ServicesCreatorIntelligenceCompleteActionButton" x:FieldModifier="public" Content="AUSWAHL ERLEDIGT" Width="170" Margin="8,0,0,0" Padding="10,6" Background="{DynamicResource HighlightItemBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource HoverBorderBrush}"/>
+                                                </WrapPanel>
+                                                <DockPanel Margin="0,12,0,0">
+                                                    <TextBlock Text="Maßnahmen-Verlauf" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                    <TextBlock x:Name="ServicesCreatorIntelligenceActionStatusText" x:FieldModifier="public" Text="0 offen · 0 erledigt" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                                </DockPanel>
+                                                <ListBox x:Name="ServicesCreatorIntelligenceActionPlanList" x:FieldModifier="public" Height="145" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" DisplayMemberPath="DisplayText"/>
+                                                <DockPanel Margin="0,12,0,0">
+                                                    <TextBlock Text="Was hat wirklich geholfen?" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                    <TextBlock x:Name="ServicesCreatorIntelligenceEffectivenessStatusText" x:FieldModifier="public" Text="Noch keine Vergleichsdaten" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                                </DockPanel>
+                                                <TextBlock x:Name="ServicesCreatorIntelligenceEffectivenessSummaryText" x:FieldModifier="public" Text="Maßnahmen werden nach weiteren vollständigen Streams automatisch verglichen." Margin="0,5,0,0" Foreground="#C5D0D7" TextWrapping="Wrap"/>
+                                                <ListBox x:Name="ServicesCreatorIntelligenceEffectivenessList" x:FieldModifier="public" Height="135" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                                <DockPanel Margin="0,12,0,0">
+                                                    <TextBlock Text="Creator-Experimente" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                    <TextBlock x:Name="ServicesCreatorIntelligenceExperimentStatusText" x:FieldModifier="public" Text="Noch keine Tests" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                                </DockPanel>
+                                                <TextBlock x:Name="ServicesCreatorIntelligenceExperimentSummaryText" x:FieldModifier="public" Text="Starte aus einer messbaren Maßnahme einen Test über drei vollständige Streams." Margin="0,5,0,0" Foreground="#C5D0D7" TextWrapping="Wrap"/>
+                                                <WrapPanel Margin="0,6,0,0">
+                                                    <Button x:Name="ServicesCreatorIntelligenceStartExperimentButton" x:FieldModifier="public" Content="AUS AUSWAHL TEST STARTEN" Width="220" Padding="10,6" Background="{DynamicResource HighlightItemBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource HoverBorderBrush}"/>
+                                                </WrapPanel>
+                                                <ListBox x:Name="ServicesCreatorIntelligenceExperimentList" x:FieldModifier="public" Height="145" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock Text="Automatische Empfehlungen" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                        <ListBox x:Name="ServicesCreatorIntelligenceRecommendationsList" x:FieldModifier="public" Height="125" Margin="0,6,0,10" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
+                                        <DockPanel>
+                                            <TextBox x:Name="ServicesCreatorIntelligenceNoteBox" x:FieldModifier="public" MinWidth="420" MaxLength="1000" ToolTip="Notiz zur laufenden Session"/>
+                                            <Button x:Name="ServicesCreatorIntelligenceAddNoteButton" x:FieldModifier="public" Content="SESSION-NOTIZ SPEICHERN" Margin="8,0,0,0" Padding="12,5" DockPanel.Dock="Right"/>
+                                        </DockPanel>
+                                    </StackPanel>
+                                </Border>
+                                <Grid Margin="0,18,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.5*"/>
+                                        <ColumnDefinition Width="1*"/>
+                                        <ColumnDefinition Width="1*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="Chat" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                        <Grid Height="220" Margin="0,8,0,0">
+                                            <ListBox x:Name="ServicesTwitchChatList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <wv2:WebView2 x:Name="ServicesTwitchWebChat" x:FieldModifier="public"
+                                                          Visibility="Collapsed"
+                                                          DefaultBackgroundColor="Transparent"/>
+                                        </Grid>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="8,0">
+                                        <TextBlock x:Name="ServicesTwitchUsersHeaderText" x:FieldModifier="public" Text="User (0)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                        <ListBox x:Name="ServicesTwitchUsersList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Height="220" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Margin="8,0,0,0">
+                                        <TextBlock Text="Events" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                        <ListBox x:Name="ServicesTwitchEventsList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Height="220" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Chat-Moderation" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
+                                        <WrapPanel Margin="0,10,0,0">
+                                            <StackPanel Margin="0,0,8,8">
+                                                <TextBlock Text="Benutzer" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <TextBox x:Name="ServicesModerationUserBox" x:FieldModifier="public" Width="180" ToolTip="Benutzername für Moderation"/>
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,8,8">
+                                                <TextBlock Text="Timeout (Minuten)" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <TextBox x:Name="ServicesModerationDurationBox" x:FieldModifier="public" Width="110" Text="10"/>
+                                            </StackPanel>
+                                            <StackPanel Margin="0,0,8,8">
+                                                <TextBlock Text="Grund (optional)" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <TextBox x:Name="ServicesModerationReasonBox" x:FieldModifier="public" Width="280" MaxLength="500"/>
+                                            </StackPanel>
+                                        </WrapPanel>
+                                        <WrapPanel>
+                                            <Button x:Name="ServicesTimeoutUserButton" x:FieldModifier="public" Content="TIMEOUT"/>
+                                            <Button x:Name="ServicesBanUserButton" x:FieldModifier="public" Content="BANNEN" Margin="8,0,0,0"/>
+                                            <Button x:Name="ServicesUnbanUserButton" x:FieldModifier="public" Content="BAN/TIMEOUT AUFHEBEN" Margin="8,0,0,0"/>
+                                        </WrapPanel>
+                                        <WrapPanel Margin="0,10,0,0">
+                                            <TextBlock Text="Schnellwahl:" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <Button x:Name="ServicesModerationPreset1Button" x:FieldModifier="public" Content="1 MIN" Padding="10,4"/>
+                                            <Button x:Name="ServicesModerationPreset10Button" x:FieldModifier="public" Content="10 MIN" Padding="10,4" Margin="6,0,0,0"/>
+                                            <Button x:Name="ServicesModerationPreset60Button" x:FieldModifier="public" Content="1 STD." Padding="10,4" Margin="6,0,0,0"/>
+                                            <Button x:Name="ServicesModerationPreset1440Button" x:FieldModifier="public" Content="24 STD." Padding="10,4" Margin="6,0,0,0"/>
+                                        </WrapPanel>
+                                        <Separator Margin="0,12,0,10"/>
+                                        <DockPanel>
+                                            <TextBlock Text="Moderationsprotokoll" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" DockPanel.Dock="Left"/>
+                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                                <Button x:Name="ServicesExportModerationLogButton" x:FieldModifier="public" Content="EXPORTIEREN" Padding="10,4"/>
+                                                <Button x:Name="ServicesClearModerationLogButton" x:FieldModifier="public" Content="ANSICHT LEEREN" Padding="10,4" Margin="6,0,0,0"/>
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <ListBox x:Name="ServicesTwitchModerationLogList" x:FieldModifier="public" Height="120" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Interaktionen" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
+                                        <TabControl Margin="0,10,0,0">
+                                            <TabItem Header="Channel Points">
+                                                <StackPanel Margin="10">
+                                                    <WrapPanel>
+                                                        <TextBox x:Name="ServicesRewardTitleBox" x:FieldModifier="public" Width="220" ToolTip="Titel der Belohnung"/>
+                                                        <TextBox x:Name="ServicesRewardCostBox" x:FieldModifier="public" Width="90" Text="500" Margin="8,0,0,0" ToolTip="Punktekosten"/>
+                                                        <TextBox x:Name="ServicesRewardPromptBox" x:FieldModifier="public" Width="280" Margin="8,0,0,0" ToolTip="Beschreibung oder Eingabeaufforderung"/>
+                                                        <Button x:Name="ServicesCreateRewardButton" x:FieldModifier="public" Content="ERSTELLEN" Margin="8,0,0,0"/>
+                                                        <Button x:Name="ServicesRefreshRewardsButton" x:FieldModifier="public" Content="AKTUALISIEREN" Margin="8,0,0,0"/>
+                                                    </WrapPanel>
+                                                    <ListBox x:Name="ServicesRewardsList" x:FieldModifier="public" Height="130" Margin="0,10,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="Title"/>
+                                                    <TextBlock Text="Offene Einlösungen der ausgewählten Belohnung" Margin="0,12,0,4" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    <WrapPanel>
+                                                        <Button x:Name="ServicesRefreshRedemptionsButton" x:FieldModifier="public" Content="EINLÖSUNGEN LADEN"/>
+                                                        <Button x:Name="ServicesFulfillRedemptionButton" x:FieldModifier="public" Content="ERFÜLLT" Margin="8,0,0,0"/>
+                                                        <Button x:Name="ServicesCancelRedemptionButton" x:FieldModifier="public" Content="ABLEHNEN" Margin="8,0,0,0"/>
+                                                    </WrapPanel>
+                                                    <ListBox x:Name="ServicesRedemptionsList" x:FieldModifier="public" Height="130" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
+                                                </StackPanel>
+                                            </TabItem>
+                                            <TabItem Header="Umfrage">
+                                                <StackPanel Margin="10">
+                                                    <TextBox x:Name="ServicesPollTitleBox" x:FieldModifier="public" ToolTip="Frage der Umfrage"/>
+                                                    <TextBox x:Name="ServicesPollChoicesBox" x:FieldModifier="public" Margin="0,8,0,0" Text="Ja&#x0a;Nein" AcceptsReturn="True" Height="70" ToolTip="Eine Antwort pro Zeile"/>
+                                                    <WrapPanel Margin="0,8,0,0">
+                                                        <TextBox x:Name="ServicesPollDurationBox" x:FieldModifier="public" Width="90" Text="60" ToolTip="Dauer in Sekunden"/>
+                                                        <Button x:Name="ServicesCreatePollButton" x:FieldModifier="public" Content="UMFRAGE STARTEN" Margin="8,0,0,0"/>
+                                                        <Button x:Name="ServicesEndPollButton" x:FieldModifier="public" Content="UMFRAGE BEENDEN" Margin="8,0,0,0"/>
+                                                        <Button x:Name="ServicesArchivePollButton" x:FieldModifier="public" Content="ARCHIVIEREN" Margin="8,0,0,0"/>
+                                                        <TextBlock x:Name="ServicesPollStatusText" x:FieldModifier="public" Text="Keine aktive Umfrage" Margin="12,5,0,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </TabItem>
+                                            <TabItem Header="Vorhersage">
+                                                <StackPanel Margin="10">
+                                                    <TextBox x:Name="ServicesPredictionTitleBox" x:FieldModifier="public" ToolTip="Frage der Vorhersage"/>
+                                                    <TextBox x:Name="ServicesPredictionOutcomesBox" x:FieldModifier="public" Margin="0,8,0,0" Text="Erfolg&#x0a;Fehlschlag" AcceptsReturn="True" Height="70" ToolTip="Zwei bis zehn Ergebnisse, eines pro Zeile"/>
+                                                    <WrapPanel Margin="0,8,0,0">
+                                                        <TextBox x:Name="ServicesPredictionWindowBox" x:FieldModifier="public" Width="90" Text="120" ToolTip="Teilnahmefenster in Sekunden"/>
+                                                        <Button x:Name="ServicesCreatePredictionButton" x:FieldModifier="public" Content="VORHERSAGE STARTEN" Margin="8,0,0,0"/>
+                                                        <Button x:Name="ServicesLockPredictionButton" x:FieldModifier="public" Content="SPERREN" Margin="8,0,0,0"/>
+                                                        <Button x:Name="ServicesCancelPredictionButton" x:FieldModifier="public" Content="ABBRECHEN" Margin="8,0,0,0"/>
+                                                        <TextBlock x:Name="ServicesPredictionStatusText" x:FieldModifier="public" Text="Keine aktive Vorhersage" Margin="12,5,0,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    </WrapPanel>
+                                                    <WrapPanel Margin="0,8,0,0">
+                                                        <ComboBox x:Name="ServicesPredictionWinnerBox" x:FieldModifier="public" Width="260" DisplayMemberPath="Title"/>
+                                                        <Button x:Name="ServicesResolvePredictionButton" x:FieldModifier="public" Content="GEWINNER AUFLÖSEN" Margin="8,0,0,0"/>
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </TabItem>
+                                        </TabControl>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Streamtitel und Kategorie" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
+                                        <TextBlock Text="Streamtitel" Margin="0,12,0,4"/>
+                                        <TextBox x:Name="ServicesTwitchTitleBox" x:FieldModifier="public"/>
+                                        <TextBlock Text="Kategorie suchen" Margin="0,12,0,4"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="ServicesTwitchCategorySearchBox" x:FieldModifier="public"/>
+                                            <Button x:Name="ServicesSearchTwitchCategoryButton" x:FieldModifier="public" Grid.Column="1" Content="Suchen"/>
+                                        </Grid>
+                                        <ComboBox x:Name="ServicesTwitchCategoryResultsBox" x:FieldModifier="public" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                        <Button x:Name="ServicesSaveTwitchChannelButton" x:FieldModifier="public" Content="Titel und Kategorie ändern" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Streamende und Raid" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
+                                        <CheckBox x:Name="ServicesTwitchRaidEnabledBox" x:FieldModifier="public" Content="Stream mit Raid beenden" Margin="0,10,0,0"/>
+                                        <TextBlock Text="Häufige Raidziele" Margin="0,12,0,5"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="ServicesTwitchNewRaidChannelBox" x:FieldModifier="public" ToolTip="Twitch-Kanalname ohne twitch.tv/"/>
+                                            <Button x:Name="ServicesTwitchAddRaidChannelButton" x:FieldModifier="public" Grid.Column="1" Content="HINZUFÜGEN" Margin="8,0,0,0"/>
+                                        </Grid>
+                                        <ListBox x:Name="ServicesTwitchRaidChannelsList" x:FieldModifier="public" Height="120" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}"/>
+                                        <Button x:Name="ServicesTwitchRemoveRaidChannelButton" x:FieldModifier="public" Content="AUSGEWÄHLTES ZIEL ENTFERNEN" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+                                        <TextBox x:Name="ServicesTwitchRaidChannelsBox" x:FieldModifier="public" Visibility="Collapsed" AcceptsReturn="True"/>
+                                        <TextBlock Text="Bevorzugtes Raid-Ziel" Margin="0,10,0,5"/>
+                                        <WrapPanel>
+                                            <ComboBox x:Name="ServicesTwitchRaidTargetBox" x:FieldModifier="public" Foreground="{DynamicResource TextPrimaryBrush}" Background="{DynamicResource TextMutedBrush}" MinWidth="300" HorizontalAlignment="Left"/>
+                                            <Button x:Name="ServicesTwitchOpenRaidChannelButton" x:FieldModifier="public" Content="Channel öffnen" Margin="8,0,0,0"/>
+                                        </WrapPanel>
+                                        <TextBlock x:Name="ServicesTwitchRaidTargetStatusText" x:FieldModifier="public" Text="Kein Ziel ausgewählt" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Border Width="48" Height="48" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="4" Margin="0,0,10,0">
+                                                <Image x:Name="ServicesTwitchRaidProfileImage" x:FieldModifier="public" Stretch="UniformToFill"/>
+                                            </Border>
+                                            <TextBlock x:Name="ServicesTwitchRaidLiveDurationText" x:FieldModifier="public" Text="Live-Dauer: -" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <WrapPanel Margin="0,10,0,0">
+                                            <TextBlock Text="Raid-Countdown" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="ServicesTwitchRaidCountdownSecondsBox" x:FieldModifier="public" Width="70" Margin="8,0"/>
+                                            <TextBlock Text="Sekunden (Twitch normalerweise 90)" VerticalAlignment="Center"/>
+                                        </WrapPanel>
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <TextBlock Text="Auto-Raid Timeout" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="ServicesTwitchRaidStartTimeoutSecondsBox" x:FieldModifier="public" Width="70" Margin="8,0"
+                                                     ToolTip="Nach der Endszene: wie lange Ziel-Status gepollt und StartRaid wiederholt wird, bevor ohne Raid beendet wird."/>
+                                            <TextBlock Text="Sekunden (Polling/Retry nach Endszene)" VerticalAlignment="Center"/>
+                                        </WrapPanel>
+                                        <CheckBox x:Name="ServicesTwitchStopStreamAfterRaidBox" x:FieldModifier="public" Content="Stream nach dem Raid automatisch beenden" Margin="0,8,0,0"/>
+                                        <CheckBox x:Name="ServicesTwitchStopSpotifyAfterRaidBox" x:FieldModifier="public" Content="Spotify nach dem Raid pausieren" Margin="0,5,0,0"/>
+                                        <WrapPanel Margin="0,10,0,0">
+                                            <TextBlock Text="Endszene anzeigen für" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="ServicesTwitchEndSceneSecondsBox" x:FieldModifier="public" Width="70" Margin="8,0"/>
+                                            <TextBlock Text="Sekunden" VerticalAlignment="Center"/>
+                                        </WrapPanel>
+                                        <Border Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,12,0,0">
+                                            <StackPanel>
+                                                <TextBlock Text="Follower-Ziel auf der Endszene" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <TextBlock Text="Dieser Zielwert wird in die overlay-data.json geschrieben und von der Endszene angezeigt." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,8"/>
+                                                <WrapPanel>
+                                                    <TextBlock Text="Ziel" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="ServicesTwitchEndFollowerGoalTargetBox" x:FieldModifier="public" Width="90" Margin="8,0,0,0" ToolTip="Beispiel: 200"/>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+                                        <Button x:Name="ServicesTwitchSaveEndSettingsButton" x:FieldModifier="public" Content="Streamende-Einstellungen speichern" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
+                                    <twitchgoals:TwitchGoalsView x:Name="TwitchGoalsViewHost" x:FieldModifier="public"/>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+</UserControl>

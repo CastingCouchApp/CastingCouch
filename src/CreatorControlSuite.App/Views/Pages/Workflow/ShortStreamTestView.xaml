@@ -1,0 +1,25 @@
+<UserControl x:Class="CreatorControlSuite.App.Views.Pages.Workflow.ShortStreamTestView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="18" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                                <TextBlock Text="Stream-Kurztest ohne Livegang" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+                                <TextBlock Text="Prüft die wichtigsten Verbindungen und führt auf Wunsch ungefährliche Testaktionen aus. OBS-Streaming wird dabei niemals gestartet." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,16"/>
+                                <UniformGrid Columns="2">
+                                    <CheckBox x:Name="ShortTestObsBox" x:FieldModifier="public" Content="OBS-Verbindung und Szenen prüfen" IsChecked="True" Margin="6"/>
+                                    <CheckBox x:Name="ShortTestSpotifyBox" x:FieldModifier="public" Content="Spotify-Verbindung prüfen" IsChecked="True" Margin="6"/>
+                                    <CheckBox x:Name="ShortTestStreamerBotBox" x:FieldModifier="public" Content="Streamer.bot-Verbindung prüfen" IsChecked="True" Margin="6"/>
+                                    <CheckBox x:Name="ShortTestOverlayBox" x:FieldModifier="public" Content="Overlay-Datei prüfen" IsChecked="True" Margin="6"/>
+                                    <CheckBox x:Name="ShortTestAlertBox" x:FieldModifier="public" Content="Ausgewählten Suite-Alert testen" Margin="6"/>
+                                    <CheckBox x:Name="ShortTestAutomationBox" x:FieldModifier="public" Content="Ausgewählte Automatisierungsregel testen" Margin="6"/>
+                                </UniformGrid>
+                                <WrapPanel Margin="0,18,0,10">
+                                    <Button x:Name="StartShortStreamTestButton" x:FieldModifier="public" Content="KURZTEST STARTEN" Background="#416B3C" FontWeight="Bold"/>
+                                    <Button x:Name="CancelShortStreamTestButton" x:FieldModifier="public" Content="ABBRECHEN" Background="#7A3838"/>
+                                </WrapPanel>
+                                <TextBlock x:Name="ShortStreamTestStatusText" Text="Bereit." Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+                                <ListBox x:Name="ShortStreamTestResultsList" x:FieldModifier="public" MinHeight="260" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            </StackPanel>
+                        </ScrollViewer>
+</UserControl>

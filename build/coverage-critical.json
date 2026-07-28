@@ -1,0 +1,11 @@
+{
+  "minimumBranchRate": 0.9,
+  "criticalRoots": [
+    "src/CreatorControlSuite.Core/Updates/",
+    "src/CreatorControlSuite.Core/Security/",
+    "src/CreatorControlSuite.Agent/Security/"
+  ],
+  "enforcedFiles": [
+    "src/CreatorControlSuite.Core/Updates/FileUpdateTransaction.cs"
+  ]
+}
