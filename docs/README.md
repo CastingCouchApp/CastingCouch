@@ -19,4 +19,6 @@ Verkaufsrisiken: [`architecture/RISK-REGISTER.md`](architecture/RISK-REGISTER.md
 
 Betriebsfreigabe: [`operations/SALES-READINESS-RUNBOOK.md`](operations/SALES-READINESS-RUNBOOK.md)
 
+Agent-Vertrag: [`operations/AGENT-API.md`](operations/AGENT-API.md)
+
 UI-Themes: [`architecture/UI-THEMES.md`](architecture/UI-THEMES.md)

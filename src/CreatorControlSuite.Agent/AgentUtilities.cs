@@ -59,6 +59,10 @@ internal static class AgentUtilities
             });
             options.RejectionStatusCode =
                 StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (context, cancellationToken) =>
+                await AgentApiResults.TooManyRequests(
+                        "Das Anfrage-Limit wurde überschritten.")
+                    .ExecuteAsync(context.HttpContext);
         });
         builder.WebHost.ConfigureKestrel(options =>
         {
@@ -76,7 +80,6 @@ internal static class AgentUtilities
         WebApplication app)
     {
         var correlationIdSlot = new AsyncLocal<string?>();
-        app.UseExceptionHandler();
         app.Use(async (context, next) =>
         {
             string requested =
@@ -97,6 +100,8 @@ internal static class AgentUtilities
                 correlationIdSlot.Value = null;
             }
         });
+        app.Use((context, next) =>
+            AgentApiExceptionHandling.HandleAsync(context, next));
         app.Use(async (context, next) =>
         {
             if (context.Request.Path.StartsWithSegments(
@@ -110,6 +115,8 @@ internal static class AgentUtilities
 
             await next();
         });
+        app.Use((context, next) =>
+            AgentRequestLimits.EnforceAsync(context, next));
         app.UseRateLimiter();
         return correlationIdSlot;
     }
