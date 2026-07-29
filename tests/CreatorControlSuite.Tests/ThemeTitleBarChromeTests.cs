@@ -177,7 +177,7 @@ public sealed class ThemeTitleBarChromeTests
     }
 
     [Fact]
-    public void MainWindowTitleBar_CentersRoundedLogoBeforeStreamWidget()
+    public void MainWindowTitleBar_CentersWordmarkAndConnectionsBeforeStreamWidget()
     {
         string path = Path.Combine(
             FindRepositoryRoot(),
@@ -188,21 +188,31 @@ public sealed class ThemeTitleBarChromeTests
         string xaml = File.ReadAllText(path);
 
         Assert.Contains(
-            "<ColumnDefinition Width=\"172\"/>",
+            "<ColumnDefinition Width=\"340\"/>",
             xaml,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Source=\"Assets/Brand/castingcouch-logo-rounded.png\"",
+            "Source=\"Assets/Brand/castingcouch-horizontal-logo.png\"",
             xaml,
             StringComparison.Ordinal);
         Assert.Contains(
-            "HorizontalAlignment=\"Center\"",
+            "Width=\"300\"",
             xaml,
             StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "<TextBlock Text=\"CastingCouch\"",
-            xaml,
+
+        int brandPanel = xaml.IndexOf(
+            "x:Name=\"TitleBarBrandPanel\"",
             StringComparison.Ordinal);
+        int connections = xaml.IndexOf(
+            "x:Name=\"DashboardConnectionSummaryChip\"",
+            StringComparison.Ordinal);
+        int streamWidgets = xaml.IndexOf(
+            "x:Name=\"DashboardTopStatusRow\"",
+            StringComparison.Ordinal);
+
+        Assert.True(brandPanel >= 0);
+        Assert.True(connections > brandPanel);
+        Assert.True(streamWidgets > connections);
     }
 
     private static string FindRepositoryRoot()
