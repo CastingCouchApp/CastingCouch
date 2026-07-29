@@ -6,6 +6,7 @@
     "src/CreatorControlSuite.Agent/Security/"
   ],
   "enforcedFiles": [
-    "src/CreatorControlSuite.Core/Updates/FileUpdateTransaction.cs"
+    "src/CreatorControlSuite.Core/Updates/FileUpdateTransaction.cs",
+    "src/CreatorControlSuite.Core/Updates/LocalUpdateService.cs"
   ]
 }

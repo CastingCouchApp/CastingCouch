@@ -33,6 +33,8 @@ public sealed class LocalUpdateService : IUpdateService
     private readonly string _installDirectory;
     private readonly string _mainExeName;
     private readonly string _updaterExeName;
+    private readonly Func<ProcessStartInfo, Process?> _processStarter;
+    private readonly Action<string> _writeProbe;
 
     public LocalUpdateService(
         HttpClient httpClient,
@@ -44,7 +46,9 @@ public sealed class LocalUpdateService : IUpdateService
         Func<string>? currentVersionProvider = null,
         string? installDirectory = null,
         string mainExeName = "CreatorControlSuite.exe",
-        string updaterExeName = "CreatorControlSuite.Updater.exe")
+        string updaterExeName = "CreatorControlSuite.Updater.exe",
+        Func<ProcessStartInfo, Process?>? processStarter = null,
+        Action<string>? writeProbe = null)
     {
         _httpClient = httpClient;
         _settingsStore = settingsStore;
@@ -64,6 +68,8 @@ public sealed class LocalUpdateService : IUpdateService
             : installDirectory;
         _mainExeName = mainExeName;
         _updaterExeName = updaterExeName;
+        _processStarter = processStarter ?? Process.Start;
+        _writeProbe = writeProbe ?? ProbeInstallDirectoryWritable;
 
         Directory.CreateDirectory(_backupRoot);
         Directory.CreateDirectory(_downloadRoot);
@@ -338,9 +344,7 @@ public sealed class LocalUpdateService : IUpdateService
 
         try
         {
-            string probe = Path.Combine(installDir, $".ccs-write-probe-{Guid.NewGuid():N}");
-            File.WriteAllText(probe, "ok");
-            File.Delete(probe);
+            _writeProbe(installDir);
         }
         catch (UnauthorizedAccessException)
         {
@@ -371,7 +375,7 @@ public sealed class LocalUpdateService : IUpdateService
         startInfo.ArgumentList.Add(
             Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
-        if (Process.Start(startInfo) is null)
+        if (_processStarter(startInfo) is null)
         {
             throw new InvalidOperationException("Updater konnte nicht gestartet werden.");
         }
@@ -544,6 +548,13 @@ public sealed class LocalUpdateService : IUpdateService
                 yield return file;
             }
         }
+    }
+
+    private static void ProbeInstallDirectoryWritable(string installDir)
+    {
+        string probe = Path.Combine(installDir, $".ccs-write-probe-{Guid.NewGuid():N}");
+        File.WriteAllText(probe, "ok");
+        File.Delete(probe);
     }
 
     private static async Task<string> ComputeSha256Async(
