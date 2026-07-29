@@ -176,6 +176,35 @@ public sealed class ThemeTitleBarChromeTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void MainWindowTitleBar_CentersRoundedLogoBeforeStreamWidget()
+    {
+        string path = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml");
+        string xaml = File.ReadAllText(path);
+
+        Assert.Contains(
+            "<ColumnDefinition Width=\"172\"/>",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Source=\"Assets/Brand/castingcouch-logo-rounded.png\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "HorizontalAlignment=\"Center\"",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "<TextBlock Text=\"CastingCouch\"",
+            xaml,
+            StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);
