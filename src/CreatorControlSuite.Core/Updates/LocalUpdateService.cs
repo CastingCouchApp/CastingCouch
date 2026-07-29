@@ -12,8 +12,8 @@ namespace CreatorControlSuite.Core.Updates;
 
 public sealed class LocalUpdateService : IUpdateService
 {
-    public const string DefaultGitHubOwner = "frankhildebrandt";
-    public const string DefaultGitHubRepo = "CreatorControlSuite";
+    public const string DefaultGitHubOwner = "CastingCouchApp";
+    public const string DefaultGitHubRepo = "CastingCouch";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

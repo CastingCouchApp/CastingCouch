@@ -4,7 +4,7 @@ RSA-SHA256-Prüfung für Update-Manifeste sowie SHA-256- und Größenprüfung f�
 
 ## Artefakte pro Release
 
-GitHub Release (`frankhildebrandt/CreatorControlSuite`) enthält:
+GitHub Release (`CastingCouchApp/CastingCouch`) enthält:
 
 - `CreatorControlSuite-{version}-win-x64.zip` – Portable- und Update-Payload
 - `CreatorControlSuite-{version}-x64.msi` – Installer
