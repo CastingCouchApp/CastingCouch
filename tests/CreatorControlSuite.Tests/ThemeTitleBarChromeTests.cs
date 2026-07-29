@@ -188,15 +188,15 @@ public sealed class ThemeTitleBarChromeTests
         string xaml = File.ReadAllText(path);
 
         Assert.Contains(
-            "<ColumnDefinition Width=\"340\"/>",
+            "<ColumnDefinition Width=\"220\"/>",
             xaml,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Source=\"Assets/Brand/castingcouch-horizontal-logo.png\"",
+            "Source=\"pack://application:,,,/Assets/Brand/castingcouch-horizontal-logo.png\"",
             xaml,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Width=\"300\"",
+            "Width=\"200\"",
             xaml,
             StringComparison.Ordinal);
 

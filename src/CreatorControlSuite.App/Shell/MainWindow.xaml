@@ -68,7 +68,7 @@
                         Panel.ZIndex="1"/>
                 <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="340"/>
+                    <ColumnDefinition Width="220"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
@@ -77,9 +77,9 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Margin="0,0,0,0">
-                    <Image Source="Assets/Brand/castingcouch-horizontal-logo.png"
-                           Width="300"
-                           Height="64"
+                    <Image Source="pack://application:,,,/Assets/Brand/castingcouch-horizontal-logo.png"
+                           Width="200"
+                           Height="52"
                            Stretch="Uniform"
                            IsHitTestVisible="False"
                            RenderOptions.BitmapScalingMode="HighQuality"/>
