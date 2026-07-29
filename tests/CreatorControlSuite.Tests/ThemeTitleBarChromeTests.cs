@@ -115,6 +115,17 @@ public sealed class ThemeTitleBarChromeTests
             "x:Key=\"TitleBarWidgetCardStyle\"",
             appXaml,
             StringComparison.Ordinal);
+        int compactStyleStart = appXaml.IndexOf(
+            "x:Key=\"TitleBarWidgetStyle\"",
+            StringComparison.Ordinal);
+        int cardStyleStart = appXaml.IndexOf(
+            "x:Key=\"TitleBarWidgetCardStyle\"",
+            StringComparison.Ordinal);
+        Assert.True(compactStyleStart >= 0 && cardStyleStart > compactStyleStart);
+        Assert.Contains(
+            "<Setter Property=\"Padding\" Value=\"10,10\"/>",
+            appXaml[compactStyleStart..cardStyleStart],
+            StringComparison.Ordinal);
 
         int serviceSectionStart = xaml.IndexOf(
             "x:Name=\"DashboardServiceStatusSection\"",
