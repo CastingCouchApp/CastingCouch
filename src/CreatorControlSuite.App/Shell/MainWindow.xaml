@@ -367,8 +367,7 @@
                                                     BorderThickness="1"
                                                     CornerRadius="10"
                                                     Padding="14"
-                                                    MinWidth="260"
-                                                    MaxWidth="300">
+                                                    MinWidth="320">
                                                 <StackPanel>
                                                     <TextBlock Text="Countdown einstellen" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,10"/>
                                                     <TextBlock Text="Label" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
@@ -377,9 +376,9 @@
                                                     <TextBox x:Name="DashboardCountdownSecondsBox" Text="600" Margin="0,4,0,8" ToolTip="Countdown-Dauer in Sekunden"/>
                                                     <TextBlock Text="Presets" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,0,0,6"/>
                                                     <UniformGrid Columns="3" Margin="0,0,0,12">
-                                                        <Button x:Name="DashboardCountdownPreset5Button" Content="5 Min" Height="30" Margin="0,0,4,0" Tag="300"/>
-                                                        <Button x:Name="DashboardCountdownPreset10Button" Content="10 Min" Height="30" Margin="0,0,4,0" Tag="600"/>
-                                                        <Button x:Name="DashboardCountdownPreset30Button" Content="30 Min" Height="30" Margin="0" Tag="1800"/>
+                                                        <Button x:Name="DashboardCountdownPreset5Button" Content="5 Min" Height="38" Margin="0,0,4,0" Tag="300"/>
+                                                        <Button x:Name="DashboardCountdownPreset10Button" Content="10 Min" Height="38" Margin="0,0,4,0" Tag="600"/>
+                                                        <Button x:Name="DashboardCountdownPreset30Button" Content="30 Min" Height="38" Margin="0" Tag="1800"/>
                                                     </UniformGrid>
                                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                                         <Button x:Name="DashboardCountdownSettingsCancelButton" Content="Abbrechen" MinWidth="88" Margin="0,0,8,0"/>
