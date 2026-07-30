@@ -233,12 +233,26 @@
                         </StackPanel>
                         <TextBlock x:Name="ServicesSpotifyAutomationStatusText"
                                    x:FieldModifier="public"
-                                   Text="Deaktiviert"
-                                   Foreground="{DynamicResource AccentBrush}"
-                                   FontWeight="SemiBold"
-                                   DockPanel.Dock="Right"
-                                   VerticalAlignment="Center"/>
+                                   Visibility="Collapsed"/>
                     </DockPanel>
+                    <CheckBox x:Name="ServicesSpotifySmartAutomationBox"
+                              x:FieldModifier="public"
+                              Content="Stream- und Szenenautomatik aktivieren"
+                              FontWeight="SemiBold"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
+                              Margin="0,12,0,0"/>
+                    <StackPanel x:Name="SpotifyAutomationContent" Margin="0,2,0,0">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=ServicesSpotifySmartAutomationBox}"
+                                                 Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                     <Border Background="{DynamicResource InputAltBackgroundBrush}"
                             CornerRadius="8"
                             Padding="14"
@@ -266,10 +280,6 @@
                                 Padding="16,9"
                                 Margin="18,0,0,0"/>
                     </Grid>
-                    <CheckBox x:Name="ServicesSpotifySmartAutomationBox"
-                              x:FieldModifier="public"
-                              Content="Szenenregeln aktivieren"
-                              Margin="0,12,0,0"/>
                     <TextBlock Text="Eingerichtete Szenen" FontWeight="SemiBold" Margin="0,12,0,5"/>
                     <ListBox x:Name="ServicesSpotifyAutomationRulesList"
                              x:FieldModifier="public"
@@ -277,6 +287,87 @@
                              MaxHeight="150"
                              Background="{DynamicResource SidebarBackgroundBrush}"
                              BorderBrush="{DynamicResource SubtleBorderBrush}"/>
+                    <Separator Margin="0,18,0,14"/>
+                    <TextBlock Text="Overlay-Verhalten"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Text="Bestimme, wann das Spotify-Overlay sichtbar bleibt."
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+                    <CheckBox x:Name="ServicesSpotifyHidePausedBox"
+                              x:FieldModifier="public"
+                              Content="Overlay bei pausierter Musik ausblenden"
+                              Margin="0,12,0,0"/>
+                    <CheckBox x:Name="ServicesSpotifyHideMutedBox"
+                              x:FieldModifier="public"
+                              Content="Overlay bei lautloser Musik ausblenden"
+                              Margin="0,7,0,0"/>
+                    <Border Background="{DynamicResource InputAltBackgroundBrush}"
+                            CornerRadius="8"
+                            Padding="12"
+                            Margin="22,8,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Musik erkennen über"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <CheckBox x:Name="ServicesSpotifyDetectVolumeMuteBox"
+                                      x:FieldModifier="public"
+                                      Content="Spotify-Lautstärke"
+                                      Margin="0,7,0,0"/>
+                            <CheckBox x:Name="ServicesSpotifyDetectObsMuteBox"
+                                      x:FieldModifier="public"
+                                      Content="OBS-Audioquelle"
+                                      Margin="0,6,0,0"/>
+                            <ComboBox x:Name="ServicesSpotifyObsAudioSourceBox"
+                                      x:FieldModifier="public"
+                                      IsEditable="True"
+                                      Width="360"
+                                      HorizontalAlignment="Left"
+                                      Margin="22,6,0,0"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                      Background="{DynamicResource ElevatedBackgroundBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <Expander Margin="0,12,0,0">
+                        <Expander.Header>
+                            <TextBlock Text="Overlay-Datendatei"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        </Expander.Header>
+                        <StackPanel Margin="0,8,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="ServicesSpotifyDataJsonPathBox"
+                                         x:FieldModifier="public"/>
+                                <Button x:Name="ServicesSpotifyBrowseDataJsonButton"
+                                        x:FieldModifier="public"
+                                        Grid.Column="1"
+                                        Content="AUSWÄHLEN"
+                                        Margin="8,0,0,0"/>
+                            </Grid>
+                            <TextBlock x:Name="ServicesSpotifyOverlayPathText"
+                                       x:FieldModifier="public"
+                                       Text="Keine JSON-Datei ausgewählt."
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       Margin="0,6,0,0"/>
+                            <TextBlock x:Name="ServicesSpotifyOverlayStatusText"
+                                       x:FieldModifier="public"
+                                       Text="Overlay-Verknüpfung nicht geprüft."
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       Margin="0,4,0,0"/>
+                            <WrapPanel Margin="0,10,0,0">
+                                <Button x:Name="ServicesSpotifySaveOverlayButton" x:FieldModifier="public" Content="SPEICHERN"/>
+                                <Button x:Name="ServicesSpotifySyncOverlayButton" x:FieldModifier="public" Content="JETZT SCHREIBEN"/>
+                                <Button x:Name="ServicesSpotifyReloadOverlayButton" x:FieldModifier="public" Content="ORDNER ÖFFNEN"/>
+                                <Button x:Name="ServicesSpotifyPreviewOverlayButton" x:FieldModifier="public" Content="DATEI ÖFFNEN"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Expander>
                     <Expander Header="Interne Spotify-Diagnose" Visibility="Collapsed">
                         <StackPanel Margin="0,10,0,0">
                             <CheckBox x:Name="ServicesSpotifyHealthMonitorBox"
@@ -304,6 +395,7 @@
                                      BorderBrush="{DynamicResource SubtleBorderBrush}"/>
                         </StackPanel>
                     </Expander>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
@@ -334,82 +426,6 @@
                             VerticalAlignment="Center"/>
                 </Grid>
             </Border>
-
-            <!-- Overlay -->
-            <Expander Header="Overlay-Verhalten"
-                      IsExpanded="False"
-                      Background="{DynamicResource ElevatedBackgroundBrush}"
-                      BorderBrush="{DynamicResource SubtleBorderBrush}"
-                      BorderThickness="1"
-                      Padding="18"
-                      Margin="0,16,0,0">
-                <StackPanel Margin="0,12,0,0">
-                    <TextBlock Text="Bestimme, wann das Spotify-Overlay sichtbar bleibt."
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               TextWrapping="Wrap"/>
-                    <CheckBox x:Name="ServicesSpotifyHidePausedBox"
-                              x:FieldModifier="public"
-                              Content="Overlay bei pausierter Musik ausblenden"
-                              Margin="0,12,0,0"/>
-                    <CheckBox x:Name="ServicesSpotifyHideMutedBox"
-                              x:FieldModifier="public"
-                              Content="Overlay bei lautloser Musik ausblenden"
-                              Margin="0,7,0,0"/>
-                    <Border Background="{DynamicResource InputAltBackgroundBrush}"
-                            CornerRadius="8"
-                            Padding="12"
-                            Margin="22,8,0,0">
-                        <StackPanel>
-                            <TextBlock Text="Mute erkennen über" FontWeight="SemiBold"/>
-                            <CheckBox x:Name="ServicesSpotifyDetectVolumeMuteBox"
-                                      x:FieldModifier="public"
-                                      Content="Spotify-Lautstärke"
-                                      Margin="0,7,0,0"/>
-                            <CheckBox x:Name="ServicesSpotifyDetectObsMuteBox"
-                                      x:FieldModifier="public"
-                                      Content="OBS-Audioquelle"
-                                      Margin="0,6,0,0"/>
-                            <ComboBox x:Name="ServicesSpotifyObsAudioSourceBox"
-                                      x:FieldModifier="public"
-                                      IsEditable="True"
-                                      Width="360"
-                                      HorizontalAlignment="Left"
-                                      Margin="22,6,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    <Separator Margin="0,16,0,14"/>
-                    <TextBlock Text="Overlay-Datendatei" FontWeight="SemiBold"/>
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="ServicesSpotifyDataJsonPathBox"
-                                 x:FieldModifier="public"/>
-                        <Button x:Name="ServicesSpotifyBrowseDataJsonButton"
-                                x:FieldModifier="public"
-                                Grid.Column="1"
-                                Content="AUSWÄHLEN"
-                                Margin="8,0,0,0"/>
-                    </Grid>
-                    <TextBlock x:Name="ServicesSpotifyOverlayPathText"
-                               x:FieldModifier="public"
-                               Text="Keine JSON-Datei ausgewählt."
-                               Foreground="{DynamicResource TextMutedBrush}"
-                               Margin="0,6,0,0"/>
-                    <TextBlock x:Name="ServicesSpotifyOverlayStatusText"
-                               x:FieldModifier="public"
-                               Text="Overlay-Verknüpfung nicht geprüft."
-                               Foreground="{DynamicResource TextMutedBrush}"
-                               Margin="0,4,0,0"/>
-                    <WrapPanel Margin="0,10,0,0">
-                        <Button x:Name="ServicesSpotifySaveOverlayButton" x:FieldModifier="public" Content="SPEICHERN"/>
-                        <Button x:Name="ServicesSpotifySyncOverlayButton" x:FieldModifier="public" Content="JETZT SCHREIBEN"/>
-                        <Button x:Name="ServicesSpotifyReloadOverlayButton" x:FieldModifier="public" Content="ORDNER ÖFFNEN"/>
-                        <Button x:Name="ServicesSpotifyPreviewOverlayButton" x:FieldModifier="public" Content="DATEI ÖFFNEN"/>
-                    </WrapPanel>
-                </StackPanel>
-            </Expander>
 
             <!--
               Diese Controls bleiben ausschließlich als interne Kompatibilitätsfelder bestehen,
