@@ -132,18 +132,16 @@ public partial class MainWindow : Window
 
         foreach (Button button in navigationButtons)
         {
-            button.ClearValue(FrameworkElement.TagProperty);
+            button.Tag = null;
             button.ClearValue(Control.BackgroundProperty);
             button.ClearValue(Control.ForegroundProperty);
             button.ClearValue(Control.FontWeightProperty);
         }
 
-        if (activeButton is null)
+        if (activeButton is not null)
         {
-            return;
+            activeButton.Tag = "Active";
         }
-
-        activeButton.Tag = "Active";
     }
 
     private void ShowPage(UIElement page)
