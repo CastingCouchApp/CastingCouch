@@ -60,6 +60,22 @@ public sealed class CountdownSettingsPopupTests
         }
     }
 
+    [Fact]
+    public void TitleBarCountdown_ShowsOnlyTheFixedHeading()
+    {
+        XDocument document = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml"));
+
+        Assert.DoesNotContain(
+            document.Descendants(),
+            element =>
+                (string?)element.Attribute(XamlNs + "Name") == "DashboardCountdownLabelText");
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

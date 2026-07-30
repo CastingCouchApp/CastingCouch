@@ -76,7 +76,6 @@ public partial class MainWindow : Window
 
         string label = DashboardCountdownLabelBox.Text.Trim();
         _settings.Workflow.CountdownLabel = string.IsNullOrWhiteSpace(label) ? "Countdown" : label;
-        DashboardCountdownLabelText.Text = _settings.Workflow.CountdownLabel;
     }
 
     private void OpenDashboardCountdownSettingsPopup()
@@ -176,8 +175,5 @@ public partial class MainWindow : Window
     {
         int total = Math.Max(0, _settings.Workflow.StartCountdownSeconds);
         DashboardCountdownRemainingText.Text = TimeSpan.FromSeconds(total).ToString(@"mm\:ss");
-        DashboardCountdownLabelText.Text = string.IsNullOrWhiteSpace(_settings.Workflow.CountdownLabel)
-            ? "Countdown"
-            : _settings.Workflow.CountdownLabel;
     }
 }
