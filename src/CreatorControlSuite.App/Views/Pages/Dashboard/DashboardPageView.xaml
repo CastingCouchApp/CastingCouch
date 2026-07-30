@@ -242,7 +242,7 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Text="LETZTE EVENTS" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                                                        <Button x:Name="DashboardJoinStreamTogetherButton" x:FieldModifier="public" Grid.Column="1" Content="BEITRETEN" Padding="8,4" Visibility="Collapsed"/>
+                                                        <Button x:Name="DashboardJoinStreamTogetherButton" x:FieldModifier="public" Grid.Column="1" Content="ANFRAGE ÖFFNEN" Padding="8,4" ToolTip="Stream-Together-Anfrage in Twitch annehmen oder ablehnen" Visibility="Collapsed"/>
                                                     </Grid>
                                                     <ListBox x:Name="DashboardTwitchEventsList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="1" Margin="0,8,0,0" Background="{DynamicResource ListBackgroundBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Stretch" Focusable="False">
                                                         <ListBox.ItemContainerStyle>

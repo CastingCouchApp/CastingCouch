@@ -298,25 +298,24 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
         }
         catch (Exception exception)
         {
-            // Guest Star/Stream Together ist eine optionale Beta-Schnittstelle.
-            // Fehlende Berechtigungen dürfen nicht als technisches Live-Event erscheinen.
-            if (!string.Equals(
-                    type,
-                    "channel.guest_star_guest.update",
-                    StringComparison.Ordinal))
-            {
-                EventReceived?.Invoke(
-                    this,
-                    new TwitchEvent(
-                        "subscription.warning",
-                        $"{displayName} konnte nicht aktiviert werden: {exception.Message}",
-                        DateTimeOffset.Now,
-                        new Dictionary<string, string>
-                        {
-                            ["subscription_type"] = type,
-                            ["error"] = exception.Message
-                        }));
-            }
+            string summary = string.Equals(
+                type,
+                "channel.guest_star_guest.update",
+                StringComparison.Ordinal)
+                ? "Stream Together ist nicht aktiv. Twitch bitte erneut autorisieren."
+                : $"{displayName} konnte nicht aktiviert werden: {exception.Message}";
+
+            EventReceived?.Invoke(
+                this,
+                new TwitchEvent(
+                    "subscription.warning",
+                    summary,
+                    DateTimeOffset.Now,
+                    new Dictionary<string, string>
+                    {
+                        ["subscription_type"] = type,
+                        ["error"] = exception.Message
+                    }));
 
             return false;
         }

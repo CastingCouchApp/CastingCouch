@@ -91,6 +91,17 @@ public sealed class TwitchModule(
             tokenSet.AccessToken,
             cancellationToken);
 
+        string[] missingScopes = settings.Twitch.Scopes
+            .Except(_validation.Scopes, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (missingScopes.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "Der gespeicherte Twitch-Token hat nicht alle benötigten Berechtigungen. " +
+                "Bitte Twitch erneut autorisieren. Fehlend: " +
+                string.Join(", ", missingScopes));
+        }
+
         _apiClient.Configure(
             settings.Twitch.ClientId,
             tokenSet.AccessToken);
