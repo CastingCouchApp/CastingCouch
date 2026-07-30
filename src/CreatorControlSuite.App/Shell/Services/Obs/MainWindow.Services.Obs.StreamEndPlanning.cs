@@ -452,7 +452,6 @@ public partial class MainWindow : Window
         await LoadStreamHistoryAsync();
         await _statisticsPageViewModel.LoadAsync(
             GetStreamHistoryFilePath());
-        TryCloseApplicationAfterStreamEnd();
     }
 
     private void SetStreamEndStatus(string text)
@@ -534,7 +533,6 @@ public partial class MainWindow : Window
         {
             if (!_streamEndFlowActive)
             {
-                _closeAfterStreamEnd = false;
                 dialog.Close();
             }
             else
@@ -582,7 +580,6 @@ public partial class MainWindow : Window
                     await ExecuteStreamEndFlowAsync(mode);
                     if (_streamEndAbortRequested)
                     {
-                        _closeAfterStreamEnd = false;
                         dialog.MarkCompleted("Streamende abgebrochen. Stream läuft weiter.");
                     }
                     else
@@ -593,7 +590,6 @@ public partial class MainWindow : Window
                 catch (Exception exception)
                 {
                     ResetStreamEndFlowState();
-                    _closeAfterStreamEnd = false;
                     dialog.MarkCompleted($"Streamende fehlgeschlagen: {exception.Message}");
                     AddDashboardNotification($"Streamende fehlgeschlagen: {exception.Message}", "Fehler");
                 }
@@ -618,7 +614,6 @@ public partial class MainWindow : Window
     private void AbortStreamEndFlowFromDialog()
     {
         _streamEndAbortRequested = true;
-        _closeAfterStreamEnd = false;
         _endSceneCountdownCts?.Cancel();
         _raidCountdownCts?.Cancel();
         _raidAutoStartCts?.Cancel();

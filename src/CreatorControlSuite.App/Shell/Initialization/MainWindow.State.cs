@@ -326,8 +326,6 @@ public partial class MainWindow : Window
     private bool _plannedStreamEndActive;
     private bool _streamEndFlowActive;
     private bool _streamEndAbortRequested;
-    private bool _allowMainWindowClose;
-    private bool _closeAfterStreamEnd;
     private bool _raidTargetIsOnline;
     private bool _awaitingManualRaid;
     private StreamEndDialogWindow? _activeStreamEndDialog;

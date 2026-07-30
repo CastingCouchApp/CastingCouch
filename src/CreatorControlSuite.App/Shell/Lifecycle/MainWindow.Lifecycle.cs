@@ -84,60 +84,6 @@ public partial class MainWindow : Window
         Close();
     }
 
-    private void OnMainWindowClosing(object? sender, CancelEventArgs e)
-    {
-        if (_allowMainWindowClose)
-        {
-            return;
-        }
-
-        if (_streamEndFlowActive)
-        {
-            e.Cancel = true;
-            _activeStreamEndDialog?.Activate();
-            MessageBox.Show(
-                this,
-                "Das Streamende läuft noch. Bitte warte, bis der Stream beendet ist, oder brich den Ablauf ab.",
-                "CastingCouch",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        if (!_lastObsStreamActive)
-        {
-            return;
-        }
-
-        e.Cancel = true;
-        MessageBoxResult result = MessageBox.Show(
-            this,
-            "Der Stream läuft noch. Die Anwendung kann erst geschlossen werden, wenn der Stream beendet ist.\n\nStreamende-Dialog öffnen?",
-            "CastingCouch",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (result != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        _closeAfterStreamEnd = true;
-        _ = StopObsStreamAsync();
-    }
-
-    private void TryCloseApplicationAfterStreamEnd()
-    {
-        if (!_closeAfterStreamEnd)
-        {
-            return;
-        }
-
-        _closeAfterStreamEnd = false;
-        _allowMainWindowClose = true;
-        Dispatcher.BeginInvoke(new Action(Close));
-    }
-
     private void UpdateTitleBarMaximizeButton()
     {
         if (TitleBarMaximizeButton is null || TitleBarMaximizeIcon is null || TitleBarRestoreIcon is null)

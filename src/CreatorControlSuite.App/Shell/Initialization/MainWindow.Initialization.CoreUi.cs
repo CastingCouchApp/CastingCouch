@@ -202,7 +202,6 @@ public partial class MainWindow : Window
             }
         };
 
-        Closing += OnMainWindowClosing;
         Closed += (_, _) =>
         {
             try

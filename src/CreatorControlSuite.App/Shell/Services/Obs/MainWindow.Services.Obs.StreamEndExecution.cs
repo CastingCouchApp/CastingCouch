@@ -175,7 +175,6 @@ public partial class MainWindow : Window
                     {
                         DashboardPageViewHost.DashboardWorkflowStageText.Text = "RAID AUSGEFÜHRT · STREAM LÄUFT WEITER";
                         AddDashboardNotification("Raid wurde ausgeführt. Automatisches Streamende ist deaktiviert.", "Info");
-                        _closeAfterStreamEnd = false;
                         ResetStreamEndFlowState();
                     }
 
@@ -200,7 +199,6 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            _closeAfterStreamEnd = false;
             ResetStreamEndFlowState();
             AddDashboardNotification($"Streamende fehlgeschlagen: {exception.Message}", "Fehler");
             throw;
