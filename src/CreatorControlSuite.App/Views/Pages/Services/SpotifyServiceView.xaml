@@ -361,7 +361,6 @@
                                        Foreground="{DynamicResource TextMutedBrush}"
                                        Margin="0,4,0,0"/>
                             <WrapPanel Margin="0,10,0,0">
-                                <Button x:Name="ServicesSpotifySaveOverlayButton" x:FieldModifier="public" Content="SPEICHERN"/>
                                 <Button x:Name="ServicesSpotifySyncOverlayButton" x:FieldModifier="public" Content="JETZT SCHREIBEN"/>
                                 <Button x:Name="ServicesSpotifyReloadOverlayButton" x:FieldModifier="public" Content="ORDNER ÖFFNEN"/>
                                 <Button x:Name="ServicesSpotifyPreviewOverlayButton" x:FieldModifier="public" Content="DATEI ÖFFNEN"/>
@@ -396,6 +395,15 @@
                         </StackPanel>
                     </Expander>
                     </StackPanel>
+                    <Button x:Name="ServicesSpotifySaveAutomationButton"
+                            x:FieldModifier="public"
+                            Content="AUTOMATIK-EINSTELLUNGEN SPEICHERN"
+                            HorizontalAlignment="Left"
+                            Margin="0,16,0,0"/>
+                    <TextBlock x:Name="ServicesSpotifyAutomationSaveStatusText"
+                               x:FieldModifier="public"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="0,6,0,0"/>
                 </StackPanel>
             </Border>
 

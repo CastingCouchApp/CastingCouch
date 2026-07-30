@@ -455,12 +455,8 @@ public partial class MainWindow : Window
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutoTransferPreferredBox.Unchecked += async (_, _) => await SaveSpotifyDeviceBehaviorAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyUseActiveFallbackBox.Checked += async (_, _) => await SaveSpotifyDeviceBehaviorAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyUseActiveFallbackBox.Unchecked += async (_, _) => await SaveSpotifyDeviceBehaviorAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySmartAutomationBox.Checked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySmartAutomationBox.Unchecked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyHealthMonitorBox.Checked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyHealthMonitorBox.Unchecked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutoRecoverBox.Checked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutoRecoverBox.Unchecked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySaveAutomationButton.Click += async (_, _) =>
+            await SaveSpotifyAutomationSettingsAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyCreateDefaultRulesButton.Click += async (_, _) => await CreateDefaultSpotifyAutomationRulesAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyEditSceneMusicButton.Click += async (_, _) => await EditSpotifySceneMusicAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyTestAutomationButton.Click += async (_, _) => await ExecuteSpotifySceneAutomationAsync(_automationCurrentScene, force: true);

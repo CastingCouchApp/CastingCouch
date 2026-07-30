@@ -498,8 +498,6 @@ public partial class MainWindow : Window
 
         _settings.Spotify.AutomationRules =
             SpotifySceneMusicRuleService.ApplyRows(_settings.Spotify.AutomationRules, window.Rows).ToList();
-        _settings.Spotify.SmartAutomationEnabled = true;
-        await _settingsStore.SaveAsync(_settings);
         RefreshSpotifyAutomationUi(_spotifyModule.GetSnapshot());
     }
 

@@ -77,8 +77,25 @@ public partial class MainWindow : Window
         _spotifyAutomationPageViewModel.ApplyTo(
             _settings.Workflow,
             _settings.Spotify);
-        await _settingsStore.SaveAsync(_settings);
+        _settings.Spotify.SmartAutomationEnabled =
+            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySmartAutomationBox.IsChecked == true;
+        _settings.Spotify.HealthMonitorEnabled =
+            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyHealthMonitorBox.IsChecked == true;
+        _settings.Spotify.AutoRecoverPlayback =
+            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutoRecoverBox.IsChecked == true;
+        if (!_settings.Spotify.SmartAutomationEnabled && _spotifyAlertMuteActive)
+        {
+            await RestoreSpotifyVolumeAfterAlertAsync();
+        }
+
+        await SaveSpotifyOverlaySettingsAsync();
+        _lastSpotifyOverlayMuted = null;
+        await SynchronizeSpotifyOverlayVisibilityAsync(_spotifyModule.GetSnapshot().Playback);
         _spotifyAutomationPageViewModel.AutomationStatusText =
-            "Spotify-Automatik gespeichert.";
+            _settings.Spotify.SmartAutomationEnabled
+                ? "Automatik-Einstellungen gespeichert und aktiviert."
+                : "Automatik-Einstellungen gespeichert. Die Automatik ist deaktiviert.";
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutomationSaveStatusText.Text =
+            _spotifyAutomationPageViewModel.AutomationStatusText;
     }
 }

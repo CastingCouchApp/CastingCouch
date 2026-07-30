@@ -47,14 +47,48 @@ public sealed class SpotifyServiceUiStructureTests
         Assert.Contains("x:Name=\"ServicesSpotifyShuffleBox\"", xaml);
         Assert.Contains("Content=\"Stream- und Szenenautomatik aktivieren\"", xaml);
         Assert.Contains("x:Name=\"SpotifyAutomationContent\"", xaml);
+        Assert.Contains("x:Name=\"ServicesSpotifySaveAutomationButton\"", xaml);
+        Assert.Contains("Content=\"AUTOMATIK-EINSTELLUNGEN SPEICHERN\"", xaml);
         Assert.Contains("Binding=\"{Binding IsChecked, ElementName=ServicesSpotifySmartAutomationBox}\"", xaml);
         Assert.Contains("Text=\"Overlay-Verhalten\"", xaml);
         Assert.Contains("Text=\"Musik erkennen über\"", xaml);
         Assert.DoesNotContain("x:Name=\"ServicesSpotifyPauseButton\"", xaml);
         Assert.DoesNotContain("Text=\"Deaktiviert\"", xaml);
+        Assert.DoesNotContain("Content=\"ALERT-EINSTELLUNGEN SPEICHERN\"", xaml);
         Assert.DoesNotContain("Diagnose und Protokoll", xaml);
         Assert.DoesNotContain("BorderBrush=\"{DynamicResource AccentBrush}\"", xaml);
+
+        string alertXaml = File.ReadAllText(FindRepositoryFile(
+            "src",
+            "CreatorControlSuite.App",
+            "Views",
+            "Pages",
+            "Spotify",
+            "SpotifyAutomationView.xaml"));
+        Assert.DoesNotContain("AutoSave_OnChanged", alertXaml);
+        Assert.DoesNotContain("SaveCommand", alertXaml);
     }
+
+    [Fact]
+    public void SpotifyAutomationRuntime_UsesMasterSwitchForScenesAlertsAndOverlay()
+    {
+        string sceneRuntime = ReadSpotifyShellFile("MainWindow.Services.Spotify.CatalogDevices.cs");
+        string alertRuntime = ReadSpotifyShellFile("MainWindow.Services.Spotify.ConnectionAutomation.cs");
+        string overlayRuntime = ReadSpotifyShellFile("MainWindow.Services.Spotify.Visibility.cs");
+
+        Assert.Contains("!_settings.Spotify.SmartAutomationEnabled", sceneRuntime);
+        Assert.Contains("!_settings.Spotify.SmartAutomationEnabled", alertRuntime);
+        Assert.Contains("!_settings.Spotify.SmartAutomationEnabled", overlayRuntime);
+    }
+
+    private static string ReadSpotifyShellFile(string fileName) =>
+        File.ReadAllText(FindRepositoryFile(
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Spotify",
+            fileName));
 
     private static string FindRepositoryFile(params string[] parts)
     {

@@ -107,6 +107,13 @@ public partial class MainWindow : Window
         await _spotifyOverlayVisibilityLock.WaitAsync();
         try
         {
+            if (!_settings.Spotify.SmartAutomationEnabled)
+            {
+                _lastSpotifyOverlayMuted = null;
+                await ApplySpotifyOverlayMuteStateAsync(false);
+                return;
+            }
+
             if (!_settings.Spotify.OverlayHideWhenMuted && !_settings.Spotify.OverlayHideWhenPaused)
             {
                 _lastSpotifyOverlayMuted = null;
@@ -161,7 +168,8 @@ public partial class MainWindow : Window
 
     private async Task ApplySpotifyOverlayMuteStateAsync(bool isMuted)
     {
-        if (!_settings.Spotify.OverlayHideWhenMuted && !_settings.Spotify.OverlayHideWhenPaused)
+        if (!_settings.Spotify.SmartAutomationEnabled ||
+            (!_settings.Spotify.OverlayHideWhenMuted && !_settings.Spotify.OverlayHideWhenPaused))
         {
             isMuted = false;
         }

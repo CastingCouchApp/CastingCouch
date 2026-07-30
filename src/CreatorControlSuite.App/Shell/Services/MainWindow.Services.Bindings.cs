@@ -156,26 +156,6 @@ public partial class MainWindow : Window
         ServicesPageViewHost.ObsServiceViewHost.ServicesObsAutomationAddButton.Click += async (_, _) => await AddSimpleObsAutomationRuleAsync();
         ServicesPageViewHost.ObsServiceViewHost.ServicesObsAutomationDeleteButton.Click += async (_, _) => await DeleteSimpleObsAutomationRuleAsync();
         ServicesPageViewHost.ObsServiceViewHost.ServicesObsAutomationTestButton.Click += async (_, _) => await TestSimpleObsAutomationRuleAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySaveOverlayButton.Click += async (_, _) => await SaveSpotifyOverlaySettingsAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyHideMutedBox.Checked += async (_, _) =>
-        {
-            await SaveSpotifyDisplayOptionsImmediatelyAsync();
-            _lastSpotifyOverlayMuted = null;
-            await SynchronizeSpotifyOverlayVisibilityAsync(_spotifyModule.GetSnapshot().Playback);
-        };
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyHideMutedBox.Unchecked += async (_, _) =>
-        {
-            await SaveSpotifyDisplayOptionsImmediatelyAsync();
-            _lastSpotifyOverlayMuted = null;
-            await ApplySpotifyOverlayMuteStateAsync(false);
-        };
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyDetectObsMuteBox.Checked += async (_, _) => await SaveSpotifyDisplayOptionsImmediatelyAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyDetectObsMuteBox.Unchecked += async (_, _) => await SaveSpotifyDisplayOptionsImmediatelyAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyDetectVolumeMuteBox.Checked += async (_, _) => await SaveSpotifyDisplayOptionsImmediatelyAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyDetectVolumeMuteBox.Unchecked += async (_, _) => await SaveSpotifyDisplayOptionsImmediatelyAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyHidePausedBox.Checked += async (_, _) => await SaveSpotifyDisplayOptionsImmediatelyAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyHidePausedBox.Unchecked += async (_, _) => await SaveSpotifyDisplayOptionsImmediatelyAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyObsAudioSourceBox.LostFocus += async (_, _) => await SaveSpotifyDisplayOptionsImmediatelyAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyBrowseDataJsonButton.Click += (_, _) => BrowseSpotifyDataJsonPath();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlaySceneBox.SelectionChanged += async (_, _) => await RefreshSpotifyOverlayBrowserSourcesAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySyncOverlayButton.Click += async (_, _) => await WriteSpotifyDataJsonNowAsync();

@@ -199,7 +199,6 @@ public partial class MainWindow : Window
     {
         try
         {
-            await SaveSpotifyOverlaySettingsAsync();
             await _overlayModule.Service.WriteAsync();
             string path = await _overlayModule.Service.GetDataFilePathAsync();
             ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayStatusText.Text = $"JSON wurde aktualisiert: {path}";

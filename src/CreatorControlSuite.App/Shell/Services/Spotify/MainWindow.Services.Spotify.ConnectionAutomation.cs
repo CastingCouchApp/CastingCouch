@@ -190,7 +190,9 @@ public partial class MainWindow : Window
         await _spotifyAlertMuteGate.WaitAsync();
         try
         {
-            if (!_settings.Spotify.MuteDuringAlerts || string.Equals(_settings.Spotify.AlertDuckingMode, "None", StringComparison.OrdinalIgnoreCase))
+            if (!_settings.Spotify.SmartAutomationEnabled ||
+                !_settings.Spotify.MuteDuringAlerts ||
+                string.Equals(_settings.Spotify.AlertDuckingMode, "None", StringComparison.OrdinalIgnoreCase))
             {
                 if (!state.IsRunning && _spotifyAlertMuteActive)
                 {
