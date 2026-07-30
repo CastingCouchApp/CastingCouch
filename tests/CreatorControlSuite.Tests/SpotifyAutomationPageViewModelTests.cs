@@ -19,6 +19,7 @@ public sealed class SpotifyAutomationPageViewModelTests
         var spotify = new SpotifySettings
         {
             StartPlaylistUri = "spotify:playlist:two",
+            ShuffleSelectedPlaylist = true,
             SetVolumeOnLiveTransition = true,
             LiveVolumePercent = 68,
             MuteDuringAlerts = true,
@@ -36,6 +37,7 @@ public sealed class SpotifyAutomationPageViewModelTests
         viewModel.Load(workflow, spotify, playlists);
 
         Assert.True(viewModel.AutoStartOnStream);
+        Assert.True(viewModel.ShuffleStartPlaylist);
         Assert.True(viewModel.PlayEndMusic);
         Assert.True(viewModel.PauseOnStreamEnd);
         Assert.True(viewModel.SetLiveVolume);
@@ -54,6 +56,7 @@ public sealed class SpotifyAutomationPageViewModelTests
         var viewModel = new SpotifyAutomationPageViewModel
         {
             AutoStartOnStream = true,
+            ShuffleStartPlaylist = true,
             PlayEndMusic = false,
             PauseOnStreamEnd = true,
             SetLiveVolume = true,
@@ -72,6 +75,7 @@ public sealed class SpotifyAutomationPageViewModelTests
         viewModel.ApplyTo(workflow, spotify);
 
         Assert.True(workflow.AutoStartSpotifyPlaylist);
+        Assert.True(spotify.ShuffleSelectedPlaylist);
         Assert.False(workflow.AutoPlayEndMusic);
         Assert.True(workflow.PauseSpotifyOnStreamEnd);
         Assert.True(spotify.SetVolumeOnLiveTransition);

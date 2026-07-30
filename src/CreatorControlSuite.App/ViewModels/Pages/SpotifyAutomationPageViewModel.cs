@@ -32,6 +32,12 @@ public sealed class SpotifyAutomationPageViewModel : ViewModelBase
         set => SetProperty(ref field, value);
     }
 
+    public bool ShuffleStartPlaylist
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
     public bool PlayEndMusic
     {
         get;
@@ -115,6 +121,7 @@ public sealed class SpotifyAutomationPageViewModel : ViewModelBase
     {
         _configuredStartPlaylistUri = spotify.StartPlaylistUri;
         AutoStartOnStream = workflow.AutoStartSpotifyPlaylist;
+        ShuffleStartPlaylist = spotify.ShuffleSelectedPlaylist;
         PlayEndMusic = workflow.AutoPlayEndMusic;
         PauseOnStreamEnd = workflow.PauseSpotifyOnStreamEnd;
         SetLiveVolume = spotify.SetVolumeOnLiveTransition;
@@ -146,6 +153,7 @@ public sealed class SpotifyAutomationPageViewModel : ViewModelBase
         SpotifySettings spotify)
     {
         workflow.AutoStartSpotifyPlaylist = AutoStartOnStream;
+        spotify.ShuffleSelectedPlaylist = ShuffleStartPlaylist;
         workflow.AutoPlayEndMusic = PlayEndMusic;
         workflow.PauseSpotifyOnStreamEnd = PauseOnStreamEnd;
         spotify.SetVolumeOnLiveTransition = SetLiveVolume;

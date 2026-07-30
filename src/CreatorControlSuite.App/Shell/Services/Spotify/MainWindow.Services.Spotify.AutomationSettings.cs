@@ -77,8 +77,6 @@ public partial class MainWindow : Window
         _spotifyAutomationPageViewModel.ApplyTo(
             _settings.Workflow,
             _settings.Spotify);
-        _settings.Spotify.ShuffleSelectedPlaylist =
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyShufflePlaylistBox.IsChecked == true;
         await _settingsStore.SaveAsync(_settings);
         _spotifyAutomationPageViewModel.AutomationStatusText =
             "Spotify-Automatik gespeichert.";

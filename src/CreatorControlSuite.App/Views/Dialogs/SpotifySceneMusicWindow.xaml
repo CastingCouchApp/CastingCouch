@@ -14,7 +14,7 @@
         </Grid.RowDefinitions>
         <StackPanel>
             <TextBlock Text="Musik pro OBS-Szene" FontSize="26" FontWeight="Bold"/>
-            <TextBlock Text="Aktiviere eine Szene und lege Playlist, Zufallswiedergabe, Ziellautstärke und optionales Fade fest."
+            <TextBlock Text="Aktiviere „Playlist abspielen“ für die gewünschten Szenen. Nicht aktivierte Szenen verändern die laufende Musik nicht."
                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,14"/>
         </StackPanel>
         <DataGrid x:Name="RulesGrid" Grid.Row="1" AutoGenerateColumns="False"
@@ -25,7 +25,7 @@
                   RowBackground="{DynamicResource ElevatedBackgroundBrush}"
                   AlternatingRowBackground="{DynamicResource InputAltBackgroundBrush}">
             <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="Aktiv" Binding="{Binding Enabled}" Width="60"/>
+                <DataGridCheckBoxColumn Header="Playlist abspielen" Binding="{Binding Enabled}" Width="120"/>
                 <DataGridTextColumn Header="OBS-Szene" Binding="{Binding SceneName}" IsReadOnly="True" Width="180"/>
                 <DataGridComboBoxColumn x:Name="PlaylistColumn" Header="Playlist"
                                         SelectedValueBinding="{Binding PlaylistUri}"

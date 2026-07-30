@@ -20,6 +20,11 @@
                   Foreground="#FFFFFF"
                   Margin="0,10,0,0"
                   Click="AutoSave_OnChanged"/>
+        <CheckBox IsChecked="{Binding ShuffleStartPlaylist}"
+                  Content="Titel der Startplaylist zufällig abspielen"
+                  Foreground="#FFFFFF"
+                  Margin="22,7,0,0"
+                  Click="AutoSave_OnChanged"/>
         <CheckBox IsChecked="{Binding PlayEndMusic}"
                   Content="Startplaylist auch beim Wechsel in die Endszene starten"
                   Foreground="#FFFFFF"

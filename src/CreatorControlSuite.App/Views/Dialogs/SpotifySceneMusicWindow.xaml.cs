@@ -22,6 +22,19 @@ public partial class SpotifySceneMusicWindow : Window
         {
             RulesGrid.CommitEdit();
             RulesGrid.CommitEdit();
+            SpotifySceneMusicRow? invalid = Rows.FirstOrDefault(
+                row => row.Enabled && string.IsNullOrWhiteSpace(row.PlaylistUri));
+            if (invalid is not null)
+            {
+                MessageBox.Show(
+                    this,
+                    $"Bitte für die Szene „{invalid.SceneName}“ eine Playlist auswählen.",
+                    "Spotify-Szenenmusik",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
             DialogResult = true;
         };
     }

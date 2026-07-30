@@ -480,6 +480,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_spotifyModule.GetSnapshot().Authenticated)
+        {
+            await _spotifyModule.RefreshLibraryIfStaleAsync();
+        }
+
         var window = new SpotifySceneMusicWindow(
             SpotifySceneMusicRuleService.CreateRows(scenes, _settings.Spotify.AutomationRules),
             _spotifyModule.GetSnapshot().Playlists)
