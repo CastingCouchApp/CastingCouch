@@ -22,6 +22,7 @@ public sealed class SpotifyAutomationPageViewModelTests
             SetVolumeOnLiveTransition = true,
             LiveVolumePercent = 68,
             MuteDuringAlerts = true,
+            FadeDuringAlerts = false,
             AlertMuteVolumePercent = 42,
             AlertFadeOutMilliseconds = 700,
             AlertFadeInMilliseconds = 900
@@ -40,6 +41,7 @@ public sealed class SpotifyAutomationPageViewModelTests
         Assert.True(viewModel.SetLiveVolume);
         Assert.Equal("68", viewModel.LiveVolume);
         Assert.True(viewModel.MuteDuringAlerts);
+        Assert.False(viewModel.FadeDuringAlerts);
         Assert.Equal("42", viewModel.AlertVolume);
         Assert.Equal("700", viewModel.AlertFadeOutMilliseconds);
         Assert.Equal("900", viewModel.AlertFadeInMilliseconds);
@@ -57,6 +59,7 @@ public sealed class SpotifyAutomationPageViewModelTests
             SetLiveVolume = true,
             LiveVolume = "120",
             MuteDuringAlerts = true,
+            FadeDuringAlerts = false,
             AlertVolume = "-5",
             AlertFadeOutMilliseconds = "12000",
             AlertFadeInMilliseconds = "invalid"
@@ -74,6 +77,7 @@ public sealed class SpotifyAutomationPageViewModelTests
         Assert.True(spotify.SetVolumeOnLiveTransition);
         Assert.Equal(100, spotify.LiveVolumePercent);
         Assert.True(spotify.MuteDuringAlerts);
+        Assert.False(spotify.FadeDuringAlerts);
         Assert.Equal("Reduce", spotify.AlertDuckingMode);
         Assert.Equal(0, spotify.AlertMuteVolumePercent);
         Assert.Equal(10000, spotify.AlertFadeOutMilliseconds);

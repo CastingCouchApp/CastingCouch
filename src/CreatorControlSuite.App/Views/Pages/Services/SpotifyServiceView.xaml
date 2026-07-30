@@ -57,6 +57,7 @@
                                         <CheckBox x:Name="ServicesSpotifyAutoRecoverBox" x:FieldModifier="public" Content="Nicht erreichbares Wiedergabegerät automatisch wiederherstellen" Margin="0,5,0,0"/>
                                         <TextBlock x:Name="ServicesSpotifyHealthStatusText" x:FieldModifier="public" Text="Noch nicht geprüft" Foreground="{DynamicResource TextMutedBrush}" Margin="0,7,0,8"/>
                                         <WrapPanel>
+                                            <Button x:Name="ServicesSpotifyEditSceneMusicButton" x:FieldModifier="public" Content="SZENENMUSIK EINRICHTEN" Background="{DynamicResource AccentBrush}"/>
                                             <Button x:Name="ServicesSpotifyCreateDefaultRulesButton" x:FieldModifier="public" Content="STANDARDREGELN ERSTELLEN"/>
                                             <Button x:Name="ServicesSpotifyTestAutomationButton" x:FieldModifier="public" Content="AKTUELLE SZENE TESTEN"/>
                                             <Button x:Name="ServicesSpotifyClearAutomationLogButton" x:FieldModifier="public" Content="PROTOKOLL LEEREN"/>
@@ -132,26 +133,17 @@
                                     </StackPanel>
                                 </Border>
                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
-                                    <StackPanel>
-                                        <DockPanel LastChildFill="True">
-                                            <TextBlock Text="Lokale Hörstatistik" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <Button x:Name="ServicesSpotifyResetStatisticsButton" x:FieldModifier="public" Content="ZURÜCKSETZEN" DockPanel.Dock="Right" Padding="10,3" Background="#7A3838"/>
-                                        </DockPanel>
-                                        <TextBlock x:Name="ServicesSpotifyStatisticsSummaryText" x:FieldModifier="public" Text="0 erkannte Titelstarts · 00:00:00 Wiedergabezeit" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,8"/>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
-                                            <StackPanel Margin="0,0,6,0">
-                                                <TextBlock Text="Meistgespielte Titel" FontWeight="SemiBold"/>
-                                                <ListBox x:Name="ServicesSpotifyTopTracksList" x:FieldModifier="public" MaxHeight="220" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                                                <TextBlock Text="Meistgespielte Künstler" FontWeight="SemiBold"/>
-                                                <ListBox x:Name="ServicesSpotifyTopArtistsList" x:FieldModifier="public" MaxHeight="220" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" Foreground="{DynamicResource TextPrimaryBrush}" DisplayMemberPath="DisplayText"/>
-                                            </StackPanel>
-                                        </Grid>
-                                        <TextBlock x:Name="ServicesSpotifyStatisticsEmptyText" x:FieldModifier="public" Text="Die Statistik beginnt automatisch, sobald Spotify-Titel erkannt werden." Foreground="{DynamicResource TextMutedBrush}" Margin="0,7,0,0" TextWrapping="Wrap"/>
-                                        <TextBlock Text="Die Daten bleiben ausschließlich lokal auf diesem PC und werden nicht an Spotify oder andere Dienste übertragen." Foreground="{DynamicResource TextMutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                    </StackPanel>
+                                    <DockPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Lokale Hörstatistik" FontSize="16" FontWeight="SemiBold"/>
+                                            <TextBlock x:Name="ServicesSpotifyStatisticsSummaryText" x:FieldModifier="public" Text="0 erkannte Titelstarts · 00:00:00 Wiedergabezeit" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,5,0,0"/>
+                                            <TextBlock x:Name="ServicesSpotifyStatisticsEmptyText" x:FieldModifier="public" Text="Die Statistik beginnt automatisch, sobald Spotify-Titel erkannt werden." Visibility="Collapsed"/>
+                                        </StackPanel>
+                                        <Button x:Name="ServicesSpotifyOpenStatisticsButton" x:FieldModifier="public" Content="STATISTIK ÖFFNEN" DockPanel.Dock="Right" HorizontalAlignment="Right"/>
+                                        <Button x:Name="ServicesSpotifyResetStatisticsButton" x:FieldModifier="public" Visibility="Collapsed"/>
+                                        <ListBox x:Name="ServicesSpotifyTopTracksList" x:FieldModifier="public" Visibility="Collapsed"/>
+                                        <ListBox x:Name="ServicesSpotifyTopArtistsList" x:FieldModifier="public" Visibility="Collapsed"/>
+                                    </DockPanel>
                                 </Border>
                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
                                     <StackPanel>

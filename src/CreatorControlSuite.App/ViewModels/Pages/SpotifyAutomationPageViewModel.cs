@@ -62,6 +62,12 @@ public sealed class SpotifyAutomationPageViewModel : ViewModelBase
         set => SetProperty(ref field, value);
     }
 
+    public bool FadeDuringAlerts
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
     public string AlertVolume
     {
         get;
@@ -114,6 +120,7 @@ public sealed class SpotifyAutomationPageViewModel : ViewModelBase
         SetLiveVolume = spotify.SetVolumeOnLiveTransition;
         LiveVolume = spotify.LiveVolumePercent.ToString();
         MuteDuringAlerts = spotify.MuteDuringAlerts;
+        FadeDuringAlerts = spotify.FadeDuringAlerts;
         AlertVolume = spotify.AlertMuteVolumePercent.ToString();
         AlertFadeOutMilliseconds =
             spotify.AlertFadeOutMilliseconds.ToString();
@@ -147,6 +154,7 @@ public sealed class SpotifyAutomationPageViewModel : ViewModelBase
             fallback: 75,
             maximum: 100);
         spotify.MuteDuringAlerts = MuteDuringAlerts;
+        spotify.FadeDuringAlerts = FadeDuringAlerts;
         spotify.AlertDuckingMode = MuteDuringAlerts ? "Reduce" : "None";
         spotify.AlertMuteVolumePercent = ParseClamped(
             AlertVolume,

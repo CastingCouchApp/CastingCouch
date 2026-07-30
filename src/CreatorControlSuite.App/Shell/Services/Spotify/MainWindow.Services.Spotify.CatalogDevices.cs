@@ -463,6 +463,41 @@ public partial class MainWindow : Window
         RefreshSpotifyAutomationLogUi();
     }
 
+    private async Task EditSpotifySceneMusicAsync()
+    {
+        IReadOnlyList<string> scenes = _servicesObsScenes
+            .Select(scene => scene.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToList();
+        if (scenes.Count == 0)
+        {
+            MessageBox.Show(
+                this,
+                "Es wurden noch keine OBS-Szenen geladen. Bitte zuerst OBS verbinden.",
+                "Spotify-Szenenmusik",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new SpotifySceneMusicWindow(
+            SpotifySceneMusicRuleService.CreateRows(scenes, _settings.Spotify.AutomationRules),
+            _spotifyModule.GetSnapshot().Playlists)
+        {
+            Owner = this
+        };
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        _settings.Spotify.AutomationRules =
+            SpotifySceneMusicRuleService.ApplyRows(_settings.Spotify.AutomationRules, window.Rows).ToList();
+        _settings.Spotify.SmartAutomationEnabled = true;
+        await _settingsStore.SaveAsync(_settings);
+        RefreshSpotifyAutomationUi(_spotifyModule.GetSnapshot());
+    }
+
     private async Task ExecuteSpotifySceneAutomationAsync(string sceneName, bool force = false)
     {
         if ((!_settings.Spotify.SmartAutomationEnabled && !force) || string.IsNullOrWhiteSpace(sceneName))
@@ -521,6 +556,21 @@ public partial class MainWindow : Window
                         case "Pause": await _spotifyModule.PauseAsync(); break;
                         case "SetVolume": await _spotifyModule.SetVolumeImmediateAsync(Math.Clamp(rule.VolumePercent, 0, 100)); break;
                         default: await _spotifyModule.ResumeAsync(); break;
+                    }
+                    if (rule.ActionType is "StartPlaylist" or "Resume")
+                    {
+                        int targetVolume = Math.Clamp(rule.VolumePercent, 0, 100);
+                        if (rule.FadeEnabled && rule.FadeMilliseconds > 0)
+                        {
+                            await _spotifyModule.FadeToAsync(
+                                targetVolume,
+                                TimeSpan.FromMilliseconds(Math.Clamp(rule.FadeMilliseconds, 0, 60_000)),
+                                pauseAtEnd: false);
+                        }
+                        else
+                        {
+                            await _spotifyModule.SetVolumeImmediateAsync(targetVolume);
+                        }
                     }
                     _spotifyAutomationLog.Add(rule.Name, $"Aktion {rule.ActionType} für Szene '{sceneName}' ausgeführt.");
                 }

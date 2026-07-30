@@ -221,7 +221,10 @@ public partial class MainWindow : Window
                 _spotifyAlertMuteActive = true;
 
                 int alertVolume = Math.Clamp(_settings.Spotify.AlertMuteVolumePercent, 0, 100);
-                await FadeSpotifyVolumeAsync(_spotifyVolumeBeforeAlert.Value, alertVolume, _settings.Spotify.AlertFadeOutMilliseconds);
+                await FadeSpotifyVolumeAsync(
+                    _spotifyVolumeBeforeAlert.Value,
+                    alertVolume,
+                    _settings.Spotify.FadeDuringAlerts ? _settings.Spotify.AlertFadeOutMilliseconds : 0);
 
                 Dispatcher.Invoke(() =>
                 {
@@ -271,7 +274,10 @@ public partial class MainWindow : Window
         }
 
         int currentVolume = Math.Clamp(_spotifyModule.GetSnapshot().Playback.Device?.VolumePercent ?? 0, 0, 100);
-        await FadeSpotifyVolumeAsync(currentVolume, restoreVolume!.Value, _settings.Spotify.AlertFadeInMilliseconds);
+        await FadeSpotifyVolumeAsync(
+            currentVolume,
+            restoreVolume!.Value,
+            _settings.Spotify.FadeDuringAlerts ? _settings.Spotify.AlertFadeInMilliseconds : 0);
 
         Dispatcher.Invoke(() =>
         {

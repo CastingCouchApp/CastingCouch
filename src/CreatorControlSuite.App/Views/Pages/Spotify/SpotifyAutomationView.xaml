@@ -64,6 +64,11 @@
                   Foreground="#FFFFFF"
                   Margin="0,9,0,0"
                   Click="AutoSave_OnChanged"/>
+        <CheckBox IsChecked="{Binding FadeDuringAlerts}"
+                  Content="Lautstärke weich ein- und ausblenden"
+                  Foreground="#FFFFFF"
+                  Margin="22,7,0,0"
+                  Click="AutoSave_OnChanged"/>
         <Grid Margin="22,9,0,0"
               Width="430"
               HorizontalAlignment="Left">

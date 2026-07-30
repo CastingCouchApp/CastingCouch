@@ -44,6 +44,12 @@ Antworten kompatibel bleiben.
 ## Oberfläche
 
 - Spotify autorisieren
+- Player-Status und Wiedergabesteuerung direkt unter **Dienste → Spotify**
+- bevorzugtes Wiedergabegerät speichern und vor Aktionen automatisch aktivieren
+- Startplaylist inklusive Zufallswiedergabe beim Streamstart
+- Playlist, Shuffle, Ziellautstärke und optionales Fade pro OBS-Szene
+- Alert-Lautstärke mit optionalem Fade sowie Overlay-Ausblendung bei Pause oder Mute
+- lokal gespeicherte Song- und Interpretenstatistik in einem eigenen Fenster
 - verbinden/trennen
 - Geräteauswahl
 - Playlist-Auswahl

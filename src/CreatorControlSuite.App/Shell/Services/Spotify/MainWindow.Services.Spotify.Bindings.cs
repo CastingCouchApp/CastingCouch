@@ -319,6 +319,9 @@ public partial class MainWindow : Window
             RefreshSpotifyStatisticsUi();
         };
 
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOpenStatisticsButton.Click += (_, _) =>
+            new SpotifyStatisticsWindow(_spotifyListeningStatistics) { Owner = this }.ShowDialog();
+
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyRefreshSavedTracksButton.Click += async (_, _) =>
             await ExecuteUiActionAsync(
                 ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyRefreshSavedTracksButton,
@@ -434,6 +437,7 @@ public partial class MainWindow : Window
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutoRecoverBox.Checked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutoRecoverBox.Unchecked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyCreateDefaultRulesButton.Click += async (_, _) => await CreateDefaultSpotifyAutomationRulesAsync();
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyEditSceneMusicButton.Click += async (_, _) => await EditSpotifySceneMusicAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyTestAutomationButton.Click += async (_, _) => await ExecuteSpotifySceneAutomationAsync(_automationCurrentScene, force: true);
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyClearAutomationLogButton.Click += (_, _) => { _spotifyAutomationLog.Clear(); RefreshSpotifyAutomationLogUi(); };
     }

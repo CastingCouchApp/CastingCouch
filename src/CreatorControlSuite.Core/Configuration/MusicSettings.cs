@@ -41,6 +41,7 @@ public sealed class SpotifySettings
     public bool SetVolumeOnLiveTransition { get; set; } = true;
     public int LiveVolumePercent { get; set; } = 75;
     public bool MuteDuringAlerts { get; set; } = true;
+    public bool FadeDuringAlerts { get; set; } = true;
     public int AlertMuteVolumePercent { get; set; } = 75;
     public string AlertDuckingMode { get; set; } = "Duck";
     public int AlertFadeOutMilliseconds { get; set; } = 500;
@@ -88,6 +89,8 @@ public sealed class SpotifyAutomationRuleSettings
     public string PlaylistUri { get; set; } = "";
     public bool Shuffle { get; set; } = true;
     public int VolumePercent { get; set; } = 75;
+    public bool FadeEnabled { get; set; }
+    public int FadeMilliseconds { get; set; } = 500;
     public int DelaySeconds { get; set; }
 }
 
