@@ -15,30 +15,61 @@
         <StackPanel>
             <TextBlock Text="Musik pro OBS-Szene" FontSize="26" FontWeight="Bold"/>
             <TextBlock Text="Aktiviere „Playlist abspielen“ für die gewünschten Szenen. Nicht aktivierte Szenen verändern die laufende Musik nicht."
-                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,14"/>
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Margin="0,6,0,4"/>
+            <TextBlock Text="Das Lautstärke-Level ist ein fester Zielwert von 0 bis 100."
+                       Foreground="{DynamicResource TextMutedBrush}"
+                       Margin="0,0,0,14"/>
         </StackPanel>
-        <DataGrid x:Name="RulesGrid" Grid.Row="1" AutoGenerateColumns="False"
-                  CanUserAddRows="False" CanUserDeleteRows="False"
+        <DataGrid x:Name="RulesGrid"
+                  Grid.Row="1"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
                   Background="{DynamicResource ElevatedBackgroundBrush}"
                   Foreground="{DynamicResource TextPrimaryBrush}"
                   BorderBrush="{DynamicResource SubtleBorderBrush}"
+                  GridLinesVisibility="Horizontal"
+                  HorizontalGridLinesBrush="{DynamicResource SubtleBorderBrush}"
                   RowBackground="{DynamicResource ElevatedBackgroundBrush}"
                   AlternatingRowBackground="{DynamicResource InputAltBackgroundBrush}">
+            <DataGrid.Resources>
+                <Style TargetType="DataGridCell">
+                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}"/>
+                    <Setter Property="Padding" Value="6,4"/>
+                </Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                </Style>
+            </DataGrid.Resources>
             <DataGrid.Columns>
                 <DataGridCheckBoxColumn Header="Playlist abspielen" Binding="{Binding Enabled}" Width="120"/>
                 <DataGridTextColumn Header="OBS-Szene" Binding="{Binding SceneName}" IsReadOnly="True" Width="180"/>
-                <DataGridComboBoxColumn x:Name="PlaylistColumn" Header="Playlist"
-                                        SelectedValueBinding="{Binding PlaylistUri}"
-                                        SelectedValuePath="Uri" DisplayMemberPath="Name" Width="*"/>
-                <DataGridCheckBoxColumn Header="Zufällig" Binding="{Binding Shuffle}" Width="80"/>
-                <DataGridTextColumn Header="Lautstärke %" Binding="{Binding VolumePercent}" Width="100"/>
+                <DataGridTemplateColumn Header="Playlist" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ComboBox ItemsSource="{Binding DataContext.Playlists, RelativeSource={RelativeSource AncestorType=Window}}"
+                                      SelectedValue="{Binding PlaylistUri, UpdateSourceTrigger=PropertyChanged}"
+                                      SelectedValuePath="Uri"
+                                      DisplayMemberPath="Name"
+                                      Background="{DynamicResource InputAltBackgroundBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                      BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                      MinWidth="240"
+                                      HorizontalContentAlignment="Stretch"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridCheckBoxColumn Header="Shuffle" Binding="{Binding Shuffle}" Width="75"/>
+                <DataGridTextColumn Header="Level 0–100" Binding="{Binding VolumePercent}" Width="100"/>
                 <DataGridCheckBoxColumn Header="Fade" Binding="{Binding FadeEnabled}" Width="60"/>
                 <DataGridTextColumn Header="Fade ms" Binding="{Binding FadeMilliseconds}" Width="90"/>
             </DataGrid.Columns>
         </DataGrid>
         <WrapPanel Grid.Row="2" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button x:Name="CancelButton" Content="ABBRECHEN" Margin="0,0,8,0"/>
-            <Button x:Name="SaveButton" Content="SZENENMUSIK SPEICHERN" Background="{DynamicResource AccentBrush}"/>
+            <Button x:Name="SaveButton" Content="SZENENMUSIK SPEICHERN"/>
         </WrapPanel>
     </Grid>
 </Window>

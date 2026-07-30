@@ -104,16 +104,41 @@ public partial class MainWindow : Window
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyPreviousButton.Click += async (_, _) =>
             await ExecuteSpotifyAsync(() => _spotifyModule.PreviousAsync());
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyPlayButton.Click += async (_, _) =>
-            await ExecuteSpotifyAsync(() => _spotifyModule.ResumeAsync());
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyPauseButton.Click += async (_, _) =>
-            await ExecuteSpotifyAsync(() => _spotifyModule.PauseAsync());
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyNextButton.Click += async (_, _) =>
-            await ExecuteSpotifyAsync(() => _spotifyModule.NextAsync());
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyShuffleButton.Click += async (_, _) =>
             await ExecuteSpotifyAsync(async () =>
             {
-                bool enabled = !_spotifyModule.GetSnapshot().Playback.ShuffleEnabled;
-                await _spotifyModule.SetShuffleAsync(enabled);
+                if (_spotifyModule.GetSnapshot().Playback.IsPlaying)
+                {
+                    await _spotifyModule.PauseAsync();
+                }
+                else
+                {
+                    await _spotifyModule.ResumeAsync();
+                }
+
+                await RefreshSpotifyAsync();
+            });
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyNextButton.Click += async (_, _) =>
+            await ExecuteSpotifyAsync(() => _spotifyModule.NextAsync());
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyShuffleBox.Checked += async (_, _) =>
+            await ExecuteSpotifyAsync(async () =>
+            {
+                if (_updatingSpotifyUi)
+                {
+                    return;
+                }
+
+                await _spotifyModule.SetShuffleAsync(true);
+                await RefreshSpotifyAsync();
+            });
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyShuffleBox.Unchecked += async (_, _) =>
+            await ExecuteSpotifyAsync(async () =>
+            {
+                if (_updatingSpotifyUi)
+                {
+                    return;
+                }
+
+                await _spotifyModule.SetShuffleAsync(false);
                 await RefreshSpotifyAsync();
             });
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyRepeatButton.Click += async (_, _) =>

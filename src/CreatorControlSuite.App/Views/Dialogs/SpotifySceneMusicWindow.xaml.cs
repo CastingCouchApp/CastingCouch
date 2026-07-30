@@ -8,6 +8,7 @@ namespace CreatorControlSuite.App.Views.Dialogs;
 public partial class SpotifySceneMusicWindow : Window
 {
     public ObservableCollection<SpotifySceneMusicRow> Rows { get; }
+    public IReadOnlyList<SpotifyPlaylist> Playlists { get; }
 
     public SpotifySceneMusicWindow(
         IEnumerable<SpotifySceneMusicRow> rows,
@@ -15,8 +16,9 @@ public partial class SpotifySceneMusicWindow : Window
     {
         InitializeComponent();
         Rows = new ObservableCollection<SpotifySceneMusicRow>(rows);
+        Playlists = playlists.ToList();
+        DataContext = this;
         RulesGrid.ItemsSource = Rows;
-        PlaylistColumn.ItemsSource = playlists.ToList();
         CancelButton.Click += (_, _) => DialogResult = false;
         SaveButton.Click += (_, _) =>
         {

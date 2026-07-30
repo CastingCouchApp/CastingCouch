@@ -259,6 +259,21 @@ public partial class MainWindow : Window
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyShuffleButton.ToolTip = playback.ShuffleEnabled
             ? "Zufallswiedergabe ist aktiv – klicken zum Ausschalten"
             : "Zufallswiedergabe ist aus – klicken zum Einschalten";
+        _updatingSpotifyUi = true;
+        try
+        {
+            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyShuffleBox.IsChecked =
+                playback.ShuffleEnabled;
+        }
+        finally
+        {
+            _updatingSpotifyUi = false;
+        }
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyPlayButton.Content =
+            playback.IsPlaying ? "⏸" : "▶";
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyPlayButton.ToolTip =
+            playback.IsPlaying ? "Wiedergabe pausieren" : "Wiedergabe fortsetzen";
+
         DashboardPageViewHost.DashboardSpotifyRepeatButton.Content = playback.RepeatMode?.ToLowerInvariant() switch
         {
             "context" => "↻ LISTE",

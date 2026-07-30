@@ -121,11 +121,10 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <WrapPanel>
-                                <Button x:Name="ServicesSpotifyPreviousButton" x:FieldModifier="public" Content="⏮ ZURÜCK"/>
-                                <Button x:Name="ServicesSpotifyPlayButton" x:FieldModifier="public" Content="▶ PLAY" Background="{DynamicResource AccentBrush}"/>
-                                <Button x:Name="ServicesSpotifyPauseButton" x:FieldModifier="public" Content="⏸ PAUSE"/>
-                                <Button x:Name="ServicesSpotifyNextButton" x:FieldModifier="public" Content="WEITER ⏭"/>
-                                <Button x:Name="ServicesSpotifyShuffleButton" x:FieldModifier="public" Content="SHUFFLE: AUS"/>
+                                <Button x:Name="ServicesSpotifyPreviousButton" x:FieldModifier="public" Content="⏮" ToolTip="Vorheriger Titel" FontSize="18" MinWidth="44"/>
+                                <Button x:Name="ServicesSpotifyPlayButton" x:FieldModifier="public" Content="▶" ToolTip="Wiedergabe fortsetzen" FontSize="18" MinWidth="48"/>
+                                <Button x:Name="ServicesSpotifyNextButton" x:FieldModifier="public" Content="⏭" ToolTip="Nächster Titel" FontSize="18" MinWidth="44"/>
+                                <CheckBox x:Name="ServicesSpotifyShuffleBox" x:FieldModifier="public" Content="Shuffle" VerticalAlignment="Center" Margin="10,0,0,0"/>
                             </WrapPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="18,0,18,0" VerticalAlignment="Center">
                                 <TextBlock Text="Lautstärke" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}"/>
@@ -219,7 +218,7 @@
 
             <!-- Start, Alerts und Szenen -->
             <Border Background="{DynamicResource ElevatedBackgroundBrush}"
-                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="12"
                     Padding="18"
@@ -228,7 +227,7 @@
                     <DockPanel>
                         <StackPanel>
                             <TextBlock Text="Stream- und Szenenautomatik" FontSize="18" FontWeight="SemiBold"/>
-                            <TextBlock Text="Startplaylist, Alert-Lautstärke und Regeln für jede OBS-Szene."
+                            <TextBlock Text="Alert-Lautstärke und Musikregeln für jede OBS-Szene."
                                        Foreground="{DynamicResource TextMutedBrush}"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
@@ -264,7 +263,6 @@
                                 x:FieldModifier="public"
                                 Grid.Column="1"
                                 Content="MUSIK PRO OBS-SZENE EINRICHTEN"
-                                Background="{DynamicResource AccentBrush}"
                                 Padding="16,9"
                                 Margin="18,0,0,0"/>
                     </Grid>
@@ -279,7 +277,7 @@
                              MaxHeight="150"
                              Background="{DynamicResource SidebarBackgroundBrush}"
                              BorderBrush="{DynamicResource SubtleBorderBrush}"/>
-                    <Expander Header="Diagnose und Protokoll" Margin="0,12,0,0">
+                    <Expander Header="Interne Spotify-Diagnose" Visibility="Collapsed">
                         <StackPanel Margin="0,10,0,0">
                             <CheckBox x:Name="ServicesSpotifyHealthMonitorBox"
                                       x:FieldModifier="public"
@@ -419,6 +417,7 @@
               Sie sind nicht Teil der Spotify-Oberfläche.
             -->
             <Grid x:Name="SpotifyLegacyCatalogControls" Visibility="Collapsed">
+                <Button x:Name="ServicesSpotifyShuffleButton" x:FieldModifier="public"/>
                 <TextBox x:Name="ServicesSpotifyTrackSearchBox" x:FieldModifier="public"/>
                 <Button x:Name="ServicesSpotifyTrackSearchButton" x:FieldModifier="public"/>
                 <ListBox x:Name="ServicesSpotifyTrackSearchResultsList" x:FieldModifier="public"/>

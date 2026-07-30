@@ -44,6 +44,10 @@ public sealed class SpotifyServiceUiStructureTests
         Assert.Contains("x:Name=\"ServicesSpotifyEditSceneMusicButton\"", xaml);
         Assert.Contains("Content=\"MUSIK PRO OBS-SZENE EINRICHTEN\"", xaml);
         Assert.Contains("Playlist, Shuffle, Lautstärke und Fade", xaml);
+        Assert.Contains("x:Name=\"ServicesSpotifyShuffleBox\"", xaml);
+        Assert.DoesNotContain("x:Name=\"ServicesSpotifyPauseButton\"", xaml);
+        Assert.DoesNotContain("Diagnose und Protokoll", xaml);
+        Assert.DoesNotContain("BorderBrush=\"{DynamicResource AccentBrush}\"", xaml);
     }
 
     private static string FindRepositoryFile(params string[] parts)
