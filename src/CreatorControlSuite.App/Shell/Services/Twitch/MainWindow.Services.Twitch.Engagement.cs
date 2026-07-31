@@ -94,18 +94,9 @@ public partial class MainWindow : Window
         _settings.Workflow.EndSceneSeconds = int.TryParse(ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchEndSceneSecondsBox.Text, out int seconds) ? Math.Max(0, seconds) : 60;
         _settings.Twitch.EndSceneDurationSeconds = _settings.Workflow.EndSceneSeconds;
 
-        if (double.TryParse(ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchEndFollowerGoalTargetBox.Text.Replace(',', '.'),
-                System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out double followerTarget))
-        {
-            _settings.Twitch.FollowerGoal.Target = Math.Max(1, followerTarget);
-        }
-
-        // Beide Eingabefelder bearbeiten denselben Zielwert.
+        // Die Endszene verwendet dasselbe zentrale Follower-Ziel wie das Goal-Overlay.
         _twitchGoalsPageViewModel.FollowerTarget =
             _settings.Twitch.FollowerGoal.Target.ToString("0");
-        ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchEndFollowerGoalTargetBox.Text = _settings.Twitch.FollowerGoal.Target.ToString("0");
     }
 
     private async Task RefreshTwitchRewardsAsync()

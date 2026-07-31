@@ -202,7 +202,6 @@ public partial class MainWindow
         _settings.Twitch.EndSceneDurationSeconds = endSceneSeconds;
         _settings.Workflow.EndSceneSeconds = endSceneSeconds;
         ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchEndSceneSecondsBox.Text = endSceneSeconds.ToString();
-        ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchEndFollowerGoalTargetBox.Text = _settings.Twitch.FollowerGoal.Target.ToString("0");
         DashboardPageViewHost.DashboardRaidEnabledBox.IsChecked = _settings.Twitch.RaidOnStreamEnd;
         if (_settings.Twitch.PlannedStreamEndSeconds < 1)
         {

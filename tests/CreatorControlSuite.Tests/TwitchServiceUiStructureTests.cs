@@ -16,11 +16,14 @@ public sealed class TwitchServiceUiStructureTests
             "Services",
             "TwitchServiceView.xaml"));
 
-        Assert.Contains("MaxWidth=\"1120\"", xaml);
+        Assert.Contains("MaxWidth=\"1380\"", xaml);
         Assert.Contains("ServicesOpenTwitchStatisticsButton", xaml);
         Assert.Contains("ServicesOpenTwitchIntelligenceButton", xaml);
         Assert.DoesNotContain("Header=\"STREAM-STATISTIKEN ANZEIGEN\"", xaml);
         Assert.DoesNotContain("Header=\"INTELLIGENCE-ANALYSE", xaml);
+        Assert.True(
+            xaml.IndexOf("Text=\"Steuerung\"", StringComparison.Ordinal) <
+            xaml.IndexOf("Twitch Professional · Live-Analyse", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -43,6 +46,11 @@ public sealed class TwitchServiceUiStructureTests
         Assert.Contains("ServicesTwitchRaidEnabledBox", xaml);
         Assert.Contains("ServicesTwitchRaidAutomationPanel", xaml);
         Assert.Contains("ALLE TWITCH-EINSTELLUNGEN SPEICHERN", xaml);
+        Assert.Contains("Header=\"Streamziele\"", xaml);
+        Assert.Contains("ServicesOpenTwitchPollButton", xaml);
+        Assert.Contains("ServicesOpenTwitchPredictionButton", xaml);
+        Assert.Contains("ServicesOpenTwitchChannelPointsButton", xaml);
+        Assert.DoesNotContain("ServicesTwitchEndFollowerGoalTargetBox", xaml);
     }
 
     private static string FindRepositoryRoot()

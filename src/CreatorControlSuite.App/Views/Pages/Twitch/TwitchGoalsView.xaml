@@ -20,20 +20,16 @@
                    Margin="0,4,0,5"/>
         <WrapPanel>
             <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerTitle}" Width="150"/></StackPanel>
-            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerCurrent}" Width="80" ToolTip="Wird bei Twitch-Verbindung automatisch aktualisiert"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell (Twitch)" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Text="{Binding FollowerCurrent}" FontSize="18" FontWeight="SemiBold" MinWidth="80" ToolTip="Wird von Twitch automatisch aktualisiert"/></StackPanel>
             <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerTarget}" Width="80"/></StackPanel>
-            <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerFontFace}" Width="150"/></StackPanel>
-            <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding FollowerFontSize}" Width="70"/></StackPanel>
         </WrapPanel>
         <TextBlock Text="Sub-Ziel"
                    FontWeight="SemiBold"
                    Margin="0,8,0,5"/>
         <WrapPanel>
             <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionTitle}" Width="150"/></StackPanel>
-            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionCurrent}" Width="80" ToolTip="Wird bei Twitch-Verbindung automatisch aktualisiert"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell (Twitch)" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Text="{Binding SubscriptionCurrent}" FontSize="18" FontWeight="SemiBold" MinWidth="80" ToolTip="Wird von Twitch automatisch aktualisiert"/></StackPanel>
             <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionTarget}" Width="80"/></StackPanel>
-            <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionFontFace}" Width="150"/></StackPanel>
-            <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding SubscriptionFontSize}" Width="70"/></StackPanel>
         </WrapPanel>
         <TextBlock Text="Donation-Ziel"
                    FontWeight="SemiBold"
@@ -44,11 +40,9 @@
         </StackPanel>
         <WrapPanel>
             <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationTitle}" Width="150"/></StackPanel>
-            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationCurrent}" Width="80"/></StackPanel>
+            <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell (Twitch)" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Text="{Binding DonationCurrent}" FontSize="18" FontWeight="SemiBold" MinWidth="80"/></StackPanel>
             <StackPanel Margin="0,0,8,8"><TextBlock Text="Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationTarget}" Width="80"/></StackPanel>
             <StackPanel Margin="0,0,8,8"><TextBlock Text="Währung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationCurrency}" Width="70"/></StackPanel>
-            <StackPanel Margin="0,0,8,8"><TextBlock Text="Schriftart" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationFontFace}" Width="150"/></StackPanel>
-            <StackPanel Margin="0,0,8,8"><TextBlock Text="Größe" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationFontSize}" Width="70"/></StackPanel>
         </WrapPanel>
     </StackPanel>
 </UserControl>

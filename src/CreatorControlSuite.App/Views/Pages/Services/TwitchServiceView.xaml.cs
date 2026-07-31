@@ -7,6 +7,9 @@ public partial class TwitchServiceView : UserControl
 {
     private Window? _statisticsWindow;
     private Window? _intelligenceWindow;
+    private Window? _pollWindow;
+    private Window? _predictionWindow;
+    private Window? _channelPointsWindow;
 
     public TwitchServiceView()
     {
@@ -25,6 +28,27 @@ public partial class TwitchServiceView : UserControl
                 ServicesOpenTwitchIntelligenceButton,
                 _intelligenceWindow,
                 value => _intelligenceWindow = value);
+        ServicesOpenTwitchPollButton.Click += (_, _) =>
+            OpenPopout(
+                ServicesTwitchPollTab,
+                "Twitch · Umfrage starten",
+                ServicesOpenTwitchPollButton,
+                _pollWindow,
+                value => _pollWindow = value);
+        ServicesOpenTwitchPredictionButton.Click += (_, _) =>
+            OpenPopout(
+                ServicesTwitchPredictionTab,
+                "Twitch · Vorhersage starten",
+                ServicesOpenTwitchPredictionButton,
+                _predictionWindow,
+                value => _predictionWindow = value);
+        ServicesOpenTwitchChannelPointsButton.Click += (_, _) =>
+            OpenPopout(
+                ServicesTwitchChannelPointsTab,
+                "Twitch · Kanalpunkte verwalten",
+                ServicesOpenTwitchChannelPointsButton,
+                _channelPointsWindow,
+                value => _channelPointsWindow = value);
     }
 
     private void OpenPopout(
