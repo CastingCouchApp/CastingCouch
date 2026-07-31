@@ -92,6 +92,7 @@ public partial class MainWindow : Window
         DashboardPageViewHost.DashboardTwitchChannelWidget.MouseLeftButtonUp += async (_, _) => await OpenTwitchChannelEditorAsync();
         ServicesPageViewHost.TwitchServiceViewHost.ServicesSearchTwitchCategoryButton.Click += async (_, _) => await SearchTwitchCategoriesAsync(ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchCategorySearchBox, ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchCategoryResultsBox);
         ServicesPageViewHost.TwitchServiceViewHost.ServicesSaveTwitchChannelButton.Click += async (_, _) => await SaveTwitchChannelAsync(ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchTitleBox, ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchCategoryResultsBox);
+        ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchEndStreamButton.Click += async (_, _) => await ShowStreamEndDialogAndRunAsync();
         ServicesPageViewHost.TwitchServiceViewHost.ServicesCreateRewardButton.Click += async (_, _) => await CreateTwitchRewardAsync();
         ServicesPageViewHost.TwitchServiceViewHost.ServicesRefreshRewardsButton.Click += async (_, _) => await RefreshTwitchRewardsAsync();
         ServicesPageViewHost.TwitchServiceViewHost.ServicesCreatePollButton.Click += async (_, _) => await CreateTwitchPollAsync();

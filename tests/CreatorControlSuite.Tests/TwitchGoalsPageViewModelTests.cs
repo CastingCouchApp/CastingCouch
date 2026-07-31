@@ -16,6 +16,7 @@ public sealed class TwitchGoalsPageViewModelTests
         var twitch = new TwitchSettings();
         twitch.FollowerGoal.Target = 500;
         twitch.SubGoal.Target = 40;
+        twitch.DonationGoal.Reason = "Neues Mikrofon";
 
         viewModel.Load(obs, twitch, 123, 17);
 
@@ -24,6 +25,7 @@ public sealed class TwitchGoalsPageViewModelTests
         Assert.Equal("500", viewModel.FollowerTarget);
         Assert.Equal("17", viewModel.SubscriptionCurrent);
         Assert.Equal("40", viewModel.SubscriptionTarget);
+        Assert.Equal("Neues Mikrofon", viewModel.DonationReason);
     }
 
     [Fact]
@@ -41,7 +43,8 @@ public sealed class TwitchGoalsPageViewModelTests
             DonationTitle = " Support ",
             DonationCurrent = "12,5",
             DonationTarget = "1000",
-            DonationCurrency = " EUR "
+            DonationCurrency = " EUR ",
+            DonationReason = " Neues Mikrofon "
         };
         viewModel.UpdateLiveCounts(125, 8);
         var obs = new ObsSettings();
@@ -59,6 +62,7 @@ public sealed class TwitchGoalsPageViewModelTests
         Assert.Equal("Support", twitch.DonationGoal.Title);
         Assert.Equal(12.5, twitch.DonationGoal.Current);
         Assert.Equal("EUR", twitch.DonationGoal.Currency);
+        Assert.Equal("Neues Mikrofon", twitch.DonationGoal.Reason);
     }
 
     [Fact]

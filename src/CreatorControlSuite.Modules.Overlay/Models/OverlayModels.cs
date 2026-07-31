@@ -80,6 +80,7 @@ public sealed class OverlaySpotifyState
 public sealed class OverlayGoalState
 {
     public string Title { get; set; } = "";
+    public string Reason { get; set; } = "";
     public double Current { get; set; }
     public double Target { get; set; }
     public string FontFace { get; set; } = "Segoe UI";

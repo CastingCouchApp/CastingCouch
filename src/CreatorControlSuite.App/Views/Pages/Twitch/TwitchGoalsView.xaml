@@ -38,6 +38,10 @@
         <TextBlock Text="Donation-Ziel"
                    FontWeight="SemiBold"
                    Margin="0,8,0,5"/>
+        <StackPanel Margin="0,0,0,8">
+            <TextBlock Text="Grund für das Donation-Ziel" Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <TextBox Text="{Binding DonationReason}" MaxLength="160" ToolTip="Wird zusammen mit dem Donation-Ziel zentral gespeichert"/>
+        </StackPanel>
         <WrapPanel>
             <StackPanel Margin="0,0,8,8"><TextBlock Text="Bezeichnung" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationTitle}" Width="150"/></StackPanel>
             <StackPanel Margin="0,0,8,8"><TextBlock Text="Aktuell" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBox Text="{Binding DonationCurrent}" Width="80"/></StackPanel>

@@ -105,6 +105,12 @@ public sealed class TwitchGoalsPageViewModel : ViewModelBase
         set => SetProperty(ref field, value);
     } = "EUR";
 
+    public string DonationReason
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = "";
+
     public string DonationFontFace
     {
         get;
@@ -150,6 +156,7 @@ public sealed class TwitchGoalsPageViewModel : ViewModelBase
             value => DonationFontFace = value,
             value => DonationFontSize = value);
         DonationCurrency = twitch.DonationGoal.Currency;
+        DonationReason = twitch.DonationGoal.Reason;
         UpdateLiveCounts(liveFollowerCount, liveSubscriptionCount);
     }
 
@@ -198,6 +205,7 @@ public sealed class TwitchGoalsPageViewModel : ViewModelBase
             DonationFontSize,
             "Donation-Ziel");
         twitch.DonationGoal.Currency = DonationCurrency.Trim();
+        twitch.DonationGoal.Reason = DonationReason.Trim();
     }
 
     private static void LoadGoal(

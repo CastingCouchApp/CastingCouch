@@ -325,6 +325,22 @@ public partial class MainWindow : Window
             followerGoal["fontFace"] = _settings.Twitch.FollowerGoal.FontFace;
             followerGoal["fontSize"] = _settings.Twitch.FollowerGoal.FontSize;
             twitch["followerGoalState"] = followerGoal;
+            JsonObject subGoal = twitch["subGoalState"] as JsonObject ?? [];
+            subGoal["title"] = _settings.Twitch.SubGoal.Title;
+            subGoal["current"] = _settings.Twitch.SubGoal.Current;
+            subGoal["target"] = _settings.Twitch.SubGoal.Target;
+            subGoal["fontFace"] = _settings.Twitch.SubGoal.FontFace;
+            subGoal["fontSize"] = _settings.Twitch.SubGoal.FontSize;
+            twitch["subGoalState"] = subGoal;
+            JsonObject donationGoal = twitch["donationGoalState"] as JsonObject ?? [];
+            donationGoal["title"] = _settings.Twitch.DonationGoal.Title;
+            donationGoal["reason"] = _settings.Twitch.DonationGoal.Reason;
+            donationGoal["current"] = _settings.Twitch.DonationGoal.Current;
+            donationGoal["target"] = _settings.Twitch.DonationGoal.Target;
+            donationGoal["currency"] = _settings.Twitch.DonationGoal.Currency;
+            donationGoal["fontFace"] = _settings.Twitch.DonationGoal.FontFace;
+            donationGoal["fontSize"] = _settings.Twitch.DonationGoal.FontSize;
+            twitch["donationGoalState"] = donationGoal;
             root["twitch"] = twitch;
         });
     }
@@ -332,6 +348,7 @@ public partial class MainWindow : Window
     private static CreatorControlSuite.Modules.Overlay.Models.OverlayGoalState ToOverlayGoal(TwitchGoalSettings goal) => new()
     {
         Title = goal.Title,
+        Reason = goal.Reason,
         Current = goal.Current,
         Target = goal.Target,
         FontFace = goal.FontFace,

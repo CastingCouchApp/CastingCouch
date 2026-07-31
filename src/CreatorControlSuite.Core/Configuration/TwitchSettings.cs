@@ -9,6 +9,7 @@ public sealed class TwitchGoalSettings
     public string FontFace { get; set; } = "Segoe UI";
     public int FontSize { get; set; } = 36;
     public string Currency { get; set; } = "EUR";
+    public string Reason { get; set; } = "";
 }
 
 public sealed class TwitchSettings
