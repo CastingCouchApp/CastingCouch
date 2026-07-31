@@ -79,6 +79,11 @@ public sealed class SpotifyServiceUiStructureTests
         Assert.Contains("!_settings.Spotify.SmartAutomationEnabled", sceneRuntime);
         Assert.Contains("!_settings.Spotify.SmartAutomationEnabled", alertRuntime);
         Assert.Contains("!_settings.Spotify.SmartAutomationEnabled", overlayRuntime);
+
+        string bindings = ReadSpotifyShellFile("MainWindow.Services.Spotify.Bindings.cs");
+        Assert.Contains("ServicesSpotifySmartAutomationBox.Checked +=", bindings);
+        Assert.Contains("ServicesSpotifySmartAutomationBox.Unchecked +=", bindings);
+        Assert.Contains("SaveSpotifySmartAutomationSettingsAsync", bindings);
     }
 
     private static string ReadSpotifyShellFile(string fileName) =>

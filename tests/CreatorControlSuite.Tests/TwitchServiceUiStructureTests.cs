@@ -50,6 +50,7 @@ public sealed class TwitchServiceUiStructureTests
             xaml.LastIndexOf("ServicesTwitchSaveEndSettingsButton", StringComparison.Ordinal) >
             xaml.LastIndexOf("Streamende und Raid", StringComparison.Ordinal));
         Assert.Contains("Text=\"Streamziele\" FontSize=\"18\"", xaml);
+        Assert.Contains("Text=\"Streamziele\" FontSize=\"18\" FontWeight=\"SemiBold\" Foreground=\"{DynamicResource TextPrimaryBrush}\"", xaml);
         Assert.Contains("Text=\"Chat und Moderation\"", xaml);
         Assert.Contains("Text=\"Steuerung\" FontWeight=\"SemiBold\" FontSize=\"18\"", xaml);
         Assert.True(
@@ -59,6 +60,26 @@ public sealed class TwitchServiceUiStructureTests
         Assert.Contains("ServicesOpenTwitchPredictionButton", xaml);
         Assert.Contains("ServicesOpenTwitchChannelPointsButton", xaml);
         Assert.DoesNotContain("ServicesTwitchEndFollowerGoalTargetBox", xaml);
+
+        string goalsXaml = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "src",
+            "CreatorControlSuite.App",
+            "Views",
+            "Pages",
+            "Twitch",
+            "TwitchGoalsView.xaml"));
+        Assert.Contains("TextElement.Foreground=\"{DynamicResource TextPrimaryBrush}\"", goalsXaml);
+
+        string engagement = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Twitch",
+            "MainWindow.Services.Twitch.Engagement.cs"));
+        Assert.DoesNotContain("_twitchGoalsPageViewModel.FollowerTarget =", engagement);
     }
 
     [Fact]

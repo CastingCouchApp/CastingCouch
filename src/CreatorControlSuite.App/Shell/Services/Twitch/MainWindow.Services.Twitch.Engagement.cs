@@ -95,8 +95,7 @@ public partial class MainWindow : Window
         _settings.Twitch.EndSceneDurationSeconds = _settings.Workflow.EndSceneSeconds;
 
         // Die Endszene verwendet dasselbe zentrale Follower-Ziel wie das Goal-Overlay.
-        _twitchGoalsPageViewModel.FollowerTarget =
-            _settings.Twitch.FollowerGoal.Target.ToString("0");
+        // Den ViewModel-Wert hier nicht zurücksetzen: Er wird direkt danach gespeichert.
     }
 
     private async Task RefreshTwitchRewardsAsync()

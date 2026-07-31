@@ -432,6 +432,11 @@ public partial class MainWindow : Window
 
     private async Task SaveSpotifySmartAutomationSettingsAsync()
     {
+        if (_loadingSettingsIntoUi)
+        {
+            return;
+        }
+
         _settings.Spotify.SmartAutomationEnabled = ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySmartAutomationBox.IsChecked == true;
         _settings.Spotify.HealthMonitorEnabled = ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyHealthMonitorBox.IsChecked == true;
         _settings.Spotify.AutoRecoverPlayback = ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutoRecoverBox.IsChecked == true;
