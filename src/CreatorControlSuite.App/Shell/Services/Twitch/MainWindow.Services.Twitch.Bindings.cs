@@ -97,6 +97,14 @@ public partial class MainWindow : Window
         ServicesPageViewHost.TwitchServiceViewHost.ServicesRefreshRewardsButton.Click += async (_, _) => await RefreshTwitchRewardsAsync();
         ServicesPageViewHost.TwitchServiceViewHost.ServicesCreatePollButton.Click += async (_, _) => await CreateTwitchPollAsync();
         ServicesPageViewHost.TwitchServiceViewHost.ServicesCreatePredictionButton.Click += async (_, _) => await CreateTwitchPredictionAsync();
+        ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchUsersList.SelectionChanged += (_, _) =>
+        {
+            if (ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchUsersList.SelectedItem is string selectedUser)
+            {
+                ServicesPageViewHost.TwitchServiceViewHost.ServicesModerationUserBox.Text =
+                    GetTwitchUserNameFromDisplay(selectedUser);
+            }
+        };
         ServicesPageViewHost.TwitchServiceViewHost.ServicesEndPollButton.Click += async (_, _) => await EndTwitchPollAsync("TERMINATED");
         ServicesPageViewHost.TwitchServiceViewHost.ServicesArchivePollButton.Click += async (_, _) => await EndTwitchPollAsync("ARCHIVED");
         ServicesPageViewHost.TwitchServiceViewHost.ServicesLockPredictionButton.Click += async (_, _) => await EndTwitchPredictionAsync("LOCKED");

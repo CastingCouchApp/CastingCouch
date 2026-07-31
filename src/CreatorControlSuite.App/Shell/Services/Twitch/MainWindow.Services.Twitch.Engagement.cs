@@ -299,6 +299,9 @@ public partial class MainWindow : Window
 
         // Speichert das Follower-Ziel und schreibt es zugleich in die aktive overlay-data.json.
         await SaveTwitchGoalsAsync();
+        await SaveTwitchChannelAsync(
+            ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchTitleBox,
+            ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchCategoryResultsBox);
     }
 
     private async Task SaveTwitchGoalsAsync()

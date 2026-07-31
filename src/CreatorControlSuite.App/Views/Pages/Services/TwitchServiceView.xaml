@@ -5,17 +5,10 @@
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="18">
-                                <TextBlock Text="Twitch-Steuerung" FontSize="22" FontWeight="Bold"/>
-                                <TextBlock x:Name="ServicesTwitchStatusText" x:FieldModifier="public" Text="Nicht verbunden" Margin="0,10,0,12"/>
-                                <WrapPanel>
-                                    <Button x:Name="ServicesTwitchDashboardButton" x:FieldModifier="public" Content="Creator Dashboard öffnen"/>
-                                    <Button x:Name="ServicesTwitchConnectButton" x:FieldModifier="public" Content="Verbinden"/>
-                                    <Button x:Name="ServicesTwitchDisconnectButton" x:FieldModifier="public" Content="Trennen"/>
-                                    <Button x:Name="ServicesTwitchEndStreamButton" x:FieldModifier="public" Content="STREAM BEENDEN / RAID" Margin="8,0,0,0" ToolTip="Öffnet denselben Streamende- und Raid-Ablauf wie das Dashboard"/>
-                                </WrapPanel>
-                                <TextBlock Text="Titel und Kategorie werden weiterhin über die Twitch-Dienstansicht verwaltet; Zugangsdaten bleiben unter Einstellungen." TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="4,14,0,0"/>
-                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,18,0,0">
+                            <StackPanel Margin="22" MaxWidth="1120" HorizontalAlignment="Left" Style="{StaticResource CCSDarkSettingsContentStyle}">
+                                <TextBlock Text="Twitch" FontSize="30" FontWeight="Bold"/>
+                                <TextBlock Text="Live-Daten, Kanalsteuerung und Community-Werkzeuge an einem Ort." Foreground="{DynamicResource TextMutedBrush}" Margin="0,5,0,12"/>
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,6,0,0">
                                     <StackPanel>
                                         <DockPanel>
                                             <StackPanel DockPanel.Dock="Left">
@@ -40,7 +33,11 @@
                                             <StackPanel Margin="0,0,12,0"><TextBlock Text="Kategorie" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalCategoryText" x:FieldModifier="public" Text="-" TextWrapping="Wrap" FontWeight="SemiBold"/></StackPanel>
                                             <StackPanel Grid.Column="1"><TextBlock Text="Streamtitel" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock x:Name="ServicesTwitchProfessionalTitleText" x:FieldModifier="public" Text="-" TextWrapping="Wrap" FontWeight="SemiBold"/></StackPanel>
                                         </Grid>
-                                        <Expander Header="STREAM-STATISTIKEN ANZEIGEN" IsExpanded="False" Margin="0,14,0,0">
+                                        <WrapPanel Margin="0,14,0,0">
+                                            <Button x:Name="ServicesOpenTwitchStatisticsButton" x:FieldModifier="public" Content="STREAM-STATISTIKEN ÖFFNEN"/>
+                                            <Button x:Name="ServicesOpenTwitchIntelligenceButton" x:FieldModifier="public" Content="INTELLIGENCE-ANALYSE ÖFFNEN · TEST" Margin="8,0,0,0"/>
+                                        </WrapPanel>
+                                        <ContentControl x:Name="ServicesTwitchStatisticsContentHost" Visibility="Collapsed">
                                         <StackPanel Margin="0,8,0,0">
                                         <Separator Margin="0,0,0,12"/>
                                         <DockPanel>
@@ -80,10 +77,25 @@
                                         <TextBlock x:Name="ServicesTwitchProfessionalSummaryText" x:FieldModifier="public" Text="Noch keine Trenddaten verfügbar." Foreground="#D7DEE3" TextWrapping="Wrap" Margin="0,0,0,10"/>
                                         <ListBox x:Name="ServicesTwitchProfessionalHistoryList" x:FieldModifier="public" Height="170" Margin="0,4,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                                         </StackPanel>
-                                        </Expander>
+                                        </ContentControl>
                                     </StackPanel>
                                 </Border>
-                                <Expander Header="INTELLIGENCE-ANALYSE ÖFFNEN · TEST" IsExpanded="False" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="#4F46E5" BorderThickness="1" Padding="12" Margin="0,18,0,0">
+                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,12,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Steuerung" FontWeight="SemiBold"/>
+                                            <TextBlock x:Name="ServicesTwitchStatusText" x:FieldModifier="public" Text="Nicht verbunden" Foreground="{DynamicResource TextMutedBrush}" Margin="0,3,0,0"/>
+                                        </StackPanel>
+                                        <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <Button x:Name="ServicesTwitchDashboardButton" x:FieldModifier="public" Content="DASHBOARD"/>
+                                            <Button x:Name="ServicesTwitchConnectButton" x:FieldModifier="public" Content="VERBINDEN" Margin="6,0,0,0"/>
+                                            <Button x:Name="ServicesTwitchDisconnectButton" x:FieldModifier="public" Content="TRENNEN" Margin="6,0,0,0"/>
+                                            <Button x:Name="ServicesTwitchEndStreamButton" x:FieldModifier="public" Content="STREAM BEENDEN / RAID" Margin="6,0,0,0" ToolTip="Öffnet denselben Streamende- und Raid-Ablauf wie das Dashboard"/>
+                                        </WrapPanel>
+                                    </Grid>
+                                </Border>
+                                <ContentControl x:Name="ServicesTwitchIntelligenceContentHost" Visibility="Collapsed">
                                     <StackPanel>
                                         <DockPanel>
                                             <StackPanel DockPanel.Dock="Left">
@@ -187,7 +199,29 @@
                                             <Button x:Name="ServicesCreatorIntelligenceAddNoteButton" x:FieldModifier="public" Content="SESSION-NOTIZ SPEICHERN" Margin="8,0,0,0" Padding="12,5" DockPanel.Dock="Right"/>
                                         </DockPanel>
                                     </StackPanel>
-                                </Expander>
+                                </ContentControl>
+                                <Grid Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="1.1*"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
+                                    <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,0,8,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Streamtitel und Kategorie" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
+                                            <TextBlock Text="Streamtitel" Margin="0,10,0,4"/>
+                                            <TextBox x:Name="ServicesTwitchTitleBox" x:FieldModifier="public"/>
+                                            <TextBlock Text="Kategorie suchen" Margin="0,10,0,4"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBox x:Name="ServicesTwitchCategorySearchBox" x:FieldModifier="public"/>
+                                                <Button x:Name="ServicesSearchTwitchCategoryButton" x:FieldModifier="public" Grid.Column="1" Content="Suchen"/>
+                                            </Grid>
+                                            <ComboBox x:Name="ServicesTwitchCategoryResultsBox" x:FieldModifier="public" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                            <Button x:Name="ServicesSaveTwitchChannelButton" x:FieldModifier="public" Content="TITEL UND KATEGORIE ÜBERNEHMEN" Visibility="Collapsed"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14" Margin="8,0,0,0">
+                                        <twitchgoals:TwitchGoalsView x:Name="TwitchGoalsViewHost" x:FieldModifier="public"/>
+                                    </Border>
+                                </Grid>
+                                <Button x:Name="ServicesTwitchSaveEndSettingsButton" x:FieldModifier="public" Content="ALLE TWITCH-EINSTELLUNGEN SPEICHERN" HorizontalAlignment="Left" Margin="0,12,0,0" Padding="18,9"/>
                                 <Grid Margin="0,18,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.5*"/>
@@ -195,21 +229,19 @@
                                         <ColumnDefinition Width="1*"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="Events" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                        <ListBox x:Name="ServicesTwitchEventsList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Height="220" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="8,0">
                                         <TextBlock Text="Chat" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                         <Grid Height="220" Margin="0,8,0,0">
                                             <ListBox x:Name="ServicesTwitchChatList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            <wv2:WebView2 x:Name="ServicesTwitchWebChat" x:FieldModifier="public"
-                                                          Visibility="Collapsed"
-                                                          DefaultBackgroundColor="Transparent"/>
+                                            <wv2:WebView2 x:Name="ServicesTwitchWebChat" x:FieldModifier="public" Visibility="Collapsed" DefaultBackgroundColor="Transparent"/>
                                         </Grid>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Margin="8,0">
+                                    <StackPanel Grid.Column="2" Margin="8,0,0,0">
                                         <TextBlock x:Name="ServicesTwitchUsersHeaderText" x:FieldModifier="public" Text="User (0)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                         <ListBox x:Name="ServicesTwitchUsersList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Height="220" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" Margin="8,0,0,0">
-                                        <TextBlock Text="Events" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                                        <ListBox x:Name="ServicesTwitchEventsList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Height="220" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
                                     </StackPanel>
                                 </Grid>
                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,12,0,0">
@@ -310,26 +342,20 @@
                                 </Border>
                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
                                     <StackPanel>
-                                        <TextBlock Text="Streamtitel und Kategorie" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
-                                        <TextBlock Text="Streamtitel" Margin="0,12,0,4"/>
-                                        <TextBox x:Name="ServicesTwitchTitleBox" x:FieldModifier="public"/>
-                                        <TextBlock Text="Kategorie suchen" Margin="0,12,0,4"/>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox x:Name="ServicesTwitchCategorySearchBox" x:FieldModifier="public"/>
-                                            <Button x:Name="ServicesSearchTwitchCategoryButton" x:FieldModifier="public" Grid.Column="1" Content="Suchen"/>
-                                        </Grid>
-                                        <ComboBox x:Name="ServicesTwitchCategoryResultsBox" x:FieldModifier="public" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
-                                        <Button x:Name="ServicesSaveTwitchChannelButton" x:FieldModifier="public" Content="Titel und Kategorie ändern" HorizontalAlignment="Left" Margin="0,12,0,0"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
-                                    <StackPanel>
                                         <TextBlock Text="Streamende und Raid" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
-                                        <CheckBox x:Name="ServicesTwitchRaidEnabledBox" x:FieldModifier="public" Content="Stream mit Raid beenden" Margin="0,10,0,0"/>
+                                        <CheckBox x:Name="ServicesTwitchRaidEnabledBox" x:FieldModifier="public" Content="Bevorzugte Raidziele und Automatik festlegen" Margin="0,10,0,0"/>
+                                        <TextBlock Text="Aktivieren, um bevorzugte Ziele, Countdown und automatisches Streamende einzustellen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="24,3,0,0"/>
+                                        <StackPanel x:Name="ServicesTwitchRaidAutomationPanel">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsChecked, ElementName=ServicesTwitchRaidEnabledBox}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
                                         <TextBlock Text="Häufige Raidziele" Margin="0,12,0,5"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -382,11 +408,8 @@
                                                 </WrapPanel>
                                             </StackPanel>
                                         </Border>
-                                        <Button x:Name="ServicesTwitchSaveEndSettingsButton" x:FieldModifier="public" Content="ALLE TWITCH- &amp; GOAL-EINSTELLUNGEN SPEICHERN" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                                        </StackPanel>
                                     </StackPanel>
-                                </Border>
-                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
-                                    <twitchgoals:TwitchGoalsView x:Name="TwitchGoalsViewHost" x:FieldModifier="public"/>
                                 </Border>
                             </StackPanel>
                         </ScrollViewer>
