@@ -234,8 +234,9 @@ public partial class MainWindow : Window
             : _settings.Twitch.LiveNotificationText;
         DashboardPageViewHost.DashboardTwitchChannelDetailsText.Text =
             $"{(string.IsNullOrWhiteSpace(snapshot.CategoryName) ? "Keine Kategorie" : snapshot.CategoryName)} · {notification}";
-        ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchTitleBox.Text = snapshot.ChannelTitle;
-        ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchCategorySearchBox.Text = snapshot.CategoryName;
+        ServicesPageViewHost.TwitchServiceViewHost.RefreshChannelEditor(
+            snapshot.ChannelTitle,
+            snapshot.CategoryName);
         RefreshDashboardServiceActionButtons();
         _ = RefreshTwitchWebChatViewsAsync(forceReload: false);
     }

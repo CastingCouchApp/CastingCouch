@@ -148,6 +148,12 @@ public partial class MainWindow
             await _twitchModule.UpdateChannelAsync(
                 titleBox.Text.Trim(),
                 category?.Id);
+            if (ReferenceEquals(
+                    titleBox,
+                    ServicesPageViewHost.TwitchServiceViewHost.ServicesTwitchTitleBox))
+            {
+                ServicesPageViewHost.TwitchServiceViewHost.MarkChannelEditorSaved();
+            }
             RefreshTwitchUi();
         }
         catch (Exception exception)

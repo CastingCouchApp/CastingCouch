@@ -46,11 +46,36 @@ public sealed class TwitchServiceUiStructureTests
         Assert.Contains("ServicesTwitchRaidEnabledBox", xaml);
         Assert.Contains("ServicesTwitchRaidAutomationPanel", xaml);
         Assert.Contains("ALLE TWITCH-EINSTELLUNGEN SPEICHERN", xaml);
-        Assert.Contains("Header=\"Streamziele\"", xaml);
+        Assert.Contains("Text=\"Streamziele\" FontSize=\"18\"", xaml);
+        Assert.Contains("Text=\"Chat und Moderation\"", xaml);
+        Assert.Contains("Text=\"Steuerung\" FontWeight=\"SemiBold\" FontSize=\"18\"", xaml);
+        Assert.True(
+            xaml.IndexOf("x:Name=\"ServicesTwitchTitleBox\"", StringComparison.Ordinal) <
+            xaml.IndexOf("Text=\"Chat und Moderation\"", StringComparison.Ordinal));
         Assert.Contains("ServicesOpenTwitchPollButton", xaml);
         Assert.Contains("ServicesOpenTwitchPredictionButton", xaml);
         Assert.Contains("ServicesOpenTwitchChannelPointsButton", xaml);
         Assert.DoesNotContain("ServicesTwitchEndFollowerGoalTargetBox", xaml);
+    }
+
+    [Fact]
+    public void TwitchService_PreservesEditedChannelFieldsAndShowsCategoryDropdown()
+    {
+        string viewPath = Path.Combine(
+            RepositoryRoot,
+            "src",
+            "CreatorControlSuite.App",
+            "Views",
+            "Pages",
+            "Services",
+            "TwitchServiceView.xaml");
+        string codeBehind = File.ReadAllText(viewPath + ".cs");
+        string xaml = File.ReadAllText(viewPath);
+
+        Assert.Contains("IsChannelEditorDirty", codeBehind);
+        Assert.Contains("RefreshChannelEditor", codeBehind);
+        Assert.Contains("MarkChannelEditorSaved", codeBehind);
+        Assert.Contains("MaxDropDownHeight=\"360\"", xaml);
     }
 
     private static string FindRepositoryRoot()

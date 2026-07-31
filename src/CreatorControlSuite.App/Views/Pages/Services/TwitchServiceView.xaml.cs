@@ -10,10 +10,16 @@ public partial class TwitchServiceView : UserControl
     private Window? _pollWindow;
     private Window? _predictionWindow;
     private Window? _channelPointsWindow;
+    private bool _updatingChannelEditor;
+
+    public bool IsChannelEditorDirty { get; private set; }
 
     public TwitchServiceView()
     {
         InitializeComponent();
+        ServicesTwitchTitleBox.TextChanged += (_, _) => MarkChannelEditorDirty();
+        ServicesTwitchCategorySearchBox.TextChanged += (_, _) => MarkChannelEditorDirty();
+        ServicesTwitchCategoryResultsBox.SelectionChanged += (_, _) => MarkChannelEditorDirty();
         ServicesOpenTwitchStatisticsButton.Click += (_, _) =>
             OpenPopout(
                 ServicesTwitchStatisticsContentHost,
@@ -49,6 +55,41 @@ public partial class TwitchServiceView : UserControl
                 ServicesOpenTwitchChannelPointsButton,
                 _channelPointsWindow,
                 value => _channelPointsWindow = value);
+    }
+
+    public void RefreshChannelEditor(string title, string category)
+    {
+        if (IsChannelEditorDirty ||
+            ServicesTwitchTitleBox.IsKeyboardFocusWithin ||
+            ServicesTwitchCategorySearchBox.IsKeyboardFocusWithin ||
+            ServicesTwitchCategoryResultsBox.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        _updatingChannelEditor = true;
+        try
+        {
+            ServicesTwitchTitleBox.Text = title;
+            ServicesTwitchCategorySearchBox.Text = category;
+        }
+        finally
+        {
+            _updatingChannelEditor = false;
+        }
+    }
+
+    public void MarkChannelEditorSaved()
+    {
+        IsChannelEditorDirty = false;
+    }
+
+    private void MarkChannelEditorDirty()
+    {
+        if (!_updatingChannelEditor)
+        {
+            IsChannelEditorDirty = true;
+        }
     }
 
     private void OpenPopout(
