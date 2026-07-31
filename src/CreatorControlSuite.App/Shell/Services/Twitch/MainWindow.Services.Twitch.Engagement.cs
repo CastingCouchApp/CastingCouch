@@ -337,6 +337,40 @@ public partial class MainWindow : Window
             twitch["donationGoalState"] = donationGoal;
             root["twitch"] = twitch;
         });
+        await SynchronizeGoalBarsAsync();
+    }
+
+    private async Task SynchronizeGoalBarsAsync()
+    {
+        var follower = new OverlayGoalPreset(
+            _settings.Twitch.FollowerGoal.Title,
+            _settings.Twitch.FollowerGoal.Target);
+        var subscriptions = new OverlayGoalPreset(
+            _settings.Twitch.SubGoal.Title,
+            _settings.Twitch.SubGoal.Target);
+        string donationLabel = string.IsNullOrWhiteSpace(_settings.Twitch.DonationGoal.Reason)
+            ? _settings.Twitch.DonationGoal.Title
+            : $"{_settings.Twitch.DonationGoal.Title} · {_settings.Twitch.DonationGoal.Reason}";
+        var donations = new OverlayGoalPreset(
+            donationLabel,
+            _settings.Twitch.DonationGoal.Target);
+
+        foreach (string instanceId in _overlayModule.LayoutStore.ListInstanceIds())
+        {
+            OverlayLayout layout = await _overlayModule.LayoutStore.LoadAsync(instanceId);
+            if (!OverlayGoalLayoutUpdater.Apply(
+                    layout,
+                    follower,
+                    subscriptions,
+                    donations))
+            {
+                continue;
+            }
+
+            await _overlayModule.LayoutStore.SaveAsync(instanceId, layout);
+            await PublishOverlayRealtimeEventAsync(
+                OverlayEventBridge.AppOverlayLayout(instanceId, layout));
+        }
     }
 
     private static CreatorControlSuite.Modules.Overlay.Models.OverlayGoalState ToOverlayGoal(TwitchGoalSettings goal) => new()

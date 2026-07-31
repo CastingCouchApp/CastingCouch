@@ -159,8 +159,6 @@ export const WIDGET_DEFAULTS: Record<string, WidgetDefaults> = {
       variant: "classic",
       sizePreset: "standard",
       kind: "followers",
-      label: "Follower Goal",
-      target: 200,
       showLabel: true,
       showCurrent: true,
       showTarget: true,

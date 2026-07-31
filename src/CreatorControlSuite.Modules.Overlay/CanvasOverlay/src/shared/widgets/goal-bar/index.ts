@@ -53,7 +53,9 @@ export function resolveGoalBarValues(
   const kind = goalKind(item);
   const stats = ((data && data.stats) || {}) as Record<string, unknown>;
   const twitch = ((data && data.twitch) || {}) as Record<string, unknown>;
-  const label = String(prop(item, "label", defaultLabel(kind)) || defaultLabel(kind));
+  const stateKey = kind === "subs" ? "subGoalState" : kind === "bits" || kind === "custom" ? "donationGoalState" : "followerGoalState";
+  const goalState = (twitch[stateKey] || {}) as Record<string, unknown>;
+  const label = String(prop(item, "label", goalState.title || defaultLabel(kind)) || defaultLabel(kind));
   const targetOverride = prop(item, "target", null);
   const currentOverride = prop(item, "current", null);
 
@@ -62,17 +64,16 @@ export function resolveGoalBarValues(
 
   if (kind === "followers") {
     current = Number(twitch.followers || 0);
-    target = Math.max(1, Number(targetOverride != null ? targetOverride : twitch.followerGoal ?? 200));
+    target = Math.max(1, Number(targetOverride != null ? targetOverride : goalState.target ?? twitch.followerGoal ?? 200));
   } else if (kind === "subs") {
-    current =
-      Number(stats.newSubscriptions || 0) + Number(stats.giftSubscriptions || 0);
-    target = Math.max(1, Number(targetOverride) || 100);
+    current = Number(goalState.current ?? (Number(stats.newSubscriptions || 0) + Number(stats.giftSubscriptions || 0)));
+    target = Math.max(1, Number(targetOverride != null ? targetOverride : goalState.target ?? 100));
   } else if (kind === "bits") {
-    current = Number(stats.bitsCheered || 0);
-    target = Math.max(1, Number(targetOverride) || 1000);
+    current = Number(goalState.current ?? stats.bitsCheered ?? 0);
+    target = Math.max(1, Number(targetOverride != null ? targetOverride : goalState.target ?? 1000));
   } else {
-    current = Number(currentOverride || 0);
-    target = Math.max(1, Number(targetOverride) || 100);
+    current = Number(currentOverride ?? goalState.current ?? 0);
+    target = Math.max(1, Number(targetOverride != null ? targetOverride : goalState.target ?? 100));
   }
 
   if (currentOverride != null && currentOverride !== "") {

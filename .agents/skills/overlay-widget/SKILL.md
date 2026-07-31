@@ -116,6 +116,13 @@ Alle Controls nutzen `.ccs-prop-row` (**Label 88px | Control**), analog zu Zahle
 - Item-Effekte **nicht** als Widget-Props — Effects-Panel / `overlay-effect` / Packs.
 - Palette: kategorisiert (`Live`, `Interaktion`, `Content`, `Community Widgets`, `Hintergrund`, `Frames`, `Masken`, `Deko`) + Suche (`#paletteSearch`, filtert Label/Typ/Kategorie/Keywords). Hover auf Karte → Live-Vorschau mit Demodaten (`palette-preview.ts` + `palette-demo.ts`, `paintItemContent`). Community-Widgets (z. B. `fruppis-landadel`) unter **Community Widgets**.
 
+### Goal-Bar-Synchronisation
+
+- Twitch-Goals sind die zentrale Voreinstellung für `goal-bar`: neue Items ohne explizites `label`/`target` lesen `twitch.*GoalState` aus den Overlay-Daten.
+- Beim Speichern unter **Dienste → Twitch → Streamziele** müssen vorhandene `goal-bar`-Items in **allen** Canvas-Layouts über `OverlayGoalLayoutUpdater` aktualisiert werden.
+- Zu synchronisieren: `label`, `target`; ein gespeichertes `current`-Override wird entfernt, damit aktuelle Follower-/Sub-/Bits-Werte wieder aus Twitch kommen.
+- Nach jedem geänderten Layout: `IOverlayLayoutStore.SaveAsync` und `OverlayEventBridge.AppOverlayLayout` publizieren, damit bereits laufende Overlay-Views und der Editor sofort aktualisiert werden.
+
 ## Build
 
 ```bash

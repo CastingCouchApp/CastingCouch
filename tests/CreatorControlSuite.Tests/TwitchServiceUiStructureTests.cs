@@ -46,6 +46,9 @@ public sealed class TwitchServiceUiStructureTests
         Assert.Contains("ServicesTwitchRaidEnabledBox", xaml);
         Assert.Contains("ServicesTwitchRaidAutomationPanel", xaml);
         Assert.Contains("ALLE TWITCH-EINSTELLUNGEN SPEICHERN", xaml);
+        Assert.True(
+            xaml.LastIndexOf("ServicesTwitchSaveEndSettingsButton", StringComparison.Ordinal) >
+            xaml.LastIndexOf("Streamende und Raid", StringComparison.Ordinal));
         Assert.Contains("Text=\"Streamziele\" FontSize=\"18\"", xaml);
         Assert.Contains("Text=\"Chat und Moderation\"", xaml);
         Assert.Contains("Text=\"Steuerung\" FontWeight=\"SemiBold\" FontSize=\"18\"", xaml);

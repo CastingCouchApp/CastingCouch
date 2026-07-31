@@ -3,7 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
              xmlns:twitchgoals="clr-namespace:CreatorControlSuite.App.Views.Pages.Twitch"
-             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             xmlns:twitch="clr-namespace:CreatorControlSuite.App.Twitch">
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="22" MaxWidth="1380" HorizontalAlignment="Left" Style="{StaticResource CCSDarkSettingsContentStyle}">
@@ -214,7 +215,6 @@
                                         </DockPanel>
                                     </StackPanel>
                                 </ContentControl>
-                                <Button x:Name="ServicesTwitchSaveEndSettingsButton" x:FieldModifier="public" Content="ALLE TWITCH-EINSTELLUNGEN SPEICHERN" HorizontalAlignment="Left" Margin="0,12,0,0" Padding="18,9"/>
                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,18,0,0">
                                 <StackPanel>
                                 <TextBlock Text="Chat und Moderation" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
@@ -237,7 +237,13 @@
                                     <StackPanel Grid.Column="1" Margin="8,0">
                                         <TextBlock Text="Chat" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                         <Grid Height="220" Margin="0,8,0,0">
-                                            <ListBox x:Name="ServicesTwitchChatList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                           <ListBox x:Name="ServicesTwitchChatList" x:FieldModifier="public" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}">
+                                               <ListBox.ItemTemplate>
+                                                   <DataTemplate>
+                                                       <twitch:TwitchChatTextBlock ChatItem="{Binding}" TextWrapping="Wrap" Margin="3,2"/>
+                                                   </DataTemplate>
+                                               </ListBox.ItemTemplate>
+                                           </ListBox>
                                             <wv2:WebView2 x:Name="ServicesTwitchWebChat" x:FieldModifier="public" Visibility="Collapsed" DefaultBackgroundColor="Transparent"/>
                                         </Grid>
                                     </StackPanel>
@@ -413,6 +419,7 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
+                                <Button x:Name="ServicesTwitchSaveEndSettingsButton" x:FieldModifier="public" Content="ALLE TWITCH-EINSTELLUNGEN SPEICHERN" HorizontalAlignment="Left" Margin="0,18,0,8" Padding="18,9"/>
                             </StackPanel>
                         </ScrollViewer>
 </UserControl>
