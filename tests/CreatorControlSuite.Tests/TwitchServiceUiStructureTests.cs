@@ -78,6 +78,35 @@ public sealed class TwitchServiceUiStructureTests
         Assert.Contains("MaxDropDownHeight=\"360\"", xaml);
     }
 
+    [Fact]
+    public void DashboardLiveRefresh_ReloadsExternallyChangedChannelMetadata()
+    {
+        string moduleCode = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "src",
+            "CreatorControlSuite.Modules.Twitch",
+            "TwitchModule.cs"));
+        string dashboardCode = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Dashboard",
+            "MainWindow.Dashboard.LiveData.cs"));
+
+        Assert.Contains("RefreshChannelInformationAsync", moduleCode);
+        int metadataRefresh = dashboardCode.IndexOf(
+            "await _twitchModule.RefreshChannelInformationAsync()",
+            StringComparison.Ordinal);
+        int uiRefresh = dashboardCode.IndexOf(
+            "RefreshTwitchUi();",
+            metadataRefresh,
+            StringComparison.Ordinal);
+
+        Assert.True(metadataRefresh >= 0);
+        Assert.True(uiRefresh > metadataRefresh);
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

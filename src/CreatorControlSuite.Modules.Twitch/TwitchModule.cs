@@ -423,6 +423,20 @@ public sealed class TwitchModule(
             cancellationToken);
     }
 
+    public async Task RefreshChannelInformationAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_channel is null)
+        {
+            throw new InvalidOperationException(
+                "Twitch ist nicht verbunden.");
+        }
+
+        _channel = await _apiClient.GetChannelInformationAsync(
+            _channel.BroadcasterId,
+            cancellationToken);
+    }
+
     public Task<IReadOnlyList<TwitchCategory>> SearchCategoriesAsync(
         string query,
         CancellationToken cancellationToken = default)

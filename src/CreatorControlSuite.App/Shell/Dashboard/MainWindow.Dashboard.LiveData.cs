@@ -124,6 +124,22 @@ public partial class MainWindow : Window
             {
                 try
                 {
+                    try
+                    {
+                        // OBS' Twitch-Dock schreibt Titel und Kategorie direkt
+                        // bei Twitch. Den lokalen Snapshot deshalb vor jeder
+                        // Anzeige-Aktualisierung erneut über Helix einlesen.
+                        await _twitchModule.RefreshChannelInformationAsync();
+                    }
+                    catch (Exception exception)
+                    {
+                        _appLogger.Write(
+                            AppLogLevel.Warning,
+                            "Twitch",
+                            "Streamtitel und Kategorie konnten nicht automatisch aktualisiert werden.",
+                            exception);
+                    }
+
                     await Task.WhenAll(
                         RefreshLiveViewerSampleAsync(),
                         RefreshTwitchFollowerCountAsync(),
