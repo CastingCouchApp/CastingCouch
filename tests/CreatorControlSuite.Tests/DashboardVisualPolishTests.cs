@@ -152,7 +152,7 @@ public sealed class DashboardVisualPolishTests
     }
 
     [Fact]
-    public void LargeObsScenePreview_KeepsDashboardPanelsInSingleViewportRow()
+    public void LargeObsScenePreview_MovesUsersBesideCompactEvents()
     {
         string layoutSource = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
@@ -162,17 +162,23 @@ public sealed class DashboardVisualPolishTests
             "Dashboard",
             "MainWindow.Dashboard.Layout.cs"));
 
-        Assert.DoesNotContain(
-            "useWidePreviewLayout",
+        Assert.Contains(
+            "MoveDashboardTwitchUsersForLargePreview(useWidePreviewLayout)",
             layoutSource,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Grid.SetColumnSpan(DashboardPageViewHost.DashboardObsSceneColumn, 1)",
+            "activityGrid.Children.Add(usersModule)",
             layoutSource,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Grid.SetRow(DashboardPageViewHost.DashboardPrimaryContentColumn, 0)",
+            "activityGrid.ColumnDefinitions[0].Width = new GridLength(0.7, GridUnitType.Star)",
             layoutSource,
+            StringComparison.Ordinal);
+
+        string dashboardXaml = ReadDashboardXaml();
+        Assert.Contains(
+            "x:Name=\"DashboardActivityGrid\"",
+            dashboardXaml,
             StringComparison.Ordinal);
     }
 

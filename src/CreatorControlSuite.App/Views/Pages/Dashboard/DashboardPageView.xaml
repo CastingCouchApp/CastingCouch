@@ -226,10 +226,11 @@
                                         </Border>
                                     </Grid>
                                      <Grid x:Name="DashboardPrimaryContentColumn" x:FieldModifier="public" Grid.Column="1" VerticalAlignment="Stretch">
-                                         <Grid Margin="0,0,0,0" VerticalAlignment="Stretch">
+                                         <Grid x:Name="DashboardActivityGrid" x:FieldModifier="public" Margin="0,0,0,0" VerticalAlignment="Stretch">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="0"/>
                                             </Grid.ColumnDefinitions>
                                             <Border Grid.Column="0" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" x:Name="DashboardTwitchEventsModule" x:FieldModifier="public" Margin="0,0,4,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                                 <Grid>

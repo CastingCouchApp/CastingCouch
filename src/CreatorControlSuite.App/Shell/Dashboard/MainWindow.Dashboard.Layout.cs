@@ -416,19 +416,23 @@ public partial class MainWindow : Window
         DashboardPageViewHost.DashboardObsSceneControlContent.MaxWidth = width;
         DashboardPageViewHost.DashboardSceneButtonsPanel.MaxWidth = width;
 
-        // Auch die große Vorschau bleibt neben Events und Chat. Das frühere Stapeln
-        // ließ die Szenen-/User-Spalte in einer Auto-Zeile über die Fensterhöhe wachsen
-        // und schnitt dadurch Events und Chat ohne Scrollmöglichkeit ab.
-        DashboardPageViewHost.DashboardPrimaryRow.RowDefinitions[0].Height =
-            new GridLength(1, GridUnitType.Star);
-        DashboardPageViewHost.DashboardPrimaryRow.RowDefinitions[1].Height = GridLength.Auto;
+        bool useWidePreviewLayout = string.Equals(size, "Groß", StringComparison.Ordinal);
+        MoveDashboardTwitchUsersForLargePreview(useWidePreviewLayout);
+        DashboardPageViewHost.DashboardPrimaryRow.RowDefinitions[0].Height = useWidePreviewLayout
+            ? GridLength.Auto
+            : new GridLength(1, GridUnitType.Star);
+        DashboardPageViewHost.DashboardPrimaryRow.RowDefinitions[1].Height = useWidePreviewLayout
+            ? new GridLength(1, GridUnitType.Star)
+            : GridLength.Auto;
         Grid.SetRow(DashboardPageViewHost.DashboardObsSceneColumn, 0);
         Grid.SetColumn(DashboardPageViewHost.DashboardObsSceneColumn, 0);
-        Grid.SetColumnSpan(DashboardPageViewHost.DashboardObsSceneColumn, 1);
-        Grid.SetRow(DashboardPageViewHost.DashboardPrimaryContentColumn, 0);
-        Grid.SetColumn(DashboardPageViewHost.DashboardPrimaryContentColumn, 1);
-        Grid.SetColumnSpan(DashboardPageViewHost.DashboardPrimaryContentColumn, 1);
-        DashboardPageViewHost.DashboardObsSceneColumn.Margin = new Thickness(0, 0, 8, 0);
+        Grid.SetColumnSpan(DashboardPageViewHost.DashboardObsSceneColumn, useWidePreviewLayout ? 2 : 1);
+        Grid.SetRow(DashboardPageViewHost.DashboardPrimaryContentColumn, useWidePreviewLayout ? 1 : 0);
+        Grid.SetColumn(DashboardPageViewHost.DashboardPrimaryContentColumn, useWidePreviewLayout ? 0 : 1);
+        Grid.SetColumnSpan(DashboardPageViewHost.DashboardPrimaryContentColumn, useWidePreviewLayout ? 2 : 1);
+        DashboardPageViewHost.DashboardObsSceneColumn.Margin = useWidePreviewLayout
+            ? new Thickness(0, 0, 0, 10)
+            : new Thickness(0, 0, 8, 0);
 
         foreach (ComboBoxItem item in DashboardPageViewHost.DashboardObsScenePreviewSizeBox.Items
                      .OfType<System.Windows.Controls.ComboBoxItem>())
@@ -439,6 +443,48 @@ public partial class MainWindow : Window
                 break;
             }
         }
+    }
+
+    private void MoveDashboardTwitchUsersForLargePreview(bool useWidePreviewLayout)
+    {
+        Grid sceneColumn = DashboardPageViewHost.DashboardObsSceneColumn;
+        Grid activityGrid = DashboardPageViewHost.DashboardActivityGrid;
+        Border usersModule = DashboardPageViewHost.DashboardTwitchUsersModule;
+        Border eventsModule = DashboardPageViewHost.DashboardTwitchEventsModule;
+        Border chatModule = DashboardPageViewHost.DashboardTwitchChatModule;
+
+        if (useWidePreviewLayout)
+        {
+            if (ReferenceEquals(usersModule.Parent, sceneColumn))
+            {
+                sceneColumn.Children.Remove(usersModule);
+                activityGrid.Children.Add(usersModule);
+            }
+
+            activityGrid.ColumnDefinitions[0].Width = new GridLength(0.7, GridUnitType.Star);
+            activityGrid.ColumnDefinitions[1].Width = new GridLength(0.8, GridUnitType.Star);
+            activityGrid.ColumnDefinitions[2].Width = new GridLength(1.5, GridUnitType.Star);
+            Grid.SetColumn(eventsModule, 0);
+            Grid.SetColumn(usersModule, 1);
+            Grid.SetColumn(chatModule, 2);
+            usersModule.Margin = new Thickness(4, 0, 4, 0);
+            return;
+        }
+
+        if (ReferenceEquals(usersModule.Parent, activityGrid))
+        {
+            activityGrid.Children.Remove(usersModule);
+            sceneColumn.Children.Add(usersModule);
+        }
+
+        activityGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+        activityGrid.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
+        activityGrid.ColumnDefinitions[2].Width = new GridLength(0);
+        Grid.SetRow(usersModule, 1);
+        Grid.SetColumn(usersModule, 0);
+        Grid.SetColumn(eventsModule, 0);
+        Grid.SetColumn(chatModule, 1);
+        usersModule.Margin = new Thickness(0, 8, 0, 0);
     }
 
     private async Task ApplyDashboardObsScenePreviewSizeFromUiAsync()
