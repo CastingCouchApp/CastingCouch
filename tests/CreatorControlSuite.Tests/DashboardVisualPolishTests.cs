@@ -152,7 +152,7 @@ public sealed class DashboardVisualPolishTests
     }
 
     [Fact]
-    public void LargeObsScenePreview_MovesUsersBesideCompactEvents()
+    public void LargeObsScenePreview_UsesFreeSpaceBesidePreviewForActivityPanels()
     {
         string layoutSource = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
@@ -171,13 +171,25 @@ public sealed class DashboardVisualPolishTests
             layoutSource,
             StringComparison.Ordinal);
         Assert.Contains(
-            "activityGrid.ColumnDefinitions[0].Width = new GridLength(0.7, GridUnitType.Star)",
+            "Grid.SetRow(usersModule, 1)",
+            layoutSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Grid.SetRowSpan(chatModule, 2)",
+            layoutSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Grid.SetRow(DashboardPageViewHost.DashboardPrimaryContentColumn, 0)",
             layoutSource,
             StringComparison.Ordinal);
 
         string dashboardXaml = ReadDashboardXaml();
         Assert.Contains(
             "x:Name=\"DashboardActivityGrid\"",
+            dashboardXaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "x:Name=\"DashboardActivitySecondaryRow\"",
             dashboardXaml,
             StringComparison.Ordinal);
     }
