@@ -152,6 +152,31 @@ public sealed class DashboardVisualPolishTests
     }
 
     [Fact]
+    public void LargeObsScenePreview_KeepsDashboardPanelsInSingleViewportRow()
+    {
+        string layoutSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Dashboard",
+            "MainWindow.Dashboard.Layout.cs"));
+
+        Assert.DoesNotContain(
+            "useWidePreviewLayout",
+            layoutSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Grid.SetColumnSpan(DashboardPageViewHost.DashboardObsSceneColumn, 1)",
+            layoutSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Grid.SetRow(DashboardPageViewHost.DashboardPrimaryContentColumn, 0)",
+            layoutSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ChannelEditHint_UsesReadableAccentForeground()
     {
         string dashboardXaml = ReadDashboardXaml();

@@ -416,23 +416,19 @@ public partial class MainWindow : Window
         DashboardPageViewHost.DashboardObsSceneControlContent.MaxWidth = width;
         DashboardPageViewHost.DashboardSceneButtonsPanel.MaxWidth = width;
 
-        bool useWidePreviewLayout = string.Equals(size, "Groß", StringComparison.Ordinal);
-        // Events/User/Chat brauchen eine *-Zeile mit definierter Höhe, sonst bleiben sie auf MinHeight.
-        DashboardPageViewHost.DashboardPrimaryRow.RowDefinitions[0].Height = useWidePreviewLayout
-            ? GridLength.Auto
-            : new GridLength(1, GridUnitType.Star);
-        DashboardPageViewHost.DashboardPrimaryRow.RowDefinitions[1].Height = useWidePreviewLayout
-            ? new GridLength(1, GridUnitType.Star)
-            : GridLength.Auto;
+        // Auch die große Vorschau bleibt neben Events und Chat. Das frühere Stapeln
+        // ließ die Szenen-/User-Spalte in einer Auto-Zeile über die Fensterhöhe wachsen
+        // und schnitt dadurch Events und Chat ohne Scrollmöglichkeit ab.
+        DashboardPageViewHost.DashboardPrimaryRow.RowDefinitions[0].Height =
+            new GridLength(1, GridUnitType.Star);
+        DashboardPageViewHost.DashboardPrimaryRow.RowDefinitions[1].Height = GridLength.Auto;
         Grid.SetRow(DashboardPageViewHost.DashboardObsSceneColumn, 0);
         Grid.SetColumn(DashboardPageViewHost.DashboardObsSceneColumn, 0);
-        Grid.SetColumnSpan(DashboardPageViewHost.DashboardObsSceneColumn, useWidePreviewLayout ? 2 : 1);
-        Grid.SetRow(DashboardPageViewHost.DashboardPrimaryContentColumn, useWidePreviewLayout ? 1 : 0);
-        Grid.SetColumn(DashboardPageViewHost.DashboardPrimaryContentColumn, useWidePreviewLayout ? 0 : 1);
-        Grid.SetColumnSpan(DashboardPageViewHost.DashboardPrimaryContentColumn, useWidePreviewLayout ? 2 : 1);
-        DashboardPageViewHost.DashboardObsSceneColumn.Margin = useWidePreviewLayout
-            ? new Thickness(0, 0, 0, 10)
-            : new Thickness(0, 0, 8, 0);
+        Grid.SetColumnSpan(DashboardPageViewHost.DashboardObsSceneColumn, 1);
+        Grid.SetRow(DashboardPageViewHost.DashboardPrimaryContentColumn, 0);
+        Grid.SetColumn(DashboardPageViewHost.DashboardPrimaryContentColumn, 1);
+        Grid.SetColumnSpan(DashboardPageViewHost.DashboardPrimaryContentColumn, 1);
+        DashboardPageViewHost.DashboardObsSceneColumn.Margin = new Thickness(0, 0, 8, 0);
 
         foreach (ComboBoxItem item in DashboardPageViewHost.DashboardObsScenePreviewSizeBox.Items
                      .OfType<System.Windows.Controls.ComboBoxItem>())
