@@ -83,9 +83,19 @@ public sealed class SpotifyServiceUiStructureTests
         Assert.Contains("!_settings.Spotify.SmartAutomationEnabled", overlayRuntime);
 
         string bindings = ReadSpotifyShellFile("MainWindow.Services.Spotify.Bindings.cs");
-        Assert.Contains("ServicesSpotifySmartAutomationBox.Checked +=", bindings);
-        Assert.Contains("ServicesSpotifySmartAutomationBox.Unchecked +=", bindings);
-        Assert.Contains("SaveSpotifySmartAutomationSettingsAsync", bindings);
+        Assert.Contains("ServicesSpotifySmartAutomationBox.Checked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();", bindings);
+        Assert.Contains("ServicesSpotifySmartAutomationBox.Unchecked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();", bindings);
+        Assert.DoesNotContain("SaveSpotifySmartAutomationSettingsAsync", bindings);
+
+        string persistence = File.ReadAllText(FindRepositoryFile(
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Settings",
+            "MainWindow.Settings.Persistence.cs"));
+        Assert.Contains(
+            "ServicesSpotifySmartAutomationBox.IsChecked = _settings.Spotify.SmartAutomationEnabled;",
+            persistence);
     }
 
     private static string ReadSpotifyShellFile(string fileName) =>

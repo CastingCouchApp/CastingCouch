@@ -430,20 +430,6 @@ public partial class MainWindow : Window
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyDeviceStatusText.Text += " · gespeichert";
     }
 
-    private async Task SaveSpotifySmartAutomationSettingsAsync()
-    {
-        if (_loadingSettingsIntoUi)
-        {
-            return;
-        }
-
-        _settings.Spotify.SmartAutomationEnabled = ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySmartAutomationBox.IsChecked == true;
-        _settings.Spotify.HealthMonitorEnabled = ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyHealthMonitorBox.IsChecked == true;
-        _settings.Spotify.AutoRecoverPlayback = ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutoRecoverBox.IsChecked == true;
-        await _settingsStore.SaveAsync(_settings);
-        RefreshSpotifyAutomationLogUi();
-    }
-
     private async Task CreateDefaultSpotifyAutomationRulesAsync()
     {
         var rules = new List<SpotifyAutomationRuleSettings>();

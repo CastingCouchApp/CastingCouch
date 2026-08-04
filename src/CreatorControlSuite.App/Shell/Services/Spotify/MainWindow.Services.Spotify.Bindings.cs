@@ -455,8 +455,8 @@ public partial class MainWindow : Window
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyAutoTransferPreferredBox.Unchecked += async (_, _) => await SaveSpotifyDeviceBehaviorAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyUseActiveFallbackBox.Checked += async (_, _) => await SaveSpotifyDeviceBehaviorAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyUseActiveFallbackBox.Unchecked += async (_, _) => await SaveSpotifyDeviceBehaviorAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySmartAutomationBox.Checked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySmartAutomationBox.Unchecked += async (_, _) => await SaveSpotifySmartAutomationSettingsAsync();
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySmartAutomationBox.Checked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySmartAutomationBox.Unchecked += async (_, _) => await SaveSpotifyAutomationSettingsAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySaveAutomationButton.Click += async (_, _) =>
             await SaveSpotifyAutomationSettingsAsync();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyCreateDefaultRulesButton.Click += async (_, _) => await CreateDefaultSpotifyAutomationRulesAsync();
