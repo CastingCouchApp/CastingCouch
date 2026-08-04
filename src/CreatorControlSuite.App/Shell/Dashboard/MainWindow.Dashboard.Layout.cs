@@ -428,6 +428,10 @@ public partial class MainWindow : Window
         Grid.SetColumn(DashboardPageViewHost.DashboardPrimaryContentColumn, 1);
         Grid.SetColumnSpan(DashboardPageViewHost.DashboardPrimaryContentColumn, 1);
         DashboardPageViewHost.DashboardObsSceneColumn.Margin = new Thickness(0, 0, 8, 0);
+        Grid.SetRowSpan(DashboardPageViewHost.DashboardObsSceneControlModule, useWidePreviewLayout ? 2 : 1);
+        DashboardPageViewHost.DashboardObsSceneControlModule.VerticalAlignment = useWidePreviewLayout
+            ? VerticalAlignment.Stretch
+            : VerticalAlignment.Top;
 
         foreach (ComboBoxItem item in DashboardPageViewHost.DashboardObsScenePreviewSizeBox.Items
                      .OfType<System.Windows.Controls.ComboBoxItem>())

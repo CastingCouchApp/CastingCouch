@@ -270,6 +270,7 @@
                                                     <Grid.RowDefinitions>
                                                         <RowDefinition x:Name="DashboardTwitchChatHeaderRow" x:FieldModifier="public" Height="Auto"/>
                                                         <RowDefinition Height="*"/>
+                                                        <RowDefinition Height="Auto"/>
                                                         <RowDefinition x:Name="DashboardTwitchChatControlsRow" x:FieldModifier="public" Height="Auto"/>
                                                     </Grid.RowDefinitions>
                                                     <DockPanel x:Name="DashboardTwitchChatHeader" x:FieldModifier="public">
@@ -297,7 +298,12 @@
                                                                       Visibility="Collapsed"
                                                                       DefaultBackgroundColor="Transparent"/>
                                                     </Grid>
-                                                    <StackPanel x:Name="DashboardTwitchChatControls" x:FieldModifier="public" Grid.Row="2">
+                                                    <UniformGrid x:Name="DashboardTwitchEngagementActions" x:FieldModifier="public" Grid.Row="2" Columns="3" Rows="1" Margin="0,0,0,8">
+                                                        <Button x:Name="DashboardOpenTwitchPollButton" x:FieldModifier="public" Content="UMFRAGE" Margin="0,0,4,0" ToolTip="Twitch-Umfrage erstellen oder verwalten"/>
+                                                        <Button x:Name="DashboardOpenTwitchPredictionButton" x:FieldModifier="public" Content="VORHERSAGE" Margin="4,0" ToolTip="Twitch-Vorhersage erstellen oder verwalten"/>
+                                                        <Button x:Name="DashboardOpenTwitchChannelPointsButton" x:FieldModifier="public" Content="KANALPUNKTE" Margin="4,0,0,0" ToolTip="Twitch-Kanalpunkte verwalten"/>
+                                                    </UniformGrid>
+                                                    <StackPanel x:Name="DashboardTwitchChatControls" x:FieldModifier="public" Grid.Row="3">
                                                         <Grid x:Name="DashboardTwitchBuiltInSendRow" x:FieldModifier="public">
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="*"/>

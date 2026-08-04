@@ -150,6 +150,15 @@ public partial class MainWindow : Window
                 ToggleStreamerBotFromDashboardAsync);
         DashboardPageViewHost.DashboardOpenTwitchChatButton.Click += (_, _) =>
             OpenDashboardTwitchChat();
+        DashboardPageViewHost.DashboardOpenTwitchPollButton.Click += (_, _) =>
+            ServicesPageViewHost.TwitchServiceViewHost.ServicesOpenTwitchPollButton.RaiseEvent(
+                new RoutedEventArgs(Button.ClickEvent));
+        DashboardPageViewHost.DashboardOpenTwitchPredictionButton.Click += (_, _) =>
+            ServicesPageViewHost.TwitchServiceViewHost.ServicesOpenTwitchPredictionButton.RaiseEvent(
+                new RoutedEventArgs(Button.ClickEvent));
+        DashboardPageViewHost.DashboardOpenTwitchChannelPointsButton.Click += (_, _) =>
+            ServicesPageViewHost.TwitchServiceViewHost.ServicesOpenTwitchChannelPointsButton.RaiseEvent(
+                new RoutedEventArgs(Button.ClickEvent));
         DashboardPageViewHost.DashboardManageAutomationsButton.Click += (_, _) => ShowPage(WorkflowPage);
         DashboardPageViewHost.DashboardOpenEventsButton.Click += async (_, _) =>
         {

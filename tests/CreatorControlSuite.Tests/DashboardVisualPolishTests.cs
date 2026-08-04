@@ -152,6 +152,34 @@ public sealed class DashboardVisualPolishTests
     }
 
     [Fact]
+    public void DashboardChat_ShowsTwitchEngagementActionsAboveMessageInput()
+    {
+        string dashboardXaml = ReadDashboardXaml();
+        int actions = dashboardXaml.IndexOf(
+            "x:Name=\"DashboardTwitchEngagementActions\"",
+            StringComparison.Ordinal);
+        int input = dashboardXaml.IndexOf(
+            "x:Name=\"DashboardTwitchChatMessageBox\"",
+            StringComparison.Ordinal);
+
+        Assert.True(actions >= 0 && actions < input);
+        Assert.Contains("x:Name=\"DashboardOpenTwitchPollButton\"", dashboardXaml);
+        Assert.Contains("x:Name=\"DashboardOpenTwitchPredictionButton\"", dashboardXaml);
+        Assert.Contains("x:Name=\"DashboardOpenTwitchChannelPointsButton\"", dashboardXaml);
+
+        string bindingsSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Dashboard",
+            "MainWindow.Dashboard.Bindings.cs"));
+        Assert.Contains("DashboardOpenTwitchPollButton.Click", bindingsSource);
+        Assert.Contains("DashboardOpenTwitchPredictionButton.Click", bindingsSource);
+        Assert.Contains("DashboardOpenTwitchChannelPointsButton.Click", bindingsSource);
+    }
+
+    [Fact]
     public void LargeObsScenePreview_UsesFreeSpaceBesidePreviewForActivityPanels()
     {
         string layoutSource = File.ReadAllText(Path.Combine(
@@ -180,6 +208,18 @@ public sealed class DashboardVisualPolishTests
             StringComparison.Ordinal);
         Assert.Contains(
             "Grid.SetRow(DashboardPageViewHost.DashboardPrimaryContentColumn, 0)",
+            layoutSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "DashboardObsSceneControlModule.VerticalAlignment = useWidePreviewLayout",
+            layoutSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Grid.SetRowSpan(DashboardPageViewHost.DashboardObsSceneControlModule, useWidePreviewLayout ? 2 : 1)",
+            layoutSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "? VerticalAlignment.Stretch",
             layoutSource,
             StringComparison.Ordinal);
 
