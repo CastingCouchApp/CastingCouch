@@ -16,6 +16,6 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="WixToolset.UI.wixext" Version="5.0.2" />
-    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
   </ItemGroup>
 </Project>
