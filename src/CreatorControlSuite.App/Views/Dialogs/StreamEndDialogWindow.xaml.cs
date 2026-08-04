@@ -203,7 +203,7 @@ public partial class StreamEndDialogWindow : Window
 
     private void UpdateModeDependentPanels()
     {
-        bool needsDuration = EndSceneRadio.IsChecked == true || EndSceneRaidRadio.IsChecked == true;
+        bool needsDuration = EndSceneRadio.IsChecked == true;
         EndSceneDurationPanel.Visibility = needsDuration ? Visibility.Visible : Visibility.Collapsed;
         RaidTargetPanel.Visibility = EndSceneRaidRadio.IsChecked == true
             ? Visibility.Visible
@@ -394,12 +394,9 @@ public partial class StreamEndDialogWindow : Window
                 return;
             }
 
-            if (!TryReadEndSceneSeconds(out int seconds))
-            {
-                return;
-            }
-
-            SelectedEndSceneSeconds = seconds;
+            // Im Raid-Modus bestimmt Twitch den Zeitpunkt. Die Endszene bleibt
+            // sichtbar, bis das ausgehende Raid-Event eingetroffen ist.
+            SelectedEndSceneSeconds = 0;
         }
         else
         {

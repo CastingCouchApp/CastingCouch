@@ -96,6 +96,16 @@ public sealed partial class SpotifyModule
     private void PatchPlaybackVolume(int volumePercent)
     {
         int clamped = Math.Clamp(volumePercent, 0, 100);
+        string? playbackDeviceId = _playback.Device?.Id;
+        _devices = _devices
+            .Select(device =>
+                (!string.IsNullOrWhiteSpace(playbackDeviceId) &&
+                 string.Equals(device.Id, playbackDeviceId, StringComparison.Ordinal)) ||
+                (string.IsNullOrWhiteSpace(playbackDeviceId) && device.IsActive)
+                    ? device with { VolumePercent = clamped }
+                    : device)
+            .ToList();
+
         if (_playback.Device is null)
         {
             return;

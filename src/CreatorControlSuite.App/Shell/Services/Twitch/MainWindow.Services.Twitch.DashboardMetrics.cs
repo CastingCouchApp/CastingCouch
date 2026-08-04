@@ -222,6 +222,7 @@ public partial class MainWindow
 
             _currentLiveViewerCount =
                 Math.Max(0, status.ViewerCount);
+            AddDashboardViewerTrendSample(_currentLiveViewerCount);
             ApplyTwitchUsersRefreshInterval();
             await _creatorIntelligence.RecordAsync(
                 "twitch.viewer.sample",
@@ -237,6 +238,7 @@ public partial class MainWindow
             await _workflowModule.Service.AddViewerSampleAsync(
                 _currentLiveViewerCount);
             RefreshWorkflowUi(_workflowModule.Service.State);
+            RefreshCommunityUi();
 
             await _overlayModule.Service.UpdateAsync(data =>
             {

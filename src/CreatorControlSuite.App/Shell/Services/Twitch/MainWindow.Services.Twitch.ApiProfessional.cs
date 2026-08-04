@@ -381,9 +381,9 @@ public partial class MainWindow : Window
         };
     }
 
-    private static void AddLimitedItem(
-        ObservableCollection<string> collection,
-        string value,
+    private static void AddLimitedItem<T>(
+        ObservableCollection<T> collection,
+        T value,
         int limit)
     {
         collection.Add(value);

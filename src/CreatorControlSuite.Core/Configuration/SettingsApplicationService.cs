@@ -6,7 +6,11 @@ public sealed class SettingsApplicationService(
     ISettingsStore store,
     ISettingsValidator validator)
 {
-    private const string GuestStarScope = "channel:read:guest_star";
+    private static readonly string[] RequiredTwitchScopes =
+    [
+        "channel:read:guest_star",
+        "moderator:manage:banned_users"
+    ];
 
     public async Task<AppSettings> LoadAsync(
         CancellationToken cancellationToken = default)
@@ -66,14 +70,15 @@ public sealed class SettingsApplicationService(
         }
 
         settings.Twitch.Scopes ??= [];
-        if (!settings.Twitch.Scopes.Contains(
-                GuestStarScope,
-                StringComparer.Ordinal))
+        string[] missingTwitchScopes = RequiredTwitchScopes
+            .Except(settings.Twitch.Scopes, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (missingTwitchScopes.Length > 0)
         {
             settings.Twitch.Scopes =
             [
                 .. settings.Twitch.Scopes,
-                GuestStarScope
+                .. missingTwitchScopes
             ];
             changed = true;
         }

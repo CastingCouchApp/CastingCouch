@@ -177,8 +177,9 @@ public partial class MainWindow : Window
     {
         if (_raidCountdownActive)
         {
-            // „JETZT RAIDEN“ während Countdown: lokalen Warte-Countdown überspringen.
-            SkipActiveRaidCountdown();
+            // Twitch entscheidet über die tatsächliche Ausführung. Erst das
+            // ausgehende Raid-Event darf anschließend den Stream beenden.
+            await RequestImmediateRaidAsync();
             return;
         }
 
@@ -316,6 +317,9 @@ public partial class MainWindow : Window
         _streamEndRaidDecisionTcs = null;
         _endSceneCountdownCts?.Cancel();
         _raidAutoStartCts?.Cancel();
+        _outgoingRaidCompletedTcs?.TrySetCanceled();
+        _outgoingRaidCompletedTcs = null;
+        _activeOutgoingRaidTarget = "";
         UpdateDashboardStreamEndModuleVisibility();
         UpdateDashboardRaidActionButtons();
     }

@@ -135,12 +135,9 @@ public partial class MainWindow : Window
                     GetTwitchRoleLabel(
                         message);
 
-                string chatLine =
-                    $"{message.ReceivedAt:HH:mm:ss} · {role}{message.ChatterName}: {message.MessageText}";
-
                 AddLimitedItem(
                     _twitchChatItems,
-                    chatLine,
+                    TwitchChatDisplayItem.FromMessage(message, role),
                     500);
 
                 ScrollTwitchChatToLatest();
@@ -166,6 +163,28 @@ public partial class MainWindow : Window
                 if (twitchEvent.Type == "channel.follow")
                 {
                     _ = _creatorIntelligence.RecordAsync("twitch.follow", new { twitchEvent.Summary });
+                }
+
+                if (twitchEvent.Type == "channel.raid" &&
+                    twitchEvent.Data.TryGetValue("from_broadcaster_user_login", out string? fromLogin) &&
+                    string.Equals(
+                        fromLogin,
+                        _twitchModule.GetSnapshot().ChannelLogin,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    string target = twitchEvent.Data.TryGetValue(
+                        "to_broadcaster_user_login",
+                        out string? toLogin)
+                        ? toLogin
+                        : _activeOutgoingRaidTarget;
+                    if (string.IsNullOrWhiteSpace(_activeOutgoingRaidTarget) ||
+                        string.Equals(
+                            target,
+                            _activeOutgoingRaidTarget,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        _outgoingRaidCompletedTcs?.TrySetResult(true);
+                    }
                 }
 
                 AddLimitedItem(

@@ -226,6 +226,31 @@ public sealed class ThemeTitleBarChromeTests
         Assert.True(streamWidgets > connections);
     }
 
+    [Fact]
+    public void MainWindowTitleBar_ScalesWidgetStripDownToKeepCountdownVisible()
+    {
+        XDocument document = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "MainWindow.xaml"));
+
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace xamlNamespace = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        XElement statusRow = Assert.Single(
+            document.Descendants(presentation + "Grid"),
+            element =>
+                (string?)element.Attribute(xamlNamespace + "Name") == "DashboardTopStatusRow");
+        XElement viewbox = Assert.IsType<XElement>(statusRow.Parent);
+
+        Assert.Equal(presentation + "Viewbox", viewbox.Name);
+        Assert.Equal("Uniform", (string?)viewbox.Attribute("Stretch"));
+        Assert.Equal("DownOnly", (string?)viewbox.Attribute("StretchDirection"));
+        Assert.Equal("Left", (string?)viewbox.Attribute("HorizontalAlignment"));
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);

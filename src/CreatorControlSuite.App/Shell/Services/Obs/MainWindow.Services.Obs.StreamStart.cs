@@ -200,8 +200,10 @@ public partial class MainWindow : Window
         _raidCountdownCts?.Dispose();
         _raidCountdownCts = new CancellationTokenSource();
         CancellationToken token = _raidCountdownCts.Token;
-        _raidCountdownSkipRequested = false;
         _raidCountdownActive = true;
+        _activeOutgoingRaidTarget = displayName.Trim().TrimStart('@');
+        _outgoingRaidCompletedTcs = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         // Endszene-Wartezeit beenden – Raid-Countdown läuft parallel zur Endszene-Anzeige.
         _endSceneCountdownCts?.Cancel();
         UpdateDashboardStreamEndModuleVisibility();
@@ -211,10 +213,12 @@ public partial class MainWindow : Window
         DashboardPageViewHost.DashboardRaidViewerText.Text = $"Aktuelle Zuschauer: {_currentLiveViewerCount}";
         DashboardPageViewHost.DashboardRaidCountdownProgress.Minimum = 0;
         DashboardPageViewHost.DashboardRaidCountdownProgress.Maximum = Math.Max(1, seconds);
-        SetStreamEndStatus("Raid läuft · JETZT RAIDEN überspringt den Countdown");
+        SetStreamEndStatus("Raid läuft · warte auf Twitch-Bestätigung");
         _activeStreamEndDialog?.ShowRaidActions(false);
         _activeStreamEndDialog?.SetCancelRaidEnabled(true);
-        _activeStreamEndDialog?.SetRaidReady(true);
+        _activeStreamEndDialog?.SetRaidReady(false);
+        DashboardPageViewHost.DashboardStartRaidButton.IsEnabled = false;
+        DashboardPageViewHost.DashboardStartRaidButton.Visibility = Visibility.Collapsed;
 
         try
         {
@@ -225,6 +229,12 @@ public partial class MainWindow : Window
                 DashboardPageViewHost.DashboardRaidCountdownText.Text = $"Raid in: {clock}";
                 DashboardPageViewHost.DashboardRaidCountdownProgress.Value = seconds - remaining;
                 DashboardPageViewHost.DashboardWorkflowStageText.Text = $"RAID → {displayName} · noch {remaining}s";
+                bool canExecuteNow = seconds - remaining >= Math.Min(10, seconds);
+                _activeStreamEndDialog?.SetRaidReady(canExecuteNow);
+                DashboardPageViewHost.DashboardStartRaidButton.IsEnabled = canExecuteNow;
+                DashboardPageViewHost.DashboardStartRaidButton.Visibility = canExecuteNow
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
                 _activeStreamEndDialog?.UpdateCountdown(
                     "Raid",
                     clock,
@@ -233,35 +243,29 @@ public partial class MainWindow : Window
                 _activeStreamEndDialog?.SetRaidTargetStatus($"Ziel: {displayName} · Zuschauer: {_currentLiveViewerCount}");
                 if (remaining > 0)
                 {
-                    await Task.Delay(1000, token);
+                    Task delay = Task.Delay(1000, token);
+                    Task completed = await Task.WhenAny(
+                        delay,
+                        _outgoingRaidCompletedTcs.Task);
+                    if (completed == _outgoingRaidCompletedTcs.Task)
+                    {
+                        return MarkOutgoingRaidCompleted(displayName, seconds);
+                    }
                 }
             }
 
-            DashboardPageViewHost.DashboardRaidCountdownTitleText.Text = "RAID AUSGEFÜHRT";
-            DashboardPageViewHost.DashboardRaidCountdownText.Text = "Stream wird beendet …";
-            DashboardPageViewHost.DashboardRaidCountdownProgress.Value = seconds;
-            SetStreamEndStatus("Raid ausgeführt");
-            _activeStreamEndDialog?.UpdateCountdown("Raid ausgeführt", "00:00", seconds, seconds);
-            return true;
+            DashboardPageViewHost.DashboardRaidCountdownTitleText.Text = "RAID BEREIT";
+            DashboardPageViewHost.DashboardRaidCountdownText.Text = "Twitch-Bestätigung ausstehend";
+            SetStreamEndStatus("Raid bereit · bei Twitch ausführen");
+            _activeStreamEndDialog?.UpdateCountdown("Raid bereit", "00:00", seconds, seconds);
+            AddDashboardNotification(
+                $"Raid zu {displayName} ist bereit. „JETZT RAIDEN“ kann jetzt verwendet werden.",
+                "Info");
+            await _outgoingRaidCompletedTcs.Task.WaitAsync(token);
+            return MarkOutgoingRaidCompleted(displayName, seconds);
         }
         catch (OperationCanceledException)
         {
-            RaidCountdownOutcome outcome = RaidCountdownPolicy.DecideAfterCancellation(
-                _raidCountdownSkipRequested);
-            if (RaidCountdownPolicy.IsSuccessful(outcome))
-            {
-                DashboardPageViewHost.DashboardRaidCountdownTitleText.Text = "RAID JETZT";
-                DashboardPageViewHost.DashboardRaidCountdownText.Text = "Countdown übersprungen · Stream wird beendet …";
-                DashboardPageViewHost.DashboardRaidCountdownProgress.Value = seconds;
-                DashboardPageViewHost.DashboardWorkflowStageText.Text = $"RAID → {displayName} · sofort";
-                SetStreamEndStatus("Raid-Countdown übersprungen");
-                _activeStreamEndDialog?.UpdateCountdown("Raid jetzt", "00:00", seconds, seconds);
-                AddDashboardNotification(
-                    $"Raid-Countdown zu {displayName} übersprungen – Streamende geht weiter.",
-                    "Info");
-                return true;
-            }
-
             DashboardPageViewHost.DashboardRaidCountdownTitleText.Text = "RAID ABGEBROCHEN";
             DashboardPageViewHost.DashboardRaidCountdownText.Text = "Stream bleibt aktiv";
             DashboardPageViewHost.DashboardWorkflowStageText.Text = "RAID ABGEBROCHEN · STREAM LÄUFT WEITER";
@@ -271,21 +275,45 @@ public partial class MainWindow : Window
         finally
         {
             _raidCountdownActive = false;
-            _raidCountdownSkipRequested = false;
             UpdateDashboardStreamEndModuleVisibility();
             UpdateDashboardRaidActionButtons();
         }
     }
 
-    private void SkipActiveRaidCountdown()
+    private bool MarkOutgoingRaidCompleted(string displayName, int seconds)
+    {
+        DashboardPageViewHost.DashboardRaidCountdownTitleText.Text = "RAID AUSGEFÜHRT";
+        DashboardPageViewHost.DashboardRaidCountdownText.Text = "Twitch bestätigt · Stream wird beendet …";
+        DashboardPageViewHost.DashboardRaidCountdownProgress.Value = seconds;
+        DashboardPageViewHost.DashboardWorkflowStageText.Text = $"RAID → {displayName} · ausgeführt";
+        SetStreamEndStatus("Raid von Twitch bestätigt");
+        _activeStreamEndDialog?.UpdateCountdown("Raid ausgeführt", "00:00", seconds, seconds);
+        AddDashboardNotification($"Twitch hat den Raid zu {displayName} ausgeführt.", "Info");
+        return true;
+    }
+
+    private async Task RequestImmediateRaidAsync()
     {
         if (!_raidCountdownActive)
         {
             return;
         }
 
-        _raidCountdownSkipRequested = true;
-        _raidCountdownCts?.Cancel();
+        try
+        {
+            await _twitchModule.SendChatMessageAsync(
+                RaidChatCommand.Format(_activeOutgoingRaidTarget));
+            SetStreamEndStatus("Raid jetzt angefordert · warte auf Twitch-Bestätigung");
+            AddDashboardNotification(
+                $"Sofortige Raid-Ausführung zu {_activeOutgoingRaidTarget} wurde bei Twitch angefordert.",
+                "Info");
+        }
+        catch (Exception exception)
+        {
+            AddDashboardNotification(
+                $"Raid konnte noch nicht sofort ausgeführt werden: {exception.Message}",
+                "Warnung");
+        }
     }
 
     private async Task CancelActiveRaidAsync()

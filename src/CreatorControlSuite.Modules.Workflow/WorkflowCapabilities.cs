@@ -25,6 +25,8 @@ public interface IWorkflowAlertCapability
 
 public interface IWorkflowOverlayCapability
 {
+    Task ClearChatAsync(CancellationToken cancellationToken);
+
     Task UpdateAsync(
         Action<WorkflowOverlayData> update,
         CancellationToken cancellationToken);

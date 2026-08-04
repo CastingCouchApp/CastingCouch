@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using CreatorControlSuite.App.Twitch;
 
 namespace CreatorControlSuite.App.Shell;
 
@@ -216,7 +217,7 @@ public partial class MainWindow
             return;
         }
 
-        string latest = _twitchChatItems[^1];
+        TwitchChatDisplayItem latest = _twitchChatItems[^1];
         SettingsPageViewHost.TwitchChatList.ScrollIntoView(latest);
         DashboardPageViewHost.DashboardTwitchChatList
             .ScrollIntoView(latest);

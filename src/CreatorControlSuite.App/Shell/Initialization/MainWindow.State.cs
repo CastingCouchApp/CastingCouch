@@ -143,7 +143,7 @@ public partial class MainWindow : Window
     private bool _logsPaused;
     private readonly System.Windows.Threading.DispatcherTimer _alertAudioPreviewTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private bool _updatingAlertAudioTrimUi;
-    private readonly ObservableCollection<string> _twitchChatItems = [];
+    private readonly ObservableCollection<TwitchChatDisplayItem> _twitchChatItems = [];
     private string? _lastTwitchWebChatUrl;
     private readonly ObservableCollection<TwitchRewardRedemptionItem> _twitchRedemptionItems = [];
     private readonly ObservableCollection<string> _twitchModerationLogItems = [];
@@ -322,7 +322,8 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _endSceneCountdownCts;
     private CancellationTokenSource? _raidAutoStartCts;
     private bool _raidCountdownActive;
-    private bool _raidCountdownSkipRequested;
+    private TaskCompletionSource<bool>? _outgoingRaidCompletedTcs;
+    private string _activeOutgoingRaidTarget = "";
     private bool _plannedStreamEndActive;
     private bool _streamEndFlowActive;
     private bool _streamEndAbortRequested;

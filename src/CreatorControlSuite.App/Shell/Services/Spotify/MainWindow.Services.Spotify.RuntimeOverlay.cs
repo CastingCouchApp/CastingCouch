@@ -333,16 +333,20 @@ public partial class MainWindow : Window
 
         try
         {
+            int spotifyLevel = SpotifyPlaybackLevelResolver.Resolve(
+                snapshot,
+                _settings.Spotify.StartVolumePercent,
+                _lastRequestedSpotifyVolumePercent,
+                _lastRequestedSpotifyVolumeAt);
             SettingsPageViewHost.SpotifyVolumeSlider.Value =
-                playback.Device?.VolumePercent
-                ?? _settings.Spotify.StartVolumePercent;
+                spotifyLevel;
 
             SettingsPageViewHost.SpotifyVolumeValueText.Text =
                 $"{(int)Math.Round(SettingsPageViewHost.SpotifyVolumeSlider.Value)} %";
-            DashboardPageViewHost.DashboardSpotifyVolumeSlider.Value = playback.Device?.VolumePercent ?? _settings.Spotify.StartVolumePercent;
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeSlider.Value = DashboardPageViewHost.DashboardSpotifyVolumeSlider.Value;
+            DashboardPageViewHost.DashboardSpotifyVolumeSlider.Value = spotifyLevel;
+            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeSlider.Value = spotifyLevel;
             DashboardPageViewHost.DashboardSpotifyVolumeText.Text = $"{(int)Math.Round(DashboardPageViewHost.DashboardSpotifyVolumeSlider.Value)} %";
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeText.Text = DashboardPageViewHost.DashboardSpotifyVolumeText.Text;
+            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeText.Text = $"Level {spotifyLevel}";
             ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyProgressBar.Maximum = Math.Max(1, durationMs);
             ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyProgressBar.Value = Math.Clamp(progressMs, 0, Math.Max(1, durationMs));
             ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyProgressBar.IsEnabled = playback.Track is not null && durationMs > 0;

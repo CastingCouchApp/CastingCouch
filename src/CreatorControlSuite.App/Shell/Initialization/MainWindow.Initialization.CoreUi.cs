@@ -153,6 +153,9 @@ public partial class MainWindow : Window
             await LoadTwitchProfessionalHistoryAsync();
             RefreshTwitchProfessionalUi();
         };
+        ServicesPageViewHost.TwitchServiceViewHost.ServicesCompactRefreshTwitchProfessionalButton.Click += (_, _) =>
+            ServicesPageViewHost.TwitchServiceViewHost.ServicesRefreshTwitchProfessionalButton.RaiseEvent(
+                new RoutedEventArgs(Button.ClickEvent));
         ServicesPageViewHost.TwitchServiceViewHost.ServicesOpenTwitchProfessionalHistoryButton.Click += (_, _) => OpenStreamHistoryFolder();
         ServicesPageViewHost.TwitchServiceViewHost.ServicesExportTwitchProfessionalHistoryButton.Click += async (_, _) => await ExportTwitchProfessionalHistoryCsvAsync();
         ServicesPageViewHost.TwitchServiceViewHost.ServicesCreateTwitchProfessionalReportButton.Click += async (_, _) => await CreateTwitchProfessionalReportAsync();

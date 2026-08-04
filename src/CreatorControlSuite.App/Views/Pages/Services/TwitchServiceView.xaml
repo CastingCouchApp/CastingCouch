@@ -8,9 +8,25 @@
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="22" MaxWidth="1380" HorizontalAlignment="Left" Style="{StaticResource CCSDarkSettingsContentStyle}">
-                                <TextBlock Text="Twitch" FontSize="30" FontWeight="Bold"/>
-                                <TextBlock Text="Live-Daten, Kanalsteuerung und Community-Werkzeuge an einem Ort." Foreground="{DynamicResource TextMutedBrush}" Margin="0,5,0,12"/>
-                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,12">
+                                 <TextBlock Text="Twitch" FontSize="30" FontWeight="Bold"/>
+                                 <TextBlock Text="Live-Daten, Kanalsteuerung und Community-Werkzeuge an einem Ort." Foreground="{DynamicResource TextMutedBrush}" Margin="0,5,0,12"/>
+                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,12">
+                                     <StackPanel>
+                                         <DockPanel>
+                                             <TextBlock Text="Twitch Professional · Live-Analyse" FontWeight="SemiBold" FontSize="17"/>
+                                             <Button x:Name="ServicesCompactRefreshTwitchProfessionalButton" x:FieldModifier="public" Content="AKTUALISIEREN" DockPanel.Dock="Right" Padding="10,4"/>
+                                         </DockPanel>
+                                         <primitives:UniformGrid Columns="6" Margin="0,8,0,0">
+                                             <StackPanel Margin="0,0,12,0"><TextBlock Text="Status" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/><TextBlock Text="{Binding Text, ElementName=ServicesTwitchProfessionalLiveText}" FontWeight="Bold" FontSize="16"/></StackPanel>
+                                             <StackPanel Margin="0,0,12,0"><TextBlock Text="Zuschauer" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/><TextBlock Text="{Binding Text, ElementName=ServicesTwitchProfessionalViewerText}" FontWeight="Bold" FontSize="16"/></StackPanel>
+                                             <StackPanel Margin="0,0,12,0"><TextBlock Text="Peak" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/><TextBlock Text="{Binding Text, ElementName=ServicesTwitchProfessionalPeakText}" FontWeight="Bold" FontSize="16"/></StackPanel>
+                                             <StackPanel Margin="0,0,12,0"><TextBlock Text="Live-Dauer" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/><TextBlock Text="{Binding Text, ElementName=ServicesTwitchProfessionalDurationText}" FontWeight="Bold" FontSize="16"/></StackPanel>
+                                             <StackPanel Margin="0,0,12,0"><TextBlock Text="Chat" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/><TextBlock Text="{Binding Text, ElementName=ServicesTwitchProfessionalChatText}" FontWeight="Bold" FontSize="16"/></StackPanel>
+                                             <StackPanel><TextBlock Text="Events" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/><TextBlock Text="{Binding Text, ElementName=ServicesTwitchProfessionalEventsText}" FontWeight="Bold" FontSize="16"/></StackPanel>
+                                         </primitives:UniformGrid>
+                                     </StackPanel>
+                                 </Border>
+                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,12">
                                     <StackPanel>
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -37,8 +53,13 @@
                                     <ComboBox x:Name="ServicesTwitchCategoryResultsBox" x:FieldModifier="public" DisplayMemberPath="Name" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0" MinHeight="34" MaxDropDownHeight="360" HorizontalContentAlignment="Stretch" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                                     <Button x:Name="ServicesSaveTwitchChannelButton" x:FieldModifier="public" Content="TITEL UND KATEGORIE ÜBERNEHMEN" Visibility="Collapsed"/>
                                     </StackPanel>
-                                </Border>
-                                <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,6,0,0">
+                                 </Border>
+                                 <WrapPanel Margin="0,0,0,12">
+                                     <Button x:Name="ServicesCompactOpenTwitchPollButton" x:FieldModifier="public" Content="UMFRAGE STARTEN"/>
+                                     <Button x:Name="ServicesCompactOpenTwitchPredictionButton" x:FieldModifier="public" Content="VORHERSAGE STARTEN" Margin="8,0,0,0"/>
+                                     <Button x:Name="ServicesCompactOpenTwitchChannelPointsButton" x:FieldModifier="public" Content="KANALPUNKTE VERWALTEN" Margin="8,0,0,0"/>
+                                 </WrapPanel>
+                                 <Border Visibility="Collapsed" Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,6,0,0">
                                     <StackPanel>
                                         <DockPanel>
                                             <StackPanel DockPanel.Dock="Left">
@@ -181,7 +202,7 @@
                                                         <ListBox x:Name="ServicesCreatorIntelligenceActionsList" x:FieldModifier="public" Height="130" Margin="0,6,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource ComboGlyphBackgroundBrush}"/>
                                                     </StackPanel>
                                                 </Grid>
-                                                <WrapPanel Margin="0,12,0,0">
+                                 <WrapPanel Margin="0,12,0,0" Visibility="Collapsed">
                                                     <Button x:Name="ServicesCreatorIntelligenceWeeklyReportButton" x:FieldModifier="public" Content="WOCHENBERICHT ERSTELLEN" Width="220" Padding="10,6" Background="{DynamicResource HighlightItemBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource HoverBorderBrush}"/>
                                                     <Button x:Name="ServicesCreatorIntelligenceCompleteActionButton" x:FieldModifier="public" Content="AUSWAHL ERLEDIGT" Width="170" Margin="8,0,0,0" Padding="10,6" Background="{DynamicResource HighlightItemBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource HoverBorderBrush}"/>
                                                 </WrapPanel>
@@ -361,8 +382,8 @@
                                 <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,18,0,0">
                                     <StackPanel>
                                         <TextBlock Text="Streamende und Raid" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="18"/>
-                                        <CheckBox x:Name="ServicesTwitchRaidEnabledBox" x:FieldModifier="public" Content="Bevorzugte Raidziele und Automatik festlegen" Margin="0,10,0,0"/>
-                                        <TextBlock Text="Aktivieren, um bevorzugte Ziele, Countdown und automatisches Streamende einzustellen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="24,3,0,0"/>
+                                        <CheckBox x:Name="ServicesTwitchRaidEnabledBox" x:FieldModifier="public" Content="Raid-Automatik aktivieren" Margin="0,10,0,0"/>
+                                        <TextBlock Text="Countdown und automatisches Streamende einstellen." Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="24,3,0,0"/>
                                         <StackPanel x:Name="ServicesTwitchRaidAutomationPanel">
                                             <StackPanel.Style>
                                                 <Style TargetType="StackPanel">
@@ -374,7 +395,8 @@
                                                     </Style.Triggers>
                                                 </Style>
                                             </StackPanel.Style>
-                                        <TextBlock Text="Häufige Raidziele" Margin="0,12,0,5"/>
+                                        <StackPanel Visibility="Collapsed">
+                                        <TextBlock Text="Raidziele" Margin="0,12,0,5"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -386,7 +408,7 @@
                                         <ListBox x:Name="ServicesTwitchRaidChannelsList" x:FieldModifier="public" Height="120" Margin="0,8,0,0" Background="{DynamicResource SidebarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}"/>
                                         <Button x:Name="ServicesTwitchRemoveRaidChannelButton" x:FieldModifier="public" Content="AUSGEWÄHLTES ZIEL ENTFERNEN" HorizontalAlignment="Left" Margin="0,8,0,0"/>
                                         <TextBox x:Name="ServicesTwitchRaidChannelsBox" x:FieldModifier="public" Visibility="Collapsed" AcceptsReturn="True"/>
-                                        <TextBlock Text="Bevorzugtes Raid-Ziel" Margin="0,10,0,5"/>
+                                        <TextBlock Text="Raid-Ziel" Margin="0,10,0,5"/>
                                         <WrapPanel>
                                             <ComboBox x:Name="ServicesTwitchRaidTargetBox" x:FieldModifier="public" Foreground="{DynamicResource TextPrimaryBrush}" Background="{DynamicResource TextMutedBrush}" MinWidth="300" HorizontalAlignment="Left"/>
                                             <Button x:Name="ServicesTwitchOpenRaidChannelButton" x:FieldModifier="public" Content="Channel öffnen" Margin="8,0,0,0"/>
@@ -416,6 +438,7 @@
                                             <TextBox x:Name="ServicesTwitchEndSceneSecondsBox" x:FieldModifier="public" Width="70" Margin="8,0"/>
                                             <TextBlock Text="Sekunden" VerticalAlignment="Center"/>
                                         </WrapPanel>
+                                        </StackPanel>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

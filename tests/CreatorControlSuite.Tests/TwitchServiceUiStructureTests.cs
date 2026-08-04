@@ -5,6 +5,36 @@ public sealed class TwitchServiceUiStructureTests
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     [Fact]
+    public void StreamEndDialog_RaidModeDoesNotRequireEndSceneDuration()
+    {
+        string code = File.ReadAllText(Path.Combine(
+            RepositoryRoot, "src", "CreatorControlSuite.App", "Views", "Dialogs",
+            "StreamEndDialogWindow.xaml.cs"));
+
+        Assert.Contains("bool needsDuration = EndSceneRadio.IsChecked == true;", code);
+        Assert.Contains("SelectedEndSceneSeconds = 0;", code);
+    }
+
+    [Fact]
+    public void TwitchEventSub_SubscribesToOutgoingRaidCompletion()
+    {
+        string code = File.ReadAllText(Path.Combine(
+            RepositoryRoot, "src", "CreatorControlSuite.Modules.Twitch",
+            "TwitchEventSubClient.cs"));
+        string countdownCode = File.ReadAllText(Path.Combine(
+            RepositoryRoot, "src", "CreatorControlSuite.App", "Shell", "Services",
+            "Obs", "MainWindow.Services.Obs.StreamStart.cs"));
+        string eventCode = File.ReadAllText(Path.Combine(
+            RepositoryRoot, "src", "CreatorControlSuite.App", "Shell", "Services",
+            "Twitch", "MainWindow.Services.Twitch.Bindings.cs"));
+
+        Assert.Contains("from_broadcaster_user_id = broadcasterUserId", code);
+        Assert.Contains("await _outgoingRaidCompletedTcs.Task.WaitAsync(token);", countdownCode);
+        Assert.Contains("_outgoingRaidCompletedTcs?.TrySetResult(true);", eventCode);
+        Assert.DoesNotContain("Countdown übersprungen · Stream wird beendet", countdownCode);
+    }
+
+    [Fact]
     public void TwitchService_UsesCompactLayoutAndPopoutAnalysisWindows()
     {
         string xaml = File.ReadAllText(Path.Combine(
@@ -22,8 +52,16 @@ public sealed class TwitchServiceUiStructureTests
         Assert.DoesNotContain("Header=\"STREAM-STATISTIKEN ANZEIGEN\"", xaml);
         Assert.DoesNotContain("Header=\"INTELLIGENCE-ANALYSE", xaml);
         Assert.True(
+            xaml.IndexOf("Twitch Professional · Live-Analyse", StringComparison.Ordinal) <
+            xaml.IndexOf("Text=\"Steuerung\"", StringComparison.Ordinal));
+        Assert.True(
             xaml.IndexOf("Text=\"Steuerung\"", StringComparison.Ordinal) <
-            xaml.IndexOf("Twitch Professional · Live-Analyse", StringComparison.Ordinal));
+            xaml.IndexOf("ServicesCompactOpenTwitchPollButton", StringComparison.Ordinal));
+        Assert.True(
+            xaml.IndexOf("ServicesCompactOpenTwitchPollButton", StringComparison.Ordinal) <
+            xaml.IndexOf("x:Name=\"ServicesTwitchEventsList\"", StringComparison.Ordinal));
+        Assert.DoesNotContain("Bevorzugte Raidziele", xaml);
+        Assert.DoesNotContain("Bevorzugtes Raid-Ziel", xaml);
     }
 
     [Fact]
@@ -80,6 +118,16 @@ public sealed class TwitchServiceUiStructureTests
             "Twitch",
             "MainWindow.Services.Twitch.Engagement.cs"));
         Assert.DoesNotContain("_twitchGoalsPageViewModel.FollowerTarget =", engagement);
+
+        string twitchModule = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "src",
+            "CreatorControlSuite.Modules.Twitch",
+            "TwitchModule.cs"));
+        Assert.Contains("SendChatMessageWithTokenRecoveryAsync", twitchModule);
+        Assert.Contains("RefreshAccessTokenAsync", twitchModule);
+        Assert.Contains("IsUnauthorized", twitchModule);
+        Assert.Contains("Bitte Twitch erneut autorisieren", twitchModule);
     }
 
     [Fact]

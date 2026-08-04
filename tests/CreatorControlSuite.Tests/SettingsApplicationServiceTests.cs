@@ -36,6 +36,9 @@ public sealed class SettingsApplicationServiceTests
         Assert.NotNull(loaded.Obs.AudioProfiles);
         Assert.False(loaded.Alerts.AutoCreateObsSources);
         Assert.Contains("channel:read:guest_star", loaded.Twitch.Scopes);
+        Assert.Contains(
+            "moderator:manage:banned_users",
+            loaded.Twitch.Scopes);
         Assert.Single(loaded.Overlay.Canvases);
         Assert.Equal(1, store.SaveCount);
     }

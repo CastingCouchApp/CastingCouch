@@ -28,6 +28,7 @@ public sealed class StreamWorkflowServiceTests
         Assert.Equal(StreamPhase.Preparing.ToString(), harness.Overlay.Current.Stream.Phase);
         Assert.False(harness.Overlay.Current.Stream.IsLive);
         Assert.NotNull(harness.Service.SessionStats.StartedAt);
+        Assert.Equal(1, harness.Overlay.ClearChatCalls);
     }
 
     [Fact]
@@ -181,6 +182,16 @@ public sealed class StreamWorkflowServiceTests
         Assert.Equal("Idle", harness.Overlay.Current.Stream.Phase);
     }
 
+    [Fact]
+    public async Task ResetSessionStatsAsync_ClearsChatForObservedStreamStart()
+    {
+        Harness harness = CreateHarness();
+
+        await harness.Service.ResetSessionStatsAsync();
+
+        Assert.Equal(1, harness.Overlay.ClearChatCalls);
+    }
+
     private static Harness CreateHarness(Action<AppSettings>? configure = null)
     {
         var settings = new AppSettings();
@@ -294,6 +305,13 @@ public sealed class StreamWorkflowServiceTests
     private sealed class FakeWorkflowOverlayCapability : IWorkflowOverlayCapability
     {
         public WorkflowOverlayData Current { get; private set; } = new();
+        public int ClearChatCalls { get; private set; }
+
+        public Task ClearChatAsync(CancellationToken cancellationToken)
+        {
+            ClearChatCalls++;
+            return Task.CompletedTask;
+        }
 
         public Task UpdateAsync(
             Action<WorkflowOverlayData> update,

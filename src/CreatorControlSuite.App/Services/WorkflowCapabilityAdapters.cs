@@ -54,8 +54,12 @@ public sealed class WorkflowAlertCapability(
 }
 
 public sealed class WorkflowOverlayCapability(
-    IOverlayDataService overlay) : IWorkflowOverlayCapability
+    IOverlayDataService overlay,
+    IChatHistoryService chatHistory) : IWorkflowOverlayCapability
 {
+    public Task ClearChatAsync(CancellationToken cancellationToken) =>
+        chatHistory.ClearAndBroadcastAsync(cancellationToken);
+
     public Task UpdateAsync(
         Action<WorkflowOverlayData> update,
         CancellationToken cancellationToken) =>

@@ -137,7 +137,7 @@
                                         Margin="10,0,8,0"/>
                                 <TextBlock x:Name="ServicesSpotifyVolumeText"
                                            x:FieldModifier="public"
-                                           Text="100 %"
+                                           Text="Level 100"
                                            MinWidth="42"
                                            VerticalAlignment="Center"/>
                             </StackPanel>

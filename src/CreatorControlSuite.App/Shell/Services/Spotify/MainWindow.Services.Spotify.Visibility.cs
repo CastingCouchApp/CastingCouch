@@ -93,10 +93,15 @@ public partial class MainWindow : Window
     private async Task SetSpotifyVolumeTrackedAsync(int volume, CancellationToken cancellationToken = default)
     {
         volume = Math.Clamp(volume, 0, 100);
-        _lastRequestedSpotifyVolumePercent = volume;
-        _lastRequestedSpotifyVolumeAt = DateTimeOffset.UtcNow;
+        RememberSpotifyVolumeLevel(volume);
         await _spotifyModule.SetVolumeImmediateAsync(volume, cancellationToken);
         await ApplySpotifyOverlayMuteStateAsync(volume <= 0);
+    }
+
+    private void RememberSpotifyVolumeLevel(int level)
+    {
+        _lastRequestedSpotifyVolumePercent = Math.Clamp(level, 0, 100);
+        _lastRequestedSpotifyVolumeAt = DateTimeOffset.UtcNow;
     }
 
     private async Task SynchronizeSpotifyOverlayVisibilityAsync(SpotifyPlaybackState playback)

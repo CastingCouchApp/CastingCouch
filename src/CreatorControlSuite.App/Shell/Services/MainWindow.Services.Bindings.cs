@@ -164,7 +164,7 @@ public partial class MainWindow : Window
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeSlider.ValueChanged += async (_, _) =>
         {
             int volume = (int)Math.Round(ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeSlider.Value);
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeText.Text = $"{volume} %";
+            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeText.Text = $"Level {volume}";
 
             if (!_updatingSpotifyUi)
             {

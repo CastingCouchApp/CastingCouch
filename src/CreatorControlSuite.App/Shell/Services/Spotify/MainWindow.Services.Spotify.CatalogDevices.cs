@@ -562,7 +562,7 @@ public partial class MainWindow : Window
                                 shuffleOverride: rule.Shuffle);
                             break;
                         case "Pause": await _spotifyModule.PauseAsync(); break;
-                        case "SetVolume": await _spotifyModule.SetVolumeImmediateAsync(Math.Clamp(rule.VolumePercent, 0, 100)); break;
+                        case "SetVolume": await SetSpotifyVolumeTrackedAsync(Math.Clamp(rule.VolumePercent, 0, 100)); break;
                         default: await _spotifyModule.ResumeAsync(); break;
                     }
                     if (rule.ActionType is "StartPlaylist" or "Resume")
@@ -574,10 +574,11 @@ public partial class MainWindow : Window
                                 targetVolume,
                                 TimeSpan.FromMilliseconds(Math.Clamp(rule.FadeMilliseconds, 0, 60_000)),
                                 pauseAtEnd: false);
+                            RememberSpotifyVolumeLevel(targetVolume);
                         }
                         else
                         {
-                            await _spotifyModule.SetVolumeImmediateAsync(targetVolume);
+                            await SetSpotifyVolumeTrackedAsync(targetVolume);
                         }
                     }
                     _spotifyAutomationLog.Add(rule.Name, $"Aktion {rule.ActionType} für Szene '{sceneName}' ausgeführt.");
@@ -587,6 +588,7 @@ public partial class MainWindow : Window
                     _spotifyAutomationLog.Add(rule.Name, ex.Message, false);
                 }
             }
+            RefreshSpotifyUi();
         }
         finally
         {

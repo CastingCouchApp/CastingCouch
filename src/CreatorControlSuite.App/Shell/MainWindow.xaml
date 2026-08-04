@@ -120,11 +120,13 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
+                <Viewbox Grid.Column="1"
+                         Margin="0,6,0,6"
+                         HorizontalAlignment="Left"
+                         VerticalAlignment="Stretch"
+                         Stretch="Uniform"
+                         StretchDirection="DownOnly">
                 <Grid x:Name="DashboardTopStatusRow"
-                      Grid.Column="1"
-                      Margin="0,6,0,6"
-                      HorizontalAlignment="Stretch"
-                      VerticalAlignment="Stretch"
                       shell:WindowChrome.IsHitTestVisibleInChrome="True"
                       MouseRightButtonUp="TitleBar_MouseRightButtonUp">
                     <Border x:Name="DashboardServiceStatusSection" Background="Transparent" BorderThickness="0" Padding="0">
@@ -418,6 +420,7 @@
                         </Grid>
                     </Border>
                 </Grid>
+                </Viewbox>
                 <StackPanel Grid.Column="2"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"

@@ -45,6 +45,8 @@ public sealed class SpotifyServiceUiStructureTests
         Assert.Contains("Content=\"MUSIK PRO OBS-SZENE EINRICHTEN\"", xaml);
         Assert.Contains("Playlist, Shuffle, Lautstärke und Fade", xaml);
         Assert.Contains("x:Name=\"ServicesSpotifyShuffleBox\"", xaml);
+        Assert.Contains("Text=\"Level 100\"", xaml);
+        Assert.DoesNotContain("x:Name=\"ServicesSpotifyVolumeText\" x:FieldModifier=\"public\" Text=\"100 %\"", xaml);
         Assert.Contains("Content=\"Stream- und Szenenautomatik aktivieren\"", xaml);
         Assert.Contains("x:Name=\"SpotifyAutomationContent\"", xaml);
         Assert.Contains("x:Name=\"ServicesSpotifySaveAutomationButton\"", xaml);

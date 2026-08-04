@@ -425,6 +425,36 @@ public sealed class ArchitectureGuardTests
     }
 
     [Fact]
+    public void TwitchViewerSample_RefreshesCommunityUiAfterLiveCountChanges()
+    {
+        string root = FindRepositoryRoot();
+        string metricsPath = Path.Combine(
+            root,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Twitch",
+            "MainWindow.Services.Twitch.DashboardMetrics.cs");
+        string metrics = File.ReadAllText(metricsPath);
+
+        int viewerAssignment = metrics.IndexOf(
+            "_currentLiveViewerCount =\n                Math.Max(0, status.ViewerCount);",
+            StringComparison.Ordinal);
+        int communityRefresh = metrics.IndexOf(
+            "RefreshCommunityUi();",
+            viewerAssignment,
+            StringComparison.Ordinal);
+
+        Assert.True(
+            viewerAssignment >= 0,
+            "Der Live-Zuschauerwert muss aus dem Twitch-Status übernommen werden.");
+        Assert.True(
+            communityRefresh > viewerAssignment,
+            "Nach einem neuen Live-Zuschauerwert muss die Community-Anzeige direkt aktualisiert werden.");
+    }
+
+    [Fact]
     [Trait("Category", "Architecture")]
     public void TwitchDashboardShell_DelegatesRaidProjectionRules()
     {

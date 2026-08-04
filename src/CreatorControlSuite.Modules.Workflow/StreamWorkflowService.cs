@@ -52,6 +52,8 @@ public sealed class StreamWorkflowService(
                 SessionStats.BitsCheered = 0;
                 SessionStats.IncomingRaids = 0;
 
+                await _overlay.ClearChatAsync(cancellationToken);
+
                 if (settings.Workflow.AutoSwitchScenes &&
                     _obs.IsConnected &&
                     !string.IsNullOrWhiteSpace(settings.Obs.StartScene))
@@ -482,6 +484,7 @@ public sealed class StreamWorkflowService(
         SessionStats.IncomingRaids = 0;
         SessionStats.ViewerSamples.Clear();
 
+        await _overlay.ClearChatAsync(cancellationToken);
         await SyncStatsToOverlayAsync(cancellationToken);
     }
 

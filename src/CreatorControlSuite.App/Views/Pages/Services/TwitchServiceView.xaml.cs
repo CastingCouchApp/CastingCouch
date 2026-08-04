@@ -17,6 +17,12 @@ public partial class TwitchServiceView : UserControl
     public TwitchServiceView()
     {
         InitializeComponent();
+        ServicesCompactOpenTwitchPollButton.Click += (_, _) =>
+            ServicesOpenTwitchPollButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        ServicesCompactOpenTwitchPredictionButton.Click += (_, _) =>
+            ServicesOpenTwitchPredictionButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        ServicesCompactOpenTwitchChannelPointsButton.Click += (_, _) =>
+            ServicesOpenTwitchChannelPointsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         ServicesTwitchTitleBox.TextChanged += (_, _) => MarkChannelEditorDirty();
         ServicesTwitchCategorySearchBox.TextChanged += (_, _) => MarkChannelEditorDirty();
         ServicesTwitchCategoryResultsBox.SelectionChanged += (_, _) => MarkChannelEditorDirty();

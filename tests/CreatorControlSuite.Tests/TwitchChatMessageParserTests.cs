@@ -1,11 +1,36 @@
 using System.Text.Json;
 using CreatorControlSuite.Modules.Twitch;
 using CreatorControlSuite.Modules.Twitch.Models;
+using CreatorControlSuite.App.Twitch;
 
 namespace CreatorControlSuite.Tests;
 
 public sealed class TwitchChatMessageParserTests
 {
+    [Fact]
+    public void DisplayItem_PreservesNativeEmotesForInAppChat()
+    {
+        var message = new TwitchChatMessage(
+            "msg-1", "b1", "u1", "alice", "Alice", "hi Kappa", "#FF0000",
+            DateTimeOffset.Parse("2026-07-27T18:00:00Z"), [],
+            [
+                new(TwitchChatFragmentType.Text, "hi "),
+                new(TwitchChatFragmentType.Emote, "Kappa", "25")
+            ]);
+
+        TwitchChatDisplayItem item = TwitchChatDisplayItem.FromMessage(message, "[MOD] ");
+
+        Assert.Equal("18:00:00 · [MOD] Alice: ", item.Prefix);
+        Assert.Equal(2, item.Parts.Count);
+        Assert.False(item.Parts[0].IsEmote);
+        Assert.True(item.Parts[1].IsEmote);
+        Assert.Equal("Kappa", item.Parts[1].Text);
+        Assert.Equal(
+            "https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0",
+            item.Parts[1].ImageUrl);
+        Assert.Contains("[MOD]", item.ToString());
+    }
+
     [Fact]
     public void Parse_ReadsTextAndEmoteFragments()
     {

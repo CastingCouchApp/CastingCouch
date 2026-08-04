@@ -41,7 +41,7 @@
                          IsChecked="True"/>
             <RadioButton x:Name="EndSceneRaidRadio"
                          GroupName="StreamEndMode"
-                         Content="Stream Endszene-Zeit ablaufen lassen, Raid und Ende"
+                         Content="Endszene zeigen, raiden und danach Stream beenden"
                          FontSize="15"
                          Margin="0,0,0,14"/>
 
@@ -58,7 +58,7 @@
                         <ColumnDefinition Width="90"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Endszene-Dauer"
+                    <TextBlock Text="Zeit bis Streamende"
                                FontWeight="SemiBold"
                                VerticalAlignment="Center"/>
                     <TextBox x:Name="EndSceneSecondsBox"

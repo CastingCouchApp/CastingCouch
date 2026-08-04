@@ -226,6 +226,17 @@ public sealed class TwitchEventSubClient : ITwitchEventSubClient
                     to_broadcaster_user_id = broadcasterUserId
                 }),
 
+            // Outgoing raids are the authoritative signal that Twitch has
+            // actually transferred the viewers. The stream-end flow waits for
+            // this event instead of assuming that a local timer means success.
+            new Subscription(
+                "channel.raid",
+                "1",
+                new
+                {
+                    from_broadcaster_user_id = broadcasterUserId
+                }),
+
             new Subscription(
                 "channel.guest_star_guest.update",
                 "beta",

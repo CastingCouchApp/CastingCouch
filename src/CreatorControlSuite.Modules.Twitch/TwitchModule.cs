@@ -262,7 +262,7 @@ public sealed class TwitchModule(
                 "Twitch ist nicht verbunden.");
         }
 
-        await _apiClient.SendChatMessageAsync(
+        await SendChatMessageWithTokenRecoveryAsync(
             _channel.BroadcasterId,
             _currentUser.Id,
             message,
@@ -566,4 +566,69 @@ public sealed class TwitchModule(
 
         return refreshed;
     }
+
+    private async Task SendChatMessageWithTokenRecoveryAsync(
+        string broadcasterId,
+        string senderId,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _apiClient.SendChatMessageAsync(
+                broadcasterId,
+                senderId,
+                message,
+                cancellationToken);
+        }
+        catch (InvalidOperationException exception) when (IsUnauthorized(exception))
+        {
+            await RefreshAccessTokenAsync(cancellationToken);
+            await _apiClient.SendChatMessageAsync(
+                broadcasterId,
+                senderId,
+                message,
+                cancellationToken);
+        }
+    }
+
+    private async Task RefreshAccessTokenAsync(CancellationToken cancellationToken)
+    {
+        AppSettings settings = await _settingsStore.LoadAsync(cancellationToken);
+        TwitchTokenSet tokenSet = await _tokenRepository.LoadAsync(cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Twitch wurde noch nicht autorisiert. Bitte Twitch erneut autorisieren.");
+
+        if (string.IsNullOrWhiteSpace(tokenSet.RefreshToken))
+        {
+            throw new InvalidOperationException(
+                "Der Twitch-Token kann nicht erneuert werden. Bitte Twitch erneut autorisieren.");
+        }
+
+        TwitchTokenSet refreshed;
+        try
+        {
+            refreshed = await _oauthClient.RefreshAsync(
+                settings.Twitch.ClientId,
+                tokenSet.RefreshToken,
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new InvalidOperationException(
+                "Der Twitch-Token ist ungültig. Bitte Twitch erneut autorisieren.",
+                exception);
+        }
+
+        await _tokenRepository.SaveAsync(refreshed, cancellationToken);
+        _apiClient.Configure(settings.Twitch.ClientId, refreshed.AccessToken);
+        _validation = await _oauthClient.ValidateAsync(
+            refreshed.AccessToken,
+            cancellationToken);
+    }
+
+    private static bool IsUnauthorized(Exception exception) =>
+        exception.Message.Contains("Twitch API 401", StringComparison.OrdinalIgnoreCase) ||
+        exception.Message.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase) ||
+        exception.Message.Contains("Invalid OAuth token", StringComparison.OrdinalIgnoreCase);
 }
