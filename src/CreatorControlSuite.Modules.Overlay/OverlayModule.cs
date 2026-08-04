@@ -83,7 +83,7 @@ public sealed class OverlayModule(
         }
         else
         {
-            detail = "Overlay-Datendatei wird vorbereitet";
+            detail = "Overlay-Daten werden vorbereitet";
         }
 
         return new ModuleStatus(

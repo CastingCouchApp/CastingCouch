@@ -12,7 +12,7 @@
                     <TextBlock Text="Laufende Steuerung und Detailansicht der verbundenen Streaming-Dienste" Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
                 </StackPanel>
                 <ScrollViewer x:Name="ServicesOverviewPanel" Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
+                    <StackPanel MaxWidth="1120" HorizontalAlignment="Left" Style="{StaticResource CCSDarkSettingsContentStyle}">
                         <TextBlock Text="Dienste auswählen" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                         <TextBlock Text="Wähle einen Dienst aus, um dessen Live-Steuerung und Status zu öffnen. Die Dienstliste in der linken Navigation bleibt dabei ebenfalls verfügbar." Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,16"/>
                         <UniformGrid Columns="2" Rows="3">

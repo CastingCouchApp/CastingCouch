@@ -3,6 +3,17 @@ namespace CreatorControlSuite.Tests;
 public sealed class SettingsThemeUiGuardTests
 {
     [Fact]
+    public void SettingsContentStyle_SupportsAllFrameworkElementContainers()
+    {
+        string appXaml = ReadAppXaml();
+
+        Assert.Contains(
+            "<Style x:Key=\"CCSDarkSettingsContentStyle\" TargetType=\"FrameworkElement\">",
+            appXaml,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AppComboBoxTemplate_SupportsEditableTextDisplay()
     {
         string comboStyle = ExtractStyleBlock(

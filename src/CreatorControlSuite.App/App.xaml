@@ -444,7 +444,7 @@
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
             </Style>
 
-            <Style x:Key="CCSDarkSettingsContentStyle" TargetType="StackPanel">
+            <Style x:Key="CCSDarkSettingsContentStyle" TargetType="FrameworkElement">
                 <Setter Property="TextElement.Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
             </Style>
             <Style x:Key="CCSDarkSettingsTextStyle" TargetType="TextBlock">

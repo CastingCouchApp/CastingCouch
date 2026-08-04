@@ -14,6 +14,7 @@ public partial class StreamEndDialogWindow : Window
     private bool _flowStarted;
     private bool _allowClose;
     private bool _suppressSearch;
+    private bool _suppressNextFocusSearch;
     private readonly Action<string>? _openRaidChannel;
     private readonly Func<string, CancellationToken, Task<IReadOnlyList<TwitchChannelSuggestion>>>? _suggestRaidTargets;
     private readonly Action<string>? _raidTargetChanged;
@@ -64,6 +65,12 @@ public partial class StreamEndDialogWindow : Window
         RaidChannelSearchBox.PreviewKeyDown += RaidChannelSearchBox_OnPreviewKeyDown;
         RaidChannelSearchBox.GotKeyboardFocus += async (_, _) =>
         {
+            if (_suppressNextFocusSearch)
+            {
+                _suppressNextFocusSearch = false;
+                return;
+            }
+
             if (_suggestRaidTargets is not null)
             {
                 await SearchRaidTargetsAsync();
@@ -329,6 +336,8 @@ public partial class StreamEndDialogWindow : Window
 
     private void ApplySuggestion(TwitchChannelSuggestion suggestion)
     {
+        _searchTimer.Stop();
+        _searchCts?.Cancel();
         _suppressSearch = true;
         try
         {
@@ -342,7 +351,11 @@ public partial class StreamEndDialogWindow : Window
         }
 
         _raidTargetChanged?.Invoke(suggestion.Login);
-        RaidChannelSearchBox.Focus();
+        if (!RaidChannelSearchBox.IsKeyboardFocusWithin)
+        {
+            _suppressNextFocusSearch = true;
+            RaidChannelSearchBox.Focus();
+        }
     }
 
     private void MoveSuggestion(int delta)

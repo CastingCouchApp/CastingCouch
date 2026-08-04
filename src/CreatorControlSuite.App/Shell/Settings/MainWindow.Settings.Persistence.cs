@@ -176,11 +176,8 @@ public partial class MainWindow
         // gesetzt und die Einstellung dadurch praktisch ignoriert.
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayEnabledBox.IsChecked = true;
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayEnabledBox.IsEnabled = false;
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayEnabledBox.ToolTip = "Spotify-Daten werden immer automatisch in die hinterlegte JSON-Datei geschrieben.";
+        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayEnabledBox.ToolTip = "Spotify-Daten werden automatisch für das Overlay bereitgestellt.";
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayEnabledBox.Visibility = Visibility.Visible;
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyDataJsonPathBox.Text = string.IsNullOrWhiteSpace(_settings.Overlay.DataFilePath)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CreatorControlSuite", "Overlay", "data", _settings.Overlay.DataFileName)
-            : Environment.ExpandEnvironmentVariables(_settings.Overlay.DataFilePath);
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlaySourceBox.Text = string.IsNullOrWhiteSpace(_settings.Spotify.OverlayObsSource) ? "ccs_spotify" : _settings.Spotify.OverlayObsSource;
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlaySceneBox.Text = _settings.Spotify.OverlayObsScene;
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyShufflePlaylistBox.IsChecked = _settings.Spotify.ShuffleSelectedPlaylist;
@@ -398,22 +395,6 @@ public partial class MainWindow
             _settings.YouTubeMusic.BridgePort = ytPort;
             _settings.YouTubeMusic.AutoConnect = SettingsPageViewHost.YouTubeMusicAutoConnectBox.IsChecked == true;
             _settings.YouTubeMusic.ConnectOnPrepare = SettingsPageViewHost.YouTubeMusicConnectOnPrepareBox.IsChecked == true;
-
-            // Der im Spotify-Bereich eingetragene Laufzeit-JSON-Pfad muss auch beim
-            // allgemeinen Speichern erhalten bleiben. Sonst schreibt der laufende
-            // Spotify-Refresh weiter in die zuvor konfigurierte Standarddatei.
-            string? spotifyDataPath = ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyDataJsonPathBox.Text?.Trim();
-            if (!string.IsNullOrWhiteSpace(spotifyDataPath))
-            {
-                spotifyDataPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(spotifyDataPath));
-                if (!string.Equals(Path.GetExtension(spotifyDataPath), ".json", StringComparison.OrdinalIgnoreCase))
-                {
-                    spotifyDataPath += ".json";
-                }
-
-                _settings.Overlay.DataFilePath = spotifyDataPath;
-                _settings.Overlay.DataFileName = Path.GetFileName(spotifyDataPath);
-            }
 
             _settings.StreamerBot.Host = SettingsPageViewHost.StreamerBotHostBox.Text.Trim();
             _settings.StreamerBot.Port = int.Parse(SettingsPageViewHost.StreamerBotPortBox.Text.Trim());

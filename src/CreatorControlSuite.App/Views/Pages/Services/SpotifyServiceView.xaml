@@ -330,43 +330,6 @@
                                       Background="{DynamicResource ElevatedBackgroundBrush}"/>
                         </StackPanel>
                     </Border>
-                    <Expander Margin="0,12,0,0">
-                        <Expander.Header>
-                            <TextBlock Text="Overlay-Datendatei"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                        </Expander.Header>
-                        <StackPanel Margin="0,8,0,0">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBox x:Name="ServicesSpotifyDataJsonPathBox"
-                                         x:FieldModifier="public"/>
-                                <Button x:Name="ServicesSpotifyBrowseDataJsonButton"
-                                        x:FieldModifier="public"
-                                        Grid.Column="1"
-                                        Content="AUSWÄHLEN"
-                                        Margin="8,0,0,0"/>
-                            </Grid>
-                            <TextBlock x:Name="ServicesSpotifyOverlayPathText"
-                                       x:FieldModifier="public"
-                                       Text="Keine JSON-Datei ausgewählt."
-                                       Foreground="{DynamicResource TextMutedBrush}"
-                                       Margin="0,6,0,0"/>
-                            <TextBlock x:Name="ServicesSpotifyOverlayStatusText"
-                                       x:FieldModifier="public"
-                                       Text="Overlay-Verknüpfung nicht geprüft."
-                                       Foreground="{DynamicResource TextMutedBrush}"
-                                       Margin="0,4,0,0"/>
-                            <WrapPanel Margin="0,10,0,0">
-                                <Button x:Name="ServicesSpotifySyncOverlayButton" x:FieldModifier="public" Content="JETZT SCHREIBEN"/>
-                                <Button x:Name="ServicesSpotifyReloadOverlayButton" x:FieldModifier="public" Content="ORDNER ÖFFNEN"/>
-                                <Button x:Name="ServicesSpotifyPreviewOverlayButton" x:FieldModifier="public" Content="DATEI ÖFFNEN"/>
-                            </WrapPanel>
-                        </StackPanel>
-                    </Expander>
                     <Expander Header="Interne Spotify-Diagnose" Visibility="Collapsed">
                         <StackPanel Margin="0,10,0,0">
                             <CheckBox x:Name="ServicesSpotifyHealthMonitorBox"

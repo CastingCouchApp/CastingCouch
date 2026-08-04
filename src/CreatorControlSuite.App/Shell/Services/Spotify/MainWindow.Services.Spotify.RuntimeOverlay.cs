@@ -442,7 +442,7 @@ public partial class MainWindow : Window
 
             await DisableLegacyOverlayWriterAsync(overlayRoot);
 
-            // Der im Spotify-Bereich ausdrücklich ausgewählte JSON-Pfad hat Vorrang.
+            // Die zentrale Overlay-Datenquelle bestimmt den Laufzeitpfad.
             // Hotfix 6 leitete den Zielpfad erneut nur aus dem Overlay-Root ab und
             // konnte dadurch eine andere overlay-data.json beschreiben als die von
             // der OBS-HTML geladene Datei.
@@ -525,21 +525,14 @@ public partial class MainWindow : Window
                     playback.Track?.AlbumImageUrl ?? ""));
             }
 
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyDataJsonPathBox.Text = targetPath;
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayPathText.Text = $"Aktive JSON: {targetPath}";
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayStatusText.Text =
-                $"Spotify-Daten geschrieben: {DateTime.Now:HH:mm:ss} · connected={overlayConnected} · sichtbar={spotify["showInOverlay"]?.GetValue<bool?>() != false}";
             _appLogger.Write(
                 AppLogLevel.Debug,
                 "Spotify",
                 $"Overlay-JSON aktualisiert: Pfad='{targetPath}', connected={overlayConnected}, showInOverlay={spotify["showInOverlay"]}, Titel='{playback.Track?.Name ?? ""}'.");
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayStatusText.Foreground = Brushes.LightGreen;
         }
         catch (Exception exception)
         {
             _appLogger.Write(AppLogLevel.Error, "Spotify", $"Spotify-JSON konnte nicht aktualisiert werden: {exception.Message}", exception);
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayStatusText.Text = "Spotify-JSON konnte nicht aktualisiert werden: " + exception.Message;
-            ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlayStatusText.Foreground = Brushes.IndianRed;
         }
         finally
         {

@@ -198,10 +198,11 @@ public partial class MainWindow : Window
                     string state = twitchEvent.Data.TryGetValue("state", out string? guestState)
                         ? guestState
                         : "";
-                    DashboardPageViewHost.DashboardJoinStreamTogetherButton.Visibility =
-                        state is "invited" or "accepted" or "ready"
-                            ? Visibility.Visible
-                            : Visibility.Collapsed;
+                    bool hasPendingStreamTogetherRequest =
+                        state is "invited" or "accepted" or "ready";
+                    DashboardPageViewHost.DashboardJoinStreamTogetherButton.Content = hasPendingStreamTogetherRequest
+                        ? "ANFRAGE ÖFFNEN"
+                        : "STREAM TOGETHER";
                 }
             });
 

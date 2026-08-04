@@ -3,6 +3,31 @@ namespace CreatorControlSuite.Tests;
 public sealed class SpotifyServiceUiStructureTests
 {
     [Fact]
+    public void AllServicePages_UseSpotifyContentWidth()
+    {
+        string[] serviceViews =
+        [
+            "SpotifyServiceView.xaml",
+            "TwitchServiceView.xaml",
+            "ObsServiceView.xaml",
+            "StreamDeckServiceView.xaml",
+            "StreamerBotServiceView.xaml",
+            "ServicesPageView.xaml"
+        ];
+
+        foreach (string serviceView in serviceViews)
+        {
+            string xaml = File.ReadAllText(FindRepositoryFile(
+                "src", "CreatorControlSuite.App", "Views", "Pages", "Services",
+                serviceView));
+
+            Assert.Contains("MaxWidth=\"1120\"", xaml);
+            Assert.Contains("HorizontalAlignment=\"Left\"", xaml);
+            Assert.Contains("CCSDarkSettingsContentStyle", xaml);
+        }
+    }
+
+    [Fact]
     public void SpotifyServicePage_UsesFocusedSectionOrderAndHidesLegacyCatalogControls()
     {
         string xaml = File.ReadAllText(FindRepositoryFile(
@@ -54,6 +79,12 @@ public sealed class SpotifyServiceUiStructureTests
         Assert.Contains("Binding=\"{Binding IsChecked, ElementName=ServicesSpotifySmartAutomationBox}\"", xaml);
         Assert.Contains("Text=\"Overlay-Verhalten\"", xaml);
         Assert.Contains("Text=\"Musik erkennen über\"", xaml);
+        Assert.DoesNotContain("Overlay-Datendatei", xaml);
+        Assert.DoesNotContain("ServicesSpotifyDataJsonPathBox", xaml);
+        Assert.DoesNotContain("ServicesSpotifyBrowseDataJsonButton", xaml);
+        Assert.DoesNotContain("ServicesSpotifySyncOverlayButton", xaml);
+        Assert.DoesNotContain("ServicesSpotifyReloadOverlayButton", xaml);
+        Assert.DoesNotContain("ServicesSpotifyPreviewOverlayButton", xaml);
         Assert.DoesNotContain("x:Name=\"ServicesSpotifyPauseButton\"", xaml);
         Assert.DoesNotContain("Text=\"Deaktiviert\"", xaml);
         Assert.DoesNotContain("Content=\"ALERT-EINSTELLUNGEN SPEICHERN\"", xaml);

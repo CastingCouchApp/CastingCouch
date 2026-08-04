@@ -203,6 +203,13 @@ public partial class MainWindow : Window
         DashboardPageViewHost.DashboardServiceConnectTwitchButton.Content =
             twitchConnected ? "TRENNEN" : "VERBINDEN";
 
+        // EventSub meldet nur Änderungen in einer vom eigenen Kanal
+        // gehosteten Stream-Together-Sitzung. Eingehende Gast-Einladungen
+        // haben kein allgemeines Event für den Empfänger.
+        DashboardPageViewHost.DashboardJoinStreamTogetherButton.Visibility = twitchConnected
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
         DashboardPageViewHost.DashboardServiceConnectSpotifyButton.Content =
             musicConnected ? "TRENNEN" : "VERBINDEN";
 

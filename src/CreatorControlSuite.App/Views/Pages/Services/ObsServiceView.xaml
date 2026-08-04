@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="18">
+                            <StackPanel Margin="22" MaxWidth="1120" HorizontalAlignment="Left" Style="{StaticResource CCSDarkSettingsContentStyle}">
                                 <TextBlock Text="OBS-Steuerung" FontSize="22" FontWeight="Bold"/>
                                 <TextBlock x:Name="ServicesObsStatusText" x:FieldModifier="public" Text="Nicht verbunden" Margin="0,10,0,12"/>
                                 <WrapPanel>

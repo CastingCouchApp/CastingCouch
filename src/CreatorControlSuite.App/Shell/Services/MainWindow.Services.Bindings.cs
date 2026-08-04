@@ -156,11 +156,7 @@ public partial class MainWindow : Window
         ServicesPageViewHost.ObsServiceViewHost.ServicesObsAutomationAddButton.Click += async (_, _) => await AddSimpleObsAutomationRuleAsync();
         ServicesPageViewHost.ObsServiceViewHost.ServicesObsAutomationDeleteButton.Click += async (_, _) => await DeleteSimpleObsAutomationRuleAsync();
         ServicesPageViewHost.ObsServiceViewHost.ServicesObsAutomationTestButton.Click += async (_, _) => await TestSimpleObsAutomationRuleAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyBrowseDataJsonButton.Click += (_, _) => BrowseSpotifyDataJsonPath();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyOverlaySceneBox.SelectionChanged += async (_, _) => await RefreshSpotifyOverlayBrowserSourcesAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifySyncOverlayButton.Click += async (_, _) => await WriteSpotifyDataJsonNowAsync();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyReloadOverlayButton.Click += (_, _) => OpenSpotifyDataJsonFolder();
-        ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyPreviewOverlayButton.Click += (_, _) => OpenSpotifyDataJsonFile();
         ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeSlider.ValueChanged += async (_, _) =>
         {
             int volume = (int)Math.Round(ServicesPageViewHost.SpotifyServiceViewHost.ServicesSpotifyVolumeSlider.Value);

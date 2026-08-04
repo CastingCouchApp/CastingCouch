@@ -16,6 +16,19 @@ public sealed class TwitchServiceUiStructureTests
     }
 
     [Fact]
+    public void StreamEndDialog_SelectingRaidTargetDoesNotReopenSuggestions()
+    {
+        string code = File.ReadAllText(Path.Combine(
+            RepositoryRoot, "src", "CreatorControlSuite.App", "Views", "Dialogs",
+            "StreamEndDialogWindow.xaml.cs"));
+
+        Assert.Contains("_suppressNextFocusSearch", code);
+        Assert.Contains("_searchCts?.Cancel();", code);
+        Assert.Contains("if (_suppressNextFocusSearch)", code);
+        Assert.Contains("if (!RaidChannelSearchBox.IsKeyboardFocusWithin)", code);
+    }
+
+    [Fact]
     public void TwitchEventSub_SubscribesToOutgoingRaidCompletion()
     {
         string code = File.ReadAllText(Path.Combine(
@@ -177,6 +190,36 @@ public sealed class TwitchServiceUiStructureTests
 
         Assert.True(metadataRefresh >= 0);
         Assert.True(uiRefresh > metadataRefresh);
+    }
+
+    [Fact]
+    public void Dashboard_StreamTogetherActionRemainsAvailableWhileTwitchIsConnected()
+    {
+        string connectionCode = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Dashboard",
+            "MainWindow.Dashboard.Connections.cs"));
+        string eventCode = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "src",
+            "CreatorControlSuite.App",
+            "Shell",
+            "Services",
+            "Twitch",
+            "MainWindow.Services.Twitch.Bindings.cs"));
+
+        Assert.Contains(
+            "DashboardJoinStreamTogetherButton.Visibility = twitchConnected",
+            connectionCode);
+        Assert.Contains(
+            "DashboardJoinStreamTogetherButton.Content = hasPendingStreamTogetherRequest",
+            eventCode);
+        Assert.DoesNotContain(
+            "state is \"invited\" or \"accepted\" or \"ready\"\n                            ? Visibility.Visible\n                            : Visibility.Collapsed",
+            eventCode.Replace("\r\n", "\n", StringComparison.Ordinal));
     }
 
     private static string FindRepositoryRoot()

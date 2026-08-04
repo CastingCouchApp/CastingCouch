@@ -7,7 +7,7 @@
              xmlns:twitch="clr-namespace:CreatorControlSuite.App.Twitch">
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="22" MaxWidth="1380" HorizontalAlignment="Left" Style="{StaticResource CCSDarkSettingsContentStyle}">
+                            <StackPanel Margin="22" MaxWidth="1120" HorizontalAlignment="Left" Style="{StaticResource CCSDarkSettingsContentStyle}">
                                  <TextBlock Text="Twitch" FontSize="30" FontWeight="Bold"/>
                                  <TextBlock Text="Live-Daten, Kanalsteuerung und Community-Werkzeuge an einem Ort." Foreground="{DynamicResource TextMutedBrush}" Margin="0,5,0,12"/>
                                  <Border Background="{DynamicResource ElevatedBackgroundBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,12">

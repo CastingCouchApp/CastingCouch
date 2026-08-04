@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <Grid Margin="18" MinWidth="1000" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+                        <Grid Margin="22" MinWidth="1000" MaxWidth="1120" HorizontalAlignment="Left" Style="{StaticResource CCSDarkSettingsContentStyle}" TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="420"/>
                                 <ColumnDefinition Width="16"/>
