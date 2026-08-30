@@ -121,6 +121,9 @@ pub struct WorkflowRunResponse {
     pub message: String,
 }
 
+pub const WORKFLOW_PREPARE: &str = "workflow.prepare";
+pub const SIDECAR_NOT_CONNECTED: &str = "Sidecar nicht verbunden";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SidecarLaunchDecision {
     Spawn,
@@ -346,6 +349,27 @@ impl SidecarSupervisor {
         match self.client.read().await.ytm_now_playing().await {
             Ok(playing) => playing,
             Err(_) => YtmNowPlaying::default(),
+        }
+    }
+
+    pub async fn run_workflow(&self, command: &str) -> WorkflowRunResponse {
+        if self.status.read().await.state != ConnectionState::Connected {
+            return WorkflowRunResponse {
+                ok: false,
+                message: SIDECAR_NOT_CONNECTED.into(),
+            };
+        }
+        let command = if command.trim().is_empty() {
+            WORKFLOW_PREPARE
+        } else {
+            command
+        };
+        match self.client.read().await.run_workflow(command).await {
+            Ok(response) => response,
+            Err(err) => WorkflowRunResponse {
+                ok: false,
+                message: err.to_string(),
+            },
         }
     }
 
@@ -674,6 +698,17 @@ mod tests {
         assert_eq!(status.id, "sidecar");
         assert_eq!(status.state, ConnectionState::Disconnected);
         assert!(supervisor.ytm_now_playing().await.title.is_empty());
+        let workflow = supervisor.run_workflow(WORKFLOW_PREPARE).await;
+        assert!(!workflow.ok);
+        assert_eq!(workflow.message, SIDECAR_NOT_CONNECTED);
+    }
+
+    #[tokio::test]
+    async fn supervisor_run_workflow_when_disconnected_skips_http() {
+        let supervisor = SidecarSupervisor::new();
+        let workflow = supervisor.run_workflow("workflow.live").await;
+        assert!(!workflow.ok);
+        assert_eq!(workflow.message, SIDECAR_NOT_CONNECTED);
     }
 
     #[tokio::test]

@@ -9,6 +9,8 @@ import {
   Bell,
   Download,
   Info,
+  Music,
+  ListTodo,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { applyThemeId, type AppSettings } from "../../lib/app-settings";
@@ -17,6 +19,8 @@ import { queryKeys, tauriInvoke } from "../../lib/api";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/services", label: "Dienste", icon: Plug },
+  { to: "/music", label: "Musik", icon: Music },
+  { to: "/workflow", label: "Workflow", icon: ListTodo },
   { to: "/overlay", label: "Overlay", icon: Layers },
   { to: "/alerts", label: "Alerts", icon: Bell },
   { to: "/settings", label: "Einstellungen", icon: Settings },

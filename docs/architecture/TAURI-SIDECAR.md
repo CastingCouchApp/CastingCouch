@@ -77,4 +77,4 @@ Nur Loopback JSON. Der Agent unter HTTPS ist ein anderes Thema und nicht Teil di
 { "ok": false, "message": "Run-of-Show noch nicht im Sidecar" }
 ```
 
-Tauri-Commands: `sidecar_status`, `sidecar_ytm_now_playing` (HTTP-Passthrough).
+Tauri-Commands: `sidecar_status`, `sidecar_ytm_now_playing` (HTTP-Passthrough), `sidecar_workflow_run` (`{ "command": "workflow.prepare" }`, Default `workflow.prepare`). Ohne Sidecar: `sidecar_workflow_run` liefert `{ "ok": false, "message": "Sidecar nicht verbunden" }` statt HTTP.

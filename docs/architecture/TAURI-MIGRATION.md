@@ -50,9 +50,9 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 | Twitch / Spotify | Twitch Device-Code + Helix-Status + EventSub-WS (follow/sub/cheer/…); Spotify PKCE-OAuth + currently-playing |
 | Alerts | Persistenz in `settings.json` (WPF-PascalCase `Alerts.Definitions`); Runtime-Queue → Overlay-Hub `app.alert` |
 | Overlay Event Bridge | Hub-Publish als C#-`OverlayRealtimeEvent` (camelCase `source`/`type`/`at`/`summary`/`data`) |
-| YouTube Music / Workflow / Agent | Sidecar-Fallback (siehe unten) |
+| YouTube Music / Workflow / Agent | Sidecar-Fallback + dünne UI `/music` (Spotify + YTM) und `/workflow` (Schritt ausführen) |
 | Updates | SHA-256-Manifest-Verifier (`ccs-core::updates`); GitHub-Check + Download; Apply/Backup/RSA und Release-Skill in Phase 5 |
-| Haupt-UI | Dashboard Live (OBS-Szene, Twitch-Login, Spotify Now Playing; Events + 15s-Fallback), Dienste (Connect/Login/Logout + Fehlerdetail), Overlay-Canvas-Tabelle (TanStack Table, Duplicate kopiert Layout, Editor-WebView auf `/editor/{id}`), Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme` CSS-Tokens), Updates (Prüfen/Manifest/Checksum), About (Version, Datenpfad, Overlay-Health) |
+| Haupt-UI | Dashboard Live (OBS-Szene, Twitch-Login, Spotify Now Playing; Events + 15s-Fallback), Dienste (Connect/Login/Logout + Fehlerdetail), Musik (`/music`: Spotify always, YTM-Karte nur bei Sidecar healthy), Workflow (`/workflow`: Status + Schritt `workflow.*`), Overlay-Canvas-Tabelle (TanStack Table, Duplicate kopiert Layout, Editor-WebView auf `/editor/{id}`), Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme` CSS-Tokens), Updates (Prüfen/Manifest/Checksum), About (Version, Datenpfad, Overlay-Health) |
 
 ## Sidecar (Übergang)
 

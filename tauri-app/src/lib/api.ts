@@ -26,6 +26,8 @@ export const queryKeys = {
   alerts: ["alerts"] as const,
   alertRuntime: ["alert-runtime"] as const,
   nowPlaying: ["now-playing"] as const,
+  sidecarStatus: ["sidecar-status"] as const,
+  ytmNowPlaying: ["ytm-now-playing"] as const,
   paths: ["paths"] as const,
   overlayHealthUrl: ["overlay-health-url"] as const,
   overlayHealth: ["overlay-health"] as const,
@@ -60,6 +62,42 @@ export const EMPTY_NOW_PLAYING: NowPlaying = {
   album: "",
   is_playing: false,
 };
+
+export type YtmNowPlaying = {
+  provider: string;
+  connected: boolean;
+  isPlaying: boolean;
+  title: string;
+  artist: string;
+  album: string;
+  statusText: string;
+};
+
+export const EMPTY_YTM_NOW_PLAYING: YtmNowPlaying = {
+  provider: "ytmusic",
+  connected: false,
+  isPlaying: false,
+  title: "",
+  artist: "",
+  album: "",
+  statusText: "Nicht verbunden",
+};
+
+export type WorkflowRunResponse = {
+  ok: boolean;
+  message: string;
+};
+
+export const DEFAULT_WORKFLOW_COMMAND = "workflow.prepare";
+
+export const WORKFLOW_COMMANDS = [
+  { value: "workflow.prepare", label: "Prepare" },
+  { value: "workflow.countdown", label: "Countdown" },
+  { value: "workflow.live", label: "Live" },
+  { value: "workflow.pause", label: "Pause" },
+  { value: "workflow.resume", label: "Resume" },
+  { value: "workflow.end", label: "End" },
+] as const;
 
 export type ObsSceneInfo = {
   name: string;
@@ -154,15 +192,9 @@ function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
     case "sidecar_status":
       return { id: "sidecar", name: "Sidecar", state: "disconnected", detail: "" } as T;
     case "sidecar_ytm_now_playing":
-      return {
-        provider: "ytmusic",
-        connected: false,
-        isPlaying: false,
-        title: "",
-        artist: "",
-        album: "",
-        statusText: "Nicht verbunden",
-      } as T;
+      return { ...EMPTY_YTM_NOW_PLAYING } as T;
+    case "sidecar_workflow_run":
+      return { ok: false, message: "Run-of-Show noch nicht im Sidecar" } as T;
     case "connect_obs":
       return { id: "obs", name: "OBS", state: "connected", detail: "ws://127.0.0.1:4455" } as T;
     case "disconnect_obs":

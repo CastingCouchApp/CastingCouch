@@ -8,7 +8,8 @@ use ccs_modules::alerts::{AlertDefinition, AlertEngine, AlertRuntime};
 use ccs_modules::obs::{ObsClient, ObsConnectOptions, ObsSceneInfo};
 use ccs_modules::overlay_bridge::OverlayEventBridge;
 use ccs_modules::sidecar::{
-    self, SidecarStartOptions, SidecarSupervisor, YtmNowPlaying, DEFAULT_SIDECAR_PORT,
+    self, SidecarStartOptions, SidecarSupervisor, WorkflowRunResponse, YtmNowPlaying,
+    DEFAULT_SIDECAR_PORT, WORKFLOW_PREPARE,
 };
 use ccs_modules::spotify::{NowPlaying, SpotifyClient, SpotifyConnectOptions};
 use ccs_modules::twitch::{TwitchClient, TwitchConnectOptions};
@@ -503,6 +504,19 @@ async fn sidecar_ytm_now_playing(state: State<'_, AppState>) -> Result<YtmNowPla
     Ok(state.sidecar.ytm_now_playing().await)
 }
 
+#[tauri::command]
+async fn sidecar_workflow_run(
+    state: State<'_, AppState>,
+    command: String,
+) -> Result<WorkflowRunResponse, String> {
+    let command = if command.trim().is_empty() {
+        WORKFLOW_PREPARE.to_string()
+    } else {
+        command
+    };
+    Ok(state.sidecar.run_workflow(&command).await)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -705,6 +719,7 @@ pub fn run() {
             apply_update,
             sidecar_status,
             sidecar_ytm_now_playing,
+            sidecar_workflow_run,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
