@@ -71,9 +71,10 @@ Aktuelles Schema: `8.0.0-alphaN` (Beispiel: `8.0.0-alpha101`).
 1. Nächste Version ermitteln:
    - Default: `alphaN` → `alpha(N+1)`
    - Explizite User-Version hat Vorrang (z. B. `8.0.0`, `8.0.0-beta1`)
-2. `Directory.Build.props` aktualisieren.
+2. `Directory.Build.props` aktualisieren und `version.json` (`version` + `tauriVersion`) anpassen; `pwsh ./scripts/sync-tauri-version.ps1` ausführen.
 3. Changelog anlegen: `docs/changelogs/CHANGELOG-<version>.md` mit kurzer Zusammenfassung der Änderungen seit dem letzten Release-Commit.
 4. Keine anderen Dateien „auf Verdacht“ bump’en.
+5. Optional parallel: `make tauri-test` bzw. `build/Build-Tauri-Release.ps1` für NSIS/MSI/DMG.
 
 ## 6. Changes noch mal committen und pushen
 

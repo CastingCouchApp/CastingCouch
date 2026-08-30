@@ -1,0 +1,168 @@
+use crate::settings::{AppSettings, CURRENT_SCHEMA_VERSION};
+use serde_json::{Map, Value};
+use std::path::{Path, PathBuf};
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
+
+#[derive(Debug, thiserror::Error)]
+pub enum SettingsError {
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("json: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("unsupported settings schema {0}; current is {CURRENT_SCHEMA_VERSION}")]
+    UnsupportedSchema(u32),
+}
+
+pub struct JsonSettingsStore {
+    path: PathBuf,
+    save_lock: Mutex<()>,
+}
+
+impl JsonSettingsStore {
+    pub fn new(path: impl Into<PathBuf>) -> Self {
+        Self {
+            path: path.into(),
+            save_lock: Mutex::new(()),
+        }
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub async fn load(&self) -> Result<AppSettings, SettingsError> {
+        if !self.path.exists() {
+            let defaults = AppSettings::default();
+            self.save(&defaults).await?;
+            return Ok(defaults);
+        }
+
+        let bytes = fs::read(&self.path).await?;
+        let mut root: Value = serde_json::from_slice(&bytes)?;
+        let migrated = migrate(&mut root)?;
+        let mut settings: AppSettings = serde_json::from_value(root)?;
+        settings.overlay.ensure_canvases_migrated();
+        settings.schema_version = CURRENT_SCHEMA_VERSION;
+        if migrated {
+            self.save(&settings).await?;
+        }
+        Ok(settings)
+    }
+
+    pub async fn save(&self, settings: &AppSettings) -> Result<(), SettingsError> {
+        let _guard = self.save_lock.lock().await;
+        if let Some(parent) = self.path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
+        let mut clone = settings.clone();
+        clone.schema_version = CURRENT_SCHEMA_VERSION;
+        clone.overlay.ensure_canvases_migrated();
+        let json = serde_json::to_vec_pretty(&clone)?;
+
+        let tmp = self.path.with_extension(format!(
+            "{}.tmp",
+            uuid::Uuid::new_v4().simple()
+        ));
+        {
+            let mut file = fs::File::create(&tmp).await?;
+            file.write_all(&json).await?;
+            file.flush().await?;
+        }
+
+        if self.path.exists() {
+            let bak = PathBuf::from(format!("{}.bak", self.path.display()));
+            let _ = fs::copy(&self.path, &bak).await;
+        }
+
+        fs::rename(&tmp, &self.path).await?;
+        Ok(())
+    }
+}
+
+/// Sequential schema migrations, matching the WPF SettingsSchemaMigrator.
+pub fn migrate(root: &mut Value) -> Result<bool, SettingsError> {
+    let obj = root
+        .as_object_mut()
+        .ok_or_else(|| SettingsError::Json(serde_json::Error::io(std::io::Error::other("root is not an object"))))?;
+
+    let version = obj
+        .get("SchemaVersion")
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as u32;
+
+    if version > CURRENT_SCHEMA_VERSION {
+        return Err(SettingsError::UnsupportedSchema(version));
+    }
+
+    let mut changed = false;
+    if version < 1 {
+        migrate_v0_to_v1(obj);
+        changed = true;
+    }
+    if version < 2 {
+        migrate_v1_to_v2(obj);
+        changed = true;
+    }
+    obj.insert(
+        "SchemaVersion".into(),
+        Value::from(CURRENT_SCHEMA_VERSION),
+    );
+    Ok(changed)
+}
+
+fn migrate_v0_to_v1(obj: &mut Map<String, Value>) {
+    if !obj.contains_key("SchemaVersion") {
+        obj.insert("SchemaVersion".into(), Value::from(1));
+    }
+}
+
+fn migrate_v1_to_v2(obj: &mut Map<String, Value>) {
+    if let Some(overlay) = obj.get_mut("Overlay").and_then(Value::as_object_mut) {
+        if !overlay.contains_key("Canvases") {
+            overlay.insert(
+                "Canvases".into(),
+                serde_json::json!([{ "Id": "default", "Name": "Canvas" }]),
+            );
+        }
+        if !overlay.contains_key("SelectedCanvasId") {
+            overlay.insert("SelectedCanvasId".into(), Value::from("default"));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn roundtrip_defaults() {
+        let dir = tempdir().unwrap();
+        let store = JsonSettingsStore::new(dir.path().join("settings.json"));
+        let loaded = store.load().await.unwrap();
+        assert_eq!(loaded.schema_version, CURRENT_SCHEMA_VERSION);
+        assert!(store.path().exists());
+    }
+
+    #[test]
+    fn rejects_future_schema() {
+        let mut root = serde_json::json!({ "SchemaVersion": 99 });
+        let err = migrate(&mut root).unwrap_err();
+        assert!(matches!(err, SettingsError::UnsupportedSchema(99)));
+    }
+
+    #[test]
+    fn migrates_v1_canvases() {
+        let mut root = serde_json::json!({
+            "SchemaVersion": 1,
+            "Overlay": { "WebServerPort": 8765 }
+        });
+        assert!(migrate(&mut root).unwrap());
+        let canvases = root["Overlay"]["Canvases"].as_array().unwrap();
+        assert_eq!(canvases[0]["Id"], "default");
+        assert_eq!(root["SchemaVersion"], CURRENT_SCHEMA_VERSION);
+    }
+}

@@ -284,3 +284,51 @@ jobs:
           path: artifacts/publish/win-x64/**
           if-no-files-found: error
           retention-days: 14
+
+  tauri:
+    name: Tauri (Win + macOS)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tauri-app/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tauri-app/src-tauri
+
+      - name: Frontend install
+        working-directory: tauri-app
+        run: npm ci
+
+      - name: Frontend test
+        working-directory: tauri-app
+        run: npm test
+
+      - name: Frontend typecheck
+        working-directory: tauri-app
+        run: npx tsc --noEmit
+
+      - name: Rust tests
+        working-directory: tauri-app/src-tauri
+        run: cargo test --workspace
+
+      - name: Tauri build
+        working-directory: tauri-app
+        run: npm run tauri build -- --bundles none

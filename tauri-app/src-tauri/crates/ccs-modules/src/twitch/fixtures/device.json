@@ -1,0 +1,7 @@
+{
+  "device_code": "device-code-value",
+  "user_code": "ABCD-EFGH",
+  "verification_uri": "https://www.twitch.tv/activate?device-code=device-code-value",
+  "expires_in": 1800,
+  "interval": 1
+}

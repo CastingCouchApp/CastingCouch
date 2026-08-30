@@ -22,15 +22,16 @@ else
 PWSH ?= pwsh
 endif
 
-.PHONY: help restore canvas canvas-dev build test publish app clean ci release run watch format format-check format-analyzers
+.PHONY: help restore canvas canvas-dev build test publish app clean ci release run watch format format-check format-analyzers install dev build-nsis build-dmg tauri-install tauri-dev tauri-build tauri-build-nsis tauri-build-dmg tauri-test tauri-ci
 
 help:
 	@echo "Targets:"
+	@echo "  make help            - diese Übersicht"
 	@echo "  make restore         - NuGet-Pakete wiederherstellen"
 	@echo "  make canvas          - Canvas Overlay TypeScript bundlen"
 	@echo "  make canvas-dev      - Overlay Editor im Browser (Hot-Reload, Mock-Events)"
 	@echo "  make build           - Solution bauen (CONFIG=$(CONFIG))"
-	@echo "  make test            - Tests ausführen"
+	@echo "  make test            - Tests ausführen (.NET)"
 	@echo "  make format          - C# Autoformat (whitespace + style)"
 	@echo "  make format-check    - Format prüfen ohne Änderungen"
 	@echo "  make format-analyzers - Analyzer-Fixes (optional, kann scheitern)"
@@ -41,10 +42,23 @@ help:
 	@echo "  make run             - App bauen, alte Instanz beenden, neu starten (RUN_CONFIG=$(RUN_CONFIG))"
 	@echo "  make watch           - App mit Hot Reload starten (dotnet watch)"
 	@echo "  make clean           - Build-Artefakte löschen"
+	@echo "  make install         - npm-Abhängigkeiten (tauri-app)"
+	@echo "  make dev             - Tauri + React Dev-Server"
+	@echo "  make build-nsis      - Windows-NSIS-Installer (tauri-app)"
+	@echo "  make build-dmg       - macOS-DMG (tauri-app)"
+	@echo "  make tauri-install   - Alias für install"
+	@echo "  make tauri-dev       - Alias für dev"
+	@echo "  make tauri-test      - Rust- + Frontend-Tests (tauri-app)"
+	@echo "  make tauri-build     - Tauri-Release-Binary ohne Installer"
+	@echo "  make tauri-build-nsis - Alias für build-nsis"
+	@echo "  make tauri-build-dmg - Alias für build-dmg"
+	@echo "  make tauri-ci        - Overlay-npm + Tauri-Tests"
 	@echo ""
 	@echo "Variablen: CONFIG=$(CONFIG) RUN_CONFIG=$(RUN_CONFIG) RID=$(RID) DOTNET=$(DOTNET) PWSH=$(PWSH)"
 
 CANVAS_DIR := src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+
+TAURI_DIR := tauri-app
 
 restore:
 	$(DOTNET) restore $(SLN)
@@ -87,6 +101,32 @@ app: restore test publish
 	@echo "Publish: $(PUBLISH_DIR)"
 
 ci: restore build test
+
+# Kurz-Targets (kein Konflikt mit .NET build/test)
+install:
+	$(MAKE) -C $(TAURI_DIR) install
+
+dev:
+	$(MAKE) -C $(TAURI_DIR) dev
+
+build-nsis:
+	$(MAKE) -C $(TAURI_DIR) build-nsis
+
+build-dmg:
+	$(MAKE) -C $(TAURI_DIR) build-dmg
+
+tauri-install: install
+tauri-dev: dev
+tauri-build-nsis: build-nsis
+tauri-build-dmg: build-dmg
+
+tauri-test:
+	$(MAKE) -C $(TAURI_DIR) test
+
+tauri-build:
+	$(MAKE) -C $(TAURI_DIR) build
+
+tauri-ci: canvas tauri-test
 
 release:
 	@command -v $(PWSH) >/dev/null 2>&1 || { echo "$(PWSH) nicht gefunden"; exit 1; }

@@ -1,0 +1,29 @@
+[package]
+name = "ccs-modules"
+version = "8.0.0-beta.1"
+edition = "2021"
+description = "Streaming integrations: OBS, Twitch, Spotify, Alerts, Overlay bridge"
+
+[dependencies]
+ccs-core = { path = "../ccs-core" }
+ccs-overlay-server = { path = "../ccs-overlay-server" }
+ccs-secrets = { path = "../ccs-secrets" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "io-util"] }
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+getrandom = "0.2"
+futures-util = "0.3"
+base64 = "0.22"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+url = "2"
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+wiremock = "0.6"
+tempfile = "3"

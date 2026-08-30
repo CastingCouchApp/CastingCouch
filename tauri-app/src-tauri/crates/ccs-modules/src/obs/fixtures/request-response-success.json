@@ -1,0 +1,16 @@
+{
+  "op": 7,
+  "d": {
+    "requestType": "GetVersion",
+    "requestId": "request-success",
+    "requestStatus": {
+      "result": true,
+      "code": 100
+    },
+    "responseData": {
+      "obsVersion": "32.0.0",
+      "obsWebSocketVersion": "5.6.0",
+      "rpcVersion": 1
+    }
+  }
+}

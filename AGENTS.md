@@ -15,9 +15,10 @@
 
 ## Learned Workspace Facts
 
-- CastingCouch ist eine WPF-Desktop-App auf .NET 10 (`net10.0-windows`); `Directory.Build.props` setzt `EnableWindowsTargeting` außerhalb von Windows (restore/format auf macOS); Vollbuild/Test braucht Windows, CI auf `windows-latest`.
+- CastingCouch ist eine WPF-Desktop-App auf .NET 10 (`net10.0-windows`) mit parallelem Tauri-2-Stack unter `tauri-app/` (React/Tailwind/TanStack, Rust-Crates `ccs-core`/`ccs-overlay-server`/`ccs-modules`); `Directory.Build.props` setzt `EnableWindowsTargeting` außerhalb von Windows (restore/format auf macOS); WPF-Vollbuild/Test braucht Windows, CI auf `windows-latest` plus Tauri-Job Win/macOS.
 - GitHub-Remote: `CastingCouchApp/CastingCouch`.
-- Versionsquelle ist `Directory.Build.props` (`<Version>`); Changelogs liegen als `docs/changelogs/CHANGELOG-<version>.md`.
+- Versionsquelle ist `Directory.Build.props` (`<Version>`) und `version.json` für Tauri; Changelogs liegen als `docs/changelogs/CHANGELOG-<version>.md`.
+- Tauri-Doku: `docs/architecture/TAURI-MIGRATION.md`; Overlay-HTTP bleibt `127.0.0.1:8765`.
 - Build-Ausgabe unter `artifacts/`; lokale Kurzbefehle über `Makefile` (`restore`/`build`/`test`/`publish`/`ci`/`release`/`format`).
 - CI: `.github/workflows/build.yml` (Push/PR), Release: `.github/workflows/release.yml` (Tags `v*` / manuell) über `build/Build-Release.ps1`.
 - Release-Skill canonical: `.agents/skills/release/`; Symlinks unter `.cursor/skills/release` und `.codex/skills/release`.

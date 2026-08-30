@@ -1,0 +1,19 @@
+{
+  "device": {
+    "id": null,
+    "is_active": true,
+    "is_private_session": false,
+    "is_restricted": false,
+    "name": "Unknown Device",
+    "type": "speaker",
+    "volume_percent": null,
+    "supports_volume": false
+  },
+  "repeat_state": "off",
+  "shuffle_state": false,
+  "context": null,
+  "progress_ms": null,
+  "is_playing": false,
+  "item": null,
+  "currently_playing_type": "unknown"
+}

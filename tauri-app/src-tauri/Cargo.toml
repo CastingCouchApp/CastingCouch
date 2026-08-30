@@ -1,0 +1,42 @@
+[workspace]
+members = [
+  ".",
+  "crates/ccs-core",
+  "crates/ccs-secrets",
+  "crates/ccs-overlay-server",
+  "crates/ccs-modules",
+]
+resolver = "2"
+
+[package]
+name = "castingcouch"
+version = "8.0.0-beta.1"
+description = "CastingCouch — Creator Control Suite (Tauri)"
+authors = ["CastingCouch"]
+edition = "2021"
+
+[lib]
+name = "castingcouch_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "fs", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+uuid = { version = "1", features = ["v4"] }
+ccs-core = { path = "crates/ccs-core" }
+ccs-secrets = { path = "crates/ccs-secrets" }
+ccs-overlay-server = { path = "crates/ccs-overlay-server" }
+ccs-modules = { path = "crates/ccs-modules" }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true

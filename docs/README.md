@@ -15,6 +15,8 @@ Einstieg Architektur: [`architecture/ARCHITECTURE.md`](architecture/ARCHITECTURE
 
 8.x-Zielbild: [`architecture/ARCHITECTURE-8.0.md`](architecture/ARCHITECTURE-8.0.md)
 
+Tauri-Migration: [`architecture/TAURI-MIGRATION.md`](architecture/TAURI-MIGRATION.md) · Sidecar: [`architecture/TAURI-SIDECAR.md`](architecture/TAURI-SIDECAR.md) · Phasen-Prompts: [`architecture/TAURI-PHASE-PROMPTS.md`](architecture/TAURI-PHASE-PROMPTS.md) · User-Guide: [`guides/TAURI-USER-MIGRATION.md`](guides/TAURI-USER-MIGRATION.md)
+
 Verkaufsrisiken: [`architecture/RISK-REGISTER.md`](architecture/RISK-REGISTER.md)
 
 Betriebsfreigabe: [`operations/SALES-READINESS-RUNBOOK.md`](operations/SALES-READINESS-RUNBOOK.md)

@@ -37,7 +37,15 @@ make publish
 
 | Target | Bedeutung |
 |--------|-----------|
-| `make ci` | Restore + Build + Test |
+| `make help` | Übersicht aller Targets |
+| `make ci` | Restore + Build + Test (WPF) |
+| `make install` / `make tauri-install` | npm-Abhängigkeiten in `tauri-app/` |
+| `make dev` / `make tauri-dev` | Tauri + React Dev-Server |
+| `make tauri-test` | Rust-Workspace + Frontend-Tests |
+| `make tauri-build` | Tauri-Release-Binary ohne Installer |
+| `make build-nsis` / `make tauri-build-nsis` | Windows-NSIS-Installer (`tauri-app`) |
+| `make build-dmg` / `make tauri-build-dmg` | macOS-DMG (`tauri-app`) |
+| `make tauri-ci` | Overlay-npm + Tauri-Tests |
 | `make format` | C# Autoformat (Whitespace + Style via `.editorconfig`) |
 | `make format-check` | Format prüfen ohne Dateien zu ändern |
 | `make format-analyzers` | Optional Analyzer-Fixes (nicht Teil von `format`) |
@@ -57,6 +65,7 @@ build\Run-CleanRelease.cmd
 
 ```
 src/                 App, Core, Module, Agent, Updater, …
+tauri-app/           Tauri 2 (React/Tailwind/TanStack + Rust-Crates)
 tests/               xUnit-Tests
 build/               PowerShell-Build-/Release-Skripte
 installer/           WiX-Installer
@@ -65,6 +74,8 @@ artifacts/           Build-Ausgabe (gitignored)
 .agents/skills/      Agent-Skills (Cursor + Codex)
 .github/workflows/   CI (Build) und Release
 ```
+
+Tauri-Migration: [`docs/architecture/TAURI-MIGRATION.md`](docs/architecture/TAURI-MIGRATION.md). Die WPF-App bleibt bis zur Feature-Parität das produktive Windows-Release.
 
 Module u. a.: OBS, Twitch, Spotify, Alerts, Overlay, Workflow, StreamDeck.
 

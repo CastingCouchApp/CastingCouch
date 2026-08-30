@@ -1,0 +1,39 @@
+{
+  "device": {
+    "id": "device-1",
+    "is_active": true,
+    "is_private_session": false,
+    "is_restricted": false,
+    "name": "Studio PC",
+    "type": "computer",
+    "volume_percent": 64,
+    "supports_volume": true
+  },
+  "repeat_state": "context",
+  "shuffle_state": true,
+  "context": {
+    "type": "playlist",
+    "uri": "spotify:playlist:stream"
+  },
+  "progress_ms": 12345,
+  "is_playing": true,
+  "currently_playing_type": "track",
+  "item": {
+    "id": "track-1",
+    "uri": "spotify:track:track-1",
+    "name": "Contract Song",
+    "duration_ms": 180000,
+    "type": "track",
+    "artists": [
+      { "name": "Contract Artist" },
+      { "name": "Guest Artist" }
+    ],
+    "album": {
+      "name": "Contract Album",
+      "images": [
+        { "url": "https://i.scdn.co/image/contract" }
+      ]
+    }
+  },
+  "future_field": "ignored"
+}

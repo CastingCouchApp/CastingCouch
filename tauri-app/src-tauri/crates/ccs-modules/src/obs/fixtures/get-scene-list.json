@@ -1,0 +1,19 @@
+{
+  "op": 7,
+  "d": {
+    "requestType": "GetSceneList",
+    "requestId": "request-scenes",
+    "requestStatus": {
+      "result": true,
+      "code": 100
+    },
+    "responseData": {
+      "currentProgramSceneName": "Live",
+      "scenes": [
+        { "sceneName": "Start", "sceneIndex": 0 },
+        { "sceneName": "Live", "sceneIndex": 1 },
+        { "sceneName": "End", "sceneIndex": 2 }
+      ]
+    }
+  }
+}

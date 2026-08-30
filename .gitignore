@@ -114,3 +114,7 @@ $RECYCLE.BIN/
 !.codex/environments/
 !.codex/environments/environment.toml
 .cursor/hooks/state/
+
+# Tauri / Rust
+tauri-app/src-tauri/target/
+tauri-app/dist/

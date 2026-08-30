@@ -1,0 +1,7 @@
+{
+  "client_id": "contract-client-id-12345",
+  "login": "twitchdev",
+  "user_id": "141981764",
+  "scopes": ["user:read:chat", "channel:read:subscriptions"],
+  "expires_in": 3600
+}

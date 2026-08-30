@@ -1,0 +1,14 @@
+[package]
+name = "ccs-secrets"
+version = "8.0.0-beta.1"
+edition = "2021"
+description = "Cross-platform secret store (keyring)"
+
+[dependencies]
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
+thiserror = "2"
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+uuid = { version = "1", features = ["v4"] }
