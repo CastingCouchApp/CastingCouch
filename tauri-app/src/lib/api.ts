@@ -1,5 +1,9 @@
 import { QueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
+import { cloneSettings, defaultAppSettings, type AppSettings } from "./app-settings";
+
+export type { AppSettings } from "./app-settings";
+export { applyThemeId, cloneSettings, defaultAppSettings, THEME_CATALOG } from "./app-settings";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,14 +79,7 @@ export type AlertRuntime = {
   obs_scene_name: string;
 };
 
-export type AppSettings = {
-  SchemaVersion: number;
-  General: { Language: string; ThemeId: string };
-  Obs: { Host: string; Port: number; AutoConnect: boolean };
-  Twitch: { ChannelName: string; ClientId: string; AutoConnect: boolean };
-  Overlay: { WebServerPort: number; SelectedCanvasId: string };
-  Branding: { DisplayName: string; AccentColor: string };
-};
+let mockSettings = defaultAppSettings();
 
 export async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
@@ -189,14 +186,12 @@ function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
     case "test_alert":
       return 1 as T;
     case "get_settings":
-      return {
-        SchemaVersion: 2,
-        General: { Language: "de-DE", ThemeId: "classic" },
-        Obs: { Host: "127.0.0.1", Port: 4455, AutoConnect: true },
-        Twitch: { ChannelName: "", ClientId: "", AutoConnect: true },
-        Overlay: { WebServerPort: 8765, SelectedCanvasId: "default" },
-        Branding: { DisplayName: "Mein Stream", AccentColor: "#FF8C00" },
-      } as T;
+      return cloneSettings(mockSettings) as T;
+    case "save_settings":
+      if (args?.settings) {
+        mockSettings = cloneSettings(args.settings as AppSettings);
+      }
+      return undefined as T;
     case "app_paths":
       return "CreatorControlSuite" as T;
     case "create_canvas":

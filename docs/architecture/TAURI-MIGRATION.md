@@ -52,7 +52,7 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 | Overlay Event Bridge | Hub-Publish als C#-`OverlayRealtimeEvent` (camelCase `source`/`type`/`at`/`summary`/`data`) |
 | YouTube Music / Workflow / Agent | Sidecar-Fallback (siehe unten) |
 | Updates | SHA-256-Manifest-Verifier (`ccs-core::updates`) |
-| Haupt-UI | Dashboard, Dienste, Overlay-Tabelle, Alerts-Library (TanStack Table), Settings, Updates, About |
+| Haupt-UI | Dashboard, Dienste (Connect/Login/Logout + Fehlerdetail), Overlay-Tabelle, Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme`), Updates, About |
 
 ## Sidecar (Übergang)
 

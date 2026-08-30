@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Link, Outlet } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Settings,
@@ -9,6 +11,8 @@ import {
   Info,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
+import { applyThemeId, type AppSettings } from "../../lib/app-settings";
+import { queryKeys, tauriInvoke } from "../../lib/api";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -21,6 +25,17 @@ const nav = [
 ];
 
 export function AppShell() {
+  const settings = useQuery({
+    queryKey: queryKeys.settings,
+    queryFn: () => tauriInvoke<AppSettings>("get_settings"),
+  });
+
+  useEffect(() => {
+    if (settings.data?.General.ThemeId) {
+      applyThemeId(settings.data.General.ThemeId);
+    }
+  }, [settings.data?.General.ThemeId]);
+
   return (
     <div className="flex h-screen bg-ink text-zinc-100">
       <aside className="flex w-56 flex-col border-r border-white/10 bg-black/40">

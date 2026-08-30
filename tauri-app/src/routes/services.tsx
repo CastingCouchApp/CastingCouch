@@ -9,11 +9,22 @@ import {
   type ObsSceneInfo,
   type ServiceStatus,
 } from "../lib/api";
+import type { AppSettings } from "../lib/app-settings";
 import { useLiveServiceStatuses } from "../lib/live-events";
 
 export const Route = createFileRoute("/services")({
   component: ServicesPage,
 });
+
+function invokeErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return "Unbekannter Fehler";
+}
 
 function ServicesPage() {
   useLiveServiceStatuses();
@@ -21,6 +32,10 @@ function ServicesPage() {
     queryKey: queryKeys.services,
     queryFn: () => tauriInvoke<ServiceStatus[]>("service_statuses"),
     refetchInterval: 4000,
+  });
+  const settings = useQuery({
+    queryKey: queryKeys.settings,
+    queryFn: () => tauriInvoke<AppSettings>("get_settings"),
   });
 
   const obs = (services.data ?? []).find((s) => s.id === "obs");
@@ -88,6 +103,12 @@ function ServicesPage() {
     mutationFn: (scene: string) => tauriInvoke<void>("obs_set_scene", { scene }),
   });
 
+  const autoConnect = {
+    obs: settings.data?.Obs.AutoConnect === true,
+    twitch: settings.data?.Twitch.AutoConnect === true,
+    spotify: settings.data?.Spotify.AutoConnect === true,
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Dienste</h1>
@@ -98,7 +119,30 @@ function ServicesPage() {
               <div className="font-medium">{svc.name}</div>
               <div className="text-sm capitalize text-zinc-400">{svc.state}</div>
               {svc.detail ? (
-                <div className="mt-1 truncate text-xs text-zinc-500">{svc.detail}</div>
+                <div
+                  className={
+                    svc.state === "error"
+                      ? "mt-1 whitespace-pre-wrap break-words text-xs text-red-400"
+                      : "mt-1 whitespace-pre-wrap break-words text-xs text-zinc-500"
+                  }
+                >
+                  {svc.detail}
+                </div>
+              ) : null}
+              {svc.id === "obs" && autoConnect.obs && svc.state !== "connected" ? (
+                <p className="mt-2 text-xs text-zinc-500">
+                  Automatisch verbinden ist aktiv — Start versucht die Verbindung.
+                </p>
+              ) : null}
+              {svc.id === "twitch" && autoConnect.twitch && svc.state !== "connected" ? (
+                <p className="mt-2 text-xs text-zinc-500">
+                  Automatisch verbinden ist aktiv — Start versucht die Verbindung.
+                </p>
+              ) : null}
+              {svc.id === "spotify" && autoConnect.spotify && svc.state !== "connected" ? (
+                <p className="mt-2 text-xs text-zinc-500">
+                  Automatisch verbinden ist aktiv — Start versucht die Verbindung.
+                </p>
               ) : null}
             </div>
             {svc.id === "obs" ? (
@@ -117,6 +161,16 @@ function ServicesPage() {
                     Trennen
                   </Button>
                 </div>
+                {connectObs.isError ? (
+                  <p className="whitespace-pre-wrap break-words text-xs text-red-400">
+                    {invokeErrorMessage(connectObs.error)}
+                  </p>
+                ) : null}
+                {disconnectObs.isError ? (
+                  <p className="whitespace-pre-wrap break-words text-xs text-red-400">
+                    {invokeErrorMessage(disconnectObs.error)}
+                  </p>
+                ) : null}
                 {connected && (scenes.data?.length ?? 0) > 0 ? (
                   <div className="space-y-1">
                     <div className="text-xs text-zinc-500">Szenen</div>
@@ -138,44 +192,68 @@ function ServicesPage() {
                 ) : null}
               </div>
             ) : svc.id === "twitch" ? (
-              <div className="flex flex-wrap gap-2">
-                {twitchConnected ? (
-                  <Button
-                    onClick={() => twitchLogout.mutate()}
-                    disabled={twitchLogout.isPending}
-                  >
-                    Abmelden
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => twitchLogin.mutate()}
-                    disabled={
-                      twitchLogin.isPending || twitchConnecting || svc.state === "connecting"
-                    }
-                  >
-                    Anmelden
-                  </Button>
-                )}
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {twitchConnected ? (
+                    <Button
+                      onClick={() => twitchLogout.mutate()}
+                      disabled={twitchLogout.isPending}
+                    >
+                      Abmelden
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => twitchLogin.mutate()}
+                      disabled={
+                        twitchLogin.isPending || twitchConnecting || svc.state === "connecting"
+                      }
+                    >
+                      Anmelden
+                    </Button>
+                  )}
+                </div>
+                {twitchLogin.isError ? (
+                  <p className="whitespace-pre-wrap break-words text-xs text-red-400">
+                    {invokeErrorMessage(twitchLogin.error)}
+                  </p>
+                ) : null}
+                {twitchLogout.isError ? (
+                  <p className="whitespace-pre-wrap break-words text-xs text-red-400">
+                    {invokeErrorMessage(twitchLogout.error)}
+                  </p>
+                ) : null}
               </div>
             ) : svc.id === "spotify" ? (
-              <div className="flex flex-wrap gap-2">
-                {spotifyConnected ? (
-                  <Button
-                    onClick={() => spotifyLogout.mutate()}
-                    disabled={spotifyLogout.isPending}
-                  >
-                    Abmelden
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => spotifyLogin.mutate()}
-                    disabled={
-                      spotifyLogin.isPending || spotifyConnecting || svc.state === "connecting"
-                    }
-                  >
-                    Anmelden
-                  </Button>
-                )}
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {spotifyConnected ? (
+                    <Button
+                      onClick={() => spotifyLogout.mutate()}
+                      disabled={spotifyLogout.isPending}
+                    >
+                      Abmelden
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => spotifyLogin.mutate()}
+                      disabled={
+                        spotifyLogin.isPending || spotifyConnecting || svc.state === "connecting"
+                      }
+                    >
+                      Anmelden
+                    </Button>
+                  )}
+                </div>
+                {spotifyLogin.isError ? (
+                  <p className="whitespace-pre-wrap break-words text-xs text-red-400">
+                    {invokeErrorMessage(spotifyLogin.error)}
+                  </p>
+                ) : null}
+                {spotifyLogout.isError ? (
+                  <p className="whitespace-pre-wrap break-words text-xs text-red-400">
+                    {invokeErrorMessage(spotifyLogout.error)}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </Card>

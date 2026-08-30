@@ -5,6 +5,7 @@ import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { routeTree } from "../../routeTree.gen";
 import type { ServiceStatus } from "../../lib/api";
+import { defaultAppSettings } from "../../lib/app-settings";
 
 const invokeMock = vi.fn();
 const statusListeners: Array<(status: ServiceStatus) => void> = [];
@@ -194,5 +195,83 @@ describe("Services route Spotify", () => {
     const spotifyCard = serviceCard("Spotify");
     await user.click(within(spotifyCard).getByRole("button", { name: "Anmelden" }));
     expect(invokeMock).toHaveBeenCalledWith("spotify_login", undefined);
+  });
+});
+
+describe("Services route errors and AutoConnect", () => {
+  beforeEach(() => {
+    statusListeners.length = 0;
+    invokeMock.mockReset();
+  });
+
+  it("shows OBS error detail without truncating", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "service_statuses") {
+        return [
+          {
+            id: "obs",
+            name: "OBS",
+            state: "error",
+            detail: "WebSocket closed: 4009\nIdentify failed",
+          },
+          { id: "twitch", name: "Twitch", state: "disconnected", detail: "" },
+          { id: "spotify", name: "Spotify", state: "disconnected", detail: "" },
+        ] satisfies ServiceStatus[];
+      }
+      return undefined;
+    });
+    renderServices();
+    const obsCard = await waitFor(() => serviceCard("OBS"));
+    expect(within(obsCard).getByText("error")).toBeInTheDocument();
+    expect(within(obsCard).getByText(/Identify failed/)).toBeInTheDocument();
+    expect(within(obsCard).getByText(/WebSocket closed: 4009/)).toBeInTheDocument();
+  });
+
+  it("shows connect_obs mutation error on the OBS card", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "service_statuses") {
+        return statuses("disconnected");
+      }
+      if (cmd === "connect_obs") {
+        throw new Error("WebSocket connection failed");
+      }
+      if (cmd === "obs_scenes") {
+        return [];
+      }
+      return undefined;
+    });
+    const user = userEvent.setup();
+    renderServices();
+    await screen.findByText("OBS");
+    await user.click(within(serviceCard("OBS")).getByRole("button", { name: "Verbinden" }));
+    expect(await within(serviceCard("OBS")).findByText("WebSocket connection failed")).toBeInTheDocument();
+  });
+
+  it("shows AutoConnect hint when OBS is disconnected and AutoConnect is on", async () => {
+    const settings = defaultAppSettings();
+    settings.Obs.AutoConnect = true;
+    settings.Twitch.AutoConnect = false;
+    settings.Spotify.AutoConnect = false;
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "service_statuses") {
+        return statuses("disconnected");
+      }
+      if (cmd === "get_settings") {
+        return settings;
+      }
+      return undefined;
+    });
+    renderServices();
+    await screen.findByText("OBS");
+    expect(
+      await within(serviceCard("OBS")).findByText(
+        "Automatisch verbinden ist aktiv — Start versucht die Verbindung.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(serviceCard("Twitch")).queryByText(
+        "Automatisch verbinden ist aktiv — Start versucht die Verbindung.",
+      ),
+    ).not.toBeInTheDocument();
   });
 });

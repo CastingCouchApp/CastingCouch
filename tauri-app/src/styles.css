@@ -22,9 +22,49 @@ html[data-theme="classic"] {
   --color-ink: #1a1a1a;
 }
 
+html[data-theme="comic-sans-extravaganza"] {
+  --color-brand: #ffe600;
+  --color-ink: #0a1540;
+}
+
+html[data-theme="pink-cage-flair"] {
+  --color-brand: #ff2d95;
+  --color-ink: #0a0a0a;
+}
+
+html[data-theme="vespucci-heights"] {
+  --color-brand: #00c8c8;
+  --color-ink: #0a1830;
+}
+
+html[data-theme="vanilla-unicorn-lounge"] {
+  --color-brand: #e8a0d8;
+  --color-ink: #1a1520;
+}
+
 html[data-theme="neon-night-market"] {
   --color-brand: #ff2bd6;
   --color-ink: #090712;
+}
+
+html[data-theme="terminal-green-override"] {
+  --color-brand: #33ff33;
+  --color-ink: #000000;
+}
+
+html[data-theme="blood-moon-broadcast"] {
+  --color-brand: #c41e3a;
+  --color-ink: #1a0a0a;
+}
+
+html[data-theme="pastel-lofi-cafe"] {
+  --color-brand: #e8a0bf;
+  --color-ink: #1c1520;
+}
+
+html[data-theme="gold-rush-studio"] {
+  --color-brand: #d4af37;
+  --color-ink: #0c0c0c;
 }
 
 html[data-theme="arctic-glass-lab"] {
@@ -32,7 +72,12 @@ html[data-theme="arctic-glass-lab"] {
   --color-ink: #0b1520;
 }
 
-html[data-theme="pastel-lofi-cafe"] {
-  --color-brand: #e8a0bf;
-  --color-ink: #1c1520;
+html[data-theme="biomilchs-bubatz-cantina"] {
+  --color-brand: #6bbf59;
+  --color-ink: #0b1a2e;
+}
+
+html[data-theme="fruppis-landadel-kanzlei"] {
+  --color-brand: #8b1a3a;
+  --color-ink: #0c1a2e;
 }
