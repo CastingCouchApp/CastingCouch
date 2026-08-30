@@ -16,6 +16,7 @@ export const queryKeys = {
   services: ["services"] as const,
   obsScenes: ["obs-scenes"] as const,
   alerts: ["alerts"] as const,
+  alertRuntime: ["alert-runtime"] as const,
   nowPlaying: ["now-playing"] as const,
   paths: ["paths"] as const,
 };
@@ -47,10 +48,31 @@ export type ObsSceneInfo = {
 };
 
 export type AlertDefinition = {
-  id: string;
-  name: string;
-  event_type: string;
+  type: string;
   enabled: boolean;
+  text_template: string;
+  media_path: string;
+  sound_path: string;
+  duration_seconds: number;
+  priority: number;
+  font_face: string;
+  font_size: number;
+  font_color: string;
+  animation: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  volume_percent: number;
+  sound_start_seconds: number;
+  sound_end_seconds: number;
+  audio_output_device_id: string;
+};
+
+export type AlertRuntime = {
+  pending_count: number;
+  enabled: boolean;
+  obs_scene_name: string;
 };
 
 export type AppSettings = {
@@ -122,7 +144,37 @@ function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
     case "set_obs_password":
       return undefined as T;
     case "list_alerts":
-      return [] as T;
+      return [
+        {
+          type: "Follow",
+          enabled: true,
+          text_template: "{user} folgt jetzt!",
+          media_path: "",
+          sound_path: "",
+          duration_seconds: 8,
+          priority: 100,
+          font_face: "Segoe UI",
+          font_size: 44,
+          font_color: "#FFFFFF",
+          animation: "Fade",
+          x: 510,
+          y: 690,
+          width: 900,
+          height: 260,
+          volume_percent: 100,
+          sound_start_seconds: 0,
+          sound_end_seconds: 0,
+          audio_output_device_id: "",
+        },
+      ] as T;
+    case "alert_runtime":
+      return { pending_count: 0, enabled: true, obs_scene_name: "_alerts" } as T;
+    case "upsert_alert":
+      return args?.alert as T;
+    case "delete_alert":
+      return undefined as T;
+    case "test_alert":
+      return 1 as T;
     case "get_settings":
       return {
         SchemaVersion: 2,

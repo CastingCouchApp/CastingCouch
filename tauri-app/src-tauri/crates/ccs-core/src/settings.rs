@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub const CURRENT_SCHEMA_VERSION: u32 = 2;
 
@@ -408,11 +409,244 @@ pub struct StreamerBotSettings {
     pub extra: serde_json::Value,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct AlertSettings {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_obs_scene_name")]
+    pub obs_scene_name: String,
+    #[serde(default = "default_obs_media_source_name")]
+    pub obs_media_source_name: String,
+    #[serde(default = "default_obs_text_source_name")]
+    pub obs_text_source_name: String,
+    #[serde(default)]
+    pub audio_output_device_id: String,
+    #[serde(default = "default_queue_capacity")]
+    pub queue_capacity: i32,
+    #[serde(default = "default_inter_alert_delay")]
+    pub inter_alert_delay_milliseconds: i32,
+    #[serde(default = "default_true")]
+    pub stop_previous_media_before_next: bool,
+    #[serde(default)]
+    pub auto_create_obs_sources: bool,
+    #[serde(default = "AlertDefinitionSettings::create_defaults")]
+    pub definitions: HashMap<String, AlertDefinitionSettings>,
     #[serde(flatten)]
     pub extra: serde_json::Value,
+}
+
+impl Default for AlertSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            obs_scene_name: default_obs_scene_name(),
+            obs_media_source_name: default_obs_media_source_name(),
+            obs_text_source_name: default_obs_text_source_name(),
+            audio_output_device_id: String::new(),
+            queue_capacity: default_queue_capacity(),
+            inter_alert_delay_milliseconds: default_inter_alert_delay(),
+            stop_previous_media_before_next: true,
+            auto_create_obs_sources: false,
+            definitions: AlertDefinitionSettings::create_defaults(),
+            extra: serde_json::Value::Object(Default::default()),
+        }
+    }
+}
+
+fn default_obs_scene_name() -> String {
+    "_alerts".into()
+}
+fn default_obs_media_source_name() -> String {
+    "ccs_alert_media".into()
+}
+fn default_obs_text_source_name() -> String {
+    "ccs_alert_text".into()
+}
+fn default_queue_capacity() -> i32 {
+    250
+}
+fn default_inter_alert_delay() -> i32 {
+    350
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct AlertDefinitionSettings {
+    #[serde(default)]
+    pub r#type: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub text_template: String,
+    #[serde(default)]
+    pub media_path: String,
+    #[serde(default)]
+    pub sound_path: String,
+    #[serde(default = "default_duration_seconds")]
+    pub duration_seconds: i32,
+    #[serde(default = "default_priority")]
+    pub priority: i32,
+    #[serde(default = "default_font_face")]
+    pub font_face: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: i32,
+    #[serde(default = "default_font_color")]
+    pub font_color: String,
+    #[serde(default = "default_animation")]
+    pub animation: String,
+    #[serde(default = "default_alert_x")]
+    pub x: i32,
+    #[serde(default = "default_alert_y")]
+    pub y: i32,
+    #[serde(default = "default_alert_width")]
+    pub width: i32,
+    #[serde(default = "default_alert_height")]
+    pub height: i32,
+    #[serde(default = "default_volume_percent")]
+    pub volume_percent: i32,
+    #[serde(default)]
+    pub sound_start_seconds: f64,
+    #[serde(default)]
+    pub sound_end_seconds: f64,
+    #[serde(default)]
+    pub audio_output_device_id: String,
+}
+
+impl Default for AlertDefinitionSettings {
+    fn default() -> Self {
+        Self {
+            r#type: String::new(),
+            enabled: true,
+            text_template: String::new(),
+            media_path: String::new(),
+            sound_path: String::new(),
+            duration_seconds: default_duration_seconds(),
+            priority: default_priority(),
+            font_face: default_font_face(),
+            font_size: default_font_size(),
+            font_color: default_font_color(),
+            animation: default_animation(),
+            x: default_alert_x(),
+            y: default_alert_y(),
+            width: default_alert_width(),
+            height: default_alert_height(),
+            volume_percent: default_volume_percent(),
+            sound_start_seconds: 0.0,
+            sound_end_seconds: 0.0,
+            audio_output_device_id: String::new(),
+        }
+    }
+}
+
+impl AlertDefinitionSettings {
+    pub fn create_defaults() -> HashMap<String, AlertDefinitionSettings> {
+        let mut defs = HashMap::new();
+        defs.insert(
+            "Follow".into(),
+            AlertDefinitionSettings {
+                r#type: "Follow".into(),
+                text_template: "{user} folgt jetzt!".into(),
+                duration_seconds: 8,
+                priority: 100,
+                ..Default::default()
+            },
+        );
+        defs.insert(
+            "Sub".into(),
+            AlertDefinitionSettings {
+                r#type: "Sub".into(),
+                text_template: "{user} hat abonniert!".into(),
+                duration_seconds: 9,
+                priority: 80,
+                ..Default::default()
+            },
+        );
+        defs.insert(
+            "ReSub".into(),
+            AlertDefinitionSettings {
+                r#type: "ReSub".into(),
+                text_template: "{user} ist seit {months} Monaten dabei!".into(),
+                duration_seconds: 9,
+                priority: 75,
+                ..Default::default()
+            },
+        );
+        defs.insert(
+            "GiftSub".into(),
+            AlertDefinitionSettings {
+                r#type: "GiftSub".into(),
+                text_template: "{user} verschenkt {count} Subs!".into(),
+                duration_seconds: 10,
+                priority: 70,
+                ..Default::default()
+            },
+        );
+        defs.insert(
+            "Cheer".into(),
+            AlertDefinitionSettings {
+                r#type: "Cheer".into(),
+                text_template: "{user} cheeret {bits} Bits!".into(),
+                duration_seconds: 9,
+                priority: 85,
+                ..Default::default()
+            },
+        );
+        defs.insert(
+            "Raid".into(),
+            AlertDefinitionSettings {
+                r#type: "Raid".into(),
+                text_template: "Raid von {user} mit {viewers} Zuschauern!".into(),
+                duration_seconds: 12,
+                priority: 10,
+                animation: "Slide".into(),
+                ..Default::default()
+            },
+        );
+        defs
+    }
+
+    pub fn effective_type(&self, key: &str) -> String {
+        if self.r#type.trim().is_empty() {
+            key.to_string()
+        } else {
+            self.r#type.clone()
+        }
+    }
+}
+
+fn default_duration_seconds() -> i32 {
+    8
+}
+fn default_priority() -> i32 {
+    100
+}
+fn default_font_face() -> String {
+    "Segoe UI".into()
+}
+fn default_font_size() -> i32 {
+    44
+}
+fn default_font_color() -> String {
+    "#FFFFFF".into()
+}
+fn default_animation() -> String {
+    "Fade".into()
+}
+fn default_alert_x() -> i32 {
+    510
+}
+fn default_alert_y() -> i32 {
+    690
+}
+fn default_alert_width() -> i32 {
+    900
+}
+fn default_alert_height() -> i32 {
+    260
+}
+fn default_volume_percent() -> i32 {
+    100
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -620,6 +854,50 @@ mod tests {
             .scopes
             .iter()
             .any(|scope| scope == "user-read-currently-playing"));
+        assert!(s.alerts.enabled);
+        assert_eq!(s.alerts.obs_scene_name, "_alerts");
+        assert_eq!(s.alerts.obs_media_source_name, "ccs_alert_media");
+        assert_eq!(s.alerts.obs_text_source_name, "ccs_alert_text");
+        assert_eq!(s.alerts.queue_capacity, 250);
+        assert_eq!(
+            s.alerts.definitions["Follow"].text_template,
+            "{user} folgt jetzt!"
+        );
+        assert_eq!(s.alerts.definitions["Raid"].animation, "Slide");
+        assert_eq!(s.alerts.definitions.len(), 6);
+    }
+
+    #[test]
+    fn alert_settings_keep_unknown_fields() {
+        let json = r#"{
+            "Enabled": true,
+            "ObsSceneName": "_alerts",
+            "CustomFlag": true,
+            "Definitions": {
+                "Follow": { "Type": "Follow", "TextTemplate": "{user} folgt jetzt!" }
+            }
+        }"#;
+        let parsed: AlertSettings = serde_json::from_str(json).unwrap();
+        assert!(parsed.enabled);
+        assert_eq!(
+            parsed.definitions["Follow"].text_template,
+            "{user} folgt jetzt!"
+        );
+        let back = serde_json::to_value(&parsed).unwrap();
+        assert_eq!(back["CustomFlag"], true);
+        assert_eq!(back["ObsSceneName"], "_alerts");
+        assert_eq!(
+            back["Definitions"]["Follow"]["TextTemplate"],
+            "{user} folgt jetzt!"
+        );
+    }
+
+    #[test]
+    fn missing_alert_definitions_use_wpf_defaults() {
+        let parsed: AlertSettings = serde_json::from_str(r#"{ "Enabled": false }"#).unwrap();
+        assert!(!parsed.enabled);
+        assert!(parsed.definitions.contains_key("Follow"));
+        assert!(parsed.definitions.contains_key("Cheer"));
     }
 
     #[test]

@@ -48,11 +48,11 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 | Secrets | `ccs-secrets` (keyring) |
 | OBS WebSocket 5 Live-Connect | `ccs-modules` (Auth, GetSceneList/SetScene, Reconnect, `CurrentProgramSceneChanged` → Overlay-Hub) |
 | Twitch / Spotify | Twitch Device-Code + Helix-Status + EventSub-WS (follow/sub/cheer/…); Spotify PKCE-OAuth + currently-playing |
-| Alerts | In-Memory Engine (`enqueue_matching` auf EventSub-Typ / C#-Kurzname) |
+| Alerts | Persistenz in `settings.json` (WPF-PascalCase `Alerts.Definitions`); Runtime-Queue → Overlay-Hub `app.alert` |
 | Overlay Event Bridge | Hub-Publish als C#-`OverlayRealtimeEvent` (camelCase `source`/`type`/`at`/`summary`/`data`) |
 | YouTube Music / Workflow / Agent | Sidecar-Fallback (siehe unten) |
 | Updates | SHA-256-Manifest-Verifier (`ccs-core::updates`) |
-| Haupt-UI | Dashboard, Dienste, Overlay-Tabelle, Alerts, Settings, Updates, About |
+| Haupt-UI | Dashboard, Dienste, Overlay-Tabelle, Alerts-Library (TanStack Table), Settings, Updates, About |
 
 ## Sidecar (Übergang)
 

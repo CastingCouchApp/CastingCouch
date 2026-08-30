@@ -1,7 +1,7 @@
 use ccs_core::{
     logging, AppPaths, AppSettings, JsonSettingsStore, OverlayCanvasSettings, SingleInstanceLock,
 };
-use ccs_modules::alerts::{AlertDefinition, AlertEngine};
+use ccs_modules::alerts::{AlertDefinition, AlertEngine, AlertRuntime};
 use ccs_modules::obs::{ObsClient, ObsConnectOptions, ObsSceneInfo};
 use ccs_modules::overlay_bridge::OverlayEventBridge;
 use ccs_modules::spotify::{NowPlaying, SpotifyClient, SpotifyConnectOptions};
@@ -259,13 +259,39 @@ async fn spotify_logout(state: State<'_, AppState>) -> Result<ServiceStatus, Str
 
 #[tauri::command]
 async fn list_alerts(state: State<'_, AppState>) -> Result<Vec<AlertDefinition>, String> {
-    Ok(state.alerts.list().await)
+    state.alerts.list().await
 }
 
 #[tauri::command]
-async fn upsert_alert(state: State<'_, AppState>, alert: AlertDefinition) -> Result<(), String> {
-    state.alerts.upsert(alert).await;
-    Ok(())
+async fn upsert_alert(
+    state: State<'_, AppState>,
+    alert: AlertDefinition,
+) -> Result<AlertDefinition, String> {
+    state.alerts.upsert(alert).await
+}
+
+#[tauri::command]
+async fn delete_alert(state: State<'_, AppState>, alert_type: String) -> Result<(), String> {
+    state.alerts.delete(&alert_type).await
+}
+
+#[tauri::command]
+async fn alert_runtime(
+    state: State<'_, AppState>,
+    enabled: Option<bool>,
+    obs_scene_name: Option<String>,
+) -> Result<AlertRuntime, String> {
+    state.alerts.set_runtime(enabled, obs_scene_name).await
+}
+
+#[tauri::command]
+async fn test_alert(
+    state: State<'_, AppState>,
+    alert_type: String,
+    user: Option<String>,
+) -> Result<usize, String> {
+    let user = user.unwrap_or_else(|| "Test".into());
+    state.alerts.test_alert(&alert_type, &user).await
 }
 
 #[tauri::command]
@@ -328,7 +354,7 @@ pub fn run() {
             let obs = ObsClient::new_shared(loaded.obs.host.clone(), loaded.obs.port);
             let twitch = TwitchClient::new_shared(secrets_dyn.clone());
             let spotify = SpotifyClient::new_shared(secrets_dyn);
-            let alerts = Arc::new(AlertEngine::new());
+            let alerts = Arc::new(AlertEngine::from_store(settings.clone(), bridge.clone()));
 
             spawn_live_event_bridges(
                 app.handle().clone(),
@@ -473,6 +499,9 @@ pub fn run() {
             spotify_logout,
             list_alerts,
             upsert_alert,
+            delete_alert,
+            alert_runtime,
+            test_alert,
             now_playing,
             app_paths,
             overlay_health_url,
@@ -507,7 +536,7 @@ fn spawn_live_event_bridges(
                         evt.data.clone(),
                     );
                     alerts_twitch
-                        .enqueue_matching(&evt.event_type, overlay.clone())
+                        .enqueue_matching(&evt.event_type, &evt.data)
                         .await;
                     let _ = app_twitch_evt.emit("twitch-event", &overlay);
                 }

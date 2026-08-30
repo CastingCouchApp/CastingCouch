@@ -165,4 +165,64 @@ mod tests {
         assert_eq!(canvases[0]["Id"], "default");
         assert_eq!(root["SchemaVersion"], CURRENT_SCHEMA_VERSION);
     }
+
+    #[tokio::test]
+    async fn alert_definitions_roundtrip_pascal_case() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "SchemaVersion": 2,
+                "Alerts": {
+                    "Enabled": true,
+                    "ObsSceneName": "alerts-live",
+                    "Definitions": {
+                        "Follow": {
+                            "Type": "Follow",
+                            "Enabled": true,
+                            "TextTemplate": "{user} folgt jetzt!",
+                            "DurationSeconds": 8,
+                            "Priority": 100
+                        },
+                        "Cheer": {
+                            "Type": "Cheer",
+                            "Enabled": false,
+                            "TextTemplate": "{user} cheeret {bits} Bits!",
+                            "DurationSeconds": 9,
+                            "Priority": 85
+                        }
+                    }
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let store = JsonSettingsStore::new(&path);
+        let loaded = store.load().await.unwrap();
+        assert_eq!(loaded.alerts.obs_scene_name, "alerts-live");
+        assert_eq!(
+            loaded.alerts.definitions["Follow"].text_template,
+            "{user} folgt jetzt!"
+        );
+        assert!(!loaded.alerts.definitions["Cheer"].enabled);
+
+        store.save(&loaded).await.unwrap();
+        let reloaded = JsonSettingsStore::new(&path).load().await.unwrap();
+        assert_eq!(
+            reloaded.alerts.definitions["Follow"].text_template,
+            "{user} folgt jetzt!"
+        );
+        assert!(!reloaded.alerts.definitions["Cheer"].enabled);
+        assert_eq!(reloaded.alerts.obs_scene_name, "alerts-live");
+
+        let disk: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(
+            disk["Alerts"]["Definitions"]["Follow"]["TextTemplate"],
+            "{user} folgt jetzt!"
+        );
+        assert_eq!(disk["Alerts"]["ObsSceneName"], "alerts-live");
+    }
 }
