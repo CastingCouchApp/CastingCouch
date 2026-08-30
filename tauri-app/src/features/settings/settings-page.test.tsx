@@ -5,6 +5,7 @@ import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { routeTree } from "../../routeTree.gen";
 import { cloneSettings, defaultAppSettings, type AppSettings } from "../../lib/app-settings";
+import "../../styles.css";
 
 const invokeMock = vi.fn();
 
@@ -121,6 +122,35 @@ describe("Settings route", () => {
     await screen.findByRole("heading", { name: "Einstellungen" });
     await waitFor(() => {
       expect(document.documentElement.dataset.theme).toBe("arctic-glass-lab");
+    });
+  });
+
+  it("applies theme tokens immediately without save", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    const theme = await screen.findByLabelText("Theme");
+    await user.selectOptions(theme, "comic-sans-extravaganza");
+    expect(document.documentElement.dataset.theme).toBe("comic-sans-extravaganza");
+    const windowToken = getComputedStyle(document.documentElement)
+      .getPropertyValue("--color-window")
+      .trim();
+    const brandToken = getComputedStyle(document.documentElement)
+      .getPropertyValue("--color-brand")
+      .trim();
+    if (windowToken) {
+      expect(windowToken).toBe("#0a1a4a");
+    }
+    if (brandToken) {
+      expect(brandToken).toBe("#ffe600");
+    }
+  });
+
+  it("falls unknown ThemeId back to classic", async () => {
+    stored.General.ThemeId = "not-a-theme";
+    renderSettings();
+    await screen.findByRole("heading", { name: "Einstellungen" });
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe("classic");
     });
   });
 });

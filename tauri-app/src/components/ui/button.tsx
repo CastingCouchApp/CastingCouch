@@ -10,9 +10,9 @@ export function Button({ className, variant = "primary", ...props }: Props) {
     <button
       className={cn(
         "inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition",
-        variant === "primary" && "bg-brand text-white hover:bg-brand/90",
-        variant === "ghost" && "bg-white/5 hover:bg-white/10",
-        variant === "danger" && "bg-red-600 text-white hover:bg-red-500",
+        variant === "primary" && "bg-brand text-on-accent hover:opacity-90",
+        variant === "ghost" && "bg-input text-text hover:bg-nav-hover",
+        variant === "danger" && "bg-danger text-white hover:opacity-90",
         "disabled:opacity-50",
         className,
       )}

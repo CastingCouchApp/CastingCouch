@@ -27,7 +27,7 @@ version.json           Versionsquelle für Tauri (`8.0.0-beta1` ↔ `8.0.0-beta.
 | Kanal | Zweck |
 |-------|--------|
 | Tauri `invoke` | Settings, Canvas-CRUD (Layout-Datei + Rollback), `open_overlay_editor`, Service-Status, Alerts |
-| Tauri Events | `service-status`, `twitch-event`, `obs-scene` → React Query Cache |
+| Tauri Events | `service-status`, `twitch-event`, `obs-scene`, `now-playing` → React Query Cache (15s-Poll-Fallback) |
 | HTTP/WS `127.0.0.1:8765` | Overlay Editor/View/Solo, identische Routen wie Kestrel |
 
 ### Overlay-Routen (kompatibel)
@@ -51,8 +51,8 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 | Alerts | Persistenz in `settings.json` (WPF-PascalCase `Alerts.Definitions`); Runtime-Queue → Overlay-Hub `app.alert` |
 | Overlay Event Bridge | Hub-Publish als C#-`OverlayRealtimeEvent` (camelCase `source`/`type`/`at`/`summary`/`data`) |
 | YouTube Music / Workflow / Agent | Sidecar-Fallback (siehe unten) |
-| Updates | SHA-256-Manifest-Verifier (`ccs-core::updates`) |
-| Haupt-UI | Dashboard, Dienste (Connect/Login/Logout + Fehlerdetail), Overlay-Canvas-Tabelle (TanStack Table, Duplicate kopiert Layout, Editor-WebView auf `/editor/{id}`), Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme`), Updates, About |
+| Updates | SHA-256-Manifest-Verifier (`ccs-core::updates`); GitHub-Check + Download; Apply/Backup/RSA und Release-Skill in Phase 5 |
+| Haupt-UI | Dashboard Live (OBS-Szene, Twitch-Login, Spotify Now Playing; Events + 15s-Fallback), Dienste (Connect/Login/Logout + Fehlerdetail), Overlay-Canvas-Tabelle (TanStack Table, Duplicate kopiert Layout, Editor-WebView auf `/editor/{id}`), Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme` CSS-Tokens), Updates (Prüfen/Manifest/Checksum), About (Version, Datenpfad, Overlay-Health) |
 
 ## Sidecar (Übergang)
 

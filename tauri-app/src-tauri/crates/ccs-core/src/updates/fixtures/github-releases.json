@@ -1,0 +1,35 @@
+[
+  {
+    "tag_name": "v8.0.0",
+    "name": "Stable",
+    "draft": false,
+    "prerelease": false,
+    "body": "stable-body",
+    "assets": []
+  },
+  {
+    "tag_name": "v8.0.0-beta2",
+    "name": "Beta",
+    "draft": false,
+    "prerelease": true,
+    "body": "from-body",
+    "assets": [
+      {
+        "name": "update-manifest.json",
+        "browser_download_url": "https://example.test/update-manifest.json"
+      },
+      {
+        "name": "CreatorControlSuite-8.0.0-beta2-win-x64.zip",
+        "browser_download_url": "https://example.test/pkg.zip"
+      }
+    ]
+  },
+  {
+    "tag_name": "v8.0.0-alpha9",
+    "name": "Alpha",
+    "draft": false,
+    "prerelease": true,
+    "body": "alpha-body",
+    "assets": []
+  }
+]

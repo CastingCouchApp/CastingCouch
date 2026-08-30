@@ -1,0 +1,12 @@
+{
+  "ProductId": "CreatorControlSuite",
+  "Version": "8.0.0-beta2",
+  "Channel": "Beta",
+  "PackageFileName": "CreatorControlSuite-8.0.0-beta2-win-x64.zip",
+  "PackageSha256": "DEADBEEF",
+  "PackageSizeBytes": 9,
+  "PublishedAt": "2026-08-30T00:00:00.0000000Z",
+  "MinimumVersion": "0.0.0",
+  "ReleaseNotes": "Phase 4.4 fixture notes",
+  "Signature": "dGVzdA=="
+}

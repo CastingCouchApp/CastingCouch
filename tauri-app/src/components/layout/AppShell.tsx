@@ -37,9 +37,9 @@ export function AppShell() {
   }, [settings.data?.General.ThemeId]);
 
   return (
-    <div className="flex h-screen bg-ink text-zinc-100">
-      <aside className="flex w-56 flex-col border-r border-white/10 bg-black/40">
-        <div className="px-4 py-4 text-lg font-semibold tracking-tight">
+    <div className="flex h-screen bg-window font-app text-text">
+      <aside className="flex w-56 flex-col border-r border-border bg-sidebar">
+        <div className="px-4 py-4 text-lg font-semibold tracking-tight text-text">
           CastingCouch
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 px-2">
@@ -50,9 +50,9 @@ export function AppShell() {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-zinc-300 hover:bg-white/10",
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text-secondary hover:bg-nav-hover hover:text-text",
                 )}
-                activeProps={{ className: "bg-white/10 text-white" }}
+                activeProps={{ className: "bg-nav-active text-nav-fg" }}
               >
                 <Icon className="h-4 w-4" />
                 {item.label}

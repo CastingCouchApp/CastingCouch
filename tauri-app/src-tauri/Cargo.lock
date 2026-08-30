@@ -483,6 +483,7 @@ dependencies = [
  "ccs-modules",
  "ccs-overlay-server",
  "ccs-secrets",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tauri",

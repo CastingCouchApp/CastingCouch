@@ -22,4 +22,4 @@ Nur eine App-Instanz sollte den Overlay-Port 8765 binden.
 
 ## Updates
 
-Weiterhin GitHub Releases mit `update-manifest.json` (SHA-256). MSI/NSIS (Windows) und DMG (macOS) kommen aus `tauri build`.
+Weiterhin GitHub Releases mit `update-manifest.json` (SHA-256). Die Tauri-App prüft Manifest und Paket-Checksum; Installation, Backup und RSA-Signatur folgen in Phase 5 (Release-Skill / `release.yml`). MSI/NSIS (Windows) und DMG (macOS) kommen aus `tauri build`.

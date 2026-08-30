@@ -435,10 +435,12 @@ export function applyEditedSettings(base: AppSettings, form: AppSettings): AppSe
   return next;
 }
 
+const THEME_IDS = new Set(THEME_CATALOG.map((theme) => theme.id));
+
 export function applyThemeId(themeId: string | undefined | null): void {
   if (typeof document === "undefined") {
     return;
   }
   const id = themeId?.trim() || "classic";
-  document.documentElement.dataset.theme = id;
+  document.documentElement.dataset.theme = THEME_IDS.has(id) ? id : "classic";
 }

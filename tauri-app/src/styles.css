@@ -1,13 +1,32 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand: #ff8c00;
-  --color-ink: #0f1115;
+  --color-brand: #ff6a00;
+  --color-ink: #090d10;
+  --color-window: #090d10;
+  --color-sidebar: #0a0f13;
+  --color-card: #11171c;
+  --color-input: #151c22;
+  --color-text: #f4f7f9;
+  --color-text-secondary: #b8c0c7;
+  --color-muted: #8d969e;
+  --color-on-accent: #ffffff;
+  --color-border: #2a343c;
+  --color-nav-hover: #20160f;
+  --color-nav-active: #2a170a;
+  --color-nav-fg: #ff7a1a;
+  --color-success: #4cd964;
+  --color-warning: #e6a817;
+  --color-danger: #dc5a5a;
+  --font-app: "Segoe UI", system-ui, sans-serif;
+  --font-heading: "Segoe UI", system-ui, sans-serif;
 }
 
 :root {
   color-scheme: dark;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-app);
+  background: var(--color-window);
+  color: var(--color-text);
 }
 
 html,
@@ -15,69 +34,301 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  background: var(--color-window);
+  color: var(--color-text);
+  font-family: var(--font-app);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
 }
 
 html[data-theme="classic"] {
-  --color-brand: #ff8c00;
-  --color-ink: #1a1a1a;
+  --color-brand: #ff6a00;
+  --color-ink: #090d10;
+  --color-window: #090d10;
+  --color-sidebar: #0a0f13;
+  --color-card: #11171c;
+  --color-input: #151c22;
+  --color-text: #f4f7f9;
+  --color-text-secondary: #b8c0c7;
+  --color-muted: #8d969e;
+  --color-on-accent: #ffffff;
+  --color-border: #2a343c;
+  --color-nav-hover: #20160f;
+  --color-nav-active: #2a170a;
+  --color-nav-fg: #ff7a1a;
+  --color-success: #4cd964;
+  --color-warning: #e6a817;
+  --color-danger: #dc5a5a;
+  --font-app: "Segoe UI", system-ui, sans-serif;
+  --font-heading: "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="comic-sans-extravaganza"] {
   --color-brand: #ffe600;
-  --color-ink: #0a1540;
+  --color-ink: #0a1a4a;
+  --color-window: #0a1a4a;
+  --color-sidebar: #08163e;
+  --color-card: #143070;
+  --color-input: #1c3a7a;
+  --color-text: #fff9c4;
+  --color-text-secondary: #b8f0ff;
+  --color-muted: #9ad0e8;
+  --color-on-accent: #1a0a40;
+  --color-border: #00e5ff;
+  --color-nav-hover: #3a1050;
+  --color-nav-active: #5a0080;
+  --color-nav-fg: #ffe600;
+  --color-success: #00ff88;
+  --color-warning: #ffe600;
+  --color-danger: #ff4488;
+  --font-app: "Comic Sans MS", "Segoe UI", system-ui, sans-serif;
+  --font-heading: "Comic Sans MS", "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="pink-cage-flair"] {
-  --color-brand: #ff2d95;
+  --color-brand: #ff1493;
   --color-ink: #0a0a0a;
+  --color-window: #0a0a0a;
+  --color-sidebar: #0e0e0e;
+  --color-card: #1a1a1a;
+  --color-input: #1c1c1c;
+  --color-text: #f5f5f5;
+  --color-text-secondary: #d0a0b8;
+  --color-muted: #a08090;
+  --color-on-accent: #ffffff;
+  --color-border: #4a4a4a;
+  --color-nav-hover: #2a0a18;
+  --color-nav-active: #3a0a20;
+  --color-nav-fg: #ff69b4;
+  --color-success: #39d353;
+  --color-warning: #ffb347;
+  --color-danger: #ff3366;
+  --font-app: "Segoe UI", system-ui, sans-serif;
+  --font-heading: Impact, "Arial Black", "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="vespucci-heights"] {
-  --color-brand: #00c8c8;
-  --color-ink: #0a1830;
+  --color-brand: #ff2d95;
+  --color-ink: #0b0b2e;
+  --color-window: #0b0b2e;
+  --color-sidebar: #0a0a28;
+  --color-card: #1a1a50;
+  --color-input: #1c1c55;
+  --color-text: #f8f0ff;
+  --color-text-secondary: #a0e8f0;
+  --color-muted: #8890c0;
+  --color-on-accent: #ffffff;
+  --color-border: #3a3a80;
+  --color-nav-hover: #2a1040;
+  --color-nav-active: #3a1860;
+  --color-nav-fg: #00f0ff;
+  --color-success: #00e8a0;
+  --color-warning: #ff6b35;
+  --color-danger: #ff4466;
+  --font-app: Bahnschrift, "Segoe UI", system-ui, sans-serif;
+  --font-heading: Bahnschrift, "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="vanilla-unicorn-lounge"] {
-  --color-brand: #e8a0d8;
-  --color-ink: #1a1520;
+  color-scheme: light;
+  --color-brand: #e8a0bf;
+  --color-ink: #fff5f8;
+  --color-window: #fff5f8;
+  --color-sidebar: #fce4ec;
+  --color-card: #ffffff;
+  --color-input: #ffffff;
+  --color-text: #4a3050;
+  --color-text-secondary: #5c3d55;
+  --color-muted: #6e4a60;
+  --color-on-accent: #4a3050;
+  --color-border: #e8c8d8;
+  --color-nav-hover: #f3e5f5;
+  --color-nav-active: #e8d5f0;
+  --color-nav-fg: #8b4a8a;
+  --color-success: #7bc47f;
+  --color-warning: #e8c070;
+  --color-danger: #e08090;
+  --font-app: "Segoe Print", "Comic Sans MS", "Segoe UI", system-ui, sans-serif;
+  --font-heading: "Segoe Print", "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="neon-night-market"] {
-  --color-brand: #ff2bd6;
-  --color-ink: #090712;
+  --color-brand: #b8ff3c;
+  --color-ink: #050508;
+  --color-window: #050508;
+  --color-sidebar: #08080e;
+  --color-card: #101018;
+  --color-input: #12121a;
+  --color-text: #e8ffe0;
+  --color-text-secondary: #a0b0c8;
+  --color-muted: #708090;
+  --color-on-accent: #0a0a10;
+  --color-border: #2a2a40;
+  --color-nav-hover: #1a1030;
+  --color-nav-active: #241840;
+  --color-nav-fg: #b8ff3c;
+  --color-success: #b8ff3c;
+  --color-warning: #ffd60a;
+  --color-danger: #ff006e;
+  --font-app: "Cascadia Code", Consolas, "Segoe UI", system-ui, sans-serif;
+  --font-heading: "Cascadia Code", Consolas, "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="terminal-green-override"] {
-  --color-brand: #33ff33;
+  --color-brand: #33ff66;
   --color-ink: #000000;
+  --color-window: #000000;
+  --color-sidebar: #020402;
+  --color-card: #0a100a;
+  --color-input: #0c140c;
+  --color-text: #33ff66;
+  --color-text-secondary: #22aa44;
+  --color-muted: #1a6633;
+  --color-on-accent: #000000;
+  --color-border: #1a6633;
+  --color-nav-hover: #0a2a10;
+  --color-nav-active: #0e3a18;
+  --color-nav-fg: #66ff99;
+  --color-success: #33ff66;
+  --color-warning: #aaff33;
+  --color-danger: #ff3333;
+  --font-app: Consolas, "Cascadia Mono", "Segoe UI", system-ui, sans-serif;
+  --font-heading: Consolas, "Cascadia Mono", "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="blood-moon-broadcast"] {
   --color-brand: #c41e3a;
-  --color-ink: #1a0a0a;
+  --color-ink: #0c0808;
+  --color-window: #0c0808;
+  --color-sidebar: #100808;
+  --color-card: #1a1010;
+  --color-input: #1c1212;
+  --color-text: #f5e6e0;
+  --color-text-secondary: #c0a090;
+  --color-muted: #907060;
+  --color-on-accent: #ffffff;
+  --color-border: #3a2020;
+  --color-nav-hover: #2a0a10;
+  --color-nav-active: #3a1018;
+  --color-nav-fg: #d4af37;
+  --color-success: #4a9b5c;
+  --color-warning: #d4af37;
+  --color-danger: #e63950;
+  --font-app: Georgia, "Times New Roman", "Segoe UI", system-ui, serif;
+  --font-heading: Georgia, "Times New Roman", "Segoe UI", system-ui, serif;
 }
 
 html[data-theme="pastel-lofi-cafe"] {
-  --color-brand: #e8a0bf;
-  --color-ink: #1c1520;
+  color-scheme: light;
+  --color-brand: #e07a5f;
+  --color-ink: #f4f1de;
+  --color-window: #f4f1de;
+  --color-sidebar: #e8dfc8;
+  --color-card: #fffbf0;
+  --color-input: #fffbf0;
+  --color-text: #3d405b;
+  --color-text-secondary: #4a5555;
+  --color-muted: #5a6666;
+  --color-on-accent: #fffbf0;
+  --color-border: #d4c8b0;
+  --color-nav-hover: #d8e2d0;
+  --color-nav-active: #c8d8c0;
+  --color-nav-fg: #3d405b;
+  --color-success: #81b29a;
+  --color-warning: #f2cc8f;
+  --color-danger: #e07a5f;
+  --font-app: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --font-heading: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="gold-rush-studio"] {
   --color-brand: #d4af37;
-  --color-ink: #0c0c0c;
+  --color-ink: #0a0a0a;
+  --color-window: #0a0a0a;
+  --color-sidebar: #0c0c0c;
+  --color-card: #161616;
+  --color-input: #141414;
+  --color-text: #f5e6c8;
+  --color-text-secondary: #c8b890;
+  --color-muted: #908060;
+  --color-on-accent: #0a0a0a;
+  --color-border: #3a3420;
+  --color-nav-hover: #2a2410;
+  --color-nav-active: #3a3018;
+  --color-nav-fg: #f0d060;
+  --color-success: #6baa6b;
+  --color-warning: #f0d060;
+  --color-danger: #c05050;
+  --font-app: "Palatino Linotype", Georgia, "Segoe UI", system-ui, serif;
+  --font-heading: "Palatino Linotype", Georgia, "Segoe UI", system-ui, serif;
 }
 
 html[data-theme="arctic-glass-lab"] {
-  --color-brand: #4fd1ff;
-  --color-ink: #0b1520;
+  --color-brand: #4fc3f7;
+  --color-ink: #0a1218;
+  --color-window: #0a1218;
+  --color-sidebar: #0c161e;
+  --color-card: #142028;
+  --color-input: #162430;
+  --color-text: #e8f4f8;
+  --color-text-secondary: #a8c8d8;
+  --color-muted: #7898a8;
+  --color-on-accent: #0a1218;
+  --color-border: #2a4050;
+  --color-nav-hover: #0a2030;
+  --color-nav-active: #0e3040;
+  --color-nav-fg: #81d4fa;
+  --color-success: #66bb6a;
+  --color-warning: #ffca28;
+  --color-danger: #ef5350;
+  --font-app: "Segoe UI", system-ui, sans-serif;
+  --font-heading: "Segoe UI Light", "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="biomilchs-bubatz-cantina"] {
-  --color-brand: #6bbf59;
-  --color-ink: #0b1a2e;
+  --color-brand: #5cdb6a;
+  --color-ink: #060b14;
+  --color-window: #060b14;
+  --color-sidebar: #081018;
+  --color-card: #101c2c;
+  --color-input: #122028;
+  --color-text: #eaf6ff;
+  --color-text-secondary: #9ec4d8;
+  --color-muted: #6e94a8;
+  --color-on-accent: #060b14;
+  --color-border: #2a4050;
+  --color-nav-hover: #0a2418;
+  --color-nav-active: #123020;
+  --color-nav-fg: #8aff96;
+  --color-success: #4caf50;
+  --color-warning: #e8b84a;
+  --color-danger: #e53935;
+  --font-app: "Segoe UI", system-ui, sans-serif;
+  --font-heading: Bahnschrift, "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="fruppis-landadel-kanzlei"] {
-  --color-brand: #8b1a3a;
-  --color-ink: #0c1a2e;
+  --color-brand: #2e6bb0;
+  --color-ink: #080c12;
+  --color-window: #080c12;
+  --color-sidebar: #0a1016;
+  --color-card: #121820;
+  --color-input: #10161e;
+  --color-text: #f2eee6;
+  --color-text-secondary: #c8b890;
+  --color-muted: #7a8a9a;
+  --color-on-accent: #ffffff;
+  --color-border: #2a3848;
+  --color-nav-hover: #0c1e30;
+  --color-nav-active: #163a60;
+  --color-nav-fg: #e8d5a3;
+  --color-success: #4a9b6c;
+  --color-warning: #e8d5a3;
+  --color-danger: #b91c3a;
+  --font-app: Georgia, Cambria, "Segoe UI", system-ui, serif;
+  --font-heading: Georgia, Cambria, "Segoe UI", system-ui, serif;
 }

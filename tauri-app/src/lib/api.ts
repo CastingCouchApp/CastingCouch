@@ -14,17 +14,23 @@ export const queryClient = new QueryClient({
   },
 });
 
+/** Fallback poll when Tauri events are missed; live updates go through listen → setQueryData. */
+export const FALLBACK_POLL_MS = 15_000;
+
 export const queryKeys = {
   settings: ["settings"] as const,
   canvases: ["canvases"] as const,
   services: ["services"] as const,
   obsScenes: ["obs-scenes"] as const,
+  obsCurrentScene: ["obs-current-scene"] as const,
   alerts: ["alerts"] as const,
   alertRuntime: ["alert-runtime"] as const,
   nowPlaying: ["now-playing"] as const,
   paths: ["paths"] as const,
   overlayHealthUrl: ["overlay-health-url"] as const,
   overlayHealth: ["overlay-health"] as const,
+  appVersion: ["app-version"] as const,
+  updates: ["updates"] as const,
 };
 
 export type CanvasDto = {
@@ -46,6 +52,13 @@ export type NowPlaying = {
   artist: string;
   album: string;
   is_playing: boolean;
+};
+
+export const EMPTY_NOW_PLAYING: NowPlaying = {
+  title: "",
+  artist: "",
+  album: "",
+  is_playing: false,
 };
 
 export type ObsSceneInfo = {
@@ -79,6 +92,36 @@ export type AlertRuntime = {
   pending_count: number;
   enabled: boolean;
   obs_scene_name: string;
+};
+
+export type AppVersionInfo = {
+  version: string;
+  channel: string;
+};
+
+export type UpdatePackage = {
+  product_id: string;
+  version: string;
+  channel: string;
+  download_uri: string;
+  sha256: string;
+  size: number;
+  release_notes: string;
+  package_file_name: string;
+};
+
+export type UpdateCheckResult = {
+  update_available: boolean;
+  current_version: string;
+  package: UpdatePackage | null;
+  detail: string;
+};
+
+export const EMPTY_UPDATE_CHECK: UpdateCheckResult = {
+  update_available: false,
+  current_version: "8.0.0-beta.1",
+  package: null,
+  detail: "Bereit.",
 };
 
 let mockSettings = defaultAppSettings();
@@ -144,6 +187,8 @@ function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
       return { id: "spotify", name: "Spotify", state: "disconnected", detail: "" } as T;
     case "now_playing":
       return { title: "", artist: "", album: "", is_playing: false } as T;
+    case "obs_current_scene":
+      return null as T;
     case "obs_scenes":
       return [
         { name: "Start", index: 0 },
@@ -216,6 +261,19 @@ function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
       return "http://127.0.0.1:8765/health" as T;
     case "open_overlay_editor":
       return undefined as T;
+    case "app_version":
+      return { version: "8.0.0-beta.1", channel: "Alpha" } as T;
+    case "check_updates":
+      return {
+        update_available: false,
+        current_version: "8.0.0-beta.1",
+        package: null,
+        detail: "Aktuelle Version 8.0.0-beta.1 ist aktuell (Alpha).",
+      } as T;
+    case "download_update":
+      return "CreatorControlSuite/Downloads/pkg.zip" as T;
+    case "apply_update":
+      return "Installation folgt in Phase 5." as T;
     default:
       return undefined as T;
   }
@@ -235,14 +293,35 @@ export function mergeServiceStatus(
   return copy;
 }
 
-export async function listenServiceStatus(
-  onStatus: (status: ServiceStatus) => void,
+async function listenIfTauri<T>(
+  event: string,
+  onPayload: (payload: T) => void,
 ): Promise<() => void> {
   if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
     const { listen } = await import("@tauri-apps/api/event");
-    return listen<ServiceStatus>("service-status", (event) => {
-      onStatus(event.payload);
+    return listen<T>(event, (e) => {
+      onPayload(e.payload);
     });
   }
   return () => {};
+}
+
+export async function listenServiceStatus(
+  onStatus: (status: ServiceStatus) => void,
+): Promise<() => void> {
+  return listenIfTauri<ServiceStatus>("service-status", onStatus);
+}
+
+export async function listenObsScene(
+  onScene: (scene: string) => void,
+): Promise<() => void> {
+  return listenIfTauri<{ scene: string }>("obs-scene", (payload) => {
+    onScene(payload.scene);
+  });
+}
+
+export async function listenNowPlaying(
+  onPlaying: (playing: NowPlaying) => void,
+): Promise<() => void> {
+  return listenIfTauri<NowPlaying>("now-playing", onPlaying);
 }

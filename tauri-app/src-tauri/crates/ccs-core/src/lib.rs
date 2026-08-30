@@ -12,4 +12,9 @@ pub use settings::{
     SidecarSettings, CURRENT_SCHEMA_VERSION,
 };
 pub use store::{migrate, JsonSettingsStore, SettingsError};
-pub use updates::{sha256_hex, verify_package, UpdateManifest};
+pub use updates::{
+    evaluate_check, github_releases_url, manifest_asset_url, parse_manifest_bytes,
+    parse_releases_bytes, select_release, sha256_hex, store_verified_package, verify_package,
+    GitHubRelease, UpdateCheckResult, UpdateError, UpdateManifest, UpdatePackage,
+    DEFAULT_GITHUB_OWNER, DEFAULT_GITHUB_REPO, PRODUCT_ID,
+};

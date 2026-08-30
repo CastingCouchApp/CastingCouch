@@ -23,7 +23,7 @@ Verträge: [`TAURI-MIGRATION.md`](TAURI-MIGRATION.md), Sidecar: [`TAURI-SIDECAR.
 | 1 Overlay-Server | Axum + Route-Contract-Tests, Hub, Layout-Store | Assets |
 | 2 Core | Settings/Paths/Lock/Logging, Keyring, SHA-256-Verifier | Schema-Migrationen 1:1, Secret-Migration DPAPI→Keyring |
 | 3 Module | OBS Live-Connect; Twitch Device-Code + Helix + EventSub; Spotify PKCE + currently-playing; Overlay-Bridge; Alerts Persistenz + Overlay-Runtime | Sidecar-Spawn |
-| 4 UI | Shell; Alerts-Library-Table; Settings/Services; Overlay-Tabelle + Editor-WebView | Live-Events, restliche Pages, pixel-perfekte Themes |
+| 4 UI | Shell; Alerts-Library-Table; Settings/Services; Overlay-Tabelle + Editor-WebView; Dashboard Live (Szene/Twitch/Now Playing, Events + 15s-Fallback); Updates/About; Theme-Tokens (`data-theme`) | Sidecar-UI, pixel-perfekte Themes |
 | 5 Release | `make build-nsis`/`build-dmg`, `Build-Tauri-Release.ps1`, CI `--bundles none` | Signatur, In-App-Update, `release.yml` |
 | 6 Cutover | vorbereitet | WPF aus Default-Build |
 

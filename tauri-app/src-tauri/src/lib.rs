@@ -1,4 +1,9 @@
-use ccs_core::{logging, AppPaths, AppSettings, JsonSettingsStore, SingleInstanceLock};
+use ccs_core::{
+    evaluate_check, github_releases_url, logging, manifest_asset_url, parse_manifest_bytes,
+    parse_releases_bytes, select_release, store_verified_package, AppPaths, AppSettings,
+    JsonSettingsStore, SingleInstanceLock, UpdateCheckResult, UpdateError, UpdatePackage,
+    DEFAULT_GITHUB_OWNER, DEFAULT_GITHUB_REPO,
+};
 use ccs_modules::alerts::{AlertDefinition, AlertEngine, AlertRuntime};
 use ccs_modules::obs::{ObsClient, ObsConnectOptions, ObsSceneInfo};
 use ccs_modules::overlay_bridge::OverlayEventBridge;
@@ -8,9 +13,7 @@ use ccs_modules::sidecar::{
 use ccs_modules::spotify::{NowPlaying, SpotifyClient, SpotifyConnectOptions};
 use ccs_modules::twitch::{TwitchClient, TwitchConnectOptions};
 use ccs_modules::ServiceStatus;
-use ccs_overlay_server::{
-    OverlayCanvasService, OverlayLayoutStore, OverlayServer, RealtimeHub,
-};
+use ccs_overlay_server::{OverlayCanvasService, OverlayLayoutStore, OverlayServer, RealtimeHub};
 use ccs_secrets::{KeyringSecretStore, SecretStore};
 use serde::Serialize;
 use serde_json::json;
@@ -35,6 +38,7 @@ pub struct AppState {
     pub spotify: Arc<SpotifyClient>,
     pub alerts: Arc<AlertEngine>,
     pub bridge: OverlayEventBridge,
+    pub verified_update: Mutex<Option<PathBuf>>,
     _lock: Option<SingleInstanceLock>,
 }
 
@@ -53,14 +57,14 @@ async fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String>
 
 #[tauri::command]
 async fn save_settings(state: State<'_, AppState>, settings: AppSettings) -> Result<(), String> {
-    state.settings.save(&settings).await.map_err(|e| e.to_string())
+    state
+        .settings
+        .save(&settings)
+        .await
+        .map_err(|e| e.to_string())
 }
 
-fn canvas_dto(
-    settings: &AppSettings,
-    id: &str,
-    name: &str,
-) -> CanvasDto {
+fn canvas_dto(settings: &AppSettings, id: &str, name: &str) -> CanvasDto {
     CanvasDto {
         editor_url: settings.overlay.editor_url(id),
         view_url: settings.overlay.view_url(id),
@@ -70,9 +74,7 @@ fn canvas_dto(
 }
 
 fn canvas_service(state: &AppState) -> OverlayCanvasService<OverlayLayoutStore> {
-    OverlayCanvasService::new(OverlayLayoutStore::new(
-        state.paths.overlay_layouts.clone(),
-    ))
+    OverlayCanvasService::new(OverlayLayoutStore::new(state.paths.overlay_layouts.clone()))
 }
 
 #[tauri::command]
@@ -156,9 +158,7 @@ async fn open_overlay_editor(
             warn!("overlay editor window failed: {e}");
             app.opener()
                 .open_url(&editor_url, None::<&str>)
-                .map_err(|oe| {
-                    format!("Editor konnte nicht geöffnet werden: {e}; Browser: {oe}")
-                })
+                .map_err(|oe| format!("Editor konnte nicht geöffnet werden: {e}; Browser: {oe}"))
         }
     }
 }
@@ -181,10 +181,7 @@ async fn connect_obs(state: State<'_, AppState>) -> Result<ServiceStatus, String
         .get(OBS_PASSWORD_SECRET_KEY)
         .map_err(|e| e.to_string())?
         .filter(|p| !p.is_empty());
-    let reconnect_seconds = settings
-        .general
-        .connection_watchdog_seconds
-        .max(1) as u64;
+    let reconnect_seconds = settings.general.connection_watchdog_seconds.max(1) as u64;
     let options = ObsConnectOptions {
         host: settings.obs.host.clone(),
         port: settings.obs.port,
@@ -217,6 +214,11 @@ async fn obs_set_scene(state: State<'_, AppState>, scene: String) -> Result<(), 
 }
 
 #[tauri::command]
+async fn obs_current_scene(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    Ok(state.obs.current_program_scene().await)
+}
+
+#[tauri::command]
 fn set_obs_password(state: State<'_, AppState>, password: String) -> Result<(), String> {
     if password.is_empty() {
         state
@@ -241,10 +243,7 @@ fn obs_has_password(state: State<'_, AppState>) -> Result<bool, String> {
 }
 
 #[tauri::command]
-async fn twitch_login(
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<ServiceStatus, String> {
+async fn twitch_login(app: AppHandle, state: State<'_, AppState>) -> Result<ServiceStatus, String> {
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     let options = TwitchConnectOptions {
         client_id: settings.twitch.client_id.clone(),
@@ -364,6 +363,136 @@ async fn overlay_health_url(state: State<'_, AppState>) -> Result<String, String
     ))
 }
 
+#[derive(Serialize)]
+struct AppVersionInfo {
+    version: String,
+    channel: String,
+}
+
+fn update_http() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .user_agent("CreatorControlSuite")
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn app_version(state: State<'_, AppState>) -> Result<AppVersionInfo, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    Ok(AppVersionInfo {
+        version: env!("CARGO_PKG_VERSION").into(),
+        channel: settings.updates.channel,
+    })
+}
+
+#[tauri::command]
+async fn check_updates(state: State<'_, AppState>) -> Result<UpdateCheckResult, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    let current_version = env!("CARGO_PKG_VERSION");
+    let channel = settings.updates.channel.clone();
+    let client = update_http()?;
+    let url = github_releases_url(DEFAULT_GITHUB_OWNER, DEFAULT_GITHUB_REPO);
+    let response = match client.get(&url).send().await {
+        Ok(response) => response,
+        Err(error) => {
+            return Ok(UpdateCheckResult {
+                update_available: false,
+                current_version: current_version.into(),
+                package: None,
+                detail: format!("Updateprüfung fehlgeschlagen: {error}"),
+            });
+        }
+    };
+    if !response.status().is_success() {
+        return Ok(UpdateCheckResult {
+            update_available: false,
+            current_version: current_version.into(),
+            package: None,
+            detail: format!("Updateprüfung fehlgeschlagen: HTTP {}", response.status()),
+        });
+    }
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    let releases = parse_releases_bytes(&bytes).map_err(|e| e.to_string())?;
+    let Some(release) = select_release(&releases, &channel) else {
+        return Ok(UpdateCheckResult {
+            update_available: false,
+            current_version: current_version.into(),
+            package: None,
+            detail: format!("Kein GitHub-Release für Kanal {} gefunden.", channel),
+        });
+    };
+    let Some(manifest_url) = manifest_asset_url(release) else {
+        return Ok(UpdateCheckResult {
+            update_available: false,
+            current_version: current_version.into(),
+            package: None,
+            detail: format!(
+                "Release {} enthält kein update-manifest.json.",
+                release.tag_name
+            ),
+        });
+    };
+    let manifest_bytes = client
+        .get(manifest_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+    let manifest = parse_manifest_bytes(&manifest_bytes).map_err(|e| e.to_string())?;
+    Ok(evaluate_check(
+        current_version,
+        &channel,
+        &releases,
+        &manifest,
+    ))
+}
+
+#[tauri::command]
+async fn download_update(
+    state: State<'_, AppState>,
+    package: UpdatePackage,
+) -> Result<String, String> {
+    let client = update_http()?;
+    let bytes = client
+        .get(&package.download_uri)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+    let dest = state
+        .paths
+        .data_root
+        .join("Downloads")
+        .join(&package.package_file_name);
+    match store_verified_package(&dest, &package.to_manifest(), &bytes) {
+        Ok(path) => {
+            *state.verified_update.lock().await = Some(path.clone());
+            Ok(path.display().to_string())
+        }
+        Err(UpdateError::ChecksumMismatch) => {
+            *state.verified_update.lock().await = None;
+            Err("sha256 mismatch".into())
+        }
+        Err(error) => {
+            *state.verified_update.lock().await = None;
+            Err(error.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn apply_update(state: State<'_, AppState>) -> Result<String, String> {
+    let verified = state.verified_update.lock().await;
+    if verified.is_none() {
+        return Err("Updatepaket ist nicht verifiziert.".into());
+    }
+    Ok("Installation folgt in Phase 5.".into())
+}
+
 #[tauri::command]
 async fn sidecar_status(state: State<'_, AppState>) -> Result<ServiceStatus, String> {
     Ok(state.sidecar.status().await)
@@ -410,12 +539,7 @@ pub fn run() {
             }
 
             let sidecar = SidecarSupervisor::new_shared();
-            spawn_sidecar(
-                sidecar.clone(),
-                &loaded,
-                overlay_failed,
-                overlay_port,
-            );
+            spawn_sidecar(sidecar.clone(), &loaded, overlay_failed, overlay_port);
 
             let obs = ObsClient::new_shared(loaded.obs.host.clone(), loaded.obs.port);
             let twitch = TwitchClient::new_shared(secrets_dyn.clone());
@@ -426,6 +550,7 @@ pub fn run() {
                 app.handle().clone(),
                 obs.clone(),
                 twitch.clone(),
+                spotify.clone(),
                 bridge.clone(),
                 alerts.clone(),
             );
@@ -441,8 +566,7 @@ pub fn run() {
                 let host = loaded.obs.host.clone();
                 let port = loaded.obs.port;
                 let reconnect = loaded.general.reconnect_obs;
-                let reconnect_seconds =
-                    loaded.general.connection_watchdog_seconds.max(1) as u64;
+                let reconnect_seconds = loaded.general.connection_watchdog_seconds.max(1) as u64;
                 tauri::async_runtime::spawn(async move {
                     let (host, port, reconnect, reconnect_seconds) =
                         match settings_auto.load().await {
@@ -542,6 +666,7 @@ pub fn run() {
                 spotify,
                 alerts,
                 bridge,
+                verified_update: Mutex::new(None),
                 _lock: lock,
             });
             Ok(())
@@ -559,6 +684,7 @@ pub fn run() {
             disconnect_obs,
             obs_scenes,
             obs_set_scene,
+            obs_current_scene,
             set_obs_password,
             obs_has_password,
             twitch_login,
@@ -573,6 +699,10 @@ pub fn run() {
             now_playing,
             app_paths,
             overlay_health_url,
+            app_version,
+            check_updates,
+            download_update,
+            apply_update,
             sidecar_status,
             sidecar_ytm_now_playing,
         ])
@@ -638,6 +768,7 @@ fn spawn_live_event_bridges(
     app: AppHandle,
     obs: Arc<ObsClient>,
     twitch: Arc<TwitchClient>,
+    spotify: Arc<SpotifyClient>,
     bridge: OverlayEventBridge,
     alerts: Arc<AlertEngine>,
 ) {
@@ -645,6 +776,8 @@ fn spawn_live_event_bridges(
     let twitch_status = twitch.subscribe_status();
     let obs_status = obs.subscribe_status();
     let mut obs_scenes = obs.subscribe_scenes();
+    let spotify_status = spotify.subscribe_status();
+    let mut spotify_now_playing = spotify.subscribe_now_playing();
 
     let app_twitch_evt = app.clone();
     let bridge_twitch = bridge.clone();
@@ -672,6 +805,20 @@ fn spawn_live_event_bridges(
 
     spawn_status_forward(app.clone(), twitch_status);
     spawn_status_forward(app.clone(), obs_status);
+    spawn_status_forward(app.clone(), spotify_status);
+
+    let app_np = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match spotify_now_playing.recv().await {
+                Ok(playing) => {
+                    let _ = app_np.emit("now-playing", &playing);
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
 
     let app_obs = app;
     let bridge_obs = bridge;
