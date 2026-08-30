@@ -34,6 +34,8 @@ version.json           Versionsquelle für Tauri (`8.0.0-beta1` ↔ `8.0.0-beta.
 
 `/health` `/ws` `/layout/{id}` `/data/overlay-data.json` `/canvas/*` `/editor` `/editor/{id}` `/view` `/view/{id}` `/w/{type}` `/extensions` `/assets` `/obs/video-settings` `/obs/preview` `/chat` `/chat/config` `/chat/history`
 
+Mehrere Pfade sind in Tauri nur gemountet, nicht verhaltensgleich (501/204/Hardcode) — siehe Cutover-Blocker.
+
 ## Datenpfade
 
 Gleicher Ordner wie WPF: `%LocalAppData%/CreatorControlSuite` bzw. `~/Library/Application Support/CreatorControlSuite`.
@@ -43,11 +45,11 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 
 | Modul | Status |
 |-------|--------|
-| Overlay-Server (HTTP/WS) | Rust, Route-Contract-Tests, Layout-Store unter `Overlay/layouts` |
+| Overlay-Server (HTTP/WS) | Rust, Route-Contract-Tests, Layout-Store unter `Overlay/layouts`. **Stubs:** Asset-Upload, Extension-Install, `/obs/preview`, `/obs/video-settings` (kein Live-OBS), `/chat`, `/health`-Widget-Liste unvollständig |
 | Settings/Paths/Lock/Logging | `ccs-core` |
 | Secrets | `ccs-secrets` (keyring) |
-| OBS WebSocket 5 Live-Connect | `ccs-modules` (Auth, GetSceneList/SetScene, Reconnect, `CurrentProgramSceneChanged` → Overlay-Hub) |
-| Twitch / Spotify | Twitch Device-Code + Helix-Status + EventSub-WS (follow/sub/cheer/…); Spotify PKCE-OAuth + currently-playing |
+| OBS WebSocket 5 Live-Connect | `ccs-modules` (Auth, GetSceneList/SetScene, Reconnect, `CurrentProgramSceneChanged` → Overlay-Hub). **Kein** `GetVideoSettings` / Screenshot, keine Sources/Audio/Stream-Steuerung |
+| Twitch / Spotify | Twitch Device-Code + Helix `GET /users` + EventSub-WS (follow/sub/cheer/raid incoming). **Kein** Chat (`channel.chat.message`), Helix jenseits User. Spotify PKCE-OAuth + currently-playing |
 | Alerts | Persistenz in `settings.json` (WPF-PascalCase `Alerts.Definitions`); Runtime-Queue → Overlay-Hub `app.alert` |
 | Overlay Event Bridge | Hub-Publish als C#-`OverlayRealtimeEvent` (camelCase `source`/`type`/`at`/`summary`/`data`) |
 | YouTube Music / Workflow / Agent | Sidecar-Fallback + dünne UI `/music` (Spotify + YTM) und `/workflow` (Schritt ausführen) |
@@ -59,15 +61,49 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 Komplexe Rest-Module (YouTube Music, Workflow-Schritt, Multi-PC-Agent) bleiben in .NET, bis Rust-Parität steht.
 Der Tauri-Host spawnt optional `CreatorControlSuite.CommandClient.exe --sidecar --port 18765` (Windows, Loopback-JSON), wenn `Sidecar.Enabled` oder `CCS_SIDECAR=1` gesetzt ist und die Binary existiert. macOS überspringt den Spawn. Vertrag: [`TAURI-SIDECAR.md`](TAURI-SIDECAR.md).
 
-## Cutover (Phase 6, vorbereitet)
+## Cutover (Phase 6, gestoppt 30. Aug 2026)
 
-Solange Overlay/OBS/Twitch in Tauri nicht feature-paritätisch sind:
+**Nicht ausgeführt.** Overlay/OBS/Twitch sind nicht feature-paritätisch. CI, Makefile, App-Pfad, Release-Skill, User-Guide und Sidecar unverändert.
 
-- WPF bleibt in `.github/workflows/build.yml` Job `dotnet` + `package`.
-- Tauri läuft zusätzlich (`tauri` Job, Windows + macOS, `--bundles none`).
+Unverändert (WPF bleibt Default):
+
+- WPF in `.github/workflows/build.yml` Job `dotnet` + `package`.
+- Tauri zusätzlich (`tauri` Job, Windows + macOS, `--bundles none`).
 - Tag-Release (`.github/workflows/release.yml`): WPF-ZIP/MSI **und** Tauri-NSIS/MSI/DMG.
 - Default-Makefile: `make ci` = .NET; `make tauri-ci` = Tauri+Overlay-Frontend; `make tauri-release` = Installer nach `artifacts/tauri`.
-- Nach Parität: WPF-Jobs auf `legacy` setzen, `src/CreatorControlSuite.App` nach `legacy/` verschieben.
+- Nach Parität: WPF-Jobs auf `legacy` setzen, `src/CreatorControlSuite.App` nach `legacy/` verschieben. Prompt 6 dann erneut.
+
+### Blocker Overlay
+
+| Route | Tauri | WPF |
+|-------|-------|-----|
+| `POST /extensions/install` | 501 | ZIP-Install |
+| `DELETE /extensions/{id}` | 204, no-op | Uninstall |
+| `POST /assets` | 501 | Bild-Upload |
+| `DELETE /assets/{id}` | 204, no-op | Delete |
+| `GET /obs/video-settings` | fest 1920×1080@60 | Live `GetVideoSettings` |
+| `GET /obs/preview` | 204 | PNG Programmszene |
+| `GET /chat` | HTML nur Titel | Standalone-Chat |
+| `GET /chat/background` | 204 | Hintergrundbild |
+| `GET /chat/history` | Datei oder `{messages:[]}`, kein Writer | `{events}` + Persistenz |
+| `GET /data/overlay-config.json` | `{ok:true}` | echte Config oder `{}` |
+| `GET /health` | Port immer 8765; Widget-Liste Teilmenge | Port aus Settings; volle Liste |
+
+Weitere: kein EventSub-Chat ins Overlay; WS-Hello/Layout-PUT-Envelope weicht ab; Port-Änderung startet den Server nicht neu; `overlay-data.json` ohne Live-Writer.
+
+### Blocker OBS
+
+Nur Auth, `GetSceneList`, `SetCurrentProgramScene`, Reconnect, Program-Scene → Hub. Fehlend für Overlay-Kern: `GetVideoSettings`, `GetSourceScreenshot` (Editor-Preview). Professional (Sources, Audio, Stream/Record, Scene Items, Automation) ist kein Cutover-Gate, aber unportiert.
+
+### Blocker Twitch
+
+Kein `channel.chat.message` / delete / clear → Overlay-Chat tot. Helix nur `GET /users`. EventSub ohne Reconnect nach hartem Drop. React hört `twitch-event` nicht. Professional (Polls/Predictions/Rewards/Outgoing-Raid) ist kein Cutover-Gate.
+
+### Vor erneutem Cutover (Kern, nicht Professional-Dashboard)
+
+1. Overlay: Asset-Upload/Delete, Extension-Install/Uninstall, Live `/obs/video-settings` + `/obs/preview`, `/health`-Widgets = CanvasOverlay, Port nicht hardcoden.
+2. Twitch: EventSub Chat + Fragments → Overlay-Hub; History-Writer im WPF-Format.
+3. OBS: `GetVideoSettings` + `GetSourceScreenshot` live.
 
 ## Versionen
 

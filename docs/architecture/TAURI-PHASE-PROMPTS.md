@@ -20,12 +20,12 @@ Verträge: [`TAURI-MIGRATION.md`](TAURI-MIGRATION.md), Sidecar: [`TAURI-SIDECAR.
 | Phase | Skeleton | Offen |
 |-------|----------|--------|
 | 0 Fundament | `tauri-app/`, CI-Job Win/macOS, Makefile | — |
-| 1 Overlay-Server | Axum + Route-Contract-Tests, Hub, Layout-Store | Assets |
+| 1 Overlay-Server | Axum + Route-Contract-Tests, Hub, Layout-Store | Assets, Extension-Install, `/obs/preview`, Chat-HTML |
 | 2 Core | Settings/Paths/Lock/Logging, Keyring, SHA-256-Verifier | Schema-Migrationen 1:1, Secret-Migration DPAPI→Keyring |
-| 3 Module | OBS Live-Connect; Twitch Device-Code + Helix + EventSub; Spotify PKCE + currently-playing; Overlay-Bridge; Alerts Persistenz + Overlay-Runtime; Sidecar-Spawn | — |
-| 4 UI | Shell; Alerts-Library-Table; Settings/Services; Overlay-Tabelle + Editor-WebView; Dashboard Live (Szene/Twitch/Now Playing, Events + 15s-Fallback); Updates/About; Theme-Tokens (`data-theme`); Sidecar-UI (`/music`, `/workflow`) | pixel-perfekte Themes |
+| 3 Module | OBS Live-Connect; Twitch Device-Code + Helix + EventSub; Spotify PKCE + currently-playing; Overlay-Bridge; Alerts Persistenz + Overlay-Runtime; Sidecar-Spawn | OBS Preview/VideoSettings; Twitch Chat-EventSub |
+| 4 UI | Shell; Alerts-Library-Table; Settings/Services; Overlay-Tabelle + Editor-WebView; Dashboard Live (Szene/Twitch/Now Playing, Events + 15s-Fallback); Updates/About; Theme-Tokens (`data-theme`); Sidecar-UI (`/music`, `/workflow`) | pixel-perfekte Themes; `twitch-event`-Listener |
 | 5 Release | `release.yml` (WPF + Tauri NSIS/MSI/DMG), signierte `update-manifest-tauri-*.json`, RSA-Verifier, Apply/Backup | Apple-Notarize |
-| 6 Cutover | vorbereitet | WPF aus Default-Build |
+| 6 Cutover | **gestoppt** (Parität fehlt, 30. Aug 2026) | Overlay-Stubs, Chat, OBS-Preview — siehe `TAURI-MIGRATION.md` |
 
 ---
 
@@ -314,6 +314,8 @@ Exit: Tag-Pipeline erzeugt Tauri-Installer + Manifest; Verifier akzeptiert das P
 ---
 
 ## Prompt 6 — Cutover (erst nach Feature-Parität)
+
+Letzter Versuch 30. Aug 2026: **STOP**. Lücken in [`TAURI-MIGRATION.md`](TAURI-MIGRATION.md) (Cutover-Blocker). Nicht erneut ausführen, bis Overlay-Stubs, EventSub-Chat und OBS-Preview geschlossen sind.
 
 ```
 Implementiere Phase 6 nur wenn Overlay/OBS/Twitch in Tauri feature-paritätisch sind. Sonst STOPPEN und Lücken listen.
