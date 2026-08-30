@@ -22,4 +22,10 @@ Nur eine App-Instanz sollte den Overlay-Port 8765 binden.
 
 ## Updates
 
-Weiterhin GitHub Releases mit `update-manifest.json` (SHA-256). Die Tauri-App prüft Manifest und Paket-Checksum; Installation, Backup und RSA-Signatur folgen in Phase 5 (Release-Skill / `release.yml`). MSI/NSIS (Windows) und DMG (macOS) kommen aus `tauri build`.
+GitHub Releases tragen parallele Manifeste bei gleicher ProductId `CreatorControlSuite`:
+
+- WPF: `update-manifest.json` → ZIP
+- Tauri Windows: `update-manifest-tauri-win.json` → NSIS-Setup
+- Tauri macOS: `update-manifest-tauri-macos.json` → DMG
+
+Kanal in `settings.json` bleibt `Alpha`/`Beta`/`Stable` (version-abgeleitet) und ist geteilt. Die Tauri-App prüft RSA-Signatur und SHA-256, sichert den Installationsordner nach `Backups/{version}` und startet den Installer. macOS-DMGs in Phase 5 ohne Apple-Notarize. MSI/NSIS (Windows) und DMG (macOS) kommen aus `tauri build` bzw. der Tag-Pipeline.

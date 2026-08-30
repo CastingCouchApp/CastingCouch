@@ -15,7 +15,10 @@ tokio = { version = "1", features = ["fs", "io-util", "sync"] }
 uuid = { version = "1", features = ["v4"] }
 fs4 = "0.13"
 sha2 = "0.10"
+rsa = { version = "0.9", features = ["pem", "sha2"] }
+base64 = "0.22"
 
 [dev-dependencies]
 tempfile = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+rand = "0.8"

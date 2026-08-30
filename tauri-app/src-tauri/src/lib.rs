@@ -1,8 +1,8 @@
 use ccs_core::{
-    evaluate_check, github_releases_url, logging, manifest_asset_url, parse_manifest_bytes,
-    parse_releases_bytes, select_release, store_verified_package, AppPaths, AppSettings,
-    JsonSettingsStore, SingleInstanceLock, UpdateCheckResult, UpdateError, UpdatePackage,
-    DEFAULT_GITHUB_OWNER, DEFAULT_GITHUB_REPO,
+    apply_verified_update, evaluate_signed_check, github_releases_url, launch_installer, logging,
+    parse_manifest_bytes, parse_releases_bytes, select_release, store_verified_package,
+    tauri_manifest_asset_url, AppPaths, AppSettings, JsonSettingsStore, SingleInstanceLock,
+    UpdateCheckResult, UpdateError, UpdatePackage, DEFAULT_GITHUB_OWNER, DEFAULT_GITHUB_REPO,
 };
 use ccs_modules::alerts::{AlertDefinition, AlertEngine, AlertRuntime};
 use ccs_modules::obs::{ObsClient, ObsConnectOptions, ObsSceneInfo};
@@ -422,14 +422,15 @@ async fn check_updates(state: State<'_, AppState>) -> Result<UpdateCheckResult, 
             detail: format!("Kein GitHub-Release für Kanal {} gefunden.", channel),
         });
     };
-    let Some(manifest_url) = manifest_asset_url(release) else {
+    let Some(manifest_url) = tauri_manifest_asset_url(release) else {
         return Ok(UpdateCheckResult {
             update_available: false,
             current_version: current_version.into(),
             package: None,
             detail: format!(
-                "Release {} enthält kein update-manifest.json.",
-                release.tag_name
+                "Release {} enthält kein {}.",
+                release.tag_name,
+                ccs_core::current_tauri_manifest_asset_name()
             ),
         });
     };
@@ -442,7 +443,7 @@ async fn check_updates(state: State<'_, AppState>) -> Result<UpdateCheckResult, 
         .await
         .map_err(|e| e.to_string())?;
     let manifest = parse_manifest_bytes(&manifest_bytes).map_err(|e| e.to_string())?;
-    Ok(evaluate_check(
+    Ok(evaluate_signed_check(
         current_version,
         &channel,
         &releases,
@@ -487,11 +488,27 @@ async fn download_update(
 
 #[tauri::command]
 async fn apply_update(state: State<'_, AppState>) -> Result<String, String> {
-    let verified = state.verified_update.lock().await;
-    if verified.is_none() {
+    let verified = {
+        let guard = state.verified_update.lock().await;
+        guard.clone()
+    };
+    let Some(package) = verified else {
         return Err("Updatepaket ist nicht verifiziert.".into());
-    }
-    Ok("Installation folgt in Phase 5.".into())
+    };
+    let install_dir = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|p| p.to_path_buf()))
+        .ok_or_else(|| "Installationsordner nicht ermittelbar.".to_string())?;
+    let current_version = env!("CARGO_PKG_VERSION");
+    apply_verified_update(
+        &package,
+        &install_dir,
+        &state.paths.backups,
+        current_version,
+        launch_installer,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok("Installer gestartet. Die App kann beendet werden, sobald das Setup läuft.".into())
 }
 
 #[tauri::command]

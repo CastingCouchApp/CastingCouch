@@ -67,8 +67,11 @@ function UpdatesPage() {
           Kanal: {version.data?.channel ?? "…"} · Quelle: {GITHUB_SOURCE}
         </p>
         <p className="text-sm text-muted">
-          Signierte GitHub-Releases (`update-manifest.json` + SHA-256). RSA-Signatur und Backup
-          folgen in Phase 5.
+          Signierte GitHub-Releases (RSA + SHA-256). Tauri nutzt{" "}
+          <code>update-manifest-tauri-win.json</code> /{" "}
+          <code>update-manifest-tauri-macos.json</code>; WPF bleibt bei{" "}
+          <code>update-manifest.json</code>. ProductId ist in beiden Stacks{" "}
+          <code>CreatorControlSuite</code>.
         </p>
         <Button onClick={() => check.mutate()} disabled={check.isPending}>
           Prüfen
@@ -126,7 +129,10 @@ function UpdatesPage() {
           Installieren
         </Button>
       </div>
-      <p className="text-sm text-muted">Backup vor dem Update folgt in Phase 5.</p>
+      <p className="text-sm text-muted">
+        Vor der Installation wird der aktuelle App-Ordner nach Backups kopiert. Danach startet der
+        NSIS-/MSI- bzw. DMG-Installer.
+      </p>
     </div>
   );
 }

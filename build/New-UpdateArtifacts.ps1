@@ -15,11 +15,19 @@ param(
 
     [string]$MinimumVersion = "0.0.0",
 
-    [string]$ChangelogPath = ""
+    [string]$ChangelogPath = "",
+
+    [string]$ManifestFileName = "update-manifest.json"
 )
 
 Set-StrictMode -Version 1.0
 $ErrorActionPreference = "Stop"
+$script:CleanupKeyPath = $null
+
+$gitOpenSsl = "C:\Program Files\Git\usr\bin"
+if (Test-Path -LiteralPath (Join-Path $gitOpenSsl "openssl.exe")) {
+    $env:PATH = $gitOpenSsl + [IO.Path]::PathSeparator + $env:PATH
+}
 
 function Get-UpdateChannelFromVersion {
     param([string]$Value)
@@ -122,7 +130,15 @@ try {
     $signature = [Convert]::ToBase64String($signatureBytes)
     $publishedText = $publishedAt.ToUniversalTime().ToString("o")
 
-    $manifestPath = Join-Path $OutputDirectory "update-manifest.json"
+    if ([string]::IsNullOrWhiteSpace($ManifestFileName)) {
+        $ManifestFileName = "update-manifest.json"
+    }
+    $ManifestFileName = [System.IO.Path]::GetFileName($ManifestFileName)
+    if ([string]::IsNullOrWhiteSpace($ManifestFileName)) {
+        throw "ManifestFileName ist ungültig."
+    }
+
+    $manifestPath = Join-Path $OutputDirectory $ManifestFileName
     $escape = {
         param([string]$Value)
         if ($null -eq $Value) { return "" }

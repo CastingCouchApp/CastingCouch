@@ -13,8 +13,11 @@ pub use settings::{
 };
 pub use store::{migrate, JsonSettingsStore, SettingsError};
 pub use updates::{
-    evaluate_check, github_releases_url, manifest_asset_url, parse_manifest_bytes,
-    parse_releases_bytes, select_release, sha256_hex, store_verified_package, verify_package,
-    GitHubRelease, UpdateCheckResult, UpdateError, UpdateManifest, UpdatePackage,
-    DEFAULT_GITHUB_OWNER, DEFAULT_GITHUB_REPO, PRODUCT_ID,
+    apply_verified_update, current_tauri_manifest_asset_name, evaluate_check,
+    evaluate_signed_check, github_releases_url, launch_installer, manifest_asset_name,
+    manifest_asset_url, parse_manifest_bytes, parse_releases_bytes, select_release, sha256_hex,
+    store_verified_package, tauri_manifest_asset_url, verify_manifest_signature, verify_package,
+    GitHubRelease, UpdateCheckResult, UpdateError, UpdateManifest, UpdatePackage, UpdateStack,
+    DEFAULT_GITHUB_OWNER, DEFAULT_GITHUB_REPO, MANIFEST_TAURI_MACOS, MANIFEST_TAURI_WIN,
+    MANIFEST_WPF, PRODUCT_ID,
 };

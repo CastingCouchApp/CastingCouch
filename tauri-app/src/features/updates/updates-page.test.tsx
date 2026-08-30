@@ -87,6 +87,8 @@ describe("Updates page", () => {
     expect(await screen.findByRole("heading", { name: "Updates" })).toBeInTheDocument();
     expect(await screen.findByText(/8\.0\.0-beta\.1/)).toBeInTheDocument();
     expect(screen.getByText(/CastingCouchApp\/CastingCouch/)).toBeInTheDocument();
+    expect(screen.getByText(/update-manifest-tauri-win\.json/)).toBeInTheDocument();
+    expect(screen.queryByText(/folgt in Phase 5/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Installieren" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Prüfen" }));
@@ -138,7 +140,7 @@ describe("Updates page", () => {
         return "Downloads/pkg.zip";
       }
       if (cmd === "apply_update") {
-        return "Installation folgt in Phase 5.";
+        return "Installer gestartet. Die App kann beendet werden, sobald das Setup läuft.";
       }
       return undefined;
     });
@@ -150,7 +152,7 @@ describe("Updates page", () => {
     const install = await screen.findByRole("button", { name: "Installieren" });
     await waitFor(() => expect(install).toBeEnabled());
     await user.click(install);
-    expect(await screen.findByText(/Installation folgt in Phase 5/)).toBeInTheDocument();
+    expect(await screen.findByText(/Installer gestartet/)).toBeInTheDocument();
     expect(invokeMock).toHaveBeenCalledWith("apply_update", undefined);
   });
 });

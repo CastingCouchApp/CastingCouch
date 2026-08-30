@@ -14,6 +14,7 @@ pub struct AppPaths {
     pub logs: PathBuf,
     pub crash_reports: PathBuf,
     pub lock_file: PathBuf,
+    pub backups: PathBuf,
 }
 
 impl AppPaths {
@@ -32,6 +33,7 @@ impl AppPaths {
             logs: data_root.join("Logs"),
             crash_reports: data_root.join("CrashReports"),
             lock_file: data_root.join(SINGLE_INSTANCE_LOCK),
+            backups: data_root.join("Backups"),
             data_root,
         }
     }
@@ -43,6 +45,7 @@ impl AppPaths {
             &self.overlay_layouts,
             &self.logs,
             &self.crash_reports,
+            &self.backups,
         ] {
             std::fs::create_dir_all(dir).map_err(PathError::Io)?;
         }
@@ -71,6 +74,9 @@ mod tests {
         assert!(
             paths.overlay_layouts.ends_with("Overlay/layouts")
                 || paths.overlay_layouts.ends_with(r"Overlay\layouts")
+        );
+        assert!(
+            paths.backups.ends_with("Backups") || paths.backups.ends_with(r"Backups")
         );
     }
 }

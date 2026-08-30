@@ -12,6 +12,8 @@ help:
 	@echo "  make build       - Release-Binary ohne Installer (--bundles none)"
 	@echo "  make build-nsis  - Windows-NSIS-Installer"
 	@echo "  make build-dmg   - macOS-DMG"
+	@echo ""
+	@echo "Release-Kopie nach artifacts/tauri: make -C .. tauri-release (Build-Tauri-Release.ps1)"
 
 install:
 	npm install --no-audit --no-fund

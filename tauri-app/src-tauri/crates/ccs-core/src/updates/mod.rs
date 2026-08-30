@@ -1,9 +1,27 @@
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
+pub mod apply;
+pub mod signature;
+
+pub use apply::{apply_verified_update, installer_launch_command, launch_installer};
+pub use signature::{
+    canonical_payload, verify_manifest_signature, verify_manifest_signature_with_key,
+    UPDATE_PUBLIC_KEY_PEM,
+};
+
 pub const PRODUCT_ID: &str = "CreatorControlSuite";
 pub const DEFAULT_GITHUB_OWNER: &str = "CastingCouchApp";
 pub const DEFAULT_GITHUB_REPO: &str = "CastingCouch";
+pub const MANIFEST_WPF: &str = "update-manifest.json";
+pub const MANIFEST_TAURI_WIN: &str = "update-manifest-tauri-win.json";
+pub const MANIFEST_TAURI_MACOS: &str = "update-manifest-tauri-macos.json";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdateStack {
+    Wpf,
+    Tauri,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum UpdateError {
@@ -15,6 +33,10 @@ pub enum UpdateError {
     ChecksumMismatch,
     #[error("invalid manifest")]
     InvalidManifest,
+    #[error("invalid signature")]
+    InvalidSignature,
+    #[error("apply: {0}")]
+    Apply(String),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -38,6 +60,8 @@ pub struct UpdateManifest {
     pub minimum_version: String,
     #[serde(default)]
     pub release_notes: String,
+    #[serde(default)]
+    pub signature: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -88,6 +112,7 @@ impl UpdatePackage {
             published_at: String::new(),
             minimum_version: String::new(),
             release_notes: self.release_notes.clone(),
+            signature: String::new(),
         }
     }
 }
@@ -262,10 +287,36 @@ pub fn normalize_channel(channel: &str) -> String {
     }
 }
 
-pub fn manifest_asset_url(release: &GitHubRelease) -> Option<&str> {
-    find_asset(release, "update-manifest.json")
+pub fn manifest_asset_name(stack: UpdateStack, os: &str) -> &'static str {
+    match stack {
+        UpdateStack::Wpf => MANIFEST_WPF,
+        UpdateStack::Tauri => match os.to_ascii_lowercase().as_str() {
+            "macos" | "darwin" => MANIFEST_TAURI_MACOS,
+            _ => MANIFEST_TAURI_WIN,
+        },
+    }
+}
+
+pub fn current_tauri_manifest_asset_name() -> &'static str {
+    if cfg!(target_os = "macos") {
+        MANIFEST_TAURI_MACOS
+    } else {
+        MANIFEST_TAURI_WIN
+    }
+}
+
+pub fn manifest_asset_url_named<'a>(release: &'a GitHubRelease, name: &str) -> Option<&'a str> {
+    find_asset(release, name)
         .map(|asset| asset.browser_download_url.as_str())
         .filter(|url| !url.trim().is_empty())
+}
+
+pub fn manifest_asset_url(release: &GitHubRelease) -> Option<&str> {
+    manifest_asset_url_named(release, MANIFEST_WPF)
+}
+
+pub fn tauri_manifest_asset_url(release: &GitHubRelease) -> Option<&str> {
+    manifest_asset_url_named(release, current_tauri_manifest_asset_name())
 }
 
 pub fn select_release<'a>(
@@ -418,6 +469,39 @@ pub fn evaluate_check(
     }
 }
 
+pub fn evaluate_signed_check(
+    current_version: &str,
+    channel: &str,
+    releases: &[GitHubRelease],
+    manifest: &UpdateManifest,
+) -> UpdateCheckResult {
+    evaluate_signed_check_with_key(
+        current_version,
+        channel,
+        releases,
+        manifest,
+        UPDATE_PUBLIC_KEY_PEM,
+    )
+}
+
+pub fn evaluate_signed_check_with_key(
+    current_version: &str,
+    channel: &str,
+    releases: &[GitHubRelease],
+    manifest: &UpdateManifest,
+    public_pem: &str,
+) -> UpdateCheckResult {
+    if !verify_manifest_signature_with_key(manifest, public_pem) {
+        return UpdateCheckResult {
+            update_available: false,
+            current_version: current_version.into(),
+            package: None,
+            detail: "Update-Manifest-Signatur ungültig.".into(),
+        };
+    }
+    evaluate_check(current_version, channel, releases, manifest)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -436,6 +520,7 @@ mod tests {
             published_at: String::new(),
             minimum_version: String::new(),
             release_notes: String::new(),
+            signature: String::new(),
         }
     }
 
@@ -574,6 +659,112 @@ mod tests {
         assert_eq!(
             github_releases_url(DEFAULT_GITHUB_OWNER, DEFAULT_GITHUB_REPO),
             "https://api.github.com/repos/CastingCouchApp/CastingCouch/releases?per_page=30"
+        );
+    }
+
+    #[test]
+    fn manifest_asset_name_separates_wpf_and_tauri_channels() {
+        assert_eq!(manifest_asset_name(UpdateStack::Wpf, "windows"), MANIFEST_WPF);
+        assert_eq!(
+            manifest_asset_name(UpdateStack::Tauri, "windows"),
+            MANIFEST_TAURI_WIN
+        );
+        assert_eq!(
+            manifest_asset_name(UpdateStack::Tauri, "macos"),
+            MANIFEST_TAURI_MACOS
+        );
+        assert_eq!(
+            manifest_asset_name(UpdateStack::Tauri, "darwin"),
+            MANIFEST_TAURI_MACOS
+        );
+    }
+
+    #[test]
+    fn tauri_manifest_url_prefers_os_asset() {
+        let releases = fixture_releases();
+        let beta = select_release(&releases, "Beta").expect("beta");
+        assert_eq!(
+            manifest_asset_url(beta),
+            Some("https://example.test/update-manifest.json")
+        );
+        assert_eq!(
+            manifest_asset_url_named(beta, MANIFEST_TAURI_WIN),
+            Some("https://example.test/update-manifest-tauri-win.json")
+        );
+        assert_eq!(
+            manifest_asset_url_named(beta, MANIFEST_TAURI_MACOS),
+            Some("https://example.test/update-manifest-tauri-macos.json")
+        );
+    }
+
+    #[test]
+    fn evaluate_check_accepts_tauri_windows_package() {
+        let releases = fixture_releases();
+        let mut manifest = fixture_manifest();
+        manifest.package_file_name = "CastingCouch-8.0.0-beta2-win-x64-setup.exe".into();
+        manifest.sha256 = "abc".into();
+        let result = evaluate_check("8.0.0-beta.1", "Beta", &releases, &manifest);
+        assert!(result.update_available);
+        let package = result.package.expect("package");
+        assert_eq!(
+            package.package_file_name,
+            "CastingCouch-8.0.0-beta2-win-x64-setup.exe"
+        );
+        assert_eq!(package.download_uri, "https://example.test/setup.exe");
+    }
+
+    #[test]
+    fn evaluate_signed_check_rejects_fixture_signature() {
+        let result = evaluate_signed_check(
+            "8.0.0-beta.1",
+            "Beta",
+            &fixture_releases(),
+            &fixture_manifest(),
+        );
+        assert!(!result.update_available);
+        assert!(result.detail.contains("Signatur"));
+        assert!(result.package.is_none());
+    }
+
+    #[test]
+    fn parses_signature_alias_from_fixture() {
+        let manifest = fixture_manifest();
+        assert_eq!(manifest.signature, "dGVzdA==");
+    }
+
+    #[test]
+    fn evaluate_signed_check_with_key_accepts_valid_signature() {
+        use base64::engine::general_purpose::STANDARD as BASE64;
+        use base64::Engine;
+        use rsa::pkcs1v15::SigningKey;
+        use rsa::pkcs8::EncodePublicKey;
+        use rsa::signature::{SignatureEncoding, Signer};
+        use rsa::RsaPrivateKey;
+        use sha2::Sha256;
+
+        let mut rng = rand::thread_rng();
+        let private_key = RsaPrivateKey::new(&mut rng, 2048).expect("key");
+        let public_pem = private_key
+            .to_public_key()
+            .to_public_key_pem(rsa::pkcs8::LineEnding::LF)
+            .expect("pem");
+        let signing_key = SigningKey::<Sha256>::new(private_key);
+        let mut manifest = fixture_manifest();
+        manifest.package_file_name = "CastingCouch-8.0.0-beta2-win-x64-setup.exe".into();
+        manifest.sha256 = "abc".into();
+        let signature = signing_key.sign(canonical_payload(&manifest).as_bytes());
+        manifest.signature = BASE64.encode(signature.to_bytes());
+        let result = evaluate_signed_check_with_key(
+            "8.0.0-beta.1",
+            "Beta",
+            &fixture_releases(),
+            &manifest,
+            &public_pem,
+        );
+        assert!(result.update_available);
+        assert_eq!(
+            result.package.unwrap().package_file_name,
+            "CastingCouch-8.0.0-beta2-win-x64-setup.exe"
         );
     }
 }

@@ -46,14 +46,15 @@ make publish
 | `make build-nsis` / `make tauri-build-nsis` | Windows-NSIS-Installer (`tauri-app`) |
 | `make build-dmg` / `make tauri-build-dmg` | macOS-DMG (`tauri-app`) |
 | `make tauri-ci` | Overlay-npm + Tauri-Tests |
+| `make tauri-release` | Tauri-Installer nach `artifacts/tauri` (NSIS/MSI auf Windows, DMG auf macOS) |
 | `make format` | C# Autoformat (Whitespace + Style via `.editorconfig`) |
 | `make format-check` | Format prüfen ohne Dateien zu ändern |
 | `make format-analyzers` | Optional Analyzer-Fixes (nicht Teil von `format`) |
 | `make publish` | Self-contained Publish (`win-x64`) inkl. CommandClient + Updater |
-| `make release` | Voller Release-Pfad über `build/Build-Release.ps1` (App + MSI) |
+| `make release` | WPF-Release über `build/Build-Release.ps1` (App + MSI) |
 | `make clean` | Artefakte entfernen |
 
-Ausgabe liegt unter `artifacts/` (u. a. `artifacts/publish/win-x64`, `artifacts/installer`).
+Ausgabe liegt unter `artifacts/` (u. a. `artifacts/publish/win-x64`, `artifacts/installer`, `artifacts/tauri`).
 
 Klassischer Windows-Pfad ohne Make:
 
@@ -81,8 +82,10 @@ Module u. a.: OBS, Twitch, Spotify, Alerts, Overlay, Workflow, StreamDeck.
 
 ## CI & Release
 
-- **Build:** `.github/workflows/build.yml` — bei Push/PR auf `main`/`master` (Windows): restore, build, test, publish
-- **Release:** `.github/workflows/release.yml` — bei Tag `v*` oder manuell: `Build-Release.ps1`, Zip/MSI, GitHub Release
+- **Build:** `.github/workflows/build.yml` — bei Push/PR: .NET (Windows) plus Tauri-Job Win/macOS mit `--bundles none` (kein Installer)
+- **Release:** `.github/workflows/release.yml` — bei Tag `v*` oder manuell: WPF (`Build-Release.ps1`, Zip/MSI, `update-manifest.json`) **und** Tauri (NSIS/MSI auf Windows, DMG auf macOS, `update-manifest-tauri-*.json`). GitHub-Release nach beiden Jobs.
+
+Lokal: `make release` bleibt WPF-only; `make tauri-release` schreibt NSIS/MSI bzw. DMG nach `artifacts/tauri/`. Der volle Dual-Release ist die Tag-Pipeline.
 
 Release-Tag Beispiel:
 

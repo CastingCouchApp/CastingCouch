@@ -20,10 +20,10 @@
 - Versionsquelle ist `Directory.Build.props` (`<Version>`) und `version.json` für Tauri; Changelogs liegen als `docs/changelogs/CHANGELOG-<version>.md`.
 - Tauri-Doku: `docs/architecture/TAURI-MIGRATION.md`; Overlay-HTTP bleibt `127.0.0.1:8765`.
 - Build-Ausgabe unter `artifacts/`; lokale Kurzbefehle über `Makefile` (`restore`/`build`/`test`/`publish`/`ci`/`release`/`format`).
-- CI: `.github/workflows/build.yml` (Push/PR), Release: `.github/workflows/release.yml` (Tags `v*` / manuell) über `build/Build-Release.ps1`.
+- Release: `.github/workflows/release.yml` (Tags `v*` / manuell) — WPF (`Build-Release.ps1`) plus Tauri (`Build-Tauri-Release.ps1`, NSIS/MSI/DMG).
 - Release-Skill canonical: `.agents/skills/release/`; Symlinks unter `.cursor/skills/release` und `.codex/skills/release`.
 - Overlay-Widget-Skill canonical: `.agents/skills/overlay-widget/`; Effect-Skill: `.agents/skills/overlay-effect/`; Extension-Pack-Skill: `.agents/skills/overlay-extension-pack/` (Symlinks unter `.cursor/skills/` und `.codex/skills/`).
 - Canvas Overlay ist TypeScript unter `src/CreatorControlSuite.Modules.Overlay/CanvasOverlay/`; Bundle via esbuild (`npm run build` / MSBuild-Target `BuildCanvasOverlay`); generierte Bundles (`runtime.js`/`editor.js`/…) sind gitignored; Node 18+ nötig für Overlay-Modul-Build; Browser-Dev mit Hot-Reload und Overlay-Server-Simulation via `make canvas-dev` bzw. `npm run dev` (Default-Port 8765).
-- Release-Artefakte: ZIP, MSI und signiertes `update-manifest.json` via `build/New-UpdateArtifacts.ps1`; In-App-Updates über GitHub Releases (`LocalUpdateService`), Public Key unter `src/CreatorControlSuite.App/Keys/`, CI-Secret `UPDATE_SIGNING_KEY_PEM`.
+- Release-Artefakte: WPF-ZIP/MSI und `update-manifest.json` plus Tauri-NSIS/MSI/DMG und `update-manifest-tauri-*.json` via `build/New-UpdateArtifacts.ps1` (`-ManifestFileName`); In-App-Updates über GitHub Releases (WPF `LocalUpdateService`, Tauri `ccs-core::updates`); Public Key unter `src/CreatorControlSuite.App/Keys/`, CI-Secret `UPDATE_SIGNING_KEY_PEM`.
 - Docs-Struktur: `docs/architecture/`, `modules/`, `build/`, `releases/`, `changelogs/`, `licensing/`, `operations/`, `guides/` (Index: `docs/README.md`).
 - `.gitignore` deckt `artifacts/`, Secrets (`.env`, `*.pfx`/`*.pem`, `appsettings.*.Local.json`) und `.cursor/hooks/state/` ab; `Keys/README.txt` und `*-public.pem` bleiben versionierbar, Codex-Skills unter `.codex/skills/` ebenfalls.

@@ -21,6 +21,22 @@
       {
         "name": "CreatorControlSuite-8.0.0-beta2-win-x64.zip",
         "browser_download_url": "https://example.test/pkg.zip"
+      },
+      {
+        "name": "update-manifest-tauri-win.json",
+        "browser_download_url": "https://example.test/update-manifest-tauri-win.json"
+      },
+      {
+        "name": "CastingCouch-8.0.0-beta2-win-x64-setup.exe",
+        "browser_download_url": "https://example.test/setup.exe"
+      },
+      {
+        "name": "update-manifest-tauri-macos.json",
+        "browser_download_url": "https://example.test/update-manifest-tauri-macos.json"
+      },
+      {
+        "name": "CastingCouch-8.0.0-beta2-macos.dmg",
+        "browser_download_url": "https://example.test/app.dmg"
       }
     ]
   },

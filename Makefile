@@ -22,7 +22,7 @@ else
 PWSH ?= pwsh
 endif
 
-.PHONY: help restore canvas canvas-dev build test publish app clean ci release run watch format format-check format-analyzers install dev build-nsis build-dmg tauri-install tauri-dev tauri-build tauri-build-nsis tauri-build-dmg tauri-test tauri-ci
+.PHONY: help restore canvas canvas-dev build test publish app clean ci release run watch format format-check format-analyzers install dev build-nsis build-dmg tauri-install tauri-dev tauri-build tauri-build-nsis tauri-build-dmg tauri-test tauri-ci tauri-release
 
 help:
 	@echo "Targets:"
@@ -38,7 +38,7 @@ help:
 	@echo "  make publish         - App self-contained publishen ($(RID))"
 	@echo "  make app             - restore + test + publish"
 	@echo "  make ci              - restore + build + test"
-	@echo "  make release         - voller Release-Build (App+Client+Updater+MSI, Windows/pwsh)"
+	@echo "  make release         - WPF-Release (App+Client+Updater+MSI, Windows/pwsh)"
 	@echo "  make run             - App bauen, alte Instanz beenden, neu starten (RUN_CONFIG=$(RUN_CONFIG))"
 	@echo "  make watch           - App mit Hot Reload starten (dotnet watch)"
 	@echo "  make clean           - Build-Artefakte löschen"
@@ -53,6 +53,10 @@ help:
 	@echo "  make tauri-build-nsis - Alias für build-nsis"
 	@echo "  make tauri-build-dmg - Alias für build-dmg"
 	@echo "  make tauri-ci        - Overlay-npm + Tauri-Tests"
+	@echo "  make tauri-release   - Tauri-Installer nach artifacts/tauri (NSIS/MSI bzw. DMG)"
+	@echo ""
+	@echo "Tag-Pipeline (.github/workflows/release.yml): WPF-ZIP/MSI + Tauri-NSIS/MSI/DMG + signierte Manifeste"
+	@echo "PR-CI (build.yml tauri): --bundles none, keine Installer"
 	@echo ""
 	@echo "Variablen: CONFIG=$(CONFIG) RUN_CONFIG=$(RUN_CONFIG) RID=$(RID) DOTNET=$(DOTNET) PWSH=$(PWSH)"
 
@@ -127,6 +131,10 @@ tauri-build:
 	$(MAKE) -C $(TAURI_DIR) build
 
 tauri-ci: canvas tauri-test
+
+tauri-release:
+	@command -v $(PWSH) >/dev/null 2>&1 || { echo "$(PWSH) nicht gefunden"; exit 1; }
+	$(PWSH) -NoProfile -ExecutionPolicy Bypass -File ./build/Build-Tauri-Release.ps1
 
 release:
 	@command -v $(PWSH) >/dev/null 2>&1 || { echo "$(PWSH) nicht gefunden"; exit 1; }

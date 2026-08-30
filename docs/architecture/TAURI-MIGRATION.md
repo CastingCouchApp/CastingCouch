@@ -51,8 +51,8 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 | Alerts | Persistenz in `settings.json` (WPF-PascalCase `Alerts.Definitions`); Runtime-Queue → Overlay-Hub `app.alert` |
 | Overlay Event Bridge | Hub-Publish als C#-`OverlayRealtimeEvent` (camelCase `source`/`type`/`at`/`summary`/`data`) |
 | YouTube Music / Workflow / Agent | Sidecar-Fallback + dünne UI `/music` (Spotify + YTM) und `/workflow` (Schritt ausführen) |
-| Updates | SHA-256-Manifest-Verifier (`ccs-core::updates`); GitHub-Check + Download; Apply/Backup/RSA und Release-Skill in Phase 5 |
-| Haupt-UI | Dashboard Live (OBS-Szene, Twitch-Login, Spotify Now Playing; Events + 15s-Fallback), Dienste (Connect/Login/Logout + Fehlerdetail), Musik (`/music`: Spotify always, YTM-Karte nur bei Sidecar healthy), Workflow (`/workflow`: Status + Schritt `workflow.*`), Overlay-Canvas-Tabelle (TanStack Table, Duplicate kopiert Layout, Editor-WebView auf `/editor/{id}`), Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme` CSS-Tokens), Updates (Prüfen/Manifest/Checksum), About (Version, Datenpfad, Overlay-Health) |
+| Updates | SHA-256 + RSA-Manifest-Verifier (`ccs-core::updates`); GitHub-Check + Download; Apply startet NSIS/MSI/DMG nach Backup; Tag-Pipeline in Phase 5 |
+| Haupt-UI | Dashboard Live (OBS-Szene, Twitch-Login, Spotify Now Playing; Events + 15s-Fallback), Dienste (Connect/Login/Logout + Fehlerdetail), Musik (`/music`: Spotify always, YTM-Karte nur bei Sidecar healthy), Workflow (`/workflow`: Status + Schritt `workflow.*`), Overlay-Canvas-Tabelle (TanStack Table, Duplicate kopiert Layout, Editor-WebView auf `/editor/{id}`), Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme` CSS-Tokens), Updates (Prüfen/RSA+SHA-256/Installer), About (Version, Datenpfad, Overlay-Health) |
 
 ## Sidecar (Übergang)
 
@@ -64,8 +64,9 @@ Der Tauri-Host spawnt optional `CreatorControlSuite.CommandClient.exe --sidecar 
 Solange Overlay/OBS/Twitch in Tauri nicht feature-paritätisch sind:
 
 - WPF bleibt in `.github/workflows/build.yml` Job `dotnet` + `package`.
-- Tauri läuft zusätzlich (`tauri` Job, Windows + macOS).
-- Default-Makefile: `make ci` = .NET; `make tauri-ci` = Tauri+Overlay-Frontend.
+- Tauri läuft zusätzlich (`tauri` Job, Windows + macOS, `--bundles none`).
+- Tag-Release (`.github/workflows/release.yml`): WPF-ZIP/MSI **und** Tauri-NSIS/MSI/DMG.
+- Default-Makefile: `make ci` = .NET; `make tauri-ci` = Tauri+Overlay-Frontend; `make tauri-release` = Installer nach `artifacts/tauri`.
 - Nach Parität: WPF-Jobs auf `legacy` setzen, `src/CreatorControlSuite.App` nach `legacy/` verschieben.
 
 ## Versionen

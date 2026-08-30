@@ -29,26 +29,15 @@ env:
   CONFIGURATION: Release
 
 jobs:
-  release:
-    name: Release Build
+  version:
+    name: Resolve version
     runs-on: windows-latest
-    timeout-minutes: 90
-
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay/package-lock.json
 
       - name: Resolve version
         id: version
@@ -72,6 +61,28 @@ jobs:
           "msi=$msi" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Release-Version: $version (Kanal: $channel, MSI: $msi)"
 
+  wpf:
+    name: WPF Release
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay/package-lock.json
+
       - name: Cache NuGet
         uses: actions/cache@v6
         with:
@@ -83,12 +94,12 @@ jobs:
       - name: Build release
         shell: pwsh
         run: |
-          ./build/Build-Release.ps1 -Configuration $env:CONFIGURATION -Version "${{ steps.version.outputs.version }}"
+          ./build/Build-Release.ps1 -Configuration $env:CONFIGURATION -Version "${{ needs.version.outputs.version }}"
 
       - name: Package portable zip
         shell: pwsh
         run: |
-          $version = "${{ steps.version.outputs.version }}"
+          $version = "${{ needs.version.outputs.version }}"
           $publish = "artifacts/publish/win-x64"
           $outDir = "artifacts/release"
           New-Item -ItemType Directory -Path $outDir -Force | Out-Null
@@ -102,8 +113,8 @@ jobs:
         env:
           UPDATE_SIGNING_KEY_PEM: ${{ secrets.UPDATE_SIGNING_KEY_PEM }}
         run: |
-          $version = "${{ steps.version.outputs.version }}"
-          $channel = "${{ steps.version.outputs.channel }}"
+          $version = "${{ needs.version.outputs.version }}"
+          $channel = "${{ needs.version.outputs.channel }}"
           $zip = "artifacts/release/CreatorControlSuite-$version-win-x64.zip"
           $changelog = "docs/changelogs/CHANGELOG-$version.md"
           $notes = ""
@@ -122,34 +133,160 @@ jobs:
         with:
           path: artifacts/publish/win-x64
           format: spdx-json
-          output-file: artifacts/release/CreatorControlSuite-${{ steps.version.outputs.version }}.spdx.json
+          output-file: artifacts/release/CreatorControlSuite-${{ needs.version.outputs.version }}.spdx.json
           upload-artifact: false
 
-      - name: Upload release artifacts
+      - name: Upload WPF artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: release-${{ steps.version.outputs.version }}
+          name: wpf-${{ needs.version.outputs.version }}
           path: |
-            artifacts/publish/win-x64/**
             artifacts/installer/**
             artifacts/release/*
           if-no-files-found: error
           retention-days: 30
 
+  tauri:
+    name: Tauri (${{ matrix.os }})
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tauri-app/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tauri-app/src-tauri
+
+      - name: Rust tests
+        working-directory: tauri-app/src-tauri
+        run: cargo test --workspace
+
+      - name: Build Tauri installers
+        shell: pwsh
+        run: |
+          ./build/Build-Tauri-Release.ps1 -Version "${{ needs.version.outputs.version }}" -SkipSign
+
+      - name: Upload Tauri artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: tauri-${{ runner.os }}-${{ needs.version.outputs.version }}
+          path: artifacts/tauri/*
+          if-no-files-found: error
+          retention-days: 30
+
+  github-release:
+    name: GitHub Release
+    needs: [version, wpf, tauri]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    if: >
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.create_github_release)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: collected
+
+      - name: Manifest smoke test
+        shell: pwsh
+        run: ./build/Test-UpdateManifest.ps1
+
+      - name: Flatten, sign Tauri manifests, stage GitHub files
+        shell: pwsh
+        env:
+          UPDATE_SIGNING_KEY_PEM: ${{ secrets.UPDATE_SIGNING_KEY_PEM }}
+        run: |
+          $version = "${{ needs.version.outputs.version }}"
+          $channel = "${{ needs.version.outputs.channel }}"
+          $out = "artifacts/github"
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          Get-ChildItem -LiteralPath collected -Recurse -File |
+            Where-Object {
+              $_.Extension -in ".zip", ".msi", ".exe", ".dmg", ".json" -or $_.Name -like "*.spdx.json"
+            } |
+            ForEach-Object {
+              Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $out $_.Name) -Force
+              Write-Host "Staged $($_.Name)"
+            }
+
+          $changelog = "docs/changelogs/CHANGELOG-$version.md"
+          $notes = ""
+          if (Test-Path -LiteralPath $changelog) {
+            $notes = Get-Content -LiteralPath $changelog -Raw
+          }
+
+          $setup = Join-Path $out "CastingCouch-$version-win-x64-setup.exe"
+          if (-not (Test-Path -LiteralPath $setup)) {
+            throw "Tauri NSIS-Setup fehlt: $setup"
+          }
+          ./build/New-UpdateArtifacts.ps1 `
+            -PackageZipPath $setup `
+            -Version $version `
+            -Channel $channel `
+            -OutputDirectory $out `
+            -ReleaseNotes $notes `
+            -ManifestFileName "update-manifest-tauri-win.json"
+
+          $dmg = Join-Path $out "CastingCouch-$version-macos.dmg"
+          if (-not (Test-Path -LiteralPath $dmg)) {
+            throw "Tauri DMG fehlt: $dmg"
+          }
+          ./build/New-UpdateArtifacts.ps1 `
+            -PackageZipPath $dmg `
+            -Version $version `
+            -Channel $channel `
+            -OutputDirectory $out `
+            -ReleaseNotes $notes `
+            -ManifestFileName "update-manifest-tauri-macos.json"
+
+          foreach ($required in @(
+            "update-manifest.json",
+            "update-manifest-tauri-win.json",
+            "update-manifest-tauri-macos.json",
+            "CreatorControlSuite-$version-win-x64.zip",
+            "CreatorControlSuite-$version-x64.msi"
+          )) {
+            $path = Join-Path $out $required
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Pflicht-Artefakt fehlt: $required"
+            }
+          }
+
       - name: Create GitHub Release
-        if: >
-          startsWith(github.ref, 'refs/tags/v') ||
-          (github.event_name == 'workflow_dispatch' && inputs.create_github_release)
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
-          name: CastingCouch ${{ steps.version.outputs.version }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', needs.version.outputs.version) }}
+          name: CastingCouch ${{ needs.version.outputs.version }}
           generate_release_notes: true
           draft: ${{ github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v') }}
           files: |
-            artifacts/release/*.zip
-            artifacts/release/update-manifest.json
-            artifacts/release/*.spdx.json
-            artifacts/installer/CreatorControlSuite-${{ steps.version.outputs.version }}-x64.msi
+            artifacts/github/*.zip
+            artifacts/github/*.msi
+            artifacts/github/*.exe
+            artifacts/github/*.dmg
+            artifacts/github/*.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
