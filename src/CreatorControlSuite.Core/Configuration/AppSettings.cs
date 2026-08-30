@@ -24,4 +24,5 @@ public sealed class AppSettings
     public StreamDeckSettings StreamDeck { get; set; } = new();
     public DashboardSettings Dashboard { get; set; } = new();
     public UpdateSettings Updates { get; set; } = new();
+    public SidecarSettings Sidecar { get; set; } = new();
 }

@@ -56,8 +56,8 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 
 ## Sidecar (Übergang)
 
-Komplexe Rest-Module (YouTube Music, Workflow-Designer, Multi-PC-Agent) bleiben in .NET, bis Rust-Parität steht.
-Der Tauri-Host kann später einen lokalen HTTP-Sidecar starten (`CreatorControlSuite.exe` / Agent). Schnittstelle: JSON über Loopback, nicht Named Pipes.
+Komplexe Rest-Module (YouTube Music, Workflow-Schritt, Multi-PC-Agent) bleiben in .NET, bis Rust-Parität steht.
+Der Tauri-Host spawnt optional `CreatorControlSuite.CommandClient.exe --sidecar --port 18765` (Windows, Loopback-JSON), wenn `Sidecar.Enabled` oder `CCS_SIDECAR=1` gesetzt ist und die Binary existiert. macOS überspringt den Spawn. Vertrag: [`TAURI-SIDECAR.md`](TAURI-SIDECAR.md).
 
 ## Cutover (Phase 6, vorbereitet)
 

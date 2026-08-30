@@ -225,4 +225,36 @@ mod tests {
         );
         assert_eq!(disk["Alerts"]["ObsSceneName"], "alerts-live");
     }
+
+    #[tokio::test]
+    async fn sidecar_enabled_roundtrip() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "SchemaVersion": 2,
+                "Sidecar": {
+                    "Enabled": true,
+                    "Port": 18765,
+                    "BinaryPath": "C:/Tools/CommandClient.exe"
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let store = JsonSettingsStore::new(&path);
+        let loaded = store.load().await.unwrap();
+        assert!(loaded.sidecar.enabled);
+        assert_eq!(loaded.sidecar.port, 18765);
+        assert_eq!(loaded.sidecar.binary_path, "C:/Tools/CommandClient.exe");
+
+        store.save(&loaded).await.unwrap();
+        let disk: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(disk["Sidecar"]["Enabled"], true);
+        assert_eq!(disk["Sidecar"]["Port"], 18765);
+        assert_eq!(disk["Sidecar"]["BinaryPath"], "C:/Tools/CommandClient.exe");
+    }
 }

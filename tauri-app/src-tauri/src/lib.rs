@@ -4,6 +4,9 @@ use ccs_core::{
 use ccs_modules::alerts::{AlertDefinition, AlertEngine, AlertRuntime};
 use ccs_modules::obs::{ObsClient, ObsConnectOptions, ObsSceneInfo};
 use ccs_modules::overlay_bridge::OverlayEventBridge;
+use ccs_modules::sidecar::{
+    self, SidecarStartOptions, SidecarSupervisor, YtmNowPlaying, DEFAULT_SIDECAR_PORT,
+};
 use ccs_modules::spotify::{NowPlaying, SpotifyClient, SpotifyConnectOptions};
 use ccs_modules::twitch::{TwitchClient, TwitchConnectOptions};
 use ccs_modules::ServiceStatus;
@@ -11,11 +14,12 @@ use ccs_overlay_server::{OverlayServer, RealtimeHub};
 use ccs_secrets::{KeyringSecretStore, SecretStore};
 use serde::Serialize;
 use serde_json::json;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use tokio::sync::{broadcast, Mutex};
-use tracing::warn;
+use tracing::{error, info, warn};
 
 const OBS_PASSWORD_SECRET_KEY: &str = "obs.password";
 
@@ -24,8 +28,8 @@ pub struct AppState {
     pub settings: Arc<JsonSettingsStore>,
     pub secrets: Arc<KeyringSecretStore>,
     pub hub: Arc<RealtimeHub>,
-    #[allow(dead_code)]
     pub overlay: Mutex<Option<OverlayServer>>,
+    pub sidecar: Arc<SidecarSupervisor>,
     pub obs: Arc<ObsClient>,
     pub twitch: Arc<TwitchClient>,
     pub spotify: Arc<SpotifyClient>,
@@ -127,6 +131,7 @@ async fn service_statuses(state: State<'_, AppState>) -> Result<Vec<ServiceStatu
         state.obs.status().await,
         state.twitch.status().await,
         state.spotify.status().await,
+        state.sidecar.status().await,
     ])
 }
 
@@ -317,6 +322,16 @@ fn overlay_health_url() -> String {
     "http://127.0.0.1:8765/health".into()
 }
 
+#[tauri::command]
+async fn sidecar_status(state: State<'_, AppState>) -> Result<ServiceStatus, String> {
+    Ok(state.sidecar.status().await)
+}
+
+#[tauri::command]
+async fn sidecar_ytm_now_playing(state: State<'_, AppState>) -> Result<YtmNowPlaying, String> {
+    Ok(state.sidecar.ytm_now_playing().await)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -338,19 +353,28 @@ pub fn run() {
             let secrets: Arc<KeyringSecretStore> = Arc::new(KeyringSecretStore::new());
             let secrets_dyn: Arc<dyn SecretStore> = secrets.clone();
 
-            let rt_settings = settings.clone();
-            let rt_paths = paths.clone();
-            let rt_hub = hub.clone();
-            tauri::async_runtime::spawn(async move {
-                match OverlayServer::start(rt_settings, rt_paths, rt_hub, 8765).await {
-                    Ok(server) => {
-                        tracing::info!(port = server.port, "overlay server started");
-                    }
-                    Err(e) => tracing::error!("overlay server failed: {e}"),
-                }
-            });
-
             let loaded = tauri::async_runtime::block_on(settings.load()).unwrap_or_default();
+            let overlay_port = loaded.overlay.web_server_port;
+            let overlay_server = tauri::async_runtime::block_on(OverlayServer::start(
+                settings.clone(),
+                paths.clone(),
+                hub.clone(),
+                overlay_port,
+            ));
+            let overlay_failed = overlay_server.is_err();
+            match &overlay_server {
+                Ok(server) => info!(port = server.port, "overlay server started"),
+                Err(e) => error!("overlay server failed: {e}"),
+            }
+
+            let sidecar = SidecarSupervisor::new_shared();
+            spawn_sidecar(
+                sidecar.clone(),
+                &loaded,
+                overlay_failed,
+                overlay_port,
+            );
+
             let obs = ObsClient::new_shared(loaded.obs.host.clone(), loaded.obs.port);
             let twitch = TwitchClient::new_shared(secrets_dyn.clone());
             let spotify = SpotifyClient::new_shared(secrets_dyn);
@@ -469,7 +493,8 @@ pub fn run() {
                 settings,
                 secrets,
                 hub,
-                overlay: Mutex::new(None),
+                overlay: Mutex::new(overlay_server.ok()),
+                sidecar,
                 obs,
                 twitch,
                 spotify,
@@ -505,9 +530,65 @@ pub fn run() {
             now_playing,
             app_paths,
             overlay_health_url,
+            sidecar_status,
+            sidecar_ytm_now_playing,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn spawn_sidecar(
+    sidecar: Arc<SidecarSupervisor>,
+    loaded: &AppSettings,
+    overlay_failed: bool,
+    overlay_port: u16,
+) {
+    let enabled = loaded.sidecar.enabled || sidecar::env_enabled();
+    let port = if loaded.sidecar.port == 0 {
+        DEFAULT_SIDECAR_PORT
+    } else {
+        loaded.sidecar.port
+    };
+    let explicit = {
+        let trimmed = loaded.sidecar.binary_path.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(PathBuf::from(trimmed))
+        }
+    };
+    let binary = sidecar::resolve_binary(explicit.as_deref(), &sidecar_search_dirs());
+    tauri::async_runtime::spawn(async move {
+        let status = sidecar
+            .start(SidecarStartOptions {
+                enabled,
+                port,
+                overlay_failed,
+                overlay_port,
+                binary,
+                is_windows: cfg!(windows),
+            })
+            .await;
+        match status.state {
+            ccs_modules::ConnectionState::Connected => {
+                info!(detail = %status.detail, "sidecar connected");
+            }
+            ccs_modules::ConnectionState::Error => {
+                warn!(detail = %status.detail, "sidecar not started");
+            }
+            _ => {}
+        }
+    });
+}
+
+fn sidecar_search_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            dirs.push(parent.to_path_buf());
+        }
+    }
+    dirs
 }
 
 fn spawn_live_event_bridges(

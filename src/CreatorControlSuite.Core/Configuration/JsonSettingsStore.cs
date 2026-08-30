@@ -164,6 +164,11 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
         settings.StreamDeck ??= new StreamDeckSettings();
         settings.Dashboard ??= new DashboardSettings();
         settings.Updates ??= new UpdateSettings();
+        settings.Sidecar ??= new SidecarSettings();
+        if (settings.Sidecar.Port is <= 0 or > 65535)
+        {
+            settings.Sidecar.Port = 18765;
+        }
 
         settings.Overlay.EnsureInstancesMigrated();
 

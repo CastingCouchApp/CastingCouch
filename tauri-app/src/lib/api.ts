@@ -107,7 +107,20 @@ function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
         { id: "obs", name: "OBS", state: "disconnected", detail: "" },
         { id: "twitch", name: "Twitch", state: "disconnected", detail: "" },
         { id: "spotify", name: "Spotify", state: "disconnected", detail: "" },
+        { id: "sidecar", name: "Sidecar", state: "disconnected", detail: "" },
       ] as T;
+    case "sidecar_status":
+      return { id: "sidecar", name: "Sidecar", state: "disconnected", detail: "" } as T;
+    case "sidecar_ytm_now_playing":
+      return {
+        provider: "ytmusic",
+        connected: false,
+        isPlaying: false,
+        title: "",
+        artist: "",
+        album: "",
+        statusText: "Nicht verbunden",
+      } as T;
     case "connect_obs":
       return { id: "obs", name: "OBS", state: "connected", detail: "ws://127.0.0.1:4455" } as T;
     case "disconnect_obs":

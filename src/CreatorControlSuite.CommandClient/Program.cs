@@ -2,10 +2,36 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using CreatorControlSuite.Core.Ipc;
+using CreatorControlSuite.Core.Sidecar;
+
+if (SidecarCommandLine.IsSidecarMode(args))
+{
+    int port = SidecarCommandLine.ParsePort(args);
+    await using var sidecar = new SidecarHttpServer(port);
+    try
+    {
+        await sidecar.StartAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine(ex.Message);
+        return 1;
+    }
+
+    var shutdown = new TaskCompletionSource();
+    Console.CancelKeyPress += (_, eventArgs) =>
+    {
+        eventArgs.Cancel = true;
+        shutdown.TrySetResult();
+    };
+    await shutdown.Task;
+    return 0;
+}
 
 if (args.Length == 0)
 {
     Console.Error.WriteLine("Verwendung: CommandClient <command> [key=value]");
+    Console.Error.WriteLine("           CommandClient --sidecar [--port 18765]");
     return 2;
 }
 

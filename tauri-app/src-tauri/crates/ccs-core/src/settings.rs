@@ -40,6 +40,8 @@ pub struct AppSettings {
     pub dashboard: DashboardSettings,
     #[serde(default)]
     pub updates: UpdateSettings,
+    #[serde(default)]
+    pub sidecar: SidecarSettings,
 }
 
 impl Default for AppSettings {
@@ -62,6 +64,7 @@ impl Default for AppSettings {
             stream_deck: StreamDeckSettings::default(),
             dashboard: DashboardSettings::default(),
             updates: UpdateSettings::default(),
+            sidecar: SidecarSettings::default(),
         }
     }
 }
@@ -833,6 +836,31 @@ impl Default for UpdateSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SidecarSettings {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "sidecar_port")]
+    pub port: u16,
+    #[serde(default)]
+    pub binary_path: String,
+}
+
+impl Default for SidecarSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            port: sidecar_port(),
+            binary_path: String::new(),
+        }
+    }
+}
+
+fn sidecar_port() -> u16 {
+    18765
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -865,6 +893,26 @@ mod tests {
         );
         assert_eq!(s.alerts.definitions["Raid"].animation, "Slide");
         assert_eq!(s.alerts.definitions.len(), 6);
+        assert!(!s.sidecar.enabled);
+        assert_eq!(s.sidecar.port, 18765);
+        assert!(s.sidecar.binary_path.is_empty());
+    }
+
+    #[test]
+    fn sidecar_settings_roundtrip_pascal_case() {
+        let json = r#"{
+            "Enabled": true,
+            "Port": 19001,
+            "BinaryPath": "C:/Tools/CommandClient.exe"
+        }"#;
+        let parsed: SidecarSettings = serde_json::from_str(json).unwrap();
+        assert!(parsed.enabled);
+        assert_eq!(parsed.port, 19001);
+        assert!(parsed.binary_path.contains("CommandClient.exe"));
+        let back = serde_json::to_value(&parsed).unwrap();
+        assert_eq!(back["Enabled"], true);
+        assert_eq!(back["Port"], 19001);
+        assert_eq!(back["BinaryPath"], parsed.binary_path);
     }
 
     #[test]
