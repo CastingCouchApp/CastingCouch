@@ -1,5 +1,6 @@
 use crate::ModuleResult;
 use serde::Deserialize;
+use serde_json::{json, Value};
 
 use super::tokens::TwitchHelixUser;
 
@@ -115,6 +116,51 @@ impl TwitchHelixClient {
             .ok_or_else(|| {
                 crate::ModuleError::Message("Twitch Helix /users lieferte keinen Benutzer.".into())
             })
+    }
+
+    pub async fn create_eventsub_subscription(
+        &self,
+        event_type: &str,
+        version: &str,
+        condition: Value,
+        session_id: &str,
+    ) -> ModuleResult<()> {
+        if self.client_id.is_empty() || self.access_token.is_empty() {
+            return Err(crate::ModuleError::Message(
+                "Twitch API ist nicht konfiguriert.".into(),
+            ));
+        }
+
+        let url = format!("{}eventsub/subscriptions", self.helix_base);
+        let body = json!({
+            "type": event_type,
+            "version": version,
+            "condition": condition,
+            "transport": {
+                "method": "websocket",
+                "session_id": session_id
+            }
+        });
+
+        let response = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.access_token))
+            .header("Client-Id", &self.client_id)
+            .json(&body)
+            .send()
+            .await?;
+
+        let status = response.status();
+        let resp_body = response.text().await.unwrap_or_default();
+        if !status.is_success() {
+            let message = parse_helix_error(&resp_body);
+            return Err(crate::ModuleError::Message(format!(
+                "Twitch API {}: {message}",
+                status.as_u16()
+            )));
+        }
+        Ok(())
     }
 }
 

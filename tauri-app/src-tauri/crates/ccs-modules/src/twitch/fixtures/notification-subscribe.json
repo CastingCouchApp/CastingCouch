@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "message_id": "notif-sub-1",
+    "message_type": "notification",
+    "message_timestamp": "2026-07-27T18:00:00.000000Z",
+    "subscription_type": "channel.subscribe",
+    "subscription_version": "1"
+  },
+  "payload": {
+    "subscription": {
+      "id": "sub-subscribe",
+      "status": "enabled",
+      "type": "channel.subscribe",
+      "version": "1"
+    },
+    "event": {
+      "user_id": "2",
+      "user_login": "bob",
+      "user_name": "bob",
+      "broadcaster_user_id": "141981764",
+      "tier": "1000",
+      "is_gift": false
+    }
+  }
+}

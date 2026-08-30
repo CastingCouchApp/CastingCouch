@@ -22,7 +22,7 @@ Verträge: [`TAURI-MIGRATION.md`](TAURI-MIGRATION.md), Sidecar: [`TAURI-SIDECAR.
 | 0 Fundament | `tauri-app/`, CI-Job Win/macOS, Makefile | — |
 | 1 Overlay-Server | Axum + Route-Contract-Tests, Hub | Layout-Store, Assets, Editor-WebView |
 | 2 Core | Settings/Paths/Lock/Logging, Keyring, SHA-256-Verifier | Schema-Migrationen 1:1, Secret-Migration DPAPI→Keyring |
-| 3 Module | OBS Live-Connect; Twitch Device-Code + Helix-Status; Spotify PKCE + currently-playing; Alerts in-memory | EventSub, Alert-Persistenz, Sidecar-Spawn |
+| 3 Module | OBS Live-Connect; Twitch Device-Code + Helix + EventSub; Spotify PKCE + currently-playing; Overlay-Bridge; Alerts in-memory | Alert-Persistenz, Sidecar-Spawn |
 | 4 UI | Shell + Placeholder-Pages | Forms, Table, Live-Events, Themes, restliche Pages |
 | 5 Release | `make build-nsis`/`build-dmg`, `Build-Tauri-Release.ps1`, CI `--bundles none` | Signatur, In-App-Update, `release.yml` |
 | 6 Cutover | vorbereitet | WPF aus Default-Build |

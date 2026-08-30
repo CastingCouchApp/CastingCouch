@@ -1,7 +1,9 @@
+mod eventsub;
 mod helix;
 mod oauth;
 mod tokens;
 
+pub use eventsub::{alert_type_for_event, EventSubClient, TwitchEvent};
 pub use helix::{TwitchHelixClient, HELIX_BASE_URL};
 pub use oauth::{
     TwitchOAuthClient, OAUTH_DEVICE_URL, OAUTH_TOKEN_URL, OAUTH_VALIDATE_URL,
@@ -12,7 +14,7 @@ use crate::{ConnectionState, ModuleError, ModuleResult, ServiceStatus};
 use ccs_secrets::{SecretStore, TWITCH_TOKEN_SET_KEY};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio::task::JoinHandle;
 
 pub fn eventsub_url() -> &'static str {
@@ -67,30 +69,55 @@ pub struct TwitchConnectOptions {
     pub client_id: String,
     pub channel_name: String,
     pub scopes: Vec<String>,
+    pub enable_event_sub: bool,
 }
 
-/// Twitch Device-Code OAuth + Helix user status (EventSub later).
+/// Twitch Device-Code OAuth + Helix user status + EventSub.
 pub struct TwitchClient {
     status: RwLock<ServiceStatus>,
     tokens: TwitchTokenRepository,
     oauth: TwitchOAuthClient,
     helix_base: String,
+    eventsub_url: Option<String>,
+    eventsub: Arc<EventSubClient>,
+    events_tx: broadcast::Sender<TwitchEvent>,
+    status_tx: broadcast::Sender<ServiceStatus>,
     current_user: RwLock<Option<TwitchHelixUser>>,
     login_task: Mutex<Option<JoinHandle<()>>>,
     cancel_login: AtomicBool,
 }
 
 impl TwitchClient {
-    pub fn new(secrets: Arc<dyn SecretStore>) -> Self {
+    fn inner(
+        secrets: Arc<dyn SecretStore>,
+        oauth: TwitchOAuthClient,
+        helix_base: String,
+        eventsub_url: Option<String>,
+    ) -> Self {
+        let (events_tx, _) = broadcast::channel(64);
+        let (status_tx, _) = broadcast::channel(16);
         Self {
             status: RwLock::new(ServiceStatus::disconnected("twitch", "Twitch")),
             tokens: TwitchTokenRepository::new(secrets),
-            oauth: TwitchOAuthClient::new(),
-            helix_base: HELIX_BASE_URL.into(),
+            oauth,
+            helix_base,
+            eventsub_url,
+            eventsub: EventSubClient::new_shared(),
+            events_tx,
+            status_tx,
             current_user: RwLock::new(None),
             login_task: Mutex::new(None),
             cancel_login: AtomicBool::new(false),
         }
+    }
+
+    pub fn new(secrets: Arc<dyn SecretStore>) -> Self {
+        Self::inner(
+            secrets,
+            TwitchOAuthClient::new(),
+            HELIX_BASE_URL.into(),
+            Some(eventsub_url().into()),
+        )
     }
 
     pub fn new_shared(secrets: Arc<dyn SecretStore>) -> Arc<Self> {
@@ -102,19 +129,33 @@ impl TwitchClient {
         oauth: TwitchOAuthClient,
         helix_base: impl Into<String>,
     ) -> Self {
-        Self {
-            status: RwLock::new(ServiceStatus::disconnected("twitch", "Twitch")),
-            tokens: TwitchTokenRepository::new(secrets),
+        Self::inner(secrets, oauth, helix_base.into(), None)
+    }
+
+    pub fn with_http_and_eventsub(
+        secrets: Arc<dyn SecretStore>,
+        oauth: TwitchOAuthClient,
+        helix_base: impl Into<String>,
+        eventsub_url: impl Into<String>,
+    ) -> Self {
+        Self::inner(
+            secrets,
             oauth,
-            helix_base: helix_base.into(),
-            current_user: RwLock::new(None),
-            login_task: Mutex::new(None),
-            cancel_login: AtomicBool::new(false),
-        }
+            helix_base.into(),
+            Some(eventsub_url.into()),
+        )
     }
 
     pub async fn status(&self) -> ServiceStatus {
         self.status.read().await.clone()
+    }
+
+    pub fn subscribe_status(&self) -> broadcast::Receiver<ServiceStatus> {
+        self.status_tx.subscribe()
+    }
+
+    pub fn subscribe_events(&self) -> broadcast::Receiver<TwitchEvent> {
+        self.events_tx.subscribe()
     }
 
     pub async fn current_user(&self) -> Option<TwitchHelixUser> {
@@ -126,9 +167,13 @@ impl TwitchClient {
     }
 
     async fn set_status(&self, state: ConnectionState, detail: impl Into<String>) {
-        let mut s = self.status.write().await;
-        s.state = state;
-        s.detail = detail.into();
+        let snapshot = {
+            let mut s = self.status.write().await;
+            s.state = state;
+            s.detail = detail.into();
+            s.clone()
+        };
+        let _ = self.status_tx.send(snapshot);
     }
 
     /// Start device-code login. Returns immediately with connecting + user_code.
@@ -158,6 +203,7 @@ impl TwitchClient {
             client_id: options.client_id.clone(),
             channel_name: options.channel_name.clone(),
             scopes: options.scopes.clone(),
+            enable_event_sub: options.enable_event_sub,
         };
         let handle = tokio::spawn(async move {
             match this
@@ -192,6 +238,7 @@ impl TwitchClient {
     /// Validate token + Helix /users. Sets connected with display name.
     pub async fn connect(&self, options: &TwitchConnectOptions) -> ModuleResult<ServiceStatus> {
         TwitchOAuthClient::validate_client_id(&options.client_id)?;
+        self.eventsub.stop().await;
         self.set_status(ConnectionState::Connecting, "Verbinde …")
             .await;
 
@@ -205,11 +252,11 @@ impl TwitchClient {
         );
         let user = helix.get_current_user().await?;
 
-        let display = if options.channel_name.trim().is_empty() {
-            user.display_name.clone()
+        let (display, broadcaster_id) = if options.channel_name.trim().is_empty() {
+            (user.display_name.clone(), user.id.clone())
         } else {
             match helix.get_user_by_login(&options.channel_name).await? {
-                Some(channel) => channel.display_name,
+                Some(channel) => (channel.display_name, channel.id),
                 None => {
                     let msg = "Der konfigurierte Twitch-Kanal wurde nicht gefunden.";
                     self.set_status(ConnectionState::Error, msg).await;
@@ -217,6 +264,25 @@ impl TwitchClient {
                 }
             }
         };
+
+        if options.enable_event_sub {
+            if let Some(url) = &self.eventsub_url {
+                if let Err(e) = self
+                    .eventsub
+                    .connect(
+                        url,
+                        helix.clone(),
+                        &broadcaster_id,
+                        &user.id,
+                        self.events_tx.clone(),
+                    )
+                    .await
+                {
+                    self.set_status(ConnectionState::Error, e.to_string()).await;
+                    return Err(e);
+                }
+            }
+        }
 
         *self.current_user.write().await = Some(user);
         let detail = format!("{display} ({})", validation.login);
@@ -227,6 +293,7 @@ impl TwitchClient {
     /// Delete token from secret store and clear connection state.
     pub async fn logout(&self) -> ModuleResult<ServiceStatus> {
         self.cancel_pending_login().await;
+        self.eventsub.stop().await;
         self.tokens.delete()?;
         *self.current_user.write().await = None;
         self.set_status(ConnectionState::Disconnected, "").await;
@@ -516,6 +583,7 @@ mod tests {
                 client_id: contract_client_id(),
                 channel_name: String::new(),
                 scopes: vec!["user:read:chat".into()],
+                enable_event_sub: false,
             })
             .await
             .unwrap();
@@ -568,6 +636,7 @@ mod tests {
                 client_id: contract_client_id(),
                 channel_name: String::new(),
                 scopes: vec!["user:read:chat".into()],
+                enable_event_sub: false,
             })
             .await
             .unwrap();

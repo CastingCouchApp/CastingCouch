@@ -1,0 +1,8 @@
+{
+  "metadata": {
+    "message_id": "keepalive-1",
+    "message_type": "session_keepalive",
+    "message_timestamp": "2026-07-27T18:00:10.000000Z"
+  },
+  "payload": {}
+}

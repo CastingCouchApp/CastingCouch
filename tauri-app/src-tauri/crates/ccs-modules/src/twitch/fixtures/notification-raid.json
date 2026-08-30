@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "message_id": "notif-raid-1",
+    "message_type": "notification",
+    "message_timestamp": "2026-07-27T18:00:00.000000Z",
+    "subscription_type": "channel.raid",
+    "subscription_version": "1"
+  },
+  "payload": {
+    "subscription": {
+      "id": "sub-raid",
+      "status": "enabled",
+      "type": "channel.raid",
+      "version": "1"
+    },
+    "event": {
+      "from_broadcaster_user_id": "9",
+      "from_broadcaster_user_login": "raider",
+      "from_broadcaster_user_name": "Raider",
+      "to_broadcaster_user_id": "141981764",
+      "viewers": 42
+    }
+  }
+}

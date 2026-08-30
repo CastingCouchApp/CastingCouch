@@ -9,12 +9,14 @@ import {
   type ObsSceneInfo,
   type ServiceStatus,
 } from "../lib/api";
+import { useLiveServiceStatuses } from "../lib/live-events";
 
 export const Route = createFileRoute("/services")({
   component: ServicesPage,
 });
 
 function ServicesPage() {
+  useLiveServiceStatuses();
   const services = useQuery({
     queryKey: queryKeys.services,
     queryFn: () => tauriInvoke<ServiceStatus[]>("service_statuses"),

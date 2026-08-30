@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "message_id": "reconnect-1",
+    "message_type": "session_reconnect",
+    "message_timestamp": "2026-07-27T18:01:00.000000Z"
+  },
+  "payload": {
+    "session": {
+      "id": "session-contract-id",
+      "status": "reconnecting",
+      "keepalive_timeout_seconds": 10,
+      "reconnect_url": "wss://eventsub.wss.twitch.tv/ws?session=reconnect-token",
+      "connected_at": "2026-07-27T18:00:00.000000Z"
+    }
+  }
+}

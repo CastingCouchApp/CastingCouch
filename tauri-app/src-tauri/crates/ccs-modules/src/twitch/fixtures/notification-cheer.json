@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "message_id": "notif-cheer-1",
+    "message_type": "notification",
+    "message_timestamp": "2026-07-27T18:00:00.000000Z",
+    "subscription_type": "channel.cheer",
+    "subscription_version": "1"
+  },
+  "payload": {
+    "subscription": {
+      "id": "sub-cheer",
+      "status": "enabled",
+      "type": "channel.cheer",
+      "version": "1"
+    },
+    "event": {
+      "user_id": "3",
+      "user_login": "carol",
+      "user_name": "carol",
+      "broadcaster_user_id": "141981764",
+      "bits": 500,
+      "message": "cheer500"
+    }
+  }
+}

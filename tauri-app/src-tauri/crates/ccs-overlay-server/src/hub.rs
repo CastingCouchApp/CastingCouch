@@ -28,6 +28,10 @@ impl RealtimeHub {
         self.clients.load(Ordering::Relaxed)
     }
 
+    pub fn subscribe(&self) -> broadcast::Receiver<String> {
+        self.tx.subscribe()
+    }
+
     pub fn publish(&self, event: &Value) {
         let _ = self.tx.send(event.to_string());
     }
@@ -92,5 +96,30 @@ impl RealtimeHub {
 impl Default for RealtimeHub {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn publish_delivers_json_to_subscribers() {
+        let hub = RealtimeHub::new();
+        let mut rx = hub.subscribe();
+        hub.publish(&json!({
+            "source": "twitch",
+            "type": "channel.follow",
+            "summary": "Neuer Follower",
+            "data": { "user": "alice" }
+        }));
+
+        let payload = rx.recv().await.expect("published frame");
+        let root: Value = serde_json::from_str(&payload).unwrap();
+        assert_eq!(root["source"], "twitch");
+        assert_eq!(root["type"], "channel.follow");
+        assert_eq!(root["summary"], "Neuer Follower");
+        assert_eq!(root["data"]["user"], "alice");
     }
 }

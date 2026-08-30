@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "message_id": "revocation-1",
+    "message_type": "revocation",
+    "message_timestamp": "2026-07-27T18:02:00.000000Z",
+    "subscription_type": "channel.follow",
+    "subscription_version": "2"
+  },
+  "payload": {
+    "subscription": {
+      "id": "sub-follow",
+      "status": "authorization_revoked",
+      "type": "channel.follow",
+      "version": "2"
+    }
+  }
+}

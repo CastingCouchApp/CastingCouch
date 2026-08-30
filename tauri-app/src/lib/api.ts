@@ -145,3 +145,29 @@ function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
       return undefined as T;
   }
 }
+
+export function mergeServiceStatus(
+  list: ServiceStatus[] | undefined,
+  next: ServiceStatus,
+): ServiceStatus[] {
+  const current = list ?? [];
+  const index = current.findIndex((item) => item.id === next.id);
+  if (index < 0) {
+    return [...current, next];
+  }
+  const copy = current.slice();
+  copy[index] = next;
+  return copy;
+}
+
+export async function listenServiceStatus(
+  onStatus: (status: ServiceStatus) => void,
+): Promise<() => void> {
+  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    const { listen } = await import("@tauri-apps/api/event");
+    return listen<ServiceStatus>("service-status", (event) => {
+      onStatus(event.payload);
+    });
+  }
+  return () => {};
+}

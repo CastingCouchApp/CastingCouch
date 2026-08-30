@@ -27,7 +27,7 @@ version.json           Versionsquelle für Tauri (`8.0.0-beta1` ↔ `8.0.0-beta.
 | Kanal | Zweck |
 |-------|--------|
 | Tauri `invoke` | Settings, Canvas-CRUD, Service-Status, Alerts |
-| Tauri Events | später: Live-Push (Twitch, Music) → Query-Cache |
+| Tauri Events | `service-status`, `twitch-event`, `obs-scene` → React Query Cache |
 | HTTP/WS `127.0.0.1:8765` | Overlay Editor/View/Solo, identische Routen wie Kestrel |
 
 ### Overlay-Routen (kompatibel)
@@ -46,10 +46,10 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 | Overlay-Server (HTTP/WS) | Rust, Route-Contract-Tests |
 | Settings/Paths/Lock/Logging | `ccs-core` |
 | Secrets | `ccs-secrets` (keyring) |
-| OBS WebSocket 5 Live-Connect | `ccs-modules` (Auth, GetSceneList/SetScene, Reconnect; Events → 3.4) |
-| Twitch / Spotify | Twitch Device-Code + Helix-Status (Keyring `twitch.tokenSet`); Spotify PKCE-OAuth + currently-playing (Keyring `spotify.tokenSet`); EventSub folgt |
-| Alerts | In-Memory Engine |
-| Overlay Event Bridge | Hub-Publish |
+| OBS WebSocket 5 Live-Connect | `ccs-modules` (Auth, GetSceneList/SetScene, Reconnect, `CurrentProgramSceneChanged` → Overlay-Hub) |
+| Twitch / Spotify | Twitch Device-Code + Helix-Status + EventSub-WS (follow/sub/cheer/…); Spotify PKCE-OAuth + currently-playing |
+| Alerts | In-Memory Engine (`enqueue_matching` auf EventSub-Typ / C#-Kurzname) |
+| Overlay Event Bridge | Hub-Publish als C#-`OverlayRealtimeEvent` (camelCase `source`/`type`/`at`/`summary`/`data`) |
 | YouTube Music / Workflow / Agent | Sidecar-Fallback (siehe unten) |
 | Updates | SHA-256-Manifest-Verifier (`ccs-core::updates`) |
 | Haupt-UI | Dashboard, Dienste, Overlay-Tabelle, Alerts, Settings, Updates, About |

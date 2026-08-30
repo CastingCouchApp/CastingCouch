@@ -5,8 +5,9 @@ pub use protocol::{ObsSceneInfo, DEFAULT_EVENT_SUBSCRIPTIONS, SUPPORTED_RPC_VERS
 use crate::{ConnectionState, ModuleError, ModuleResult, ServiceStatus};
 use futures_util::{SinkExt, StreamExt};
 use protocol::{
-    build_request, create_identify, decode_envelope, parse_scene_list, ObsHello, ObsIdentified,
-    ObsRequestResponse, ObsRequestStatus, EVENT_OP, HELLO_OP, IDENTIFIED_OP, REQUEST_RESPONSE_OP,
+    build_request, create_identify, decode_envelope, parse_current_program_scene, parse_scene_list,
+    ObsHello, ObsIdentified, ObsRequestResponse, ObsRequestStatus, EVENT_OP, HELLO_OP,
+    IDENTIFIED_OP, REQUEST_RESPONSE_OP,
 };
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -14,7 +15,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
-use tokio::sync::{oneshot, Mutex, RwLock};
+use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::{
     connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream,
@@ -58,10 +59,14 @@ pub struct ObsClient {
     options: RwLock<Option<ObsConnectOptions>>,
     want_connected: AtomicBool,
     allow_reconnect: AtomicBool,
+    scene_tx: broadcast::Sender<String>,
+    status_tx: broadcast::Sender<ServiceStatus>,
 }
 
 impl ObsClient {
     pub fn new(host: impl Into<String>, port: u16) -> Self {
+        let (scene_tx, _) = broadcast::channel(16);
+        let (status_tx, _) = broadcast::channel(16);
         Self {
             status: RwLock::new(ServiceStatus::disconnected("obs", "OBS")),
             session: Mutex::new(None),
@@ -76,6 +81,8 @@ impl ObsClient {
             })),
             want_connected: AtomicBool::new(false),
             allow_reconnect: AtomicBool::new(true),
+            scene_tx,
+            status_tx,
         }
     }
 
@@ -85,6 +92,19 @@ impl ObsClient {
 
     pub async fn status(&self) -> ServiceStatus {
         self.status.read().await.clone()
+    }
+
+    pub fn subscribe_status(&self) -> broadcast::Receiver<ServiceStatus> {
+        self.status_tx.subscribe()
+    }
+
+    pub fn subscribe_scenes(&self) -> broadcast::Receiver<String> {
+        self.scene_tx.subscribe()
+    }
+
+    async fn publish_status(&self) {
+        let snapshot = self.status.read().await.clone();
+        let _ = self.status_tx.send(snapshot);
     }
 
     /// Identify handshake payload for OBS WebSocket 5.x (no auth). API compat.
@@ -153,6 +173,7 @@ impl ObsClient {
             s.state = ConnectionState::Connecting;
             s.detail = options.websocket_url();
         }
+        self.publish_status().await;
 
         let url = options.websocket_url();
         let (ws, _) = match tokio::time::timeout(CONNECT_TIMEOUT, connect_async(&url)).await {
@@ -262,6 +283,7 @@ impl ObsClient {
             s.state = ConnectionState::Connected;
             s.detail = url;
         }
+        self.publish_status().await;
 
         self.spawn_receive(reader).await;
         Ok(())
@@ -315,7 +337,9 @@ impl ObsClient {
                 }
             }
             EVENT_OP => {
-                // Phase 3.4 — ignore events for now.
+                if let Some(scene) = parse_current_program_scene(&envelope.data) {
+                    let _ = self.scene_tx.send(scene);
+                }
             }
             _ => {}
         }
@@ -337,6 +361,8 @@ impl ObsClient {
                 s.state = ConnectionState::Disconnected;
                 s.detail.clear();
             }
+            drop(s);
+            self.publish_status().await;
             return;
         }
 
@@ -347,6 +373,7 @@ impl ObsClient {
                 s.detail = "OBS-Verbindung unterbrochen".into();
             }
         }
+        self.publish_status().await;
 
         if self.allow_reconnect.load(Ordering::SeqCst) {
             self.schedule_reconnect();
@@ -380,6 +407,7 @@ impl ObsClient {
                 s.state = ConnectionState::Connecting;
                 s.detail = format!("Reconnect {}", options.websocket_url());
             }
+            this.publish_status().await;
             if let Err(e) = this.handshake_and_start(options).await {
                 warn!(error = %e, "OBS reconnect failed");
                 if this.allow_reconnect.load(Ordering::SeqCst)
@@ -421,6 +449,8 @@ impl ObsClient {
             let mut s = self.status.write().await;
             s.state = ConnectionState::Disconnected;
             s.detail.clear();
+            drop(s);
+            self.publish_status().await;
         }
     }
 
@@ -501,9 +531,12 @@ impl ObsClient {
     }
 
     async fn set_error(&self, detail: String) {
-        let mut s = self.status.write().await;
-        s.state = ConnectionState::Error;
-        s.detail = detail;
+        {
+            let mut s = self.status.write().await;
+            s.state = ConnectionState::Error;
+            s.detail = detail;
+        }
+        self.publish_status().await;
     }
 }
 

@@ -2,12 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "../components/ui/card";
 import { queryKeys, tauriInvoke, type ServiceStatus } from "../lib/api";
+import { useLiveServiceStatuses } from "../lib/live-events";
 
 export const Route = createFileRoute("/")({
   component: DashboardPage,
 });
 
 function DashboardPage() {
+  useLiveServiceStatuses();
   const services = useQuery({
     queryKey: queryKeys.services,
     queryFn: () => tauriInvoke<ServiceStatus[]>("service_statuses"),

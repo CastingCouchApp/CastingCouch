@@ -10,10 +10,11 @@ use ccs_modules::ServiceStatus;
 use ccs_overlay_server::{OverlayServer, RealtimeHub};
 use ccs_secrets::{KeyringSecretStore, SecretStore};
 use serde::Serialize;
+use serde_json::json;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
-use tokio::sync::Mutex;
+use tokio::sync::{broadcast, Mutex};
 use tracing::warn;
 
 const OBS_PASSWORD_SECRET_KEY: &str = "obs.password";
@@ -28,8 +29,7 @@ pub struct AppState {
     pub obs: Arc<ObsClient>,
     pub twitch: Arc<TwitchClient>,
     pub spotify: Arc<SpotifyClient>,
-    pub alerts: AlertEngine,
-    #[allow(dead_code)]
+    pub alerts: Arc<AlertEngine>,
     pub bridge: OverlayEventBridge,
     _lock: Option<SingleInstanceLock>,
 }
@@ -207,6 +207,7 @@ async fn twitch_login(
         client_id: settings.twitch.client_id.clone(),
         channel_name: settings.twitch.channel_name.clone(),
         scopes: settings.twitch.scopes.clone(),
+        enable_event_sub: settings.twitch.enable_event_sub,
     };
     let (status, verification_uri) = state
         .twitch
@@ -327,6 +328,15 @@ pub fn run() {
             let obs = ObsClient::new_shared(loaded.obs.host.clone(), loaded.obs.port);
             let twitch = TwitchClient::new_shared(secrets_dyn.clone());
             let spotify = SpotifyClient::new_shared(secrets_dyn);
+            let alerts = Arc::new(AlertEngine::new());
+
+            spawn_live_event_bridges(
+                app.handle().clone(),
+                obs.clone(),
+                twitch.clone(),
+                bridge.clone(),
+                alerts.clone(),
+            );
 
             if loaded.obs.auto_connect {
                 let obs_auto = Arc::clone(&obs);
@@ -373,17 +383,20 @@ pub fn run() {
                 let client_id = loaded.twitch.client_id.clone();
                 let channel_name = loaded.twitch.channel_name.clone();
                 let scopes = loaded.twitch.scopes.clone();
+                let enable_event_sub = loaded.twitch.enable_event_sub;
                 tauri::async_runtime::spawn(async move {
                     let options = match settings_auto.load().await {
                         Ok(s) => TwitchConnectOptions {
                             client_id: s.twitch.client_id,
                             channel_name: s.twitch.channel_name,
                             scopes: s.twitch.scopes,
+                            enable_event_sub: s.twitch.enable_event_sub,
                         },
                         Err(_) => TwitchConnectOptions {
                             client_id,
                             channel_name,
                             scopes,
+                            enable_event_sub,
                         },
                     };
                     if let Err(e) = twitch_auto.connect(&options).await {
@@ -434,7 +447,7 @@ pub fn run() {
                 obs,
                 twitch,
                 spotify,
-                alerts: AlertEngine::new(),
+                alerts,
                 bridge,
                 _lock: lock,
             });
@@ -466,4 +479,74 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn spawn_live_event_bridges(
+    app: AppHandle,
+    obs: Arc<ObsClient>,
+    twitch: Arc<TwitchClient>,
+    bridge: OverlayEventBridge,
+    alerts: Arc<AlertEngine>,
+) {
+    let mut twitch_events = twitch.subscribe_events();
+    let twitch_status = twitch.subscribe_status();
+    let obs_status = obs.subscribe_status();
+    let mut obs_scenes = obs.subscribe_scenes();
+
+    let app_twitch_evt = app.clone();
+    let bridge_twitch = bridge.clone();
+    let alerts_twitch = alerts.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match twitch_events.recv().await {
+                Ok(evt) => {
+                    let overlay = bridge_twitch.from_twitch(
+                        &evt.event_type,
+                        &evt.summary,
+                        evt.received_at,
+                        evt.data.clone(),
+                    );
+                    alerts_twitch
+                        .enqueue_matching(&evt.event_type, overlay.clone())
+                        .await;
+                    let _ = app_twitch_evt.emit("twitch-event", &overlay);
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
+
+    spawn_status_forward(app.clone(), twitch_status);
+    spawn_status_forward(app.clone(), obs_status);
+
+    let app_obs = app;
+    let bridge_obs = bridge;
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match obs_scenes.recv().await {
+                Ok(scene) => {
+                    let overlay = bridge_obs.app_obs_scene(&scene);
+                    let _ = app_obs.emit("obs-scene", json!({ "scene": scene }));
+                    let _ = overlay;
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
+}
+
+fn spawn_status_forward(app: AppHandle, mut rx: broadcast::Receiver<ServiceStatus>) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match rx.recv().await {
+                Ok(status) => {
+                    let _ = app.emit("service-status", &status);
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
 }

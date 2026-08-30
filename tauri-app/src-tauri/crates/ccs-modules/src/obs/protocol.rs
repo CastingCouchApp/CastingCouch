@@ -183,6 +183,23 @@ pub fn parse_scene_list(response_data: &Value) -> Vec<ObsSceneInfo> {
     scenes
 }
 
+pub fn parse_current_program_scene(data: &Value) -> Option<String> {
+    let event_type = data.get("eventType")?.as_str()?;
+    if event_type != "CurrentProgramSceneChanged" {
+        return None;
+    }
+    let name = data
+        .get("eventData")?
+        .get("sceneName")?
+        .as_str()?
+        .trim();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,6 +301,14 @@ mod tests {
         assert_eq!(scenes[0].name, "Start");
         assert_eq!(scenes[1].name, "Live");
         assert_eq!(scenes[2].index, 2);
+    }
+
+    #[test]
+    fn current_program_scene_changed_extracts_scene_name() {
+        let envelope = decode_envelope(&fixture("current-program-scene-changed.json")).unwrap();
+        assert_eq!(envelope.op, EVENT_OP);
+        let scene = parse_current_program_scene(&envelope.data).unwrap();
+        assert_eq!(scene, "Game");
     }
 
     #[test]
