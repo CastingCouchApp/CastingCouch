@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import {
+  FALLBACK_POLL_MS,
   queryClient,
   queryKeys,
   tauriInvoke,
@@ -31,7 +32,7 @@ function ServicesPage() {
   const services = useQuery({
     queryKey: queryKeys.services,
     queryFn: () => tauriInvoke<ServiceStatus[]>("service_statuses"),
-    refetchInterval: 4000,
+    refetchInterval: FALLBACK_POLL_MS,
   });
   const settings = useQuery({
     queryKey: queryKeys.settings,

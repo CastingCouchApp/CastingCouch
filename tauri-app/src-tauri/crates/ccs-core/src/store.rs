@@ -62,10 +62,9 @@ impl JsonSettingsStore {
         clone.overlay.ensure_canvases_migrated();
         let json = serde_json::to_vec_pretty(&clone)?;
 
-        let tmp = self.path.with_extension(format!(
-            "{}.tmp",
-            uuid::Uuid::new_v4().simple()
-        ));
+        let tmp = self
+            .path
+            .with_extension(format!("{}.tmp", uuid::Uuid::new_v4().simple()));
         {
             let mut file = fs::File::create(&tmp).await?;
             file.write_all(&json).await?;
@@ -84,9 +83,11 @@ impl JsonSettingsStore {
 
 /// Sequential schema migrations, matching the WPF SettingsSchemaMigrator.
 pub fn migrate(root: &mut Value) -> Result<bool, SettingsError> {
-    let obj = root
-        .as_object_mut()
-        .ok_or_else(|| SettingsError::Json(serde_json::Error::io(std::io::Error::other("root is not an object"))))?;
+    let obj = root.as_object_mut().ok_or_else(|| {
+        SettingsError::Json(serde_json::Error::io(std::io::Error::other(
+            "root is not an object",
+        )))
+    })?;
 
     let version = obj
         .get("SchemaVersion")
@@ -106,10 +107,7 @@ pub fn migrate(root: &mut Value) -> Result<bool, SettingsError> {
         migrate_v1_to_v2(obj);
         changed = true;
     }
-    obj.insert(
-        "SchemaVersion".into(),
-        Value::from(CURRENT_SCHEMA_VERSION),
-    );
+    obj.insert("SchemaVersion".into(), Value::from(CURRENT_SCHEMA_VERSION));
     Ok(changed)
 }
 

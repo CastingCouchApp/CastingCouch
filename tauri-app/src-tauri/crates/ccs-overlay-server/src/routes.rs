@@ -23,10 +23,19 @@ pub fn router(state: OverlayState) -> Router {
         .route("/canvas/{*asset_path}", get(canvas_asset))
         .route("/editor", get(|| html_kind("editor")))
         .route("/view", get(|| html_kind("view")))
-        .route("/editor/{instance_id}", get(|Path(_id): Path<String>| html_kind("editor")))
-        .route("/view/{instance_id}", get(|Path(_id): Path<String>| html_kind("view")))
+        .route(
+            "/editor/{instance_id}",
+            get(|Path(_id): Path<String>| html_kind("editor")),
+        )
+        .route(
+            "/view/{instance_id}",
+            get(|Path(_id): Path<String>| html_kind("view")),
+        )
         .route("/w/{ty}", get(|Path(_ty): Path<String>| html_kind("solo")))
-        .route("/w/shape/{*shape_id}", get(|Path(_id): Path<String>| html_kind("solo")))
+        .route(
+            "/w/shape/{*shape_id}",
+            get(|Path(_id): Path<String>| html_kind("solo")),
+        )
         .route("/extensions", get(list_extensions))
         .route("/extensions/install", post(install_extension))
         .route("/extensions/{pack_id}", delete(delete_extension))
@@ -69,9 +78,9 @@ async fn health(State(state): State<OverlayState>) -> impl IntoResponse {
     let widgets: Vec<Value> = assets::list_widget_types()
         .into_iter()
         .map(|t| json!({ "type": t, "url": settings.overlay.widget_url(&t) }))
-        .chain(assets::list_shape_types().into_iter().map(|t| {
-            json!({ "type": t, "url": settings.overlay.widget_url(&format!("shape/{t}")) })
-        }))
+        .chain(assets::list_shape_types().into_iter().map(
+            |t| json!({ "type": t, "url": settings.overlay.widget_url(&format!("shape/{t}")) }),
+        ))
         .collect();
 
     Json(json!({
@@ -88,10 +97,7 @@ async fn health(State(state): State<OverlayState>) -> impl IntoResponse {
     }))
 }
 
-async fn ws_upgrade(
-    ws: WebSocketUpgrade,
-    State(state): State<OverlayState>,
-) -> impl IntoResponse {
+async fn ws_upgrade(ws: WebSocketUpgrade, State(state): State<OverlayState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| async move {
         state.hub.handle_socket(socket).await;
     })
@@ -104,7 +110,10 @@ async fn get_layout(
     let store = OverlayLayoutStore::new(&state.paths.overlay_layouts);
     match store.read_bytes(&instance_id).await {
         Ok(Some(bytes)) => (
-            [(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))],
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )],
             bytes,
         )
             .into_response(),
@@ -138,7 +147,10 @@ async fn put_layout(
 async fn overlay_data(State(state): State<OverlayState>) -> Response {
     match fs::read(&state.overlay_data).await {
         Ok(bytes) => (
-            [(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))],
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )],
             bytes,
         )
             .into_response(),
@@ -280,7 +292,10 @@ async fn chat_history(State(state): State<OverlayState>) -> Response {
     let path = state.paths.overlay_root.join("chat-history.json");
     match fs::read(&path).await {
         Ok(bytes) => (
-            [(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))],
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )],
             bytes,
         )
             .into_response(),
@@ -346,7 +361,12 @@ mod tests {
         let state = test_state().await;
         let app = router_for_tests(state);
         let res = app
-            .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
@@ -374,7 +394,12 @@ mod tests {
         assert_eq!(put.status(), StatusCode::NO_CONTENT);
 
         let get = router_for_tests(state)
-            .oneshot(Request::builder().uri("/layout/default").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/layout/default")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(get.status(), StatusCode::OK);
@@ -386,12 +411,7 @@ mod tests {
         for uri in ["/editor/my-canvas", "/view/my-canvas"] {
             let app = router_for_tests(state.clone());
             let res = app
-                .oneshot(
-                    Request::builder()
-                        .uri(uri)
-                        .body(Body::empty())
-                        .unwrap(),
-                )
+                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
                 .await
                 .unwrap();
             assert_eq!(res.status(), StatusCode::OK, "{uri}");

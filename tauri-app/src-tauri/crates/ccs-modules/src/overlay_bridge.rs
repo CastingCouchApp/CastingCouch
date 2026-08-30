@@ -63,11 +63,7 @@ impl OverlayEventBridge {
         data: BTreeMap<String, String>,
     ) -> Value {
         self.publish(&OverlayRealtimeEvent::new(
-            "twitch",
-            event_type,
-            at,
-            summary,
-            data,
+            "twitch", event_type, at, summary, data,
         ))
     }
 
@@ -146,7 +142,11 @@ impl OverlayEventBridge {
     }
 }
 
-fn app_event(event_type: &str, summary: &str, data: BTreeMap<String, String>) -> OverlayRealtimeEvent {
+fn app_event(
+    event_type: &str,
+    summary: &str,
+    data: BTreeMap<String, String>,
+) -> OverlayRealtimeEvent {
     OverlayRealtimeEvent::new("app", event_type, Utc::now(), summary, data)
 }
 
@@ -203,19 +203,17 @@ mod tests {
         data.insert("user_name".into(), "alice".into());
         data.insert("user_id".into(), "1".into());
 
-        let published = bridge.from_twitch(
-            "channel.follow",
-            "alice folgt jetzt",
-            at(),
-            data,
-        );
+        let published = bridge.from_twitch("channel.follow", "alice folgt jetzt", at(), data);
 
         assert_eq!(published["source"], "twitch");
         assert_eq!(published["type"], "channel.follow");
         assert_eq!(published["summary"], "alice folgt jetzt");
         assert_eq!(published["data"]["user_name"], "alice");
         assert_eq!(published["data"]["user_id"], "1");
-        assert!(published["at"].as_str().unwrap().starts_with("2026-07-27T18:00:00"));
+        assert!(published["at"]
+            .as_str()
+            .unwrap()
+            .starts_with("2026-07-27T18:00:00"));
 
         let frame = rx.recv().await.expect("hub frame");
         let root: Value = serde_json::from_str(&frame).unwrap();

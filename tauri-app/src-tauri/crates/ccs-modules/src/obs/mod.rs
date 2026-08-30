@@ -5,9 +5,9 @@ pub use protocol::{ObsSceneInfo, DEFAULT_EVENT_SUBSCRIPTIONS, SUPPORTED_RPC_VERS
 use crate::{ConnectionState, ModuleError, ModuleResult, ServiceStatus};
 use futures_util::{SinkExt, StreamExt};
 use protocol::{
-    build_request, create_identify, decode_envelope, parse_current_program_scene, parse_scene_list,
-    ObsHello, ObsIdentified, ObsRequestResponse, ObsRequestStatus, EVENT_OP, HELLO_OP,
-    IDENTIFIED_OP, REQUEST_RESPONSE_OP,
+    build_request, create_identify, decode_envelope, parse_current_program_scene,
+    parse_current_program_scene_name, parse_scene_list, ObsHello, ObsIdentified,
+    ObsRequestResponse, ObsRequestStatus, EVENT_OP, HELLO_OP, IDENTIFIED_OP, REQUEST_RESPONSE_OP,
 };
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -17,9 +17,7 @@ use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio::task::JoinHandle;
-use tokio_tungstenite::{
-    connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream,
-};
+use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, warn};
 
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -61,6 +59,7 @@ pub struct ObsClient {
     allow_reconnect: AtomicBool,
     scene_tx: broadcast::Sender<String>,
     status_tx: broadcast::Sender<ServiceStatus>,
+    current_scene: RwLock<Option<String>>,
 }
 
 impl ObsClient {
@@ -83,6 +82,7 @@ impl ObsClient {
             allow_reconnect: AtomicBool::new(true),
             scene_tx,
             status_tx,
+            current_scene: RwLock::new(None),
         }
     }
 
@@ -100,6 +100,23 @@ impl ObsClient {
 
     pub fn subscribe_scenes(&self) -> broadcast::Receiver<String> {
         self.scene_tx.subscribe()
+    }
+
+    pub async fn current_program_scene(&self) -> Option<String> {
+        self.current_scene.read().await.clone()
+    }
+
+    async fn publish_scene(&self, scene: String) {
+        *self.current_scene.write().await = Some(scene.clone());
+        let _ = self.scene_tx.send(scene);
+    }
+
+    async fn clear_current_scene(&self) {
+        *self.current_scene.write().await = None;
+    }
+
+    async fn refresh_current_scene(&self) {
+        let _ = self.get_scene_list().await;
     }
 
     async fn publish_status(&self) {
@@ -164,10 +181,7 @@ impl ObsClient {
         .await
     }
 
-    async fn handshake_and_start(
-        self: &Arc<Self>,
-        options: ObsConnectOptions,
-    ) -> ModuleResult<()> {
+    async fn handshake_and_start(self: &Arc<Self>, options: ObsConnectOptions) -> ModuleResult<()> {
         {
             let mut s = self.status.write().await;
             s.state = ConnectionState::Connecting;
@@ -286,6 +300,7 @@ impl ObsClient {
         self.publish_status().await;
 
         self.spawn_receive(reader).await;
+        self.refresh_current_scene().await;
         Ok(())
     }
 
@@ -338,7 +353,7 @@ impl ObsClient {
             }
             EVENT_OP => {
                 if let Some(scene) = parse_current_program_scene(&envelope.data) {
-                    let _ = self.scene_tx.send(scene);
+                    self.publish_scene(scene).await;
                 }
             }
             _ => {}
@@ -362,6 +377,7 @@ impl ObsClient {
                 s.detail.clear();
             }
             drop(s);
+            self.clear_current_scene().await;
             self.publish_status().await;
             return;
         }
@@ -373,6 +389,7 @@ impl ObsClient {
                 s.detail = "OBS-Verbindung unterbrochen".into();
             }
         }
+        self.clear_current_scene().await;
         self.publish_status().await;
 
         if self.allow_reconnect.load(Ordering::SeqCst) {
@@ -450,7 +467,10 @@ impl ObsClient {
             s.state = ConnectionState::Disconnected;
             s.detail.clear();
             drop(s);
+            self.clear_current_scene().await;
             self.publish_status().await;
+        } else {
+            self.clear_current_scene().await;
         }
     }
 
@@ -462,6 +482,9 @@ impl ObsClient {
 
     pub async fn get_scene_list(&self) -> ModuleResult<Vec<ObsSceneInfo>> {
         let data = self.send_request("GetSceneList", None).await?;
+        if let Some(scene) = parse_current_program_scene_name(&data) {
+            self.publish_scene(scene).await;
+        }
         Ok(parse_scene_list(&data))
     }
 
@@ -475,6 +498,7 @@ impl ObsClient {
                 Some(json!({ "sceneName": scene })),
             )
             .await?;
+        self.publish_scene(scene.to_string()).await;
         Ok(())
     }
 
@@ -622,10 +646,16 @@ mod tests {
             let identify: Value = serde_json::from_str(&identify_msg).unwrap();
             assert_eq!(identify["op"], 1);
             assert_eq!(identify["d"]["rpcVersion"], 1);
-            assert_eq!(identify["d"]["eventSubscriptions"], DEFAULT_EVENT_SUBSCRIPTIONS);
+            assert_eq!(
+                identify["d"]["eventSubscriptions"],
+                DEFAULT_EVENT_SUBSCRIPTIONS
+            );
             if with_auth {
-                let expected =
-                    create_authentication_response(&password, "contract-salt", "contract-challenge");
+                let expected = create_authentication_response(
+                    &password,
+                    "contract-salt",
+                    "contract-challenge",
+                );
                 assert_eq!(identify["d"]["authentication"], expected);
             } else {
                 assert!(identify["d"].get("authentication").is_none());
@@ -724,16 +754,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn connect_publishes_current_program_scene() {
+        let (port, server) = start_mock_server(false, "", false).await;
+        let client = ObsClient::new_shared("127.0.0.1", port);
+        client
+            .connect_simple("127.0.0.1", port, None, false)
+            .await
+            .unwrap();
+        for _ in 0..20 {
+            if client.current_program_scene().await.is_some() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        assert_eq!(
+            client.current_program_scene().await.as_deref(),
+            Some("Live")
+        );
+        client.disconnect().await.unwrap();
+        assert!(client.current_program_scene().await.is_none());
+        let _ = server.await;
+    }
+
+    #[tokio::test]
     async fn connect_handshake_with_auth() {
         let (port, server) = start_mock_server(true, "contract-password", false).await;
         let client = ObsClient::new_shared("127.0.0.1", port);
         client
-            .connect_simple(
-                "127.0.0.1",
-                port,
-                Some("contract-password".into()),
-                false,
-            )
+            .connect_simple("127.0.0.1", port, Some("contract-password".into()), false)
             .await
             .unwrap();
         assert_eq!(client.status().await.state, ConnectionState::Connected);

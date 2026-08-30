@@ -90,7 +90,9 @@ impl OverlayLayoutStore {
     }
 
     fn layout_path(&self, instance_id: &str) -> Result<PathBuf, LayoutError> {
-        Ok(self.root.join(format!("{}.json", normalize_instance_id(instance_id)?)))
+        Ok(self
+            .root
+            .join(format!("{}.json", normalize_instance_id(instance_id)?)))
     }
 }
 

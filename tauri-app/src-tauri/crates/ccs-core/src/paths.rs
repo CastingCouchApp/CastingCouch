@@ -68,6 +68,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let paths = AppPaths::from_root(dir.path().join(APP_FOLDER));
         assert_eq!(paths.settings_file.file_name().unwrap(), SETTINGS_FILE);
-        assert!(paths.overlay_layouts.ends_with("Overlay/layouts") || paths.overlay_layouts.ends_with(r"Overlay\layouts"));
+        assert!(
+            paths.overlay_layouts.ends_with("Overlay/layouts")
+                || paths.overlay_layouts.ends_with(r"Overlay\layouts")
+        );
     }
 }

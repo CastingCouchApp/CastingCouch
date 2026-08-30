@@ -275,7 +275,10 @@ impl AlertEngine {
             apply_dto(&dto, &key)
         };
         stored.r#type = key.clone();
-        settings.alerts.definitions.insert(key.clone(), stored.clone());
+        settings
+            .alerts
+            .definitions
+            .insert(key.clone(), stored.clone());
         self.inner.store.save(&settings).await?;
         Ok(to_dto(&key, &stored))
     }
@@ -361,9 +364,11 @@ impl AlertEngine {
             return Ok(0);
         }
         let mapped = alert_type_for_event(event_type);
-        let matched = settings.alerts.definitions.iter().find(|(key, def)| {
-            def.enabled && definition_matches(key, def, event_type, mapped)
-        });
+        let matched = settings
+            .alerts
+            .definitions
+            .iter()
+            .find(|(key, def)| def.enabled && definition_matches(key, def, event_type, mapped));
         let Some((key, def)) = matched else {
             return Ok(0);
         };
@@ -492,10 +497,7 @@ fn find_definition_key(
     })
 }
 
-fn create_unique_type(
-    defs: &HashMap<String, AlertDefinitionSettings>,
-    base_type: &str,
-) -> String {
+fn create_unique_type(defs: &HashMap<String, AlertDefinitionSettings>, base_type: &str) -> String {
     let cleaned = if base_type.trim().is_empty() {
         "Eigener Alert".to_string()
     } else {
@@ -590,10 +592,7 @@ mod tests {
         let (engine, store, _rx) = engine_with(settings);
         let created = engine.upsert(AlertDefinition::default()).await.unwrap();
         assert_eq!(created.type_name, "Eigener Alert 2");
-        assert_eq!(
-            created.text_template,
-            "{user} hat einen Alert ausgelöst!"
-        );
+        assert_eq!(created.text_template, "{user} hat einen Alert ausgelöst!");
         assert_eq!(store.save_count(), 1);
         assert!(store
             .snapshot()
@@ -739,10 +738,8 @@ mod tests {
         assert_eq!(created.type_name, "Eigener Alert");
         drop(engine);
 
-        let reloaded = AlertEngine::from_store(
-            store,
-            OverlayEventBridge::new(Arc::new(RealtimeHub::new())),
-        );
+        let reloaded =
+            AlertEngine::from_store(store, OverlayEventBridge::new(Arc::new(RealtimeHub::new())));
         let types: Vec<_> = reloaded
             .list()
             .await
@@ -757,9 +754,24 @@ mod tests {
     #[tokio::test]
     async fn enqueue_matching_publishes_app_alert() {
         let mut settings = default_settings();
-        settings.alerts.definitions.get_mut("Follow").unwrap().duration_seconds = 0;
-        settings.alerts.definitions.get_mut("Cheer").unwrap().enabled = false;
-        settings.alerts.definitions.get_mut("Cheer").unwrap().duration_seconds = 0;
+        settings
+            .alerts
+            .definitions
+            .get_mut("Follow")
+            .unwrap()
+            .duration_seconds = 0;
+        settings
+            .alerts
+            .definitions
+            .get_mut("Cheer")
+            .unwrap()
+            .enabled = false;
+        settings
+            .alerts
+            .definitions
+            .get_mut("Cheer")
+            .unwrap()
+            .duration_seconds = 0;
         let (engine, _store, mut rx) = engine_with(settings);
 
         let mut data = BTreeMap::new();
@@ -788,7 +800,12 @@ mod tests {
     async fn enqueue_matching_skips_when_runtime_disabled() {
         let mut settings = default_settings();
         settings.alerts.enabled = false;
-        settings.alerts.definitions.get_mut("Follow").unwrap().duration_seconds = 0;
+        settings
+            .alerts
+            .definitions
+            .get_mut("Follow")
+            .unwrap()
+            .duration_seconds = 0;
         let (engine, _store, mut rx) = engine_with(settings);
         let n = engine
             .enqueue_matching("channel.follow", &BTreeMap::new())
@@ -800,7 +817,12 @@ mod tests {
     #[tokio::test]
     async fn test_alert_enqueues_overlay_payload() {
         let mut settings = default_settings();
-        settings.alerts.definitions.get_mut("Follow").unwrap().duration_seconds = 0;
+        settings
+            .alerts
+            .definitions
+            .get_mut("Follow")
+            .unwrap()
+            .duration_seconds = 0;
         let (engine, _store, mut rx) = engine_with(settings);
         assert_eq!(engine.test_alert("Follow", "Tester").await.unwrap(), 1);
         let frame = tokio::time::timeout(Duration::from_secs(1), rx.recv())

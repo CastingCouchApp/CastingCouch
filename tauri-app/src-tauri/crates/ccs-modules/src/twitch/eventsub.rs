@@ -10,9 +10,7 @@ use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, Mutex};
 use tokio::task::JoinHandle;
-use tokio_tungstenite::{
-    connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream,
-};
+use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::warn;
 
 use super::helix::TwitchHelixClient;
@@ -62,9 +60,7 @@ pub fn parse_eventsub_message_at(
                 .pointer("/payload/session/id")
                 .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty())
-                .ok_or_else(|| {
-                    ModuleError::Message("Twitch EventSub Session-ID fehlt.".into())
-                })?;
+                .ok_or_else(|| ModuleError::Message("Twitch EventSub Session-ID fehlt.".into()))?;
             Ok(EventSubMessage::Welcome {
                 session_id: session_id.to_string(),
             })
@@ -241,35 +237,33 @@ Bitte Twitch erneut autorisieren und die benötigten Berechtigungen bestätigen.
                 match read_text_frame_timeout(&mut reader, "notification", Duration::from_secs(30))
                     .await
                 {
-                    Ok(text) => {
-                        match parse_eventsub_message(&text) {
-                            Ok(EventSubMessage::Keepalive) | Ok(EventSubMessage::Unknown) => {}
-                            Ok(EventSubMessage::Notification(evt)) => {
-                                let _ = events_tx.send(evt);
-                            }
-                            Ok(EventSubMessage::Revocation) => {
-                                let _ = events_tx.send(TwitchEvent {
-                                    event_type: "revocation".into(),
-                                    summary: create_summary("revocation", &BTreeMap::new()),
-                                    received_at: Utc::now(),
-                                    data: BTreeMap::new(),
-                                });
-                            }
-                            Ok(EventSubMessage::Reconnect { reconnect_url }) => {
-                                match reconnect(&mut reader, &this, &reconnect_url).await {
-                                    Ok(()) => {}
-                                    Err(e) => {
-                                        warn!(error = %e, "EventSub reconnect failed");
-                                        break;
-                                    }
+                    Ok(text) => match parse_eventsub_message(&text) {
+                        Ok(EventSubMessage::Keepalive) | Ok(EventSubMessage::Unknown) => {}
+                        Ok(EventSubMessage::Notification(evt)) => {
+                            let _ = events_tx.send(evt);
+                        }
+                        Ok(EventSubMessage::Revocation) => {
+                            let _ = events_tx.send(TwitchEvent {
+                                event_type: "revocation".into(),
+                                summary: create_summary("revocation", &BTreeMap::new()),
+                                received_at: Utc::now(),
+                                data: BTreeMap::new(),
+                            });
+                        }
+                        Ok(EventSubMessage::Reconnect { reconnect_url }) => {
+                            match reconnect(&mut reader, &this, &reconnect_url).await {
+                                Ok(()) => {}
+                                Err(e) => {
+                                    warn!(error = %e, "EventSub reconnect failed");
+                                    break;
                                 }
                             }
-                            Ok(EventSubMessage::Welcome { .. }) => {}
-                            Err(e) => {
-                                warn!(error = %e, "EventSub parse error");
-                            }
                         }
-                    }
+                        Ok(EventSubMessage::Welcome { .. }) => {}
+                        Err(e) => {
+                            warn!(error = %e, "EventSub parse error");
+                        }
+                    },
                     Err(_) => break,
                 }
             }

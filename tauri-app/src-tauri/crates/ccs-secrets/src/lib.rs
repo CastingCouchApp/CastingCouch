@@ -114,7 +114,9 @@ mod tests {
     #[test]
     fn memory_store_roundtrip_and_delete() {
         let store = MemorySecretStore::new();
-        store.set(TWITCH_TOKEN_SET_KEY, r#"{"AccessToken":"a"}"#).unwrap();
+        store
+            .set(TWITCH_TOKEN_SET_KEY, r#"{"AccessToken":"a"}"#)
+            .unwrap();
         assert_eq!(
             store.get(TWITCH_TOKEN_SET_KEY).unwrap().as_deref(),
             Some(r#"{"AccessToken":"a"}"#)

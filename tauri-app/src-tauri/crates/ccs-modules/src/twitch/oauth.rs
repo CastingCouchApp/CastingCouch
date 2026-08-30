@@ -76,10 +76,7 @@ impl TwitchOAuthClient {
         let response = self
             .http
             .post(&self.device_url)
-            .form(&[
-                ("client_id", client_id),
-                ("scopes", scopes_joined.as_str()),
-            ])
+            .form(&[("client_id", client_id), ("scopes", scopes_joined.as_str())])
             .send()
             .await?;
         let status = response.status();
@@ -120,10 +117,7 @@ impl TwitchOAuthClient {
                     ("client_id", client_id),
                     ("scopes", ""),
                     ("device_code", device.device_code.as_str()),
-                    (
-                        "grant_type",
-                        "urn:ietf:params:oauth:grant-type:device_code",
-                    ),
+                    ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
                 ])
                 .send()
                 .await?;
@@ -213,9 +207,8 @@ impl TwitchOAuthClient {
 }
 
 fn parse_token_response(body: &str) -> ModuleResult<TwitchTokenSet> {
-    let token: TokenResponse = serde_json::from_str(body).map_err(|e| {
-        crate::ModuleError::Message(format!("Twitch Token-Antwort ungültig: {e}"))
-    })?;
+    let token: TokenResponse = serde_json::from_str(body)
+        .map_err(|e| crate::ModuleError::Message(format!("Twitch Token-Antwort ungültig: {e}")))?;
     Ok(TwitchTokenSet::from_oauth(
         token.access_token,
         token.refresh_token,

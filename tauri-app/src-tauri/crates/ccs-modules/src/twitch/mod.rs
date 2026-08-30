@@ -5,9 +5,7 @@ mod tokens;
 
 pub use eventsub::{alert_type_for_event, EventSubClient, TwitchEvent};
 pub use helix::{TwitchHelixClient, HELIX_BASE_URL};
-pub use oauth::{
-    TwitchOAuthClient, OAUTH_DEVICE_URL, OAUTH_TOKEN_URL, OAUTH_VALIDATE_URL,
-};
+pub use oauth::{TwitchOAuthClient, OAUTH_DEVICE_URL, OAUTH_TOKEN_URL, OAUTH_VALIDATE_URL};
 pub use tokens::{TwitchDeviceCode, TwitchHelixUser, TwitchTokenSet, TwitchTokenValidation};
 
 use crate::{ConnectionState, ModuleError, ModuleResult, ServiceStatus};
@@ -138,12 +136,7 @@ impl TwitchClient {
         helix_base: impl Into<String>,
         eventsub_url: impl Into<String>,
     ) -> Self {
-        Self::inner(
-            secrets,
-            oauth,
-            helix_base.into(),
-            Some(eventsub_url.into()),
-        )
+        Self::inner(secrets, oauth, helix_base.into(), Some(eventsub_url.into()))
     }
 
     pub async fn status(&self) -> ServiceStatus {
@@ -308,9 +301,10 @@ impl TwitchClient {
     }
 
     async fn get_valid_token(&self, client_id: &str) -> ModuleResult<TwitchTokenSet> {
-        let mut token = self.tokens.load()?.ok_or_else(|| {
-            ModuleError::Message("Twitch ist noch nicht autorisiert.".into())
-        })?;
+        let mut token = self
+            .tokens
+            .load()?
+            .ok_or_else(|| ModuleError::Message("Twitch ist noch nicht autorisiert.".into()))?;
 
         match self.oauth.validate(&token.access_token).await {
             Ok(v) if v.expires_in_seconds > 300 => return Ok(token),
@@ -374,7 +368,10 @@ mod tests {
     #[test]
     fn helix_users_url_encodes_login() {
         let url = helix_users_url("broadcaster / id");
-        assert!(url.contains("login=broadcaster+%2F+id") || url.contains("login=broadcaster%20%2F%20id"));
+        assert!(
+            url.contains("login=broadcaster+%2F+id")
+                || url.contains("login=broadcaster%20%2F%20id")
+        );
         assert!(url.starts_with("https://api.twitch.tv/helix/users?login="));
     }
 

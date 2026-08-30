@@ -85,9 +85,8 @@ pub fn decode_envelope(payload: &str) -> Result<ObsReceivedEnvelope, ModuleError
             "OBS-Nachricht überschreitet das Größenlimit.".into(),
         ));
     }
-    let root: Value = serde_json::from_str(payload).map_err(|e| {
-        ModuleError::Message(format!("Ungültige OBS-WebSocket-Nachricht: {e}"))
-    })?;
+    let root: Value = serde_json::from_str(payload)
+        .map_err(|e| ModuleError::Message(format!("Ungültige OBS-WebSocket-Nachricht: {e}")))?;
     decode_envelope_value(&root)
 }
 
@@ -183,16 +182,24 @@ pub fn parse_scene_list(response_data: &Value) -> Vec<ObsSceneInfo> {
     scenes
 }
 
+pub fn parse_current_program_scene_name(response_data: &Value) -> Option<String> {
+    let name = response_data
+        .get("currentProgramSceneName")?
+        .as_str()?
+        .trim();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name.to_string())
+    }
+}
+
 pub fn parse_current_program_scene(data: &Value) -> Option<String> {
     let event_type = data.get("eventType")?.as_str()?;
     if event_type != "CurrentProgramSceneChanged" {
         return None;
     }
-    let name = data
-        .get("eventData")?
-        .get("sceneName")?
-        .as_str()?
-        .trim();
+    let name = data.get("eventData")?.get("sceneName")?.as_str()?.trim();
     if name.is_empty() {
         None
     } else {
@@ -301,6 +308,10 @@ mod tests {
         assert_eq!(scenes[0].name, "Start");
         assert_eq!(scenes[1].name, "Live");
         assert_eq!(scenes[2].index, 2);
+        assert_eq!(
+            parse_current_program_scene_name(&response.response_data).as_deref(),
+            Some("Live")
+        );
     }
 
     #[test]

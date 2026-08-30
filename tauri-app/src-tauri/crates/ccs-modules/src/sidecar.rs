@@ -489,10 +489,7 @@ mod tests {
     #[test]
     fn url_contract_trims_trailing_slash() {
         let config = SidecarConfig::from_base_url("http://127.0.0.1:18765/");
-        assert_eq!(
-            config.health_url(),
-            "http://127.0.0.1:18765/sidecar/health"
-        );
+        assert_eq!(config.health_url(), "http://127.0.0.1:18765/sidecar/health");
         assert_eq!(
             config.workflow_run_url(),
             "http://127.0.0.1:18765/sidecar/workflow/run"
@@ -507,10 +504,7 @@ mod tests {
     fn from_port_sets_loopback_base() {
         let config = SidecarConfig::from_port(19001);
         assert_eq!(config.base_url, "http://127.0.0.1:19001");
-        assert_eq!(
-            config.health_url(),
-            "http://127.0.0.1:19001/sidecar/health"
-        );
+        assert_eq!(config.health_url(), "http://127.0.0.1:19001/sidecar/health");
     }
 
     #[test]
@@ -595,9 +589,7 @@ mod tests {
 
     #[tokio::test]
     async fn port_is_occupied_when_listener_bound() {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         assert!(port_is_occupied(port).await);
         drop(listener);
@@ -716,9 +708,7 @@ mod tests {
 
     #[tokio::test]
     async fn supervisor_sidecar_port_busy_is_error() {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let supervisor = SidecarSupervisor::new();
         let status = supervisor

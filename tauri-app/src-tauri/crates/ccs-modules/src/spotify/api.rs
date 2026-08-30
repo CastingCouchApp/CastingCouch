@@ -46,9 +46,8 @@ impl SpotifyApiClient {
         if !status.is_success() {
             return Err(map_api_error(status.as_u16(), &body));
         }
-        let parsed: MeResponse = serde_json::from_str(&body).map_err(|e| {
-            ModuleError::Message(format!("Spotify-Benutzerantwort ungültig: {e}"))
-        })?;
+        let parsed: MeResponse = serde_json::from_str(&body)
+            .map_err(|e| ModuleError::Message(format!("Spotify-Benutzerantwort ungültig: {e}")))?;
         let display_name = if parsed.display_name.trim().is_empty() {
             parsed.id.clone()
         } else {
@@ -89,9 +88,8 @@ impl Default for SpotifyApiClient {
 }
 
 pub fn map_currently_playing(body: &str) -> ModuleResult<NowPlaying> {
-    let parsed: CurrentlyPlayingResponse = serde_json::from_str(body).map_err(|e| {
-        ModuleError::Message(format!("Spotify currently-playing ungültig: {e}"))
-    })?;
+    let parsed: CurrentlyPlayingResponse = serde_json::from_str(body)
+        .map_err(|e| ModuleError::Message(format!("Spotify currently-playing ungültig: {e}")))?;
     let item = match parsed.item {
         Some(item)
             if parsed.currently_playing_type.eq_ignore_ascii_case("track")
@@ -100,12 +98,14 @@ pub fn map_currently_playing(body: &str) -> ModuleResult<NowPlaying> {
         {
             item
         }
-        _ => return Ok(NowPlaying {
-            title: String::new(),
-            artist: String::new(),
-            album: String::new(),
-            is_playing: parsed.is_playing,
-        }),
+        _ => {
+            return Ok(NowPlaying {
+                title: String::new(),
+                artist: String::new(),
+                album: String::new(),
+                is_playing: parsed.is_playing,
+            })
+        }
     };
     let artist = item
         .artists

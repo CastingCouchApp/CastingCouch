@@ -12,17 +12,11 @@ pub enum CanvasError {
 }
 
 pub trait CanvasSettingsPersist: Send + Sync {
-    fn save(
-        &self,
-        settings: &AppSettings,
-    ) -> impl Future<Output = Result<(), CanvasError>> + Send;
+    fn save(&self, settings: &AppSettings) -> impl Future<Output = Result<(), CanvasError>> + Send;
 }
 
 impl CanvasSettingsPersist for JsonSettingsStore {
-    fn save(
-        &self,
-        settings: &AppSettings,
-    ) -> impl Future<Output = Result<(), CanvasError>> + Send {
+    fn save(&self, settings: &AppSettings) -> impl Future<Output = Result<(), CanvasError>> + Send {
         let settings = settings.clone();
         async move {
             JsonSettingsStore::save(self, &settings)
@@ -51,7 +45,11 @@ pub trait OverlayLayoutOps: Send + Sync {
 impl OverlayLayoutOps for OverlayLayoutStore {
     fn load(&self, id: &str) -> impl Future<Output = Result<Value, CanvasError>> + Send {
         let id = id.to_string();
-        async move { OverlayLayoutStore::load(self, &id).await.map_err(Into::into) }
+        async move {
+            OverlayLayoutStore::load(self, &id)
+                .await
+                .map_err(Into::into)
+        }
     }
 
     fn save(
@@ -454,11 +452,10 @@ mod tests {
     #[tokio::test]
     async fn delete_persists_metadata_before_removing_layout() {
         let layouts = TrackingLayoutStore::new();
-        layouts
-            .layouts
-            .lock()
-            .unwrap()
-            .insert("second".into(), OverlayLayoutStore::default_layout("Second"));
+        layouts.layouts.lock().unwrap().insert(
+            "second".into(),
+            OverlayLayoutStore::default_layout("Second"),
+        );
         let persist = FakePersist::ok();
         let mut settings = two_canvas_settings();
         let service = OverlayCanvasService::new(&layouts);
@@ -468,11 +465,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(!settings
-            .overlay
-            .canvases
-            .iter()
-            .any(|c| c.id == "second"));
+        assert!(!settings.overlay.canvases.iter().any(|c| c.id == "second"));
         assert_eq!(settings.overlay.selected_canvas_id, "first");
         let mut events = persist.events();
         events.extend(layouts.events());
@@ -510,11 +503,7 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.to_string().contains("disk full"));
-        assert!(!settings
-            .overlay
-            .canvases
-            .iter()
-            .any(|c| c.id == "rollback"));
+        assert!(!settings.overlay.canvases.iter().any(|c| c.id == "rollback"));
         assert_eq!(settings.overlay.selected_canvas_id, original_selected);
         assert!(!layouts.exists("rollback"));
     }

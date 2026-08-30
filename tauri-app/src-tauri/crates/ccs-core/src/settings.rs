@@ -734,10 +734,7 @@ impl OverlaySettings {
             }
         }
 
-        format!(
-            "{slug}-{}",
-            &uuid::Uuid::new_v4().simple().to_string()[..8]
-        )
+        format!("{slug}-{}", &uuid::Uuid::new_v4().simple().to_string()[..8])
     }
 
     pub fn selected_canvas(&self) -> OverlayCanvasSettings {
@@ -929,10 +926,7 @@ mod tests {
         assert_eq!(s.obs.port, 4455);
         assert_eq!(s.overlay.web_server_port, 8765);
         assert_eq!(s.general.theme_id, "classic");
-        assert_eq!(
-            s.spotify.redirect_uri,
-            "http://127.0.0.1:43821/callback/"
-        );
+        assert_eq!(s.spotify.redirect_uri, "http://127.0.0.1:43821/callback/");
         assert!(s.spotify.auto_connect);
         assert!(s
             .spotify

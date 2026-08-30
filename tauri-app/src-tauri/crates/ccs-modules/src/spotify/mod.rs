@@ -10,7 +10,7 @@ use crate::{ConnectionState, ModuleError, ModuleResult, ServiceStatus};
 use ccs_secrets::{SecretStore, SPOTIFY_TOKEN_SET_KEY};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio::task::JoinHandle;
 
 use api::SpotifyApiClient as Api;
@@ -72,10 +72,22 @@ pub struct SpotifyClient {
     poll_task: Mutex<Option<JoinHandle<()>>>,
     cancel_login: AtomicBool,
     poll_enabled: AtomicBool,
+    status_tx: broadcast::Sender<ServiceStatus>,
+    now_playing_tx: broadcast::Sender<NowPlaying>,
 }
 
 impl SpotifyClient {
+    fn channels() -> (
+        broadcast::Sender<ServiceStatus>,
+        broadcast::Sender<NowPlaying>,
+    ) {
+        let (status_tx, _) = broadcast::channel(16);
+        let (now_playing_tx, _) = broadcast::channel(16);
+        (status_tx, now_playing_tx)
+    }
+
     pub fn new(secrets: Arc<dyn SecretStore>) -> Self {
+        let (status_tx, now_playing_tx) = Self::channels();
         Self {
             status: RwLock::new(ServiceStatus::disconnected("spotify", "Spotify")),
             tokens: SpotifyTokenRepository::new(secrets),
@@ -87,6 +99,8 @@ impl SpotifyClient {
             poll_task: Mutex::new(None),
             cancel_login: AtomicBool::new(false),
             poll_enabled: AtomicBool::new(false),
+            status_tx,
+            now_playing_tx,
         }
     }
 
@@ -94,7 +108,12 @@ impl SpotifyClient {
         Arc::new(Self::new(secrets))
     }
 
-    pub fn with_http(secrets: Arc<dyn SecretStore>, oauth: OAuth, api_base: impl Into<String>) -> Self {
+    pub fn with_http(
+        secrets: Arc<dyn SecretStore>,
+        oauth: OAuth,
+        api_base: impl Into<String>,
+    ) -> Self {
+        let (status_tx, now_playing_tx) = Self::channels();
         Self {
             status: RwLock::new(ServiceStatus::disconnected("spotify", "Spotify")),
             tokens: SpotifyTokenRepository::new(secrets),
@@ -106,6 +125,8 @@ impl SpotifyClient {
             poll_task: Mutex::new(None),
             cancel_login: AtomicBool::new(false),
             poll_enabled: AtomicBool::new(false),
+            status_tx,
+            now_playing_tx,
         }
     }
 
@@ -125,14 +146,38 @@ impl SpotifyClient {
         self.now_playing.read().await.clone()
     }
 
+    pub fn subscribe_status(&self) -> broadcast::Receiver<ServiceStatus> {
+        self.status_tx.subscribe()
+    }
+
+    pub fn subscribe_now_playing(&self) -> broadcast::Receiver<NowPlaying> {
+        self.now_playing_tx.subscribe()
+    }
+
     pub fn has_token(&self) -> bool {
         matches!(self.tokens.load(), Ok(Some(_)))
     }
 
     async fn set_status(&self, state: ConnectionState, detail: impl Into<String>) {
-        let mut s = self.status.write().await;
-        s.state = state;
-        s.detail = detail.into();
+        let snapshot = {
+            let mut s = self.status.write().await;
+            s.state = state;
+            s.detail = detail.into();
+            s.clone()
+        };
+        let _ = self.status_tx.send(snapshot);
+    }
+
+    async fn store_now_playing(&self, playing: NowPlaying) {
+        let changed = {
+            let mut np = self.now_playing.write().await;
+            let changed = *np != playing;
+            *np = playing.clone();
+            changed
+        };
+        if changed {
+            let _ = self.now_playing_tx.send(playing);
+        }
     }
 
     pub async fn begin_login(
@@ -230,14 +275,20 @@ impl SpotifyClient {
             Ok(p) => p,
             Err(e) => {
                 // Token is valid; surface playback errors in detail but stay connected.
-                self.set_status(ConnectionState::Connected, format!("{} · {e}", user.display_name))
-                    .await;
+                self.set_status(
+                    ConnectionState::Connected,
+                    format!("{} · {e}", user.display_name),
+                )
+                .await;
                 return Ok(self.status().await);
             }
         };
-        *self.now_playing.write().await = playing.clone();
-        self.set_status(ConnectionState::Connected, status_detail(&user.display_name, &playing))
-            .await;
+        self.store_now_playing(playing.clone()).await;
+        self.set_status(
+            ConnectionState::Connected,
+            status_detail(&user.display_name, &playing),
+        )
+        .await;
         Ok(self.status().await)
     }
 
@@ -245,7 +296,7 @@ impl SpotifyClient {
         self.cancel_pending_login().await;
         self.stop_poll().await;
         self.tokens.delete()?;
-        *self.now_playing.write().await = NowPlaying::default();
+        self.store_now_playing(NowPlaying::default()).await;
         *self.display_name.write().await = String::new();
         self.set_status(ConnectionState::Disconnected, "").await;
         Ok(self.status().await)
@@ -257,13 +308,16 @@ impl SpotifyClient {
         }
         match self.fetch_now_playing(client_id).await {
             Ok(playing) => {
-                *self.now_playing.write().await = playing.clone();
+                self.store_now_playing(playing.clone()).await;
                 let display = self.display_name.read().await.clone();
                 if self.status().await.state == ConnectionState::Connected
                     || self.status().await.state == ConnectionState::Error
                 {
-                    self.set_status(ConnectionState::Connected, status_detail(&display, &playing))
-                        .await;
+                    self.set_status(
+                        ConnectionState::Connected,
+                        status_detail(&display, &playing),
+                    )
+                    .await;
                 }
                 Ok(playing)
             }
@@ -275,7 +329,7 @@ impl SpotifyClient {
     }
 
     pub async fn set_now_playing(&self, track: NowPlaying) {
-        *self.now_playing.write().await = track;
+        self.store_now_playing(track).await;
         let mut s = self.status.write().await;
         s.state = ConnectionState::Connected;
     }
@@ -293,9 +347,10 @@ impl SpotifyClient {
     }
 
     async fn get_valid_token(&self, client_id: &str) -> ModuleResult<SpotifyTokenSet> {
-        let token = self.tokens.load()?.ok_or_else(|| {
-            ModuleError::Message("Spotify wurde noch nicht autorisiert.".into())
-        })?;
+        let token = self
+            .tokens
+            .load()?
+            .ok_or_else(|| ModuleError::Message("Spotify wurde noch nicht autorisiert.".into()))?;
         if !token.is_expired() {
             return Ok(token);
         }
@@ -303,9 +358,10 @@ impl SpotifyClient {
     }
 
     async fn refresh_forced(&self, client_id: &str) -> ModuleResult<SpotifyTokenSet> {
-        let old = self.tokens.load()?.ok_or_else(|| {
-            ModuleError::Message("Spotify wurde noch nicht autorisiert.".into())
-        })?;
+        let old = self
+            .tokens
+            .load()?
+            .ok_or_else(|| ModuleError::Message("Spotify wurde noch nicht autorisiert.".into()))?;
         if old.refresh_token.trim().is_empty() {
             return Err(ModuleError::Message(
                 "Der Spotify-Token ist abgelaufen. Bitte Spotify neu autorisieren.".into(),
@@ -413,8 +469,7 @@ mod tests {
 
     #[test]
     fn pkce_challenge_is_deterministic_and_url_safe() {
-        const VERIFIER: &str =
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
+        const VERIFIER: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
         let first = OAuth::create_code_challenge(VERIFIER);
         let second = OAuth::create_code_challenge(VERIFIER);
         assert_eq!(first, second);
@@ -457,7 +512,9 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/me/player/currently-playing"))
             .and(header("Authorization", "Bearer contract-token"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(fixture("currently-playing-track.json")))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(fixture("currently-playing-track.json")),
+            )
             .mount(&server)
             .await;
 
@@ -475,7 +532,8 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/me/player/currently-playing"))
             .respond_with(
-                ResponseTemplate::new(200).set_body_string(fixture("currently-playing-null-item.json")),
+                ResponseTemplate::new(200)
+                    .set_body_string(fixture("currently-playing-null-item.json")),
             )
             .mount(&server)
             .await;
@@ -651,7 +709,10 @@ mod tests {
         let saved = client.tokens.load().unwrap().unwrap();
         assert_eq!(saved.access_token, "new-access");
         assert_eq!(saved.refresh_token, "old-refresh");
-        assert_eq!(saved.scopes, vec!["user-read-currently-playing".to_string()]);
+        assert_eq!(
+            saved.scopes,
+            vec!["user-read-currently-playing".to_string()]
+        );
     }
 
     #[tokio::test]
@@ -673,7 +734,9 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/me/player/currently-playing"))
             .and(header("Authorization", "Bearer contract-access"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(fixture("currently-playing-track.json")))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(fixture("currently-playing-track.json")),
+            )
             .mount(&server)
             .await;
 
@@ -780,7 +843,51 @@ mod tests {
         assert!(!err.contains("old-access"));
         assert!(!err.contains("old-refresh"));
         assert_eq!(client.status().await.state, ConnectionState::Error);
-        assert!(client.status().await.detail.contains("Refresh token revoked"));
+        assert!(client
+            .status()
+            .await
+            .detail
+            .contains("Refresh token revoked"));
+    }
+
+    #[tokio::test]
+    async fn refresh_now_playing_broadcasts_track_change() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/me/player/currently-playing"))
+            .and(header("Authorization", "Bearer contract-access"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(fixture("currently-playing-track.json")),
+            )
+            .mount(&server)
+            .await;
+
+        let store = Arc::new(MemorySecretStore::new());
+        let oauth = OAuth::with_base_urls(
+            format!("{}/authorize", server.uri()),
+            format!("{}/api/token", server.uri()),
+        );
+        let client = SpotifyClient::with_http(store.clone(), oauth, format!("{}/", server.uri()));
+        let token = SpotifyTokenSet::from_oauth(
+            "contract-access".into(),
+            "contract-refresh".into(),
+            3600,
+            "Bearer".into(),
+            vec!["user-read-currently-playing".into()],
+        );
+        client.tokens.save(&token).unwrap();
+
+        let mut tracks = client.subscribe_now_playing();
+        let playing = client
+            .refresh_now_playing(&contract_client_id())
+            .await
+            .unwrap();
+        assert_eq!(playing.title, "Contract Song");
+        assert_eq!(playing.artist, "Contract Artist, Guest Artist");
+
+        let got = tracks.recv().await.expect("now-playing broadcast");
+        assert_eq!(got.title, "Contract Song");
+        assert!(got.is_playing);
     }
 
     #[test]

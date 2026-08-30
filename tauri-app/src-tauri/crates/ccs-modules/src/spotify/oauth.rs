@@ -46,10 +46,7 @@ impl SpotifyOAuthClient {
         }
     }
 
-    pub fn with_base_urls(
-        authorize_url: impl Into<String>,
-        token_url: impl Into<String>,
-    ) -> Self {
+    pub fn with_base_urls(authorize_url: impl Into<String>, token_url: impl Into<String>) -> Self {
         Self {
             http: reqwest::Client::new(),
             authorize_url: authorize_url.into(),
@@ -103,9 +100,8 @@ impl SpotifyOAuthClient {
         state: &str,
     ) -> String {
         let scopes_joined = scopes.join(" ");
-        let mut url = url::Url::parse(&self.authorize_url).unwrap_or_else(|_| {
-            url::Url::parse(AUTHORIZE_URL).expect("spotify authorize url")
-        });
+        let mut url = url::Url::parse(&self.authorize_url)
+            .unwrap_or_else(|_| url::Url::parse(AUTHORIZE_URL).expect("spotify authorize url"));
         {
             let mut q = url.query_pairs_mut();
             q.append_pair("client_id", client_id);
@@ -262,7 +258,11 @@ impl SpotifyOAuthClient {
         parse_token_response(&body)
     }
 
-    pub async fn refresh(&self, client_id: &str, refresh_token: &str) -> ModuleResult<SpotifyTokenSet> {
+    pub async fn refresh(
+        &self,
+        client_id: &str,
+        refresh_token: &str,
+    ) -> ModuleResult<SpotifyTokenSet> {
         Self::validate_client_id(client_id)?;
         if refresh_token.trim().is_empty() {
             return Err(ModuleError::Message(
@@ -325,9 +325,8 @@ fn parse_callback_request(request: &str) -> Option<CallbackRequest> {
 }
 
 async fn bind_loopback(redirect_uri: &str) -> ModuleResult<TcpListener> {
-    let uri = url::Url::parse(redirect_uri).map_err(|_| {
-        ModuleError::Message("Die Spotify Redirect-URI ist ungültig.".into())
-    })?;
+    let uri = url::Url::parse(redirect_uri)
+        .map_err(|_| ModuleError::Message("Die Spotify Redirect-URI ist ungültig.".into()))?;
     if uri.host_str() != Some("127.0.0.1") {
         return Err(ModuleError::Message(
             "Die Spotify Redirect-URI muss 127.0.0.1 verwenden.".into(),
@@ -390,9 +389,8 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 fn parse_token_response(body: &str) -> ModuleResult<SpotifyTokenSet> {
-    let token: TokenResponse = serde_json::from_str(body).map_err(|e| {
-        ModuleError::Message(format!("Spotify Token-Antwort ungültig: {e}"))
-    })?;
+    let token: TokenResponse = serde_json::from_str(body)
+        .map_err(|e| ModuleError::Message(format!("Spotify Token-Antwort ungültig: {e}")))?;
     if token.access_token.is_empty() {
         return Err(ModuleError::Message(
             "Spotify Token-Antwort war leer.".into(),

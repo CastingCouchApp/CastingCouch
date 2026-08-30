@@ -16,7 +16,10 @@ pub fn get_asset(asset_path: &str) -> Option<(Vec<u8>, String)> {
         return None;
     }
     let bytes = std::fs::read(&path).ok()?;
-    let mime = from_path(&path).first_or_octet_stream().essence_str().to_string();
+    let mime = from_path(&path)
+        .first_or_octet_stream()
+        .essence_str()
+        .to_string();
     Some((bytes, mime))
 }
 
@@ -31,10 +34,18 @@ pub fn html_shell(kind: &str) -> Option<String> {
 }
 
 pub fn list_widget_types() -> Vec<String> {
-    ["now-playing", "chat", "countdown", "viewer-count", "socials", "qr-code", "announcement-bar"]
-        .into_iter()
-        .map(str::to_string)
-        .collect()
+    [
+        "now-playing",
+        "chat",
+        "countdown",
+        "viewer-count",
+        "socials",
+        "qr-code",
+        "announcement-bar",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect()
 }
 
 pub fn list_shape_types() -> Vec<String> {
