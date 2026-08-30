@@ -26,13 +26,13 @@ version.json           Versionsquelle für Tauri (`8.0.0-beta1` ↔ `8.0.0-beta.
 
 | Kanal | Zweck |
 |-------|--------|
-| Tauri `invoke` | Settings, Canvas-CRUD, Service-Status, Alerts |
+| Tauri `invoke` | Settings, Canvas-CRUD (Layout-Datei + Rollback), `open_overlay_editor`, Service-Status, Alerts |
 | Tauri Events | `service-status`, `twitch-event`, `obs-scene` → React Query Cache |
 | HTTP/WS `127.0.0.1:8765` | Overlay Editor/View/Solo, identische Routen wie Kestrel |
 
 ### Overlay-Routen (kompatibel)
 
-`/health` `/ws` `/layout/{id}` `/data/overlay-data.json` `/canvas/*` `/editor` `/view` `/w/{type}` `/extensions` `/assets` `/obs/video-settings` `/obs/preview` `/chat` `/chat/config` `/chat/history`
+`/health` `/ws` `/layout/{id}` `/data/overlay-data.json` `/canvas/*` `/editor` `/editor/{id}` `/view` `/view/{id}` `/w/{type}` `/extensions` `/assets` `/obs/video-settings` `/obs/preview` `/chat` `/chat/config` `/chat/history`
 
 ## Datenpfade
 
@@ -43,7 +43,7 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 
 | Modul | Status |
 |-------|--------|
-| Overlay-Server (HTTP/WS) | Rust, Route-Contract-Tests |
+| Overlay-Server (HTTP/WS) | Rust, Route-Contract-Tests, Layout-Store unter `Overlay/layouts` |
 | Settings/Paths/Lock/Logging | `ccs-core` |
 | Secrets | `ccs-secrets` (keyring) |
 | OBS WebSocket 5 Live-Connect | `ccs-modules` (Auth, GetSceneList/SetScene, Reconnect, `CurrentProgramSceneChanged` → Overlay-Hub) |
@@ -52,7 +52,7 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 | Overlay Event Bridge | Hub-Publish als C#-`OverlayRealtimeEvent` (camelCase `source`/`type`/`at`/`summary`/`data`) |
 | YouTube Music / Workflow / Agent | Sidecar-Fallback (siehe unten) |
 | Updates | SHA-256-Manifest-Verifier (`ccs-core::updates`) |
-| Haupt-UI | Dashboard, Dienste (Connect/Login/Logout + Fehlerdetail), Overlay-Tabelle, Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme`), Updates, About |
+| Haupt-UI | Dashboard, Dienste (Connect/Login/Logout + Fehlerdetail), Overlay-Canvas-Tabelle (TanStack Table, Duplicate kopiert Layout, Editor-WebView auf `/editor/{id}`), Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme`), Updates, About |
 
 ## Sidecar (Übergang)
 

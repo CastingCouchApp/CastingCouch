@@ -1,5 +1,7 @@
 mod assets;
+mod canvas;
 mod hub;
+mod layout_store;
 mod routes;
 mod state;
 
@@ -10,7 +12,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
 
+pub use canvas::{CanvasError, CanvasSettingsPersist, OverlayCanvasService};
 pub use hub::RealtimeHub;
+pub use layout_store::OverlayLayoutStore;
 pub use state::OverlayState;
 
 #[derive(Debug, thiserror::Error)]

@@ -23,6 +23,8 @@ export const queryKeys = {
   alertRuntime: ["alert-runtime"] as const,
   nowPlaying: ["now-playing"] as const,
   paths: ["paths"] as const,
+  overlayHealthUrl: ["overlay-health-url"] as const,
+  overlayHealth: ["overlay-health"] as const,
 };
 
 export type CanvasDto = {
@@ -201,6 +203,19 @@ function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
         editor_url: "http://127.0.0.1:8765/editor/new",
         view_url: "http://127.0.0.1:8765/view/new",
       } as T;
+    case "duplicate_canvas":
+      return {
+        id: "canvas-kopie",
+        name: "Canvas (Kopie)",
+        editor_url: "http://127.0.0.1:8765/editor/canvas-kopie",
+        view_url: "http://127.0.0.1:8765/view/canvas-kopie",
+      } as T;
+    case "delete_canvas":
+      return undefined as T;
+    case "overlay_health_url":
+      return "http://127.0.0.1:8765/health" as T;
+    case "open_overlay_editor":
+      return undefined as T;
     default:
       return undefined as T;
   }

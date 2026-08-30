@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub const CURRENT_SCHEMA_VERSION: u32 = 2;
 
@@ -699,9 +699,45 @@ impl OverlaySettings {
         if self.canvases.is_empty() {
             self.canvases.push(OverlayCanvasSettings::default());
         }
-        if self.selected_canvas_id.is_empty() {
+        let selected_ok = self
+            .canvases
+            .iter()
+            .any(|c| c.id.eq_ignore_ascii_case(&self.selected_canvas_id));
+        if self.selected_canvas_id.is_empty() || !selected_ok {
             self.selected_canvas_id = self.canvases[0].id.clone();
         }
+    }
+
+    pub fn create_canvas_id(
+        name: &str,
+        existing_ids: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> String {
+        let taken: HashSet<String> = existing_ids
+            .into_iter()
+            .map(|id| id.as_ref().trim().to_ascii_lowercase())
+            .filter(|id| !id.is_empty())
+            .collect();
+
+        let mut slug = slugify_canvas_name(name);
+        if slug.is_empty() {
+            slug = "canvas".into();
+        }
+
+        if !taken.contains(&slug) {
+            return slug;
+        }
+
+        for suffix in 2..10_000 {
+            let candidate = format!("{slug}-{suffix}");
+            if !taken.contains(&candidate) {
+                return candidate;
+            }
+        }
+
+        format!(
+            "{slug}-{}",
+            &uuid::Uuid::new_v4().simple().to_string()[..8]
+        )
     }
 
     pub fn selected_canvas(&self) -> OverlayCanvasSettings {
@@ -730,6 +766,27 @@ fn overlay_data_file() -> String {
 }
 fn overlay_port() -> u16 {
     8765
+}
+
+fn slugify_canvas_name(name: &str) -> String {
+    let raw = name.trim().to_lowercase();
+    if raw.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    let mut pending_dash = false;
+    for c in raw.chars() {
+        if c.is_ascii_lowercase() || c.is_ascii_digit() {
+            if pending_dash && !out.is_empty() {
+                out.push('-');
+            }
+            pending_dash = false;
+            out.push(c);
+        } else if c == ' ' || c == '_' || c == '-' {
+            pending_dash = !out.is_empty();
+        }
+    }
+    out
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -937,6 +994,50 @@ mod tests {
         assert_eq!(
             back["Definitions"]["Follow"]["TextTemplate"],
             "{user} folgt jetzt!"
+        );
+    }
+
+    #[test]
+    fn editor_and_view_urls_match_obs_contract() {
+        let overlay = OverlaySettings::default();
+        assert_eq!(
+            overlay.editor_url("abc"),
+            "http://127.0.0.1:8765/editor/abc"
+        );
+        assert_eq!(overlay.view_url("abc"), "http://127.0.0.1:8765/view/abc");
+        let mut custom = OverlaySettings::default();
+        custom.web_server_port = 9000;
+        assert_eq!(
+            custom.editor_url("my-canvas"),
+            "http://127.0.0.1:9000/editor/my-canvas"
+        );
+        assert_eq!(
+            custom.view_url("my-canvas"),
+            "http://127.0.0.1:9000/view/my-canvas"
+        );
+    }
+
+    #[test]
+    fn create_canvas_id_slugs_name_and_avoids_collisions() {
+        assert_eq!(
+            OverlaySettings::create_canvas_id("Just Chatting", std::iter::empty::<&str>()),
+            "just-chatting"
+        );
+        assert_eq!(
+            OverlaySettings::create_canvas_id("Just Chatting", ["just-chatting"]),
+            "just-chatting-2"
+        );
+        assert_eq!(
+            OverlaySettings::create_canvas_id("@@@", std::iter::empty::<&str>()),
+            "canvas"
+        );
+        assert_eq!(
+            OverlaySettings::create_canvas_id("@@@", ["canvas"]),
+            "canvas-2"
+        );
+        assert_eq!(
+            OverlaySettings::create_canvas_id(" My Canvas ", std::iter::empty::<&str>()),
+            "my-canvas"
         );
     }
 

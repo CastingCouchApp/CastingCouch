@@ -1,6 +1,4 @@
-use ccs_core::{
-    logging, AppPaths, AppSettings, JsonSettingsStore, OverlayCanvasSettings, SingleInstanceLock,
-};
+use ccs_core::{logging, AppPaths, AppSettings, JsonSettingsStore, SingleInstanceLock};
 use ccs_modules::alerts::{AlertDefinition, AlertEngine, AlertRuntime};
 use ccs_modules::obs::{ObsClient, ObsConnectOptions, ObsSceneInfo};
 use ccs_modules::overlay_bridge::OverlayEventBridge;
@@ -10,13 +8,15 @@ use ccs_modules::sidecar::{
 use ccs_modules::spotify::{NowPlaying, SpotifyClient, SpotifyConnectOptions};
 use ccs_modules::twitch::{TwitchClient, TwitchConnectOptions};
 use ccs_modules::ServiceStatus;
-use ccs_overlay_server::{OverlayServer, RealtimeHub};
+use ccs_overlay_server::{
+    OverlayCanvasService, OverlayLayoutStore, OverlayServer, RealtimeHub,
+};
 use ccs_secrets::{KeyringSecretStore, SecretStore};
 use serde::Serialize;
 use serde_json::json;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{error, info, warn};
@@ -56,6 +56,25 @@ async fn save_settings(state: State<'_, AppState>, settings: AppSettings) -> Res
     state.settings.save(&settings).await.map_err(|e| e.to_string())
 }
 
+fn canvas_dto(
+    settings: &AppSettings,
+    id: &str,
+    name: &str,
+) -> CanvasDto {
+    CanvasDto {
+        editor_url: settings.overlay.editor_url(id),
+        view_url: settings.overlay.view_url(id),
+        id: id.to_string(),
+        name: name.to_string(),
+    }
+}
+
+fn canvas_service(state: &AppState) -> OverlayCanvasService<OverlayLayoutStore> {
+    OverlayCanvasService::new(OverlayLayoutStore::new(
+        state.paths.overlay_layouts.clone(),
+    ))
+}
+
 #[tauri::command]
 async fn list_canvases(state: State<'_, AppState>) -> Result<Vec<CanvasDto>, String> {
     let mut settings = state.settings.load().await.map_err(|e| e.to_string())?;
@@ -64,65 +83,84 @@ async fn list_canvases(state: State<'_, AppState>) -> Result<Vec<CanvasDto>, Str
         .overlay
         .canvases
         .iter()
-        .map(|c| CanvasDto {
-            editor_url: settings.overlay.editor_url(&c.id),
-            view_url: settings.overlay.view_url(&c.id),
-            id: c.id.clone(),
-            name: c.name.clone(),
-        })
+        .map(|c| canvas_dto(&settings, &c.id, &c.name))
         .collect())
 }
 
 #[tauri::command]
 async fn create_canvas(state: State<'_, AppState>, name: String) -> Result<CanvasDto, String> {
     let mut settings = state.settings.load().await.map_err(|e| e.to_string())?;
-    settings.overlay.ensure_canvases_migrated();
-    let canvas = OverlayCanvasSettings {
-        id: uuid::Uuid::new_v4().simple().to_string(),
-        name,
-    };
-    let dto = CanvasDto {
-        editor_url: settings.overlay.editor_url(&canvas.id),
-        view_url: settings.overlay.view_url(&canvas.id),
-        id: canvas.id.clone(),
-        name: canvas.name.clone(),
-    };
-    settings.overlay.canvases.push(canvas);
-    state.settings.save(&settings).await.map_err(|e| e.to_string())?;
-    Ok(dto)
+    let canvas = canvas_service(&state)
+        .create(&mut settings, state.settings.as_ref(), &name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(canvas_dto(&settings, &canvas.id, &canvas.name))
 }
 
 #[tauri::command]
 async fn delete_canvas(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut settings = state.settings.load().await.map_err(|e| e.to_string())?;
-    settings.overlay.canvases.retain(|c| c.id != id);
-    settings.overlay.ensure_canvases_migrated();
-    state.settings.save(&settings).await.map_err(|e| e.to_string())
+    canvas_service(&state)
+        .delete(&mut settings, state.settings.as_ref(), &id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn duplicate_canvas(state: State<'_, AppState>, id: String) -> Result<CanvasDto, String> {
     let mut settings = state.settings.load().await.map_err(|e| e.to_string())?;
-    let source = settings
+    let source_name = settings
         .overlay
         .canvases
         .iter()
-        .find(|c| c.id == id)
-        .cloned()
-        .ok_or_else(|| "canvas not found".to_string())?;
-    let canvas = OverlayCanvasSettings {
-        id: uuid::Uuid::new_v4().simple().to_string(),
-        name: format!("{} (Kopie)", source.name),
+        .find(|c| c.id.eq_ignore_ascii_case(&id))
+        .map(|c| c.name.clone())
+        .ok_or_else(|| format!("Overlay-Canvas '{id}' wurde nicht gefunden."))?;
+    let name = format!("{source_name} (Kopie)");
+    let canvas = canvas_service(&state)
+        .duplicate(&mut settings, state.settings.as_ref(), &id, &name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(canvas_dto(&settings, &canvas.id, &canvas.name))
+}
+
+#[tauri::command]
+async fn open_overlay_editor(
+    app: AppHandle,
+    id: String,
+    name: String,
+    editor_url: String,
+) -> Result<(), String> {
+    let label = format!("overlay-editor-{id}");
+    if let Some(existing) = app.get_webview_window(&label) {
+        existing.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let title = if name.trim().is_empty() {
+        "Overlay Editor".to_string()
+    } else {
+        format!("Overlay Editor · {}", name.trim())
     };
-    let dto = CanvasDto {
-        editor_url: settings.overlay.editor_url(&canvas.id),
-        view_url: settings.overlay.view_url(&canvas.id),
-        id: canvas.id.clone(),
-        name: canvas.name.clone(),
-    };
-    settings.overlay.canvases.push(canvas);
-    state.settings.save(&settings).await.map_err(|e| e.to_string())?;
-    Ok(dto)
+    let parsed = editor_url
+        .parse()
+        .map_err(|e| format!("Ungültige Editor-URL: {e}"))?;
+    match WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parsed))
+        .title(title)
+        .inner_size(1280.0, 800.0)
+        .min_inner_size(960.0, 600.0)
+        .build()
+    {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            warn!("overlay editor window failed: {e}");
+            app.opener()
+                .open_url(&editor_url, None::<&str>)
+                .map_err(|oe| {
+                    format!("Editor konnte nicht geöffnet werden: {e}; Browser: {oe}")
+                })
+        }
+    }
 }
 
 #[tauri::command]
@@ -318,8 +356,12 @@ fn app_paths(state: State<'_, AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn overlay_health_url() -> String {
-    "http://127.0.0.1:8765/health".into()
+async fn overlay_health_url(state: State<'_, AppState>) -> Result<String, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    Ok(format!(
+        "http://127.0.0.1:{}/health",
+        settings.overlay.web_server_port
+    ))
 }
 
 #[tauri::command]
@@ -511,6 +553,7 @@ pub fn run() {
             create_canvas,
             delete_canvas,
             duplicate_canvas,
+            open_overlay_editor,
             service_statuses,
             connect_obs,
             disconnect_obs,

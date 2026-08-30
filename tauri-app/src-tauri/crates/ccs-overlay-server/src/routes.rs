@@ -1,4 +1,5 @@
 use crate::assets;
+use crate::layout_store::OverlayLayoutStore;
 use crate::state::OverlayState;
 use axum::extract::ws::WebSocketUpgrade;
 use axum::extract::{Path, Query, State};
@@ -100,14 +101,14 @@ async fn get_layout(
     Path(instance_id): Path<String>,
     State(state): State<OverlayState>,
 ) -> Response {
-    let path = state.paths.overlay_layouts.join(format!("{instance_id}.json"));
-    match fs::read(&path).await {
-        Ok(bytes) => (
+    let store = OverlayLayoutStore::new(&state.paths.overlay_layouts);
+    match store.read_bytes(&instance_id).await {
+        Ok(Some(bytes)) => (
             [(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))],
             bytes,
         )
             .into_response(),
-        Err(_) => Json(json!({
+        Ok(None) | Err(_) => Json(json!({
             "id": instance_id,
             "width": 1920,
             "height": 1080,
@@ -122,17 +123,11 @@ async fn put_layout(
     State(state): State<OverlayState>,
     Json(body): Json<Value>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    if let Some(parent) = state.paths.overlay_layouts.parent() {
-        let _ = fs::create_dir_all(parent).await;
-    }
-    fs::create_dir_all(&state.paths.overlay_layouts)
+    let store = OverlayLayoutStore::new(&state.paths.overlay_layouts);
+    store
+        .save(&instance_id, &body)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let path = state.paths.overlay_layouts.join(format!("{instance_id}.json"));
-    let json = serde_json::to_vec_pretty(&body).map_err(|_| StatusCode::BAD_REQUEST)?;
-    fs::write(&path, json)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
     state.hub.publish(&json!({
         "type": "app.overlay.layout",
         "id": instance_id,
@@ -383,5 +378,29 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(get.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn editor_and_view_instance_routes_serve_html() {
+        let state = test_state().await;
+        for uri in ["/editor/my-canvas", "/view/my-canvas"] {
+            let app = router_for_tests(state.clone());
+            let res = app
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(res.status(), StatusCode::OK, "{uri}");
+            let bytes = res.into_body().collect().await.unwrap().to_bytes();
+            let html = String::from_utf8(bytes.to_vec()).unwrap();
+            assert!(
+                html.contains("<!DOCTYPE html") || html.contains("<html"),
+                "{uri}: {html}"
+            );
+        }
     }
 }
