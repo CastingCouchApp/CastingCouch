@@ -1,3 +1,4 @@
+mod runtime;
 use ccs_core::{
     apply_verified_update, evaluate_signed_check, github_releases_url, launch_installer, logging,
     parse_manifest_bytes, parse_releases_bytes, select_release, store_verified_package,
@@ -12,6 +13,7 @@ use ccs_modules::twitch::{TwitchClient, TwitchConnectOptions};
 use ccs_modules::ServiceStatus;
 use ccs_overlay_server::{OverlayCanvasService, OverlayLayoutStore, OverlayServer, RealtimeHub};
 use ccs_secrets::{KeyringSecretStore, SecretStore};
+use runtime::spawn_runtime;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -87,6 +89,11 @@ async fn twitch_action(
     action: ccs_modules::twitch::TwitchAction,
 ) -> Result<Value, String> {
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    if !settings.twitch.enable_chat
+        && matches!(action, ccs_modules::twitch::TwitchAction::SendChat { .. })
+    {
+        return Err("Twitch-Chat ist deaktiviert.".into());
+    }
     state
         .twitch
         .action(
@@ -116,8 +123,13 @@ async fn twitch_query(
         .map_err(|e| e.to_string())
 }
 #[tauri::command]
-fn chat_history(state: State<'_, AppState>) -> Value {
-    state.hub.history()
+async fn chat_history(state: State<'_, AppState>) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    Ok(if settings.twitch.enable_chat {
+        state.hub.history()
+    } else {
+        json!({"events":[]})
+    })
 }
 #[tauri::command]
 fn countdown_status(state: State<'_, AppState>) -> Value {
@@ -271,7 +283,8 @@ async fn save_settings(
     state: State<'_, AppState>,
     settings: Value,
     original: Value,
-) -> Result<(), String> {
+    obs_password: Option<String>,
+) -> Result<Value, String> {
     let _guard = state.settings_mutation.lock().await;
     let requested: AppSettings =
         serde_json::from_value(settings.clone()).map_err(|e| e.to_string())?;
@@ -296,18 +309,100 @@ async fn save_settings(
         } else {
             None
         };
-    if let Err(error) = state.settings.save_edit(&original, &settings).await {
-        if let Some(server) = replacement {
-            server.stop();
+    let saved = match state.settings.save_edit(&original, &settings).await {
+        Ok(saved) => saved,
+        Err(error) => {
+            if let Some(server) = replacement {
+                server.stop();
+            }
+            return Err(error.to_string());
         }
-        return Err(error.to_string());
-    }
+    };
     if let Some(server) = replacement {
         if let Some(previous) = state.overlay.lock().await.replace(server) {
             previous.stop();
         }
+        state.hub.live.data.write().unwrap()["serverError"] = Value::Null;
     }
-    Ok(())
+    let next: AppSettings = serde_json::from_value(saved).map_err(|e| e.to_string())?;
+    let mut warnings = Vec::<String>::new();
+    let mut password_updated = false;
+    if let Some(password) = obs_password.filter(|p| !p.is_empty()) {
+        match state.secrets.set(OBS_PASSWORD_SECRET_KEY, &password) {
+            Ok(()) => password_updated = true,
+            Err(error) => warnings.push(format!(
+                "Einstellungen gespeichert; OBS-Passwort konnte nicht gespeichert werden: {error}"
+            )),
+        }
+    }
+    let obs_changed = password_updated
+        || old.obs.host != next.obs.host
+        || old.obs.port != next.obs.port
+        || old.general.reconnect_obs != next.general.reconnect_obs
+        || old.general.connection_watchdog_enabled != next.general.connection_watchdog_enabled
+        || old.general.connection_watchdog_seconds != next.general.connection_watchdog_seconds;
+    if obs_changed && state.obs.status().await.state != ccs_modules::ConnectionState::Disconnected {
+        let connection = match state.secrets.get(OBS_PASSWORD_SECRET_KEY) {
+            Ok(password) => state
+                .obs
+                .connect(ObsConnectOptions {
+                    host: next.obs.host.clone(),
+                    port: next.obs.port,
+                    password,
+                    reconnect: next.general.connection_watchdog_enabled
+                        && next.general.reconnect_obs,
+                    reconnect_seconds: next.general.connection_watchdog_seconds.max(1) as u64,
+                })
+                .await
+                .map_err(|e| e.to_string()),
+            Err(error) => Err(error.to_string()),
+        };
+        if let Err(e) = connection {
+            warnings.push(format!(
+                "Einstellungen gespeichert; OBS-Verbindung fehlgeschlagen: {e}"
+            ));
+        }
+    }
+    if (old.twitch.client_id != next.twitch.client_id
+        || old.twitch.channel_name != next.twitch.channel_name
+        || old.twitch.enable_event_sub != next.twitch.enable_event_sub)
+        && state.twitch.current_user().await.is_some()
+    {
+        if let Err(e) = state
+            .twitch
+            .connect(&TwitchConnectOptions {
+                client_id: next.twitch.client_id.clone(),
+                channel_name: next.twitch.channel_name.clone(),
+                scopes: next.twitch.scopes.clone(),
+                enable_event_sub: next.twitch.enable_event_sub,
+            })
+            .await
+        {
+            warnings.push(format!(
+                "Einstellungen gespeichert; Twitch-Verbindung fehlgeschlagen: {e}"
+            ));
+        }
+    }
+    if old.spotify.client_id != next.spotify.client_id
+        && state.spotify.status().await.state != ccs_modules::ConnectionState::Disconnected
+    {
+        if let Err(e) = state
+            .spotify
+            .connect(&SpotifyConnectOptions {
+                client_id: next.spotify.client_id.clone(),
+                redirect_uri: next.spotify.redirect_uri.clone(),
+                scopes: next.spotify.scopes.clone(),
+            })
+            .await
+        {
+            warnings.push(format!(
+                "Einstellungen gespeichert; Spotify-Verbindung fehlgeschlagen: {e}"
+            ));
+        } else {
+            state.spotify.spawn_poll(next.spotify.client_id.clone());
+        }
+    }
+    Ok(json!({"saved":true,"warnings":warnings}))
 }
 
 fn canvas_dto(settings: &AppSettings, id: &str, name: &str) -> CanvasDto {
@@ -456,7 +551,7 @@ async fn connect_obs(state: State<'_, AppState>) -> Result<ServiceStatus, String
         host: settings.obs.host.clone(),
         port: settings.obs.port,
         password,
-        reconnect: settings.general.reconnect_obs,
+        reconnect: settings.general.connection_watchdog_enabled && settings.general.reconnect_obs,
         reconnect_seconds,
     };
     let _ = state.obs.connect(options).await;
@@ -628,15 +723,7 @@ async fn test_alert(
 
 #[tauri::command]
 async fn now_playing(state: State<'_, AppState>) -> Result<NowPlaying, String> {
-    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
-    match state
-        .spotify
-        .refresh_now_playing(&settings.spotify.client_id)
-        .await
-    {
-        Ok(playing) => Ok(playing),
-        Err(_) => Ok(state.spotify.now_playing().await),
-    }
+    Ok(state.spotify.now_playing().await)
 }
 
 #[tauri::command]
@@ -804,165 +891,24 @@ async fn apply_update(state: State<'_, AppState>) -> Result<String, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(StartupState::default())
         .setup(|app| {
-            let paths = AppPaths::from_os().map_err(|e| e.to_string())?;
-            paths.ensure_dirs().map_err(|e| e.to_string())?;
-            let _ = logging::init_logging(&paths.logs);
-            let lock = Some(SingleInstanceLock::acquire(&paths.lock_file)?);
-            let settings = Arc::new(JsonSettingsStore::new(paths.settings_file.clone()));
-            let hub = Arc::new(RealtimeHub::new());
-            let bridge = OverlayEventBridge::new(hub.clone());
-            let secrets: Arc<KeyringSecretStore> = Arc::new(KeyringSecretStore::new());
-            let secrets_dyn: Arc<dyn SecretStore> = secrets.clone();
-
-            let loaded = tauri::async_runtime::block_on(settings.load())?;
-            let overlay_port = loaded.overlay.web_server_port;
-            let overlay_server = tauri::async_runtime::block_on(OverlayServer::start(
-                settings.clone(),
-                paths.clone(),
-                hub.clone(),
-                overlay_port,
-            ));
-            match &overlay_server {
-                Ok(server) => info!(port = server.port, "overlay server started"),
-                Err(e) => error!("overlay server failed: {e}"),
+            if let Err(error) = initialize(app) {
+                if error
+                    .downcast_ref::<ccs_core::instance::InstanceError>()
+                    .is_some_and(|e| matches!(e, ccs_core::instance::InstanceError::AlreadyRunning))
+                {
+                    app.handle().exit(0);
+                    return Ok(());
+                }
+                error!(%error,"App-Start fehlgeschlagen");
+                *app.state::<StartupState>().0.lock().unwrap() = Some(error.to_string());
             }
-
-            let obs = ObsClient::new_shared(loaded.obs.host.clone(), loaded.obs.port);
-            *hub.obs.write().unwrap() = Some(obs.clone());
-            let twitch = TwitchClient::new_shared(secrets_dyn.clone());
-            let spotify = SpotifyClient::new_shared(secrets_dyn);
-            let alerts = Arc::new(AlertEngine::from_store(settings.clone(), bridge.clone()));
-            alerts.attach_obs(obs.clone());
-
-            spawn_live_event_bridges(
-                app.handle().clone(),
-                obs.clone(),
-                twitch.clone(),
-                spotify.clone(),
-                bridge.clone(),
-                alerts.clone(),
-            );
-
-            if loaded.obs.auto_connect {
-                let obs_auto = Arc::clone(&obs);
-                let settings_auto = Arc::clone(&settings);
-                let password = secrets
-                    .get(OBS_PASSWORD_SECRET_KEY)
-                    .ok()
-                    .flatten()
-                    .filter(|p| !p.is_empty());
-                let host = loaded.obs.host.clone();
-                let port = loaded.obs.port;
-                let reconnect = loaded.general.reconnect_obs;
-                let reconnect_seconds = loaded.general.connection_watchdog_seconds.max(1) as u64;
-                tauri::async_runtime::spawn(async move {
-                    let (host, port, reconnect, reconnect_seconds) =
-                        match settings_auto.load().await {
-                            Ok(s) => (
-                                s.obs.host,
-                                s.obs.port,
-                                s.general.reconnect_obs,
-                                s.general.connection_watchdog_seconds.max(1) as u64,
-                            ),
-                            Err(_) => (host, port, reconnect, reconnect_seconds),
-                        };
-                    let _ = obs_auto
-                        .connect(ObsConnectOptions {
-                            host,
-                            port,
-                            password,
-                            reconnect,
-                            reconnect_seconds,
-                        })
-                        .await;
-                });
-            }
-
-            if loaded.twitch.auto_connect
-                && !loaded.twitch.client_id.trim().is_empty()
-                && twitch.has_token()
-            {
-                let twitch_auto = Arc::clone(&twitch);
-                let settings_auto = Arc::clone(&settings);
-                let client_id = loaded.twitch.client_id.clone();
-                let channel_name = loaded.twitch.channel_name.clone();
-                let scopes = loaded.twitch.scopes.clone();
-                let enable_event_sub = loaded.twitch.enable_event_sub;
-                tauri::async_runtime::spawn(async move {
-                    let options = match settings_auto.load().await {
-                        Ok(s) => TwitchConnectOptions {
-                            client_id: s.twitch.client_id,
-                            channel_name: s.twitch.channel_name,
-                            scopes: s.twitch.scopes,
-                            enable_event_sub: s.twitch.enable_event_sub,
-                        },
-                        Err(_) => TwitchConnectOptions {
-                            client_id,
-                            channel_name,
-                            scopes,
-                            enable_event_sub,
-                        },
-                    };
-                    if let Err(e) = twitch_auto.connect(&options).await {
-                        warn!("twitch auto-connect failed: {e}");
-                    }
-                });
-            }
-
-            if loaded.spotify.auto_connect
-                && !loaded.spotify.client_id.trim().is_empty()
-                && spotify.has_token()
-            {
-                let spotify_auto = Arc::clone(&spotify);
-                let settings_auto = Arc::clone(&settings);
-                let client_id = loaded.spotify.client_id.clone();
-                let redirect_uri = loaded.spotify.redirect_uri.clone();
-                let scopes = loaded.spotify.scopes.clone();
-                tauri::async_runtime::spawn(async move {
-                    let options = match settings_auto.load().await {
-                        Ok(s) => SpotifyConnectOptions {
-                            client_id: s.spotify.client_id,
-                            redirect_uri: if s.spotify.redirect_uri.trim().is_empty() {
-                                "http://127.0.0.1:43821/callback/".into()
-                            } else {
-                                s.spotify.redirect_uri
-                            },
-                            scopes: s.spotify.scopes,
-                        },
-                        Err(_) => SpotifyConnectOptions {
-                            client_id,
-                            redirect_uri,
-                            scopes,
-                        },
-                    };
-                    match spotify_auto.connect(&options).await {
-                        Ok(_) => spotify_auto.spawn_poll(options.client_id),
-                        Err(e) => warn!("spotify auto-connect failed: {e}"),
-                    }
-                });
-            }
-
-            app.manage(AppState {
-                ytm: Mutex::new(None),
-                paths,
-                settings_mutation: Mutex::new(()),
-                settings,
-                secrets,
-                hub,
-                overlay: Mutex::new(overlay_server.ok()),
-                obs,
-                twitch,
-                spotify,
-                alerts,
-                bridge,
-                verified_update: Mutex::new(None),
-                _lock: lock,
-            });
-            spawn_runtime(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            startup_error,
+            overlay_runtime_status,
             open_twitch_chat,
             twitch_action,
             twitch_query,
@@ -1028,130 +974,182 @@ pub fn run() {
         });
 }
 
-fn spawn_runtime(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
-        let mut previous_music = String::new();
-        let mut outputs = Value::Null;
-        let mut counter = 0u64;
-        loop {
-            tick.tick().await;
-            let state = app.state::<AppState>();
-            let settings = match state.settings.load().await {
-                Ok(s) => s,
-                Err(error) => {
-                    warn!(%error,"Overlay-Einstellungen nicht lesbar");
-                    continue;
-                }
-            };
-            if counter % 3 == 0 {
-                outputs = state.obs.output_status().await.unwrap_or(Value::Null);
-            }
-            if counter % settings.general.connection_watchdog_seconds.max(1) as u64 == 0
-                && settings.general.connection_watchdog_enabled
-                && settings.general.reconnect_twitch
-                && settings.twitch.enable_event_sub
-                && state.twitch.needs_eventsub_reconnect().await
-            {
-                if let Err(error) = state
-                    .twitch
-                    .connect(&TwitchConnectOptions {
-                        client_id: settings.twitch.client_id.clone(),
-                        channel_name: settings.twitch.channel_name.clone(),
-                        scopes: settings.twitch.scopes.clone(),
-                        enable_event_sub: true,
-                    })
-                    .await
-                {
-                    warn!(%error,"Twitch-Neuverbindung fehlgeschlagen");
-                }
-            }
-            counter += 1;
-            let spotify = state.spotify.now_playing().await;
-            let ytm = state
-                .ytm
-                .lock()
-                .await
-                .as_ref()
-                .map(|bridge| bridge.snapshot());
-            let mut music = if settings.music_player.source.eq_ignore_ascii_case("ytmusic")
-                || settings
-                    .music_player
-                    .source
-                    .eq_ignore_ascii_case("YouTubeMusic")
-            {
-                serde_json::to_value(ytm.unwrap_or_default()).unwrap_or(Value::Null)
-            } else {
-                json!({"provider":"spotify","connected":state.spotify.status().await.state==ccs_modules::ConnectionState::Connected,"isPlaying":spotify.is_playing,"title":spotify.title,"artist":spotify.artist,"album":spotify.album,"coverUrl":spotify.cover_url,"cover":spotify.cover_url,"progressMs":spotify.progress_ms,"durationMs":spotify.duration_ms})
-            };
-            music["cover"] = music["coverUrl"].clone();
-            music["providerDisplayName"] = json!(if music["provider"] == "ytmusic" {
-                "YouTube Music"
-            } else {
-                "Spotify"
-            });
-            for (key, fallback) in [
-                ("showInOverlay", true),
-                ("showTitle", true),
-                ("showArtist", true),
-                ("showAlbumCover", true),
-                ("showProgress", true),
-                ("hideWhenPaused", false),
-                ("hideWhenMuted", true),
-            ] {
-                let pascal = format!("{}{}", key[..1].to_uppercase(), &key[1..]);
-                music[key] = json!(settings
-                    .music_player
-                    .extra
-                    .get(&pascal)
-                    .and_then(Value::as_bool)
-                    .unwrap_or(fallback));
-            }
-            let signature = format!(
-                "{}|{}|{}",
-                music["provider"], music["title"], music["artist"]
-            );
-            if signature != previous_music {
-                state.bridge.app_music_track(
-                    music["provider"].as_str().unwrap_or("spotify"),
-                    music["title"].as_str().unwrap_or(""),
-                    music["artist"].as_str().unwrap_or(""),
-                    music["coverUrl"].as_str().unwrap_or(""),
-                );
-                previous_music = signature;
-            }
-            let runtime = state.alerts.runtime().await.ok();
-            let scene = state.obs.current_program_scene().await;
-            let snapshot = {
-                let mut snapshot = state.hub.live.data.write().unwrap();
-                snapshot["music"] = music.clone();
-                snapshot["spotify"] = music;
-                snapshot["obs"] =
-                    json!({"currentScene":scene,"connected":!outputs.is_null(),"outputs":outputs});
-                snapshot["stream"] = json!({"isLive":outputs.pointer("/stream/outputActive").and_then(Value::as_bool).unwrap_or(false),"currentScene":scene,"elapsedSeconds":outputs.pointer("/stream/outputDuration").and_then(Value::as_u64).unwrap_or(0)/1000});
-                snapshot["branding"] = json!({"displayName":settings.branding.display_name,"channelName":settings.branding.channel_name,"accentColor":settings.branding.accent_color,"logoPath":settings.branding.logo_path});
-                snapshot["alerts"] = runtime.map(|r|json!({"isRunning":r.current_type.is_some(),"currentType":r.current_type.unwrap_or_default(),"queueLength":r.pending_count})).unwrap_or_else(||json!({"isRunning":false,"currentType":"","queueLength":0}));
-                snapshot["countdown"] = state.hub.live.countdown_state();
-                snapshot["updatedAt"] = state.hub.countdown()["at"].clone();
-                snapshot.clone()
-            };
-            let dir = state.paths.data_root.join("data");
-            if let Err(error) = async {
-                tokio::fs::create_dir_all(&dir).await?;
-                let temp = dir.join("overlay-data.json.tmp");
-                tokio::fs::write(&temp, snapshot.to_string()).await?;
-                tokio::fs::rename(temp, dir.join("overlay-data.json")).await
-            }
-            .await
-            {
-                warn!(%error,"Overlay-Daten konnten nicht geschrieben werden");
-            }
-            if let Err(error) = state.hub.flush_history() {
-                warn!(%error,"Chat-Verlauf konnte nicht gespeichert werden");
-            }
-            state.hub.publish(&state.hub.countdown());
+#[derive(Default)]
+struct StartupState(std::sync::Mutex<Option<String>>);
+#[tauri::command]
+fn startup_error(state: State<'_, StartupState>) -> Option<String> {
+    state.0.lock().unwrap().clone()
+}
+#[tauri::command]
+async fn overlay_runtime_status(state: State<'_, AppState>) -> Result<Value, String> {
+    let server = state.overlay.lock().await;
+    let settings = state.settings.load().await.ok();
+    let data = state.hub.live.data.read().unwrap().clone();
+    Ok(
+        json!({"running":server.as_ref().is_some_and(|s|s.is_running()),"port":server.as_ref().map(|s|s.port),"configuredPort":settings.map(|s|s.overlay.web_server_port),"error":data.get("serverError").filter(|v|!v.is_null()).or_else(||data.get("dataError")).cloned().unwrap_or(Value::Null)}),
+    )
+}
+fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let paths = AppPaths::from_os().map_err(|e| e.to_string())?;
+    paths.ensure_dirs().map_err(|e| e.to_string())?;
+    let _ = logging::init_logging(&paths.logs);
+    let lock = Some(SingleInstanceLock::acquire(&paths.lock_file)?);
+    let settings = Arc::new(JsonSettingsStore::new(paths.settings_file.clone()));
+    let hub = Arc::new(RealtimeHub::new());
+    let bridge = OverlayEventBridge::new(hub.clone());
+    let secrets: Arc<KeyringSecretStore> = Arc::new(KeyringSecretStore::new());
+    let secrets_dyn: Arc<dyn SecretStore> = secrets.clone();
+
+    let loaded = tauri::async_runtime::block_on(settings.load())?;
+    let overlay_port = loaded.overlay.web_server_port;
+    let overlay_server = tauri::async_runtime::block_on(OverlayServer::start(
+        settings.clone(),
+        paths.clone(),
+        hub.clone(),
+        overlay_port,
+    ));
+    match &overlay_server {
+        Ok(server) => info!(port = server.port, "overlay server started"),
+        Err(e) => {
+            error!("overlay server failed: {e}");
+            hub.live.data.write().unwrap()["serverError"] = json!(format!(
+                "Overlay-Port {overlay_port} konnte nicht geöffnet werden: {e}"
+            ));
         }
+    }
+
+    let obs = ObsClient::new_shared(loaded.obs.host.clone(), loaded.obs.port);
+    *hub.obs.write().unwrap() = Some(obs.clone());
+    let twitch = TwitchClient::new_shared(secrets_dyn.clone());
+    let spotify = SpotifyClient::new_shared(secrets_dyn);
+    let alerts = Arc::new(AlertEngine::from_store(settings.clone(), bridge.clone()));
+    alerts.attach_obs(obs.clone());
+
+    spawn_live_event_bridges(
+        app.handle().clone(),
+        obs.clone(),
+        twitch.clone(),
+        spotify.clone(),
+        bridge.clone(),
+        alerts.clone(),
+    );
+
+    if loaded.obs.auto_connect {
+        let obs_auto = Arc::clone(&obs);
+        let settings_auto = Arc::clone(&settings);
+        let password = secrets
+            .get(OBS_PASSWORD_SECRET_KEY)
+            .ok()
+            .flatten()
+            .filter(|p| !p.is_empty());
+        let host = loaded.obs.host.clone();
+        let port = loaded.obs.port;
+        let reconnect = loaded.general.connection_watchdog_enabled && loaded.general.reconnect_obs;
+        let reconnect_seconds = loaded.general.connection_watchdog_seconds.max(1) as u64;
+        tauri::async_runtime::spawn(async move {
+            let (host, port, reconnect, reconnect_seconds) = match settings_auto.load().await {
+                Ok(s) => (
+                    s.obs.host,
+                    s.obs.port,
+                    s.general.connection_watchdog_enabled && s.general.reconnect_obs,
+                    s.general.connection_watchdog_seconds.max(1) as u64,
+                ),
+                Err(_) => (host, port, reconnect, reconnect_seconds),
+            };
+            let _ = obs_auto
+                .connect(ObsConnectOptions {
+                    host,
+                    port,
+                    password,
+                    reconnect,
+                    reconnect_seconds,
+                })
+                .await;
+        });
+    }
+
+    if loaded.twitch.auto_connect
+        && !loaded.twitch.client_id.trim().is_empty()
+        && twitch.has_token()
+    {
+        let twitch_auto = Arc::clone(&twitch);
+        let settings_auto = Arc::clone(&settings);
+        let client_id = loaded.twitch.client_id.clone();
+        let channel_name = loaded.twitch.channel_name.clone();
+        let scopes = loaded.twitch.scopes.clone();
+        let enable_event_sub = loaded.twitch.enable_event_sub;
+        tauri::async_runtime::spawn(async move {
+            let options = match settings_auto.load().await {
+                Ok(s) => TwitchConnectOptions {
+                    client_id: s.twitch.client_id,
+                    channel_name: s.twitch.channel_name,
+                    scopes: s.twitch.scopes,
+                    enable_event_sub: s.twitch.enable_event_sub,
+                },
+                Err(_) => TwitchConnectOptions {
+                    client_id,
+                    channel_name,
+                    scopes,
+                    enable_event_sub,
+                },
+            };
+            if let Err(e) = twitch_auto.connect(&options).await {
+                warn!("twitch auto-connect failed: {e}");
+            }
+        });
+    }
+
+    if loaded.spotify.auto_connect
+        && !loaded.spotify.client_id.trim().is_empty()
+        && spotify.has_token()
+    {
+        let spotify_auto = Arc::clone(&spotify);
+        let settings_auto = Arc::clone(&settings);
+        let client_id = loaded.spotify.client_id.clone();
+        let redirect_uri = loaded.spotify.redirect_uri.clone();
+        let scopes = loaded.spotify.scopes.clone();
+        tauri::async_runtime::spawn(async move {
+            let options = match settings_auto.load().await {
+                Ok(s) => SpotifyConnectOptions {
+                    client_id: s.spotify.client_id,
+                    redirect_uri: if s.spotify.redirect_uri.trim().is_empty() {
+                        "http://127.0.0.1:43821/callback/".into()
+                    } else {
+                        s.spotify.redirect_uri
+                    },
+                    scopes: s.spotify.scopes,
+                },
+                Err(_) => SpotifyConnectOptions {
+                    client_id,
+                    redirect_uri,
+                    scopes,
+                },
+            };
+            match spotify_auto.connect(&options).await {
+                Ok(_) => spotify_auto.spawn_poll(options.client_id),
+                Err(e) => warn!("spotify auto-connect failed: {e}"),
+            }
+        });
+    }
+
+    app.manage(AppState {
+        ytm: Mutex::new(None),
+        paths,
+        settings_mutation: Mutex::new(()),
+        settings,
+        secrets,
+        hub,
+        overlay: Mutex::new(overlay_server.ok()),
+        obs,
+        twitch,
+        spotify,
+        alerts,
+        bridge,
+        verified_update: Mutex::new(None),
+        _lock: lock,
     });
+    spawn_runtime(app.handle().clone());
+    Ok(())
 }
 
 fn spawn_live_event_bridges(
@@ -1176,6 +1174,18 @@ fn spawn_live_event_bridges(
         loop {
             match twitch_events.recv().await {
                 Ok(evt) => {
+                    if evt.event_type == "channel.chat.message" {
+                        if let Some(state) = app_twitch_evt.try_state::<AppState>() {
+                            if state
+                                .settings
+                                .load()
+                                .await
+                                .is_ok_and(|s| !s.twitch.enable_chat)
+                            {
+                                continue;
+                            }
+                        }
+                    }
                     let overlay = bridge_twitch.from_twitch(
                         &evt.event_type,
                         &evt.summary,

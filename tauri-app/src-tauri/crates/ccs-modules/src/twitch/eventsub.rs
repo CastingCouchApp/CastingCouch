@@ -286,6 +286,7 @@ Bitte Twitch erneut autorisieren und die benötigten Berechtigungen bestätigen.
                                 received_at: Utc::now(),
                                 data: BTreeMap::new(),
                             });
+                            break;
                         }
                         Ok(EventSubMessage::Reconnect { reconnect_url }) => {
                             match reconnect(&mut reader, &this, &reconnect_url).await {
@@ -712,5 +713,65 @@ mod chat_contract_tests {
             parts[1]["url"],
             "https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0"
         );
+    }
+    #[tokio::test]
+    async fn closed_connection_can_reconnect_and_resubscribe_with_new_session() {
+        use super::*;
+        use serde_json::json;
+        use tokio::net::TcpListener;
+        use tokio_tungstenite::accept_async;
+        use wiremock::{
+            matchers::{method, path},
+            Mock, MockServer, ResponseTemplate,
+        };
+        let http = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/eventsub/subscriptions"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(json!({"data":[]})))
+            .mount(&http)
+            .await;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (close_tx, mut close_rx) = tokio::sync::mpsc::channel::<()>(2);
+        let server = tokio::spawn(async move {
+            for session in ["first", "second"] {
+                let (socket, _) = listener.accept().await.unwrap();
+                let mut ws = accept_async(socket).await.unwrap();
+                ws.send(Message::Text(json!({"metadata":{"message_type":"session_welcome"},"payload":{"session":{"id":session}}}).to_string().into())).await.unwrap();
+                close_rx.recv().await.unwrap();
+                let _ = ws.close(None).await;
+            }
+        });
+        let client = EventSubClient::new_shared();
+        for session in ["first", "second"] {
+            let helix = TwitchHelixClient::with_base_url(
+                format!("{}/", http.uri()),
+                "contract-client",
+                "contract-token",
+            );
+            let (tx, _) = broadcast::channel(32);
+            client
+                .connect(&format!("ws://127.0.0.1:{port}"), helix, "u", "u", tx)
+                .await
+                .unwrap();
+            let requests = http.received_requests().await.unwrap();
+            assert!(requests
+                .iter()
+                .any(
+                    |r| serde_json::from_slice::<Value>(&r.body).unwrap()["transport"]
+                        ["session_id"]
+                        == session
+                ));
+            close_tx.send(()).await.unwrap();
+            tokio::time::timeout(Duration::from_secs(2), async {
+                while client.is_running() {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        }
+        client.stop().await;
+        server.await.unwrap();
     }
 }

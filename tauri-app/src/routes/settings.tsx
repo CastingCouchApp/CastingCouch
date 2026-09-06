@@ -41,15 +41,18 @@ function SettingsPage() {
             original: AppSettings;
             obsPassword: string;
         }) => {
-            await tauriInvoke("save_settings", { settings: next, original });
-            if (obsPassword) {
-                await tauriInvoke("set_obs_password", {
-                    password: obsPassword,
-                });
-            }
+            const applied = await tauriInvoke<{
+                saved: boolean;
+                warnings: string[];
+            }>("save_settings", {
+                settings: next,
+                original,
+                obsPassword: obsPassword || null,
+            });
+            return applied;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.settings });
+            queryClient.invalidateQueries();
             queryClient.invalidateQueries({ queryKey: ["obs-has-password"] });
         },
     });
@@ -67,11 +70,18 @@ function SettingsPage() {
     return (
         <>
             {save.error && <p role="alert">{String(save.error)}</p>}
+            {save.data?.warnings?.map((warning) => (
+                <p role="alert" key={warning}>
+                    {warning}
+                </p>
+            ))}
             <SettingsForm
                 initial={settings.data}
                 obsHasPassword={hasPassword.data === true}
                 onSave={(next, original, obsPassword) =>
-                    save.mutateAsync({ next, original, obsPassword })
+                    save
+                        .mutateAsync({ next, original, obsPassword })
+                        .then(() => {})
                 }
                 saving={save.isPending}
             />
@@ -135,7 +145,9 @@ function SettingsForm({
                                 }
                             >
                                 <option value="de-DE">Deutsch</option>
-                                <option value="en-US">English</option>
+                                <option value="en-US" disabled>
+                                    English (noch nicht verfügbar)
+                                </option>
                             </select>
                         </label>
                     )}
@@ -164,7 +176,8 @@ function SettingsForm({
                 <form.Field name="General.StartWithWindows">
                     {(field) => (
                         <Checkbox
-                            label="Mit Windows starten"
+                            disabled
+                            label="Mit Windows starten (noch nicht verfügbar)"
                             checked={field.state.value}
                             onChange={field.handleChange}
                         />
@@ -173,7 +186,8 @@ function SettingsForm({
                 <form.Field name="General.MinimizeToTray">
                     {(field) => (
                         <Checkbox
-                            label="Beim Schließen in den Infobereich minimieren"
+                            disabled
+                            label="Beim Schließen in den Infobereich minimieren (noch nicht verfügbar)"
                             checked={field.state.value}
                             onChange={field.handleChange}
                         />
@@ -182,7 +196,8 @@ function SettingsForm({
                 <form.Field name="General.TitleBarWidgetCardsEnabled">
                     {(field) => (
                         <Checkbox
-                            label="TitleBar-Widgets als Cards darstellen"
+                            disabled
+                            label="TitleBar-Widgets als Cards darstellen (noch nicht verfügbar)"
                             checked={field.state.value}
                             onChange={field.handleChange}
                         />
@@ -439,7 +454,8 @@ function SettingsForm({
                 <form.Field name="Overlay.Chat.EnableBttv">
                     {(field) => (
                         <Checkbox
-                            label="BTTV-Emotes"
+                            disabled
+                            label="BTTV-Emotes (noch nicht verfügbar)"
                             checked={field.state.value}
                             onChange={field.handleChange}
                         />
@@ -448,7 +464,8 @@ function SettingsForm({
                 <form.Field name="Overlay.Chat.EnableFfz">
                     {(field) => (
                         <Checkbox
-                            label="FrankerFaceZ-Emotes"
+                            disabled
+                            label="FrankerFaceZ-Emotes (noch nicht verfügbar)"
                             checked={field.state.value}
                             onChange={field.handleChange}
                         />
@@ -457,7 +474,8 @@ function SettingsForm({
                 <form.Field name="Overlay.Chat.EnableSevenTv">
                     {(field) => (
                         <Checkbox
-                            label="7TV-Emotes"
+                            disabled
+                            label="7TV-Emotes (noch nicht verfügbar)"
                             checked={field.state.value}
                             onChange={field.handleChange}
                         />
@@ -554,15 +572,18 @@ function Checkbox({
     label,
     checked,
     onChange,
+    disabled,
 }: {
     label: string;
     checked: boolean;
+    disabled?: boolean;
     onChange: (value: boolean) => void;
 }) {
     return (
         <label className="flex items-center gap-2 text-sm">
             <input
                 type="checkbox"
+                disabled={disabled}
                 className="size-4 accent-[var(--color-brand)]"
                 checked={checked}
                 onChange={(e) => onChange(e.target.checked)}

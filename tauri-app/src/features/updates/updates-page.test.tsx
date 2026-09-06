@@ -14,7 +14,7 @@ vi.mock("../../lib/api", async (importOriginal) => {
   return {
     ...actual,
     tauriInvoke: <T,>(cmd: string, args?: Record<string, unknown>) =>
-      invokeMock(cmd, args) as Promise<T>,
+      (cmd === "startup_error" ? Promise.resolve(null) : cmd === "overlay_runtime_status" ? Promise.resolve({ running: true, error: null }) : invokeMock(cmd, args)) as Promise<T>,
   };
 });
 

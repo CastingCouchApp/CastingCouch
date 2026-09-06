@@ -9,6 +9,7 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
     let bridge = OverlayEventBridge::new(hub.clone());
     let alerts = Arc::new(AlertEngine::from_store(settings.clone(), bridge.clone()));
     mock_builder()
+        .manage(StartupState::default())
         .manage(AppState {
             ytm: Mutex::new(None),
             settings_mutation: Mutex::new(()),
@@ -26,6 +27,10 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
             _lock: None,
         })
         .invoke_handler(tauri::generate_handler![
+            chat_history,
+            twitch_action,
+            startup_error,
+            overlay_runtime_status,
             setup_overlay_source,
             obs_query,
             open_overlay_editor,
@@ -174,4 +179,96 @@ fn obs_queries_use_typed_camel_case_arguments_through_ipc() {
     )
     .unwrap_err();
     assert!(error.as_str().unwrap().contains("inputName"));
+}
+
+#[test]
+fn successful_port_change_replaces_listener_and_reports_actual_status() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = test_app(dir.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let before = call(&window, "get_settings", json!({})).unwrap();
+    let reserved = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = reserved.local_addr().unwrap().port();
+    drop(reserved);
+    let mut edited = before.clone();
+    edited["Overlay"]["WebServerPort"] = json!(port);
+    let result = call(
+        &window,
+        "save_settings",
+        json!({"settings":edited,"original":before}),
+    )
+    .unwrap();
+    assert_eq!(result["saved"], true);
+    assert_eq!(result["warnings"], json!([]));
+    assert_eq!(
+        call(&window, "overlay_runtime_status", json!({})).unwrap()["port"],
+        port
+    );
+    tauri::async_runtime::block_on(async {
+        let response = reqwest::get(format!("http://127.0.0.1:{port}/health"))
+            .await
+            .unwrap();
+        assert!(response.status().is_success());
+        app.state::<AppState>()
+            .overlay
+            .lock()
+            .await
+            .as_ref()
+            .unwrap()
+            .stop();
+    });
+    assert_eq!(
+        call(&window, "overlay_runtime_status", json!({})).unwrap()["running"],
+        false
+    );
+}
+#[test]
+fn startup_failure_is_readable_without_service_initialization() {
+    let app = mock_builder()
+        .manage(StartupState(std::sync::Mutex::new(Some(
+            "settings unavailable".into(),
+        ))))
+        .invoke_handler(tauri::generate_handler![startup_error])
+        .build(mock_context(noop_assets()))
+        .unwrap();
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    assert_eq!(
+        call(&window, "startup_error", json!({})).unwrap(),
+        "settings unavailable"
+    );
+}
+
+#[test]
+fn disabled_twitch_chat_rejects_send_before_credentials_or_network() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = test_app(dir.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    tauri::async_runtime::block_on(async {
+        let state = app.state::<AppState>();
+        let mut settings = state.settings.load().await.unwrap();
+        settings.twitch.enable_chat = false;
+        state.settings.save(&settings).await.unwrap();
+        state
+            .hub
+            .publish(&json!({"type":"channel.chat.message","data":{"messageId":"contract"}}));
+    });
+    assert_eq!(
+        call(&window, "chat_history", json!({})).unwrap()["events"],
+        json!([])
+    );
+    assert_eq!(
+        call(
+            &window,
+            "twitch_action",
+            json!({"action":{"action":"send_chat","message":"hello"}})
+        )
+        .unwrap_err(),
+        "Twitch-Chat ist deaktiviert."
+    );
 }

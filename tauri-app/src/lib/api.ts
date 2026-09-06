@@ -1,3 +1,4 @@
+import type { CommandInvocation } from "./command-contract";
 import { QueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -159,9 +160,9 @@ export const EMPTY_UPDATE_CHECK: UpdateCheckResult = {
 let mockSettings = defaultAppSettings();
 
 export async function tauriInvoke<T>(
-    cmd: string,
-    args?: Record<string, unknown>,
+    ...invocation: CommandInvocation
 ): Promise<T> {
+    const [cmd, args] = invocation;
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
         return invoke<T>(cmd, args);
     }
@@ -170,6 +171,10 @@ export async function tauriInvoke<T>(
 
 function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
     switch (cmd) {
+        case "startup_error":
+            return null as T;
+        case "overlay_runtime_status":
+            return { running: true, error: null } as T;
         case "list_canvases":
             return [
                 {

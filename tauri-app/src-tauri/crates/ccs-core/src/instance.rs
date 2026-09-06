@@ -1,9 +1,8 @@
 use fs4::fs_std::FileExt;
 use std::fs::{File, OpenOptions};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub struct SingleInstanceLock {
-    path: PathBuf,
     file: File,
 }
 
@@ -21,17 +20,18 @@ impl SingleInstanceLock {
             .truncate(false)
             .open(&path)?;
 
-        file.try_lock_exclusive()
-            .map_err(|_| InstanceError::AlreadyRunning)?;
+        if !file.try_lock_exclusive()? {
+            return Err(InstanceError::AlreadyRunning);
+        }
 
-        Ok(Self { path, file })
+        Ok(Self { file })
     }
 }
 
 impl Drop for SingleInstanceLock {
     fn drop(&mut self) {
         let _ = self.file.unlock();
-        let _ = std::fs::remove_file(&self.path);
+        // Keep the file node: unlinking permits concurrent locks on different inodes.
     }
 }
 
@@ -51,6 +51,17 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    fn lock_file_is_not_unlinked_between_owners() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("lock");
+        let first = SingleInstanceLock::acquire(&path).unwrap();
+        drop(first);
+        assert!(
+            path.exists(),
+            "unlinking a lock creates an inode race between owners"
+        );
+    }
+    #[test]
     fn lock_roundtrip_after_drop() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("castingcouch.lock");
@@ -68,10 +79,27 @@ mod tests {
         let handle = thread::spawn(move || SingleInstanceLock::acquire(&path2));
         thread::sleep(Duration::from_millis(20));
         let second = handle.join().unwrap();
-        // Windows may allow the same process to take the lock twice; Unix should not.
-        if second.is_err() {
-            assert!(matches!(second, Err(InstanceError::AlreadyRunning)));
-        }
+        assert!(matches!(second, Err(InstanceError::AlreadyRunning)));
         drop(first);
+    }
+    #[test]
+    fn rejects_a_second_process() {
+        const CHILD_PATH: &str = "CCS_INSTANCE_CONTRACT_PATH";
+        if let Some(path) = std::env::var_os(CHILD_PATH) {
+            assert!(matches!(
+                SingleInstanceLock::acquire(path),
+                Err(InstanceError::AlreadyRunning)
+            ));
+            return;
+        }
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("lock");
+        let _first = SingleInstanceLock::acquire(&path).unwrap();
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "instance::tests::rejects_a_second_process"])
+            .env(CHILD_PATH, &path)
+            .status()
+            .unwrap();
+        assert!(status.success());
     }
 }

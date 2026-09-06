@@ -10,6 +10,13 @@ $tauri = $json.tauriVersion
 $confPath = Join-Path $RepoRoot "tauri-app/src-tauri/tauri.conf.json"
 $conf = Get-Content $confPath -Raw | ConvertFrom-Json
 $conf.version = $tauri
+# WiX rejects textual SemVer prerelease identifiers. Keep its numeric version in sync.
+$msiBase = ($tauri -split "[-+]")[0]
+$msiBuild = if ($tauri -match "-(?:alpha|beta|rc)\.?(\d+)") { $Matches[1] } else { "0" }
+if (-not $conf.bundle.windows.PSObject.Properties["wix"]) {
+  $conf.bundle.windows | Add-Member -NotePropertyName wix -NotePropertyValue ([pscustomobject]@{})
+}
+$conf.bundle.windows.wix | Add-Member -NotePropertyName version -NotePropertyValue "$msiBase.$msiBuild" -Force
 $conf | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 $confPath
 
 $pkgPath = Join-Path $RepoRoot "tauri-app/package.json"

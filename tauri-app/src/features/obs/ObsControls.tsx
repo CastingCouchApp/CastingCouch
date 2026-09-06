@@ -1,3 +1,5 @@
+import type { ObsControl } from "../../lib/command-contract";
+type OutputAction = Exclude<ObsControl["action"], `set_${string}`>;
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tauriInvoke } from "../../lib/api";
 import { Button } from "../../components/ui/button";
@@ -24,12 +26,12 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
         refetchInterval: 3000,
     });
     const control = useMutation({
-        mutationFn: (action: string) =>
+        mutationFn: (action: OutputAction) =>
             tauriInvoke("obs_control", { control: { action } }),
         onSuccess: () =>
             void client.invalidateQueries({ queryKey: ["obs-outputs"] }),
     });
-    const available = (action: string) => {
+    const available = (action: OutputAction) => {
         const key = action.includes("replay")
             ? "replay"
             : action.includes("virtual")
@@ -39,7 +41,7 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
                 : "stream";
         return Boolean(status.data?.[key]) && !status.isError;
     };
-    const button = (action: string, label: string) => (
+    const button = (action: OutputAction, label: string) => (
         <Button
             key={action}
             disabled={!enabled || control.isPending || !available(action)}

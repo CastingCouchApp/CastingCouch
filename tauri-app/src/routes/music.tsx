@@ -1,3 +1,4 @@
+import type { SpotifyAction, SpotifyQuery } from "../lib/command-contract";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -56,7 +57,7 @@ function MusicPage() {
     });
     const [setup, setSetup] = useState("");
     const [search, setSearch] = useState("");
-    const [catalogQuery, setCatalogQuery] = useState<Record<string, string>>({
+    const [catalogQuery, setCatalogQuery] = useState<SpotifyQuery>({
         query: "playlists",
     });
     const [offset, setOffset] = useState(0);
@@ -87,7 +88,7 @@ function MusicPage() {
             }),
     });
     const act = useMutation({
-        mutationFn: (action: Record<string, unknown>) =>
+        mutationFn: (action: SpotifyAction) =>
             tauriInvoke("spotify_action", { action }),
         onSuccess: () => {
             void client.invalidateQueries({ queryKey: ["spotify-playback"] });
@@ -337,12 +338,14 @@ function MusicPage() {
             <Card className="space-y-4">
                 <h2 className="text-lg font-semibold">Spotify-Bibliothek</h2>
                 <div className="flex flex-wrap gap-2">
-                    {[
-                        ["playlists", "Playlists"],
-                        ["saved", "Favoriten"],
-                        ["queue", "Warteschlange"],
-                        ["recent", "Zuletzt gehört"],
-                    ].map(([query, label]) => (
+                    {(
+                        [
+                            ["playlists", "Playlists"],
+                            ["saved", "Favoriten"],
+                            ["queue", "Warteschlange"],
+                            ["recent", "Zuletzt gehört"],
+                        ] as const
+                    ).map(([query, label]) => (
                         <Button
                             key={query}
                             onClick={() => {

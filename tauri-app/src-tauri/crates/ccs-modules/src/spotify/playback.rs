@@ -187,7 +187,7 @@ impl SpotifyClient {
         let token = self.get_valid_token(client_id).await?;
         match self.api.perform(&token.access_token, &request, None).await {
             Err(e) if super::is_unauthorized(&e) => {
-                let token = self.refresh_forced(client_id).await?;
+                let token = self.refresh_forced(client_id, &token.access_token).await?;
                 self.api.perform(&token.access_token, &request, None).await
             }
             result => result,
@@ -207,7 +207,7 @@ impl SpotifyClient {
             .await
         {
             Err(e) if super::is_unauthorized(&e) => {
-                let token = self.refresh_forced(client_id).await?;
+                let token = self.refresh_forced(client_id, &token.access_token).await?;
                 self.api
                     .perform(&token.access_token, &request, offset)
                     .await

@@ -1,0 +1,135 @@
+{
+  "stream": {
+    "isLive": false,
+    "phase": "Idle",
+    "startedAt": null,
+    "endedAt": null,
+    "elapsedSeconds": 0,
+    "viewerCount": 0,
+    "currentScene": ""
+  },
+  "twitch": {
+    "channelName": "",
+    "title": "",
+    "category": "",
+    "followers": 0,
+    "followerGoal": 200,
+    "lastFollower": "",
+    "lastEvent": "",
+    "followerGoalState": {
+      "title": "",
+      "reason": "",
+      "current": 0,
+      "target": 0,
+      "fontFace": "Segoe UI",
+      "fontSize": 36,
+      "currency": ""
+    },
+    "subGoalState": {
+      "title": "",
+      "reason": "",
+      "current": 0,
+      "target": 0,
+      "fontFace": "Segoe UI",
+      "fontSize": 36,
+      "currency": ""
+    },
+    "donationGoalState": {
+      "title": "",
+      "reason": "",
+      "current": 0,
+      "target": 0,
+      "fontFace": "Segoe UI",
+      "fontSize": 36,
+      "currency": ""
+    }
+  },
+  "spotify": {
+    "provider": "spotify",
+    "providerDisplayName": "Spotify",
+    "connected": false,
+    "isPlaying": false,
+    "title": "",
+    "artist": "",
+    "album": "",
+    "coverUrl": "",
+    "cover": "",
+    "showInOverlay": true,
+    "progressMs": 0,
+    "durationMs": 0,
+    "statusText": "Nicht verbunden",
+    "showTitle": true,
+    "showArtist": true,
+    "showAlbumCover": true,
+    "showProgress": true,
+    "hideWhenPaused": false,
+    "hideWhenMuted": true
+  },
+  "obs": {
+    "connected": false,
+    "currentScene": "",
+    "microphoneMuted": false,
+    "desktopAudioMuted": false
+  },
+  "alerts": {
+    "isRunning": false,
+    "currentType": "",
+    "queueLength": 0
+  },
+  "stats": {
+    "followersGained": 0,
+    "peakViewers": 0,
+    "averageViewers": 0,
+    "streamTimeSeconds": 0,
+    "chatMessages": 0,
+    "alertsPlayed": 0,
+    "newSubscriptions": 0,
+    "giftSubscriptions": 0,
+    "bitsCheered": 0,
+    "incomingRaids": 0
+  },
+  "branding": {
+    "displayName": "Mein Stream",
+    "channelName": "",
+    "accentColor": "#FF8C00",
+    "logoPath": ""
+  },
+  "countdown": {
+    "isRunning": false,
+    "remainingSeconds": 0,
+    "totalSeconds": 0,
+    "endsAt": null,
+    "label": "Countdown",
+    "mode": "manual"
+  },
+  "updatedAt": null,
+  "music": {
+    "provider": "spotify",
+    "providerDisplayName": "Spotify",
+    "connected": false,
+    "isPlaying": false,
+    "title": "",
+    "artist": "",
+    "album": "",
+    "coverUrl": "",
+    "cover": "",
+    "showInOverlay": true,
+    "progressMs": 0,
+    "durationMs": 0,
+    "statusText": "Nicht verbunden",
+    "showTitle": true,
+    "showArtist": true,
+    "showAlbumCover": true,
+    "showProgress": true,
+    "hideWhenPaused": false,
+    "hideWhenMuted": true
+  },
+  "workflow": {
+    "enabled": false,
+    "state": "disabled"
+  },
+  "remote": {
+    "enabled": false,
+    "connected": false
+  }
+}

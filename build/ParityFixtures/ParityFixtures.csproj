@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+ <ItemGroup><ProjectReference Include="../../src/CreatorControlSuite.Core/CreatorControlSuite.Core.csproj"/><Compile Include="../../src/CreatorControlSuite.Modules.Overlay/Models/OverlayModels.cs" Link="OverlayModels.cs"/></ItemGroup>
+</Project>

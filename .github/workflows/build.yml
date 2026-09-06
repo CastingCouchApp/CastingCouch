@@ -337,4 +337,12 @@ jobs:
 
       - name: Tauri build
         working-directory: tauri-app
-        run: npm run tauri build -- --bundles none
+        run: npm run tauri build -- --bundles ${{ runner.os == 'Windows' && 'nsis,msi' || 'dmg' }}
+
+      - name: Upload Tauri installation packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: tauri-${{ runner.os }}
+          path: tauri-app/src-tauri/target/release/bundle/**
+          if-no-files-found: error
+          retention-days: 14

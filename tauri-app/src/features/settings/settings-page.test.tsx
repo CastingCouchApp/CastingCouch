@@ -14,7 +14,7 @@ vi.mock("../../lib/api", async (importOriginal) => {
   return {
     ...actual,
     tauriInvoke: <T,>(cmd: string, args?: Record<string, unknown>) =>
-      invokeMock(cmd, args) as Promise<T>,
+      (cmd === "startup_error" ? Promise.resolve(null) : cmd === "overlay_runtime_status" ? Promise.resolve({ running: true, error: null }) : invokeMock(cmd, args)) as Promise<T>,
   };
 });
 
@@ -74,6 +74,35 @@ describe("Settings route", () => {
     });
   });
 
+    it("marks pending desktop options as unavailable", async () => {
+        renderSettings();
+        expect(
+            await screen.findByRole("checkbox", {
+                name: /Mit Windows starten/,
+            }),
+        ).toBeDisabled();
+        expect(
+            screen.getByRole("checkbox", { name: /Infobereich/ }),
+        ).toBeDisabled();
+    });
+    it("sends password with settings so reconnect uses the new credential", async () => {
+        const user = userEvent.setup();
+        renderSettings();
+        await user.type(
+            await screen.findByLabelText("WebSocket-Passwort"),
+            "contract-password",
+        );
+        await user.click(screen.getByRole("button", { name: "Speichern" }));
+        await waitFor(() =>
+            expect(invokeMock).toHaveBeenCalledWith(
+                "save_settings",
+                expect.objectContaining({ obsPassword: "contract-password" }),
+            ),
+        );
+        expect(
+            invokeMock.mock.calls.some((c) => c[0] === "set_obs_password"),
+        ).toBe(false);
+    });
   it("renders General, OBS, Twitch, Spotify, Overlay and Branding sections", async () => {
     renderSettings();
     expect(await screen.findByRole("heading", { name: "Einstellungen" })).toBeInTheDocument();

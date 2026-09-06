@@ -13,6 +13,60 @@ async fn actual_http_upload_read_delete_and_origin_contract() {
         .unwrap();
     let base = format!("http://127.0.0.1:{}", server.port);
     let client = reqwest::Client::new();
+    let layout = json!({"canvasWidth":1280,"canvasHeight":720,"items":[],"custom":true});
+    let written = client
+        .put(format!("{base}/layout/roundtrip"))
+        .json(&layout)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(written.status(), 200);
+    assert_eq!(written.json::<Value>().await.unwrap(), layout);
+    for invalid in [json!([]), json!(null)] {
+        assert_eq!(
+            client
+                .put(format!("{base}/layout/roundtrip"))
+                .json(&invalid)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            400
+        );
+    }
+    assert_eq!(
+        client
+            .get(format!("{base}/layout/invalid%20id"))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        400
+    );
+
+    let health: Value = client
+        .get(format!("{base}/health"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(health["port"], server.port);
+    let redirect = client.get(format!("{base}/editor")).send().await.unwrap();
+    assert_eq!(redirect.url().path(), "/editor/default");
+
+    let missing: Value = client
+        .get(format!("{base}/layout/missing"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(missing["canvasWidth"], 1920);
+    assert_eq!(missing["canvasHeight"], 1080);
+
     let editor = client
         .get(format!("{base}/editor/default"))
         .send()
@@ -103,4 +157,41 @@ async fn native_music_bridge_roundtrips_browser_state_and_commands_over_http() {
         .unwrap();
     assert_eq!(empty["commands"], json!([]));
     bridge.stop();
+}
+
+#[tokio::test]
+async fn chat_configuration_and_disabled_history_follow_csharp_contract() {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = AppPaths::from_root(dir.path().into());
+    let settings = Arc::new(JsonSettingsStore::new(&paths.settings_file));
+    let mut config = settings.load().await.unwrap();
+    config.overlay.chat.enabled = false;
+    config.overlay.chat.extra =
+        json!({"BackgroundType":"Image","BackgroundImagePath":"absent.png"});
+    settings.save(&config).await.unwrap();
+    let hub = Arc::new(RealtimeHub::new());
+    hub.publish(&json!({"type":"channel.chat.message","data":{"messageId":"test"}}));
+    let server = OverlayServer::start(settings, paths, hub, 0).await.unwrap();
+    let client = reqwest::Client::new();
+    let base = format!("http://127.0.0.1:{}", server.port);
+    let response = client
+        .get(format!("{base}/chat/config"))
+        .send()
+        .await
+        .unwrap();
+    let config: Value = response.json().await.unwrap();
+    assert_eq!(config["backgroundType"], "None");
+    assert_eq!(config["backgroundOpacity"], 0.55);
+    assert_eq!(config["backgroundVersion"], "0");
+    assert_eq!(config["fontSizePx"], 18);
+    let history: Value = client
+        .get(format!("{base}/chat/history"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(history["events"], json!([]));
+    server.stop();
 }

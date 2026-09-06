@@ -1,3 +1,4 @@
+import type { TwitchAction, TwitchQuery } from "../../lib/command-contract";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listenTwitchEvents, tauriInvoke } from "../../lib/api";
@@ -29,7 +30,7 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
     const [title, setTitle] = useState("");
     const [category, setCategory] = useState("");
     const [search, setSearch] = useState("");
-    const [query, setQuery] = useState<Record<string, string>>({
+    const [query, setQuery] = useState<TwitchQuery>({
         query: "channel",
     });
     const [after, setAfter] = useState<string>();
@@ -53,7 +54,7 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
         enabled,
     });
     const action = useMutation({
-        mutationFn: (action: Record<string, unknown>) =>
+        mutationFn: (action: TwitchAction) =>
             tauriInvoke("twitch_action", { action }),
         onSuccess: () => {
             void client.invalidateQueries({ queryKey: ["twitch-query"] });
@@ -79,11 +80,11 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
             unlisten?.();
         };
     }, [client]);
-    const select = (next: Record<string, string>) => {
+    const select = (next: TwitchQuery) => {
         setAfter(undefined);
         setQuery(next);
     };
-    const mutate = (value: Record<string, unknown>) => action.mutate(value);
+    const mutate = (value: TwitchAction) => action.mutate(value);
     return (
         <div className="grid gap-4 xl:grid-cols-2">
             <Card className="space-y-3">
@@ -236,17 +237,19 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                     </Button>
                 </form>
                 <div className="flex flex-wrap gap-2">
-                    {[
-                        ["channel", "Kanal"],
-                        ["followers", "Follower"],
-                        ["subscriptions", "Abos"],
-                        ["chatters", "Chatter"],
-                        ["followed_channels", "Gefolgte Kanäle"],
-                        ["followed_streams", "Live-Kanäle"],
-                        ["rewards", "Rewards"],
-                        ["polls", "Umfragen"],
-                        ["predictions", "Vorhersagen"],
-                    ].map(([query, label]) => (
+                    {(
+                        [
+                            ["channel", "Kanal"],
+                            ["followers", "Follower"],
+                            ["subscriptions", "Abos"],
+                            ["chatters", "Chatter"],
+                            ["followed_channels", "Gefolgte Kanäle"],
+                            ["followed_streams", "Live-Kanäle"],
+                            ["rewards", "Rewards"],
+                            ["polls", "Umfragen"],
+                            ["predictions", "Vorhersagen"],
+                        ] as const
+                    ).map(([query, label]) => (
                         <Button
                             disabled={!enabled}
                             key={query}

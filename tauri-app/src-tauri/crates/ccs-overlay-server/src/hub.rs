@@ -63,7 +63,13 @@ impl RealtimeHub {
         let _ = self.tx.send(payload.into());
     }
 
-    pub async fn handle_socket(&self, socket: WebSocket) {
+    pub async fn handle_socket(
+        &self,
+        socket: WebSocket,
+        layouts: crate::OverlayLayoutStore,
+        canvases: Vec<ccs_core::OverlayCanvasSettings>,
+        mut shutdown: Option<tokio::sync::watch::Receiver<bool>>,
+    ) {
         let id = Uuid::new_v4();
         self.clients.fetch_add(1, Ordering::Relaxed);
         self.sockets.write().await.insert(id, ());
@@ -71,12 +77,17 @@ impl RealtimeHub {
         let (mut sink, mut stream) = socket.split();
         let mut rx = self.tx.subscribe();
 
+        let mut hello_data = serde_json::json!({"clientId":id.to_string(),"clients":self.connected_clients().to_string()});
+        for (index, canvas) in canvases.iter().enumerate() {
+            hello_data[format!("overlay.{index}.id")] = serde_json::json!(canvas.id);
+            hello_data[format!("overlay.{index}.name")] = serde_json::json!(canvas.name);
+        }
         let hello = serde_json::json!({
             "source":"app",
             "type": "app.ws.hello",
             "at":chrono::Utc::now().to_rfc3339(),
             "summary":"Verbunden",
-            "data":{"clientId": id.to_string()},
+            "data":hello_data,
         });
         let _ = sink.send(Message::Text(hello.to_string().into())).await;
         let _ = sink
@@ -92,13 +103,26 @@ impl RealtimeHub {
 
         loop {
             tokio::select! {
+                _ = async {match shutdown.as_mut(){Some(rx)=>{let _=rx.wait_for(|v|*v).await;},None=>std::future::pending::<()>().await}} => break,
                 incoming = stream.next() => {
                     match incoming {
                         Some(Ok(Message::Text(text))) => {
                             if let Ok(value) = serde_json::from_str::<Value>(&text) {
                                 let ty = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                                if ty.starts_with("editor.layout.") {
-                                    self.publish(&value);
+                                if matches!(ty, "editor.layout.set" | "editor.layout.patch") {
+                                    let data = &value["data"];
+                                    if let Some(id) = data["instanceId"].as_str() {
+                                        let layout = match &data["layout"] {
+                                            Value::String(text) => serde_json::from_str::<Value>(text).ok(),
+                                            Value::Object(_) => Some(data["layout"].clone()),
+                                            _ => None,
+                                        };
+                                        if let Some(layout) = layout.filter(Value::is_object) {
+                                            if layouts.save(id, &layout).await.is_ok() {
+                                                self.publish(&serde_json::json!({"source":"app","type":"app.overlay.layout","at":chrono::Utc::now().to_rfc3339(),"summary":"Layout gespeichert","data":{"instanceId":id,"layout":layout.to_string()}}));
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -124,6 +148,7 @@ impl RealtimeHub {
             }
         }
 
+        let _ = sink.send(Message::Close(None)).await;
         self.sockets.write().await.remove(&id);
         self.clients.fetch_sub(1, Ordering::Relaxed);
     }

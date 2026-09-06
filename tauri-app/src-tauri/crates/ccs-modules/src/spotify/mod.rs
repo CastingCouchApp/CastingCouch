@@ -73,7 +73,9 @@ pub struct SpotifyClient {
     login_task: Mutex<Option<JoinHandle<()>>>,
     poll_task: Mutex<Option<JoinHandle<()>>>,
     cancel_login: AtomicBool,
+    token_refresh: Mutex<()>,
     poll_enabled: AtomicBool,
+    reconnect_enabled: AtomicBool,
     status_tx: broadcast::Sender<ServiceStatus>,
     now_playing_tx: broadcast::Sender<NowPlaying>,
 }
@@ -100,7 +102,9 @@ impl SpotifyClient {
             login_task: Mutex::new(None),
             poll_task: Mutex::new(None),
             cancel_login: AtomicBool::new(false),
+            token_refresh: Mutex::new(()),
             poll_enabled: AtomicBool::new(false),
+            reconnect_enabled: AtomicBool::new(true),
             status_tx,
             now_playing_tx,
         }
@@ -126,7 +130,9 @@ impl SpotifyClient {
             login_task: Mutex::new(None),
             poll_task: Mutex::new(None),
             cancel_login: AtomicBool::new(false),
+            token_refresh: Mutex::new(()),
             poll_enabled: AtomicBool::new(false),
+            reconnect_enabled: AtomicBool::new(true),
             status_tx,
             now_playing_tx,
         }
@@ -263,6 +269,14 @@ impl SpotifyClient {
     }
 
     pub async fn connect(&self, options: &SpotifyConnectOptions) -> ModuleResult<ServiceStatus> {
+        let result = self.connect_inner(options).await;
+        if let Err(error) = &result {
+            self.set_status(ConnectionState::Error, error.to_string())
+                .await;
+        }
+        result
+    }
+    async fn connect_inner(&self, options: &SpotifyConnectOptions) -> ModuleResult<ServiceStatus> {
         OAuth::validate_client_id(&options.client_id)?;
         self.set_status(ConnectionState::Connecting, "Verbinde …")
             .await;
@@ -277,7 +291,9 @@ impl SpotifyClient {
         let user = match self.api.get_current_user(&token.access_token).await {
             Ok(user) => user,
             Err(e) if is_unauthorized(&e) => {
-                let token = self.refresh_forced(&options.client_id).await?;
+                let token = self
+                    .refresh_forced(&options.client_id, &token.access_token)
+                    .await?;
                 self.api.get_current_user(&token.access_token).await?
             }
             Err(e) => {
@@ -311,6 +327,7 @@ impl SpotifyClient {
     pub async fn logout(&self) -> ModuleResult<ServiceStatus> {
         self.cancel_pending_login().await;
         self.stop_poll().await;
+        let _guard = self.token_refresh.lock().await;
         self.tokens.delete()?;
         self.store_now_playing(NowPlaying::default()).await;
         *self.display_name.write().await = String::new();
@@ -355,7 +372,7 @@ impl SpotifyClient {
         match self.api.get_currently_playing(&token.access_token).await {
             Ok(playing) => Ok(playing),
             Err(e) if is_unauthorized(&e) => {
-                let token = self.refresh_forced(client_id).await?;
+                let token = self.refresh_forced(client_id, &token.access_token).await?;
                 self.api.get_currently_playing(&token.access_token).await
             }
             Err(e) => Err(e),
@@ -370,14 +387,22 @@ impl SpotifyClient {
         if !token.is_expired() {
             return Ok(token);
         }
-        self.refresh_forced(client_id).await
+        self.refresh_forced(client_id, &token.access_token).await
     }
 
-    async fn refresh_forced(&self, client_id: &str) -> ModuleResult<SpotifyTokenSet> {
+    async fn refresh_forced(
+        &self,
+        client_id: &str,
+        expected: &str,
+    ) -> ModuleResult<SpotifyTokenSet> {
+        let _guard = self.token_refresh.lock().await;
         let old = self
             .tokens
             .load()?
             .ok_or_else(|| ModuleError::Message("Spotify wurde noch nicht autorisiert.".into()))?;
+        if old.access_token != expected {
+            return Ok(old);
+        }
         if old.refresh_token.trim().is_empty() {
             return Err(ModuleError::Message(
                 "Der Spotify-Token ist abgelaufen. Bitte Spotify neu autorisieren.".into(),
@@ -394,6 +419,10 @@ impl SpotifyClient {
         Ok(refreshed)
     }
 
+    pub fn set_reconnect_enabled(&self, enabled: bool) {
+        self.reconnect_enabled.store(enabled, Ordering::SeqCst);
+    }
+
     pub fn spawn_poll(self: &Arc<Self>, client_id: String) {
         let this = Arc::clone(self);
         this.poll_enabled.store(true, Ordering::SeqCst);
@@ -407,6 +436,11 @@ impl SpotifyClient {
                     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                     if !poller.poll_enabled.load(Ordering::SeqCst) {
                         break;
+                    }
+                    if poller.status().await.state == ConnectionState::Error
+                        && !poller.reconnect_enabled.load(Ordering::SeqCst)
+                    {
+                        continue;
                     }
                     let _ = poller.refresh_now_playing(&client_id).await;
                 }
@@ -483,6 +517,30 @@ mod tests {
         format!("http://127.0.0.1:{port}/callback/")
     }
 
+    #[tokio::test]
+    async fn concurrent_expired_requests_refresh_only_once() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST")).and(path("/token")).respond_with(ResponseTemplate::new(200).set_delay(std::time::Duration::from_millis(30)).set_body_json(json!({"access_token":"new","refresh_token":"rotated","expires_in":3600,"token_type":"Bearer"}))).expect(1).mount(&server).await;
+        let store = Arc::new(MemorySecretStore::new());
+        let oauth = OAuth::with_base_urls(
+            format!("{}/authorize", server.uri()),
+            format!("{}/token", server.uri()),
+        );
+        let client = SpotifyClient::with_http(store, oauth, server.uri());
+        let mut old = SpotifyTokenSet::from_oauth(
+            "old".into(),
+            "refresh".into(),
+            60,
+            "Bearer".into(),
+            vec![],
+        );
+        old.obtained_at = chrono::Utc::now() - chrono::Duration::seconds(120);
+        client.tokens.save(&old).unwrap();
+        let id = contract_client_id();
+        let (a, b) = tokio::join!(client.get_valid_token(&id), client.get_valid_token(&id));
+        assert_eq!(a.unwrap().access_token, "new");
+        assert_eq!(b.unwrap().access_token, "new");
+    }
     #[test]
     fn pkce_challenge_is_deterministic_and_url_safe() {
         const VERIFIER: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";

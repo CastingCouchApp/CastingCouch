@@ -43,11 +43,7 @@ impl OverlayLayoutStore {
     }
 
     pub async fn read_bytes(&self, instance_id: &str) -> Result<Option<Vec<u8>>, LayoutError> {
-        let path = match self.layout_path(instance_id) {
-            Ok(path) => path,
-            Err(LayoutError::InvalidId) => return Ok(None),
-            Err(err) => return Err(err),
-        };
+        let path = self.layout_path(instance_id)?;
         match fs::read(&path).await {
             Ok(bytes) => Ok(Some(bytes)),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),

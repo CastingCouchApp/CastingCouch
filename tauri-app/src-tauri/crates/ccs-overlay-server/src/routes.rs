@@ -31,8 +31,14 @@ pub fn router(state: OverlayState) -> Router {
         .route("/data/overlay-config.json", get(overlay_config))
         .route("/canvas/size-presets", get(size_presets))
         .route("/canvas/{*asset_path}", get(canvas_asset))
-        .route("/editor", get(|| html_kind("editor")))
-        .route("/view", get(|| html_kind("view")))
+        .route(
+            "/editor",
+            get(|State(state): State<OverlayState>| redirect_selected(state, "editor")),
+        )
+        .route(
+            "/view",
+            get(|State(state): State<OverlayState>| redirect_selected(state, "view")),
+        )
         .route(
             "/editor/{instance_id}",
             get(|Path(_id): Path<String>| html_kind("editor")),
@@ -92,11 +98,22 @@ async fn write_origin(request: axum::extract::Request, next: axum::middleware::N
             }
         }
     }
-    next.run(request).await
+    let dynamic = ["/data/", "/layout/", "/chat/", "/obs/", "/health"]
+        .iter()
+        .any(|prefix| request.uri().path().starts_with(prefix));
+    let mut response = next.run(request).await;
+    if dynamic {
+        response.headers_mut().insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store, no-cache, must-revalidate"),
+        );
+    }
+    response
 }
 
 async fn health(State(state): State<OverlayState>) -> impl IntoResponse {
     let mut settings = state.settings.load().await.unwrap_or_default();
+    settings.overlay.web_server_port = state.port;
 
     settings.overlay.ensure_canvases_migrated();
 
@@ -156,7 +173,21 @@ async fn health(State(state): State<OverlayState>) -> impl IntoResponse {
 
 async fn ws_upgrade(ws: WebSocketUpgrade, State(state): State<OverlayState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| async move {
-        state.hub.handle_socket(socket).await;
+        let canvases = state
+            .settings
+            .load()
+            .await
+            .map(|s| s.overlay.canvases)
+            .unwrap_or_default();
+        state
+            .hub
+            .handle_socket(
+                socket,
+                OverlayLayoutStore::new(state.paths.overlay_layouts),
+                canvases,
+                state.shutdown,
+            )
+            .await;
     })
 }
 
@@ -167,28 +198,16 @@ async fn get_layout(
 ) -> Response {
     let store = OverlayLayoutStore::new(&state.paths.overlay_layouts);
 
-    match store.read_bytes(&instance_id).await {
-        Ok(Some(bytes)) => (
-            [(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("application/json"),
-            )],
-            bytes,
+    match store.load(&instance_id).await {
+        Ok(layout) => Json(layout).into_response(),
+        Err(crate::layout_store::LayoutError::InvalidId) => {
+            api_error("invalid instance id").into_response()
+        }
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":error.to_string()})),
         )
             .into_response(),
-
-        Ok(None) | Err(_) => Json(json!({
-
-            "id": instance_id,
-
-            "width": 1920,
-
-            "height": 1080,
-
-            "items": []
-
-        }))
-        .into_response(),
     }
 }
 
@@ -197,14 +216,15 @@ async fn put_layout(
 
     State(state): State<OverlayState>,
 
-    Json(body): Json<Value>,
-) -> Result<impl IntoResponse, StatusCode> {
+    payload: Result<Json<Value>, axum::extract::rejection::JsonRejection>,
+) -> Result<impl IntoResponse, ApiError> {
+    let Json(body) = payload.map_err(|_| api_error("invalid json"))?;
+    if !body.is_object() {
+        return Err(api_error("invalid layout"));
+    }
     let store = OverlayLayoutStore::new(&state.paths.overlay_layouts);
 
-    store
-        .save(&instance_id, &body)
-        .await
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    store.save(&instance_id, &body).await.map_err(api_error)?;
 
     state.hub.publish(&json!({
 
@@ -220,14 +240,19 @@ async fn put_layout(
 
     }));
 
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(body))
 }
 
 async fn overlay_data(State(state): State<OverlayState>) -> Json<Value> {
     Json(state.hub.live.data.read().unwrap().clone())
 }
 async fn overlay_config(State(state): State<OverlayState>) -> Json<Value> {
-    let path = state.paths.data_root.join("data/overlay-config.json");
+    let settings = match state.settings.load().await {
+        Ok(s) => s,
+        Err(_) => return Json(json!({})),
+    };
+    let path = ccs_core::paths::overlay_data_path(&state.paths, &settings)
+        .with_file_name("overlay-config.json");
     Json(
         fs::read(path)
             .await
@@ -426,7 +451,7 @@ async fn chat_asset(Path(file): Path<String>) -> Response {
 async fn chat_config(State(state): State<OverlayState>) -> Result<Json<Value>, ApiError> {
     let settings = state.settings.load().await.map_err(api_error)?;
     let raw = serde_json::to_value(settings.overlay.chat).map_err(api_error)?;
-    let mut config = json!({"backgroundType":"None","backgroundOpacity":100,"paddingPx":12,"borderRadiusPx":0,"gapPx":8,"fontSizePx":24,"fontFamily":"sans-serif"});
+    let mut config = json!({"backgroundType":"None","backgroundColor":"#000000","backgroundOpacity":0.55,"paddingPx":12,"borderRadiusPx":12,"gapPx":6,"fontSizePx":18,"fontFamily":"Segoe UI, system-ui, sans-serif"});
     for (key, value) in raw
         .as_object()
         .ok_or_else(|| api_error("Chat-Konfiguration ungültig"))?
@@ -437,10 +462,56 @@ async fn chat_config(State(state): State<OverlayState>) -> Result<Json<Value>, A
         let camel = format!("{}{}", key[..1].to_ascii_lowercase(), &key[1..]);
         config[camel] = value.clone();
     }
+    for (key, min, max) in [
+        ("backgroundOpacity", 0.0, 1.0),
+        ("paddingPx", 0.0, 120.0),
+        ("borderRadiusPx", 0.0, 64.0),
+        ("gapPx", 0.0, 48.0),
+        ("fontSizePx", 8.0, 72.0),
+    ] {
+        if let Some(value) = config[key].as_f64() {
+            config[key] = if key == "backgroundOpacity" {
+                json!(value.clamp(min, max))
+            } else {
+                json!(value.clamp(min, max) as i64)
+            };
+        }
+    }
+    let kind = config["backgroundType"]
+        .as_str()
+        .unwrap_or("None")
+        .trim()
+        .to_ascii_lowercase();
+    let image = raw["BackgroundImagePath"]
+        .as_str()
+        .map(ccs_core::paths::expand_path)
+        .filter(|p| p.is_file());
+    config["backgroundType"] = json!(match kind.as_str() {
+        "image" if image.is_some() => "Image",
+        "color" => "Color",
+        _ => "None",
+    });
+    config["backgroundVersion"] = json!(image
+        .and_then(|p| std::fs::metadata(p).ok())
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos().to_string())
+        .unwrap_or_else(|| "0".into()));
     Ok(Json(config))
 }
 async fn chat_history(State(state): State<OverlayState>) -> Json<Value> {
-    Json(state.hub.history())
+    let config = state.settings.load().await.ok().map(|s| s.overlay.chat);
+    let mut history = state.hub.history();
+    let limit = config
+        .as_ref()
+        .filter(|c| c.enabled)
+        .map(|c| c.max_buffered_messages.clamp(0, 2000) as usize)
+        .unwrap_or(0);
+    if let Some(events) = history["events"].as_array_mut() {
+        let excess = events.len().saturating_sub(limit);
+        events.drain(..excess);
+    }
+    Json(history)
 }
 async fn chat_background(State(state): State<OverlayState>) -> Response {
     if let Ok(settings) = state.settings.load().await {
@@ -452,11 +523,11 @@ async fn chat_background(State(state): State<OverlayState>) -> Response {
             .and_then(Value::as_str)
         {
             if !path.is_empty() {
-                return serve_file(std::path::PathBuf::from(path)).await;
+                return serve_file(ccs_core::paths::expand_path(path)).await;
             }
         }
     }
-    StatusCode::NO_CONTENT.into_response()
+    StatusCode::NOT_FOUND.into_response()
 }
 
 async fn serve_file(path: std::path::PathBuf) -> Response {
@@ -521,6 +592,8 @@ mod tests {
         std::mem::forget(dir);
 
         OverlayState {
+            port: 8765,
+            shutdown: None,
             overlay_data: paths.overlay_root.join("overlay-data.json"),
 
             settings,
@@ -580,7 +653,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(put.status(), StatusCode::NO_CONTENT);
+        assert_eq!(put.status(), StatusCode::OK);
 
         let get = router_for_tests(state)
             .oneshot(
@@ -619,5 +692,19 @@ mod tests {
                 "{uri}: {html}"
             );
         }
+    }
+}
+
+async fn redirect_selected(state: OverlayState, kind: &str) -> Response {
+    match state.settings.load().await {
+        Ok(settings) => {
+            let id = settings.overlay.selected_canvas().id;
+            (
+                StatusCode::FOUND,
+                [(header::LOCATION, format!("/{kind}/{id}"))],
+            )
+                .into_response()
+        }
+        Err(error) => api_error(error).into_response(),
     }
 }

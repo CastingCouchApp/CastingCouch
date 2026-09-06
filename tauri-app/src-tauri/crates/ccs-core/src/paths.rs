@@ -75,8 +75,81 @@ mod tests {
             paths.overlay_layouts.ends_with("Overlay/layouts")
                 || paths.overlay_layouts.ends_with(r"Overlay\layouts")
         );
-        assert!(
-            paths.backups.ends_with("Backups") || paths.backups.ends_with(r"Backups")
+        assert!(paths.backups.ends_with("Backups") || paths.backups.ends_with(r"Backups"));
+    }
+}
+
+#[cfg(test)]
+mod overlay_path_tests {
+    use super::*;
+    #[test]
+    fn configured_data_path_and_legacy_nested_root_are_respected() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = AppPaths::from_root(dir.path().into());
+        let mut settings = crate::AppSettings::default();
+        assert_eq!(
+            overlay_data_path(&paths, &settings),
+            paths.overlay_root.join("data/overlay-data.json")
+        );
+        settings.overlay.data_file_path = dir.path().join("custom.json").to_string_lossy().into();
+        assert_eq!(
+            overlay_data_path(&paths, &settings),
+            dir.path().join("custom.json")
+        );
+        settings.overlay.data_file_path.clear();
+        settings.overlay.root_path = dir.path().join("imported").to_string_lossy().into();
+        std::fs::create_dir_all(dir.path().join("imported/Overlay/data")).unwrap();
+        std::fs::write(
+            dir.path().join("imported/Overlay/data/overlay-data.json"),
+            "{}",
+        )
+        .unwrap();
+        assert_eq!(
+            overlay_data_path(&paths, &settings),
+            dir.path().join("imported/Overlay/data/overlay-data.json")
         );
     }
+}
+
+pub fn expand_path(value: &str) -> PathBuf {
+    let mut result = value.to_string();
+    for (key, value) in std::env::vars() {
+        result = result.replace(&format!("%{key}%"), &value);
+    }
+    if let Some(rest) = result.strip_prefix("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(rest);
+        }
+    }
+    PathBuf::from(result)
+}
+pub fn overlay_data_path(paths: &AppPaths, settings: &crate::AppSettings) -> PathBuf {
+    let root = if settings.overlay.root_path.trim().is_empty() {
+        paths.overlay_root.clone()
+    } else {
+        expand_path(settings.overlay.root_path.trim())
+    };
+    let nested = root
+        .join("Overlay/data")
+        .join(&settings.overlay.data_file_name);
+    if root.join("Overlay/modules/ui").exists()
+        && (root.join("Overlay/modules/ui/spotify.html").exists()
+            || root.join("Overlay/modules/ui/live-status.html").exists())
+    {
+        return root.join("Overlay/data/overlay-data.json");
+    }
+    if !settings.overlay.data_file_path.trim().is_empty() {
+        return expand_path(settings.overlay.data_file_path.trim());
+    }
+    if nested.exists() {
+        return nested;
+    }
+    let prior = paths
+        .data_root
+        .join("data")
+        .join(&settings.overlay.data_file_name);
+    if settings.overlay.root_path.trim().is_empty() && prior.exists() {
+        return prior;
+    }
+    root.join("data").join(&settings.overlay.data_file_name)
 }

@@ -6,7 +6,7 @@ Stand: 6. September 2026. Referenz ist der vom Nutzer ausgewählte C#-Funktionsu
 
 Workflow/Automatisierungsmodul, externe Steuerung/Multi-PC und kommerzielle Lizenzierung entfallen in Tauri. Workflow-Seite, Navigation, Sidecar-Commands, Supervisor und Shell-Abhängigkeit wurden entfernt. YouTube Music nutzt eine native Rust-HTTP-Bridge. Die vorhandenen WPF-Module und ihre Release-Strecke bleiben verfügbar. Historische Settings-Felder dieser Module werden ausschließlich zur verlustfreien Datenkompatibilität mitgeführt.
 
-DA2 enthält keine Workflow-Steuerung. Die Workflow- und EX-Abhängigkeiten der ursprünglichen Planung entfallen. Musikautomationen MU4 bleiben ein eigenes gewünschtes Paket; MU5 betrifft vorerst interne Alerts. Lokale IPC aus den technischen Vorgaben bleibt als getrennte, noch offene Integrationsentscheidung sichtbar; daraus wird keine neue externe Bedienoberfläche abgeleitet.
+DA2 enthält keine Workflow-Steuerung. Die Workflow- und EX-Abhängigkeiten der ursprünglichen Planung entfallen. Musikautomationen MU4 bleiben ein eigenes gewünschtes Paket; MU5 betrifft vorerst interne Alerts. Lokale IPC aus den technischen Vorgaben ist als Named Pipe unter Windows und Unix-Socket unter macOS umgesetzt; daraus wird keine neue externe Bedienoberfläche abgeleitet.
 
 ## Statusbegriffe
 
@@ -19,13 +19,15 @@ DA2 enthält keine Workflow-Steuerung. Die Workflow- und EX-Abhängigkeiten der 
 
 | Abnahme | ID | Stand | Implementierung und verbleibende Arbeit |
 |---|---|---|---|
-| [ ] | B1 | Teilweise | `editorUrl`, `alertType`, `obsSceneName` korrigiert; UI-Regressionstests und sichtbarer Browser-Demomodus. Native IPC-Tests für Editor öffnen, Alert testen/löschen, Alert-Runtime, Canvas-Update und Settings ergänzt. Weitere Commands und generierte gemeinsame TS/Rust-Typen fehlen. |
-| [ ] | B2 | Implementiert | Canvas-Build vor Packaging; HTML/JS/CSS/Assets in Rust-Binary eingebettet, kein Laufzeitzugriff auf das Repository. CI/Release installiert die Canvas-Abhängigkeiten. Installierte Pakete noch prüfen. |
-| [ ] | B3 | Teilweise | Validierung, Port-Reservierung vor Commit, kontrollierter Austausch des Servers, Rücknahme bei Speicherfehler. Weitere Einstellungen müssen noch vollständig an die Dienste angebunden werden. |
-| [ ] | B4 | Teilweise | Unbekannte verschachtelte Felder einschließlich identifizierter Listeneinträge erhalten; dreiwege Merge verhindert verlorene parallele Änderungen; vorhandene Enum-Konvertierung bleibt. Vollständige reale C#-Datenfixtures und sämtliche Listen-/Enum-Sonderfälle noch prüfen. |
-| [ ] | B5 | Teilweise | Fehlgeschlagene Instanzsperre verhindert Start; EventSub-Abbruch löst Neuverbindung/Subscriptions aus; Token-Refresh vorhanden. Aktivierung der ersten Instanz, durchgängige sichtbare Startfehler und gesamte Wiederanlaufmatrix fehlen. |
-| [ ] | B6 | Teilweise | Hello/Layout-Envelope, Chat-History, Assets/Extensions, Katalog/Presets und Live-OBS-Routen ergänzt. Alle Editor-Nachrichten, Konfigurationen und Solo-Varianten noch systematisch vergleichen. |
-| [ ] | B7 | Teilweise | Periodischer Snapshot mit Musik, OBS, Streamstatus, Branding, Alerts und Countdown; Track-Events, persistente Chat-History. Twitch-Ziele, komplette Sessionstatistik und weitere Legacy-Felder fehlen. |
+| [ ] | B1 | Implementiert | Command-Namen und Argumente sowie OBS-/Twitch-/Spotify-Enums werden aus Rust nach TypeScript erzeugt; Build prüft Drift und falsche Aufrufe. Native IPC prüft zentrale Persistenz-, Port-, Start-, Editor-, Alert- und Chat-Verträge. Browser-Demobetrieb bleibt gekennzeichnet. |
+| [ ] | B2 | Implementiert | Canvas-Build vor Packaging; HTML/JS/CSS/Assets im Rust-Binary eingebettet. Kein Repository-Zugriff zur Laufzeit. CI baut jetzt NSIS/MSI und DMG; Installation und Live-Abnahme bleiben separat offen. |
+| [ ] | B3 | Implementiert | Validierung, Port-Reservierung, Austausch und Rücknahme bei Speicherfehler; alter Server schließt WebSockets. Laufzeitstatus und URLs aktualisiert. OBS-/Twitch-/Spotify-Verbindungsparameter werden angewendet; neue OBS-Zugangsdaten vor der Neuverbindung gespeichert. Teilerfolge werden als gespeicherte Einstellungen mit konkreten Warnungen gemeldet. Nicht portierte Komfortoptionen sind deaktiviert gekennzeichnet. |
+| [ ] | B4 | Implementiert | C#-Default- und mit Listeneinträgen befüllte Modell-Fixtures werden feldweise auf verlustfreien Roundtrip geprüft. Unbekannte verschachtelte Felder und Eintragsidentitäten sowie unveränderte Enum-/Zahlendarstellungen bleiben erhalten. Dreiwege-Merge übernimmt unabhängige Änderungen und meldet Konflikte. |
+| [ ] | B5 | Implementiert | Instanzsperre über einen zweiten echten Prozess geprüft (auch Ok(false) wird abgewiesen). Startfehler erscheinen in der App; ausgefallener Overlay-Server wird erneut gestartet. EventSub-Abbruch und erneute Subscriptions, sichtbare Verbindungsfehler sowie serialisierte Token-Erneuerung geprüft. Erste Instanz wird nicht automatisch fokussiert; zweite Instanz wird verhindert. |
+| [ ] | B6 | Implementiert | C#-Routen abgeglichen: Hello mit Canvas-Katalog, ausgewählter Canvas bei /editor und /view, tatsächlicher Health-Port, Layout-Defaults und persistente WebSocket-Änderungen. Chat-Konfiguration/History, Assets/Extensions, Katalog/Presets und OBS-Antworten angebunden. Weitere Widget-/Pack-Betriebsabnahme gehört zu O2/O4/O6. |
+| [ ] | B7 | Implementiert | Vollständige C#-Snapshot-Felder mit definierten Leer-/Verfügbarkeitszuständen. Unabhängige OBS-/Twitch-Abfragen, gemeinsamer Musik-/Stream-/Alert-/Branding-/Countdown-Datenstand, Twitch-Ziele und laufende Sitzungszähler. Datei und HTTP erhalten benutzerdefinierte Zusatzfelder; konfigurierte Datenpfade und Hardlinks bleiben nutzbar. Historische Sessionberichte bleiben DA3/DA4. |
+
+Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAURI-BASE-ACCEPTANCE.md). Die offenen Checkboxen bezeichnen die plattformübergreifende Abnahme, nicht fehlende Basisimplementierung.
 
 ## Overlay
 
@@ -58,7 +60,7 @@ DA2 enthält keine Workflow-Steuerung. Die Workflow- und EX-Abhängigkeiten der 
 | [ ] | TW2 | Teilweise | EventSub Chat, Senden, Textanzeige und History; abgelehnte Sendebestätigung als Fehler. Reichhaltige App-Darstellung und vollständiger Ereignisfeed fehlen. |
 | [ ] | TW3 | Teilweise | Eigenes Twitch-Popout-WebView; Windows mit eigenem persistenten Profil, macOS Standard-WebView-Speicher. Dauerhafter Login auf beiden Plattformen noch nachzuweisen. |
 | [ ] | TW4 | Teilweise | Ban/Unban/Timeout/Delete-Backend, UI für Timeout/Löschen/Clear; EventSub-Synchronisierung. Vollständige Moderationsoberfläche fehlt. |
-| [ ] | TW5 | Teilweise | Helix-Abfragen und einfache Anzeige für Follower/Subs/Chatter. Ziele, konsistente Viewer-Daten und Overlay-Ziele fehlen. |
+| [ ] | TW5 | Teilweise | Helix-Abfragen und einfache Anzeige für Follower/Subs/Chatter. B7 versorgt Viewer-Daten und vorhandene Zielkonfiguration im Overlay; der vollständige Ziele-Editor fehlt. |
 | [ ] | TW6 | Teilweise | Kanal-/Live-/Followed-Suche und ausgehender Raid; Backend für Abbruch. Vollständiger Community-Ablauf noch prüfen. |
 | [ ] | TW7 | Teilweise | Reward erstellen/anzeigen; Einlösungen laden und Status ändern. Reward bearbeiten/löschen und vollständiger Verwaltungsablauf fehlen. |
 | [ ] | TW8 | Teilweise | Polls/Predictions erstellen, laden, beenden/auflösen. Vollständige C#-Optionen und Ereignissynchronisierung fehlen. |
@@ -108,7 +110,7 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 
 ## Nächste Umsetzungsschritte
 
-1. Weitere native Command-Verträge und OBS-Playback mit Verbindungsabbrüchen/Stopprennen absichern; bestehende C#-Datenfixtures vollständig übernehmen.
+1. Installierte Pakete und echte Dienstverbindungen abnehmen; weitere Alert-Playback-Abbruchfälle im Feature-Paket AL2/AL3 prüfen.
 2. B5–B7 und O5/O6 vervollständigen; vollständige Twitch-Daten-/Zielversorgung und Sessionerfassung als Grundlage für DA3/DA4.
 3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung, Alert-Sound und Musikautomationen/Ducking/Zustände fertigstellen.
 4. Dashboard, Einrichtung, Rechtstexte, Profile, Migration/Backups und Diagnostik umsetzen.
@@ -132,3 +134,9 @@ Die Dienste-Seite bietet jetzt Profile, Szenensammlungen und Übergänge, Scene 
 Neue Tests prüfen echte Tauri-Command-Deserialisierung, OBS-WebSocket-Abfragen und Fehlerantworten sowie UI-Auswahl, Mute, Sichtbarkeit und gezielte Transformationsänderungen. Die kontrollierte WebSocket-Gegenstelle ersetzt keine Live-Abnahme. Vollständige Filterparameter, sämtliche quellentypspezifischen Einstellungen und laufende Synchronisierung externer OBS-Änderungen bleiben offen.
 
 Validierung: 157 Rust-Tests, 51 Frontend-Tests und TypeScript-/Vite-Build erfolgreich. Windows-/macOS-Installations- und Live-Abnahme bleiben offen.
+
+## Fortsetzung: Basis B1–B7
+
+Die technische Basis ist implementiert. Die Instanzsperre wurde durch einen Test mit einem zweiten Prozess korrigiert; der vorherige Stand wertete `Ok(false)` fälschlich als Erfolg. Weitere gefundene und behobene Fehler: Editor-WebSocket-Frames ohne Speicherung, unvollständiges Hello, falsche Layout-Defaults und Health-Ports, veränderte C#-Wertdarstellungen, parallele Token-Erneuerungen und verlorene Hardlinks bzw. Zusatzfelder bei der Datenversorgung.
+
+Nicht portierte Desktop-Komfortoptionen und Drittanbieter-Emotes werden in den Einstellungen als noch nicht verfügbar angezeigt. Diese Feature-Arbeit bleibt in SYS7/O6; sie wird nicht als abgeschlossen gezählt. Windows-/macOS-Installation, echte OAuth-/OBS-Verbindungen und ein vollständiger Streamablauf sind weiterhin nicht abgenommen.

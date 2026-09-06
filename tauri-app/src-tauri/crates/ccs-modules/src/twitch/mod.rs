@@ -85,6 +85,9 @@ pub struct TwitchClient {
     current_user: RwLock<Option<TwitchHelixUser>>,
     login_task: Mutex<Option<JoinHandle<()>>>,
     cancel_login: AtomicBool,
+    want_connected: AtomicBool,
+    expect_eventsub: AtomicBool,
+    token_refresh: Mutex<()>,
 }
 
 impl TwitchClient {
@@ -108,6 +111,9 @@ impl TwitchClient {
             current_user: RwLock::new(None),
             login_task: Mutex::new(None),
             cancel_login: AtomicBool::new(false),
+            want_connected: AtomicBool::new(false),
+            expect_eventsub: AtomicBool::new(false),
+            token_refresh: Mutex::new(()),
         }
     }
 
@@ -142,7 +148,18 @@ impl TwitchClient {
     }
 
     pub async fn status(&self) -> ServiceStatus {
-        self.status.read().await.clone()
+        let mut status = self.status.read().await.clone();
+        if status.state == ConnectionState::Connected
+            && self.expect_eventsub.load(Ordering::SeqCst)
+            && self.eventsub_url.is_some()
+            && !self.eventsub.is_running()
+        {
+            status.state = ConnectionState::Error;
+            status.detail =
+                "Twitch EventSub getrennt; Wiederverbindung oder erneute Anmeldung erforderlich."
+                    .into();
+        }
+        status
     }
 
     pub fn subscribe_status(&self) -> broadcast::Receiver<ServiceStatus> {
@@ -158,9 +175,13 @@ impl TwitchClient {
     }
 
     pub async fn needs_eventsub_reconnect(&self) -> bool {
-        self.current_user.read().await.is_some()
-            && self.eventsub_url.is_some()
-            && !self.eventsub.is_running()
+        self.needs_reconnect(true).await
+    }
+    pub async fn needs_reconnect(&self, eventsub_enabled: bool) -> bool {
+        self.want_connected.load(Ordering::SeqCst)
+            && self.has_token()
+            && (self.status().await.state == ConnectionState::Error
+                || (eventsub_enabled && self.eventsub_url.is_some() && !self.eventsub.is_running()))
     }
 
     pub fn has_token(&self) -> bool {
@@ -238,6 +259,17 @@ impl TwitchClient {
 
     /// Validate token + Helix /users. Sets connected with display name.
     pub async fn connect(&self, options: &TwitchConnectOptions) -> ModuleResult<ServiceStatus> {
+        self.want_connected.store(true, Ordering::SeqCst);
+        self.expect_eventsub
+            .store(options.enable_event_sub, Ordering::SeqCst);
+        let result = self.connect_inner(options).await;
+        if let Err(error) = &result {
+            self.set_status(ConnectionState::Error, error.to_string())
+                .await;
+        }
+        result
+    }
+    async fn connect_inner(&self, options: &TwitchConnectOptions) -> ModuleResult<ServiceStatus> {
         TwitchOAuthClient::validate_client_id(&options.client_id)?;
         self.eventsub.stop().await;
         self.set_status(ConnectionState::Connecting, "Verbinde …")
@@ -293,8 +325,10 @@ impl TwitchClient {
 
     /// Delete token from secret store and clear connection state.
     pub async fn logout(&self) -> ModuleResult<ServiceStatus> {
+        self.want_connected.store(false, Ordering::SeqCst);
         self.cancel_pending_login().await;
         self.eventsub.stop().await;
+        let _guard = self.token_refresh.lock().await;
         self.tokens.delete()?;
         *self.current_user.write().await = None;
         self.set_status(ConnectionState::Disconnected, "").await;
@@ -309,6 +343,7 @@ impl TwitchClient {
     }
 
     async fn get_valid_token(&self, client_id: &str) -> ModuleResult<TwitchTokenSet> {
+        let _guard = self.token_refresh.lock().await;
         let mut token = self
             .tokens
             .load()?
@@ -351,6 +386,21 @@ mod tests {
         "contract-client-id-12345".into()
     }
 
+    #[tokio::test]
+    async fn failed_connection_does_not_remain_connecting() {
+        let client = TwitchClient::new(Arc::new(MemorySecretStore::new()));
+        let result = client
+            .connect(&TwitchConnectOptions {
+                client_id: contract_client_id(),
+                channel_name: String::new(),
+                scopes: vec![],
+                enable_event_sub: false,
+            })
+            .await;
+        assert!(result.is_err());
+        assert_eq!(client.status().await.state, ConnectionState::Error);
+        assert!(!client.status().await.detail.is_empty());
+    }
     #[test]
     fn token_repository_roundtrip_and_delete() {
         let store = Arc::new(MemorySecretStore::new());

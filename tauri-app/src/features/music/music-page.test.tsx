@@ -11,7 +11,7 @@ import { defaultAppSettings } from "../../lib/app-settings";
 const invokeMock = vi.fn();
 vi.mock("../../lib/api", async (original) => ({
     ...(await original<typeof import("../../lib/api")>()),
-    tauriInvoke: (cmd: string, args: unknown) => invokeMock(cmd, args),
+    tauriInvoke: (cmd: string, args: unknown) => (cmd === "startup_error" ? Promise.resolve(null) : cmd === "overlay_runtime_status" ? Promise.resolve({ running: true, error: null }) : invokeMock(cmd, args)),
 }));
 function renderMusic() {
     const client = new QueryClient({

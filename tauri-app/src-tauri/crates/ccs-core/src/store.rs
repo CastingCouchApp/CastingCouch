@@ -61,7 +61,7 @@ impl JsonSettingsStore {
         if self.path.exists() {
             let raw: Value = serde_json::from_slice(&fs::read(&self.path).await?)?;
             let known = serde_json::to_value(serde_json::from_value::<AppSettings>(raw.clone())?)?;
-            preserve_unknown(&raw, &known, &mut next);
+            preserve_unknown(&raw, &known, &mut next, true);
         }
         self.write_value(&next).await
     }
@@ -70,7 +70,7 @@ impl JsonSettingsStore {
         let known = serde_json::to_value(self.load().await?)?;
         let raw: Value = serde_json::from_slice(&fs::read(&self.path).await?)?;
         let mut result = known.clone();
-        preserve_unknown(&raw, &known, &mut result);
+        preserve_unknown(&raw, &known, &mut result, false);
         Ok(result)
     }
 
@@ -84,10 +84,11 @@ impl JsonSettingsStore {
         let raw: Value = serde_json::from_slice(&fs::read(&self.path).await?)?;
         let known = serde_json::to_value(serde_json::from_value::<AppSettings>(raw.clone())?)?;
         let mut current = known.clone();
-        preserve_unknown(&raw, &known, &mut current);
+        preserve_unknown(&raw, &known, &mut current, false);
         merge_edit(original, edited, &mut current, "")?;
         let settings: AppSettings = serde_json::from_value(current.clone())?;
         validate_settings(&settings)?;
+        preserve_unknown(&raw, &known, &mut current, true);
         self.write_value(&current).await?;
         Ok(current)
     }
@@ -119,7 +120,12 @@ impl JsonSettingsStore {
     }
 }
 
-fn preserve_unknown(raw: &Value, known: &Value, next: &mut Value) {
+fn preserve_unknown(raw: &Value, known: &Value, next: &mut Value, representation: bool) {
+    // Keep legacy enum/number representation when a typed save did not edit its value.
+    if representation && !known.is_object() && !known.is_array() && next == known {
+        *next = raw.clone();
+        return;
+    }
     if let (Some(raw), Some(known), Some(next)) =
         (raw.as_array(), known.as_array(), next.as_array_mut())
     {
@@ -134,7 +140,7 @@ fn preserve_unknown(raw: &Value, known: &Value, next: &mut Value) {
             };
             if let Some(i) = old_index {
                 if let (Some(original), Some(old)) = (raw.get(i), known.get(i)) {
-                    preserve_unknown(original, old, new);
+                    preserve_unknown(original, old, new, representation);
                 }
             }
         }
@@ -146,7 +152,7 @@ fn preserve_unknown(raw: &Value, known: &Value, next: &mut Value) {
         for (key, value) in raw {
             if let Some(old) = known.get(key) {
                 if let Some(new) = next.get_mut(key) {
-                    preserve_unknown(value, old, new);
+                    preserve_unknown(value, old, new, representation);
                 }
             } else {
                 next.entry(key.clone()).or_insert_with(|| value.clone());
