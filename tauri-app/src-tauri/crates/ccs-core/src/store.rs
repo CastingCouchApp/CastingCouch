@@ -225,6 +225,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn load_accepts_wpf_twitch_enum_integers() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "SchemaVersion": 2,
+                "Twitch": {
+                    "ChatUiMode": 1,
+                    "StreamEndMode": 2
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let loaded = JsonSettingsStore::new(&path).load().await.unwrap();
+        assert_eq!(loaded.twitch.chat_ui_mode, "EmbeddedWeb");
+        assert_eq!(loaded.twitch.extra["StreamEndMode"], 2);
+    }
+
+    #[tokio::test]
     async fn sidecar_enabled_roundtrip() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("settings.json");

@@ -321,7 +321,11 @@ pub struct TwitchSettings {
     pub creator_dashboard_url: String,
     #[serde(default = "default_true")]
     pub enable_chat: bool,
-    #[serde(default)]
+    #[serde(
+        default = "default_chat_ui_mode",
+        deserialize_with = "deserialize_chat_ui_mode",
+        serialize_with = "serialize_chat_ui_mode"
+    )]
     pub chat_ui_mode: String,
     #[serde(default = "default_true")]
     pub enable_event_sub: bool,
@@ -342,13 +346,71 @@ impl Default for TwitchSettings {
             connect_on_prepare: true,
             creator_dashboard_url: String::new(),
             enable_chat: true,
-            chat_ui_mode: "BuiltIn".into(),
+            chat_ui_mode: default_chat_ui_mode(),
             enable_event_sub: true,
             use_device_code_flow: true,
             scopes: default_twitch_scopes(),
             extra: serde_json::Value::Object(Default::default()),
         }
     }
+}
+
+fn default_chat_ui_mode() -> String {
+    "BuiltIn".into()
+}
+
+fn chat_ui_mode_from_index(index: u64) -> String {
+    match index {
+        1 => "EmbeddedWeb".into(),
+        _ => default_chat_ui_mode(),
+    }
+}
+
+fn normalize_chat_ui_mode(value: &str) -> String {
+    if value.eq_ignore_ascii_case("EmbeddedWeb") || value == "1" {
+        "EmbeddedWeb".into()
+    } else {
+        default_chat_ui_mode()
+    }
+}
+
+fn deserialize_chat_ui_mode<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct ChatUiModeVisitor;
+    impl<'de> serde::de::Visitor<'de> for ChatUiModeVisitor {
+        type Value = String;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("TwitchChatUiMode as string or integer")
+        }
+
+        fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Self::Value, E> {
+            Ok(chat_ui_mode_from_index(v))
+        }
+
+        fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Self::Value, E> {
+            Ok(chat_ui_mode_from_index(v.max(0) as u64))
+        }
+
+        fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+            Ok(normalize_chat_ui_mode(v))
+        }
+    }
+
+    deserializer.deserialize_any(ChatUiModeVisitor)
+}
+
+fn serialize_chat_ui_mode<S>(value: &str, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_u64(if value.eq_ignore_ascii_case("EmbeddedWeb") {
+        1
+    } else {
+        0
+    })
 }
 
 fn default_spotify_redirect() -> String {
@@ -1041,6 +1103,30 @@ mod tests {
         assert!(!parsed.enabled);
         assert!(parsed.definitions.contains_key("Follow"));
         assert!(parsed.definitions.contains_key("Cheer"));
+    }
+
+    #[test]
+    fn twitch_chat_ui_mode_accepts_wpf_enum_integer() {
+        let parsed: TwitchSettings = serde_json::from_str(
+            r#"{ "ChatUiMode": 1, "StreamEndMode": 2, "ChannelName": "demo" }"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.chat_ui_mode, "EmbeddedWeb");
+        assert_eq!(parsed.channel_name, "demo");
+        assert_eq!(parsed.extra["StreamEndMode"], 2);
+
+        let built_in: TwitchSettings =
+            serde_json::from_str(r#"{ "ChatUiMode": 0 }"#).unwrap();
+        assert_eq!(built_in.chat_ui_mode, "BuiltIn");
+
+        let as_string: TwitchSettings =
+            serde_json::from_str(r#"{ "ChatUiMode": "EmbeddedWeb" }"#).unwrap();
+        assert_eq!(as_string.chat_ui_mode, "EmbeddedWeb");
+
+        let back = serde_json::to_value(&parsed).unwrap();
+        assert_eq!(back["ChatUiMode"], 1);
+        assert_eq!(back["StreamEndMode"], 2);
+        assert_eq!(back["ChannelName"], "demo");
     }
 
     #[test]
