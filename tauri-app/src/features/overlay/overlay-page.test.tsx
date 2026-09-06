@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from "@testing-library/react";
 import {
     RouterProvider,
     createMemoryHistory,
@@ -70,6 +76,7 @@ describe("Overlay canvas page", () => {
                 if (cmd === "get_settings") {
                     return defaultAppSettings();
                 }
+                if (cmd === "obs_scenes") return [];
                 if (cmd === "list_canvases") {
                     return canvases;
                 }
@@ -102,9 +109,13 @@ describe("Overlay canvas page", () => {
             await screen.findByRole("heading", { name: "Overlay" }),
         ).toBeInTheDocument();
         expect(screen.getByText("Canvas anlegen")).toBeInTheDocument();
-        expect(await screen.findByText("Canvas")).toBeInTheDocument();
         expect(
-            screen.getByText("http://127.0.0.1:8765/view/default"),
+            await screen.findByRole("cell", { name: "Canvas" }),
+        ).toBeInTheDocument();
+        expect(
+            within(screen.getByRole("table")).getByText(
+                "http://127.0.0.1:8765/view/default",
+            ),
         ).toBeInTheDocument();
         expect(screen.getByText("View-URL")).toBeInTheDocument();
         expect(screen.getByText("Aktionen")).toBeInTheDocument();

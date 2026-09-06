@@ -19,7 +19,7 @@ DA2 enthält keine Workflow-Steuerung. Die Workflow- und EX-Abhängigkeiten der 
 
 | Abnahme | ID | Stand | Implementierung und verbleibende Arbeit |
 |---|---|---|---|
-| [ ] | B1 | Teilweise | `editorUrl`, `alertType`, `obsSceneName` korrigiert; UI-Regressionstests und sichtbarer Browser-Demomodus. Native IPC-Tests aller Commands und generierte gemeinsame TS/Rust-Typen fehlen. |
+| [ ] | B1 | Teilweise | `editorUrl`, `alertType`, `obsSceneName` korrigiert; UI-Regressionstests und sichtbarer Browser-Demomodus. Native IPC-Tests für Editor öffnen, Alert testen/löschen, Alert-Runtime, Canvas-Update und Settings ergänzt. Weitere Commands und generierte gemeinsame TS/Rust-Typen fehlen. |
 | [ ] | B2 | Implementiert | Canvas-Build vor Packaging; HTML/JS/CSS/Assets in Rust-Binary eingebettet, kein Laufzeitzugriff auf das Repository. CI/Release installiert die Canvas-Abhängigkeiten. Installierte Pakete noch prüfen. |
 | [ ] | B3 | Teilweise | Validierung, Port-Reservierung vor Commit, kontrollierter Austausch des Servers, Rücknahme bei Speicherfehler. Weitere Einstellungen müssen noch vollständig an die Dienste angebunden werden. |
 | [ ] | B4 | Teilweise | Unbekannte verschachtelte Felder einschließlich identifizierter Listeneinträge erhalten; dreiwege Merge verhindert verlorene parallele Änderungen; vorhandene Enum-Konvertierung bleibt. Vollständige reale C#-Datenfixtures und sämtliche Listen-/Enum-Sonderfälle noch prüfen. |
@@ -35,7 +35,7 @@ DA2 enthält keine Workflow-Steuerung. Die Workflow- und EX-Abhängigkeiten der 
 | [ ] | O2 | Teilweise | Gemeinsamer vollständiger Canvas-Frontend-Build wird eingebettet. Backend-Verträge und alle Widgets benötigen noch gemeinsame Betriebsprüfung. |
 | [ ] | O3 | Implementiert | Import, Auflistung, Anzeige/URL-Auswahl und echte Löschung; WPF-Indexformat und bestehende IDs, 15-MB-Limit; echter HTTP-Test. Bildinhalt wird wie bisher über Dateiendung akzeptiert. |
 | [ ] | O4 | Teilweise | ZIP-Installation, Katalog, atomarer Austausch und Deinstallation; Pfad-/Datei-/Größen-/Referenzvalidierung; ungültiges Update erhält vorheriges Pack. Gesamte C#-Validierungsmatrix und alle Pack-Varianten noch abgleichen. |
-| [ ] | O5 | Teilweise | Live-Videoeinstellungen und PNG-Screenshot aus OBS. Browserquellen-Assistent fehlt. |
+| [ ] | O5 | Teilweise | Live-Videoeinstellungen und PNG-Screenshot aus OBS; Browserquellen-Assistent mit Canvas-/Szenen-/Namenswahl ergänzt. Erstellt oder aktualisiert Browserquellen mit Layout-Größe und aktueller URL. Fremde Quellentypen werden abgelehnt; vorhandene Position/Sichtbarkeit bleiben erhalten. WebSocket- und UI-Vertragstests vorhanden; Betriebsabnahme steht aus. |
 | [ ] | O6 | Teilweise | Standalone-Chat-Frontend, Hintergrund und Konfiguration; Twitch-Fragments mit nativen Emotes, History und Moderationsbereinigung. Badge-Kataloge, BTTV/FFZ/7TV, alle Chat-Settings und Solo-/Canvas-Abnahme fehlen. |
 | [ ] | O7 | Implementiert | Start/Stopp/Zeitänderung im Dashboard; Snapshot und WebSocket-Zustand für spät verbundene Clients; unabhängig vom Workflow. |
 
@@ -48,7 +48,7 @@ DA2 enthält keine Workflow-Steuerung. Die Workflow- und EX-Abhängigkeiten der 
 | [ ] | OBS3 | Teilweise | Typisierte Backend-Befehle für Profile, Sammlungen und Übergänge/Dauer; Auswahl-/Verwaltungsoberfläche fehlt. |
 | [ ] | OBS4 | Teilweise | Backend-Befehle für Quellen, Scene Items, Transformation und Filter sowie Alert-Quelleneinrichtung. Vollständiger Editor fehlt. |
 | [ ] | OBS5 | Teilweise | Backend für Mute, Lautstärke, Monitoring, Sync-Offset. Geräte-/Quellenanzeige und Audiobedienung fehlen. |
-| [ ] | OBS6 | Teilweise | Regelmäßige Ausgangsstatus-/FPS-/CPU-Abfrage und Fehleranzeige. Umfassendes Monitoring und Verhalten bei nicht unterstützten Ausgängen fehlen. |
+| [ ] | OBS6 | Teilweise | Regelmäßige Ausgangsstatus-/FPS-/CPU-Abfrage und Fehleranzeige. Optionale Ausgangsfehler werden einzeln angezeigt; Streamstatus bleibt erhalten. Bei fehlendem Status bleiben Schaltflächen deaktiviert. Umfassendes Monitoring fehlt. |
 
 ## Twitch
 
@@ -102,14 +102,25 @@ DA2 enthält keine Workflow-Steuerung. Die Workflow- und EX-Abhängigkeiten der 
 
 Automatisiert geprüft: Rust-Workspace, Frontend-Vitest, TypeScript und Produktions-Frontend-Build. Zusätzliche Tests betreffen Settings-Konflikte und unbekannte Daten, Canvas-Identität, eingebettete Distribution, Asset-/ZIP-Persistenz, echte Loopback-HTTP-Aufrufe, Chat-Fragments/History/Moderation, Countdown, Spotify-HTTP/OAuth und OBS-Request-Felder.
 
-HTTP-Tests verwenden echte lokale Server mit temporären Daten. Spotify/Twitch-Tests verwenden kontrollierte lokale Gegenstellen; sie belegen keine Berechtigung oder Erreichbarkeit eines echten Accounts. OBS-Renderer hat noch keinen vollständigen Playback-Integrationstest. Native Tauri-IPC ist noch nicht vollständig durchtestsichert. Kein Live-Stream wurde ausgelöst.
+HTTP-Tests verwenden echte lokale Server mit temporären Daten. Spotify/Twitch-Tests verwenden kontrollierte lokale Gegenstellen; sie belegen keine Berechtigung oder Erreichbarkeit eines echten Accounts. OBS-Renderer hat WebSocket-Integrationstests für Playback/Stoppen ohne Quellenerstellung und sichtbare Fehler beim Ausblenden. Native Tauri-IPC prüft zentrale Commands einschließlich belegtem Server-Port und echter Persistenz; weitere Commands bleiben offen. Kein Live-Stream wurde ausgelöst.
 
 Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: Datenmigration, Verbindungen, OBS-Browserquellen, Chat/Musik/Alerts, Abbruch/Wiederanlauf, Neustart/Persistenz und Updateabschluss. WPF bleibt bis zu dieser Abnahme verfügbar.
 
 ## Nächste Umsetzungsschritte
 
-1. Native Command-Verträge und OBS-Playback mit Fehler-/Stopprennen absichern; bestehende C#-Datenfixtures vollständig übernehmen.
+1. Weitere native Command-Verträge und OBS-Playback mit Verbindungsabbrüchen/Stopprennen absichern; bestehende C#-Datenfixtures vollständig übernehmen.
 2. B5–B7 und O5/O6 vervollständigen; vollständige Twitch-Daten-/Zielversorgung und Sessionerfassung als Grundlage für DA3/DA4.
 3. OBS3–5-Oberflächen, Twitch-Verwaltung, Alert-Sound und Musikautomationen/Ducking/Zustände fertigstellen.
 4. Dashboard, Einrichtung, Rechtstexte, Profile, Migration/Backups und Diagnostik umsetzen.
 5. Windows-/macOS-Installer bauen und jeden gewählten Nutzerablauf dokumentiert abnehmen; erst danach Cutover entscheiden.
+
+
+## Fortsetzung: OBS-Einrichtung und Vertragsprüfung
+
+- O5: Assistent auf der Overlay-Seite; eine vorhandene Browserquelle wird nur bezüglich URL/Breite/Höhe aktualisiert. Existiert sie bereits in der Zielszene, wird kein zusätzliches Szenenelement erzeugt. OBS-Fehler werden an die Oberfläche weitergereicht.
+- B1/B3: Tests laufen über `tauri::test::get_ipc_response` und die tatsächlichen Command-Makros, mit temporärem Settings-Verzeichnis. Der Tauri-Fenster-Runtime wird simuliert, die Argumentdeserialisierung und Fachlogik nicht. Portkonflikte werden mit einem real belegten lokalen Port geprüft.
+- OBS6: Ein Fehler beim virtuellen Kamera-/Replay-/Aufnahmestatus vernichtet nicht mehr den erfolgreich gelesenen Streamstatus. Fehlerzustände werden nicht als „gestoppt“ ausgegeben.
+- AL2/AL3: Stoppen führt alle Cleanup-Operationen aus; Fehler beim Stoppen/Ausblenden bleiben in der Runtime sichtbar. Die Tests verwenden eine lokale OBS-WebSocket-Gegenstelle und prüfen konkrete Requests.
+- Windows: Common-Controls-v6-Manifest wird einmalig vom Linker für App und Tests eingebettet; Tauri-Ressourcen enthalten kein zweites Manifest. Keine Änderung am Berechtigungsniveau.
+
+Validierung dieses Schritts: 154 Rust-Tests (Workspace einschließlich ergänzter nativer IPC-Prüfung), 47 Frontend-Tests sowie TypeScript-/Vite-Produktionsbuild. Die Windows-/macOS-Abnahme mit echten OBS-/Twitch-/Musikverbindungen und installiertem Paket bleibt offen.

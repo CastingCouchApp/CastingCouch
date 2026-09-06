@@ -154,6 +154,42 @@ async fn spotify_query(
         .map_err(|e| e.to_string())
 }
 #[tauri::command]
+async fn setup_overlay_source(
+    state: State<'_, AppState>,
+    canvas_id: String,
+    scene_name: String,
+    input_name: String,
+) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    if !settings.overlay.canvases.iter().any(|c| c.id == canvas_id) {
+        return Err("Canvas existiert nicht".into());
+    }
+    let layout = OverlayLayoutStore::new(state.paths.overlay_layouts.clone())
+        .load(&canvas_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let width = layout["canvasWidth"]
+        .as_u64()
+        .and_then(|n| u32::try_from(n).ok())
+        .ok_or("Canvas-Breite fehlt")?;
+    let height = layout["canvasHeight"]
+        .as_u64()
+        .and_then(|n| u32::try_from(n).ok())
+        .ok_or("Canvas-Höhe fehlt")?;
+    state
+        .obs
+        .ensure_overlay_source(
+            &scene_name,
+            &input_name,
+            &settings.overlay.view_url(&canvas_id),
+            width,
+            height,
+        )
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn obs_control(state: State<'_, AppState>, control: ObsControl) -> Result<Value, String> {
     state.obs.control(control).await.map_err(|e| e.to_string())
 }
@@ -354,8 +390,8 @@ async fn update_canvas(
 }
 
 #[tauri::command]
-async fn open_overlay_editor(
-    app: AppHandle,
+async fn open_overlay_editor<R: tauri::Runtime>(
+    app: AppHandle<R>,
     id: String,
     name: String,
     editor_url: String,
@@ -928,6 +964,7 @@ pub fn run() {
             spotify_action,
             spotify_query,
             obs_control,
+            setup_overlay_source,
             obs_output_status,
             ytm_connect,
             ytm_disconnect,
@@ -1194,3 +1231,6 @@ fn spawn_status_forward(app: AppHandle, mut rx: broadcast::Receiver<ServiceStatu
         }
     });
 }
+
+#[cfg(test)]
+mod command_tests;

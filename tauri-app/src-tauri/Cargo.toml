@@ -41,3 +41,7 @@ ccs-modules = { path = "crates/ccs-modules" }
 panic = "abort"
 codegen-units = 1
 lto = true
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+tempfile = "3"

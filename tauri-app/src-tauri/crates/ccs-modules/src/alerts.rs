@@ -513,7 +513,13 @@ async fn worker_loop(inner: Arc<AlertEngineInner>) {
                     _=stopped.changed()=>{},
                 }
                 if let Some(obs) = &obs {
-                    crate::alert_renderer::hide(obs, &settings.alerts).await;
+                    if let Err(cleanup) = crate::alert_renderer::hide(obs, &settings.alerts).await {
+                        let mut error = inner.last_error.lock().unwrap();
+                        *error = Some(match error.take() {
+                            Some(playback) => format!("{playback}; {cleanup}"),
+                            None => cleanup,
+                        });
+                    }
                 }
                 *inner.current.lock().unwrap() = None;
                 inner.pending.fetch_sub(1, Ordering::SeqCst);

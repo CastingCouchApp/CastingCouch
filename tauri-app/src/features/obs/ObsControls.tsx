@@ -9,10 +9,11 @@ type Output = {
 };
 type Outputs = {
     stream: Output;
-    record: Output;
-    replay: Output;
-    camera: Output;
-    stats: { activeFps?: number; cpuUsage?: number };
+    record: Output | null;
+    replay: Output | null;
+    camera: Output | null;
+    stats: { activeFps?: number; cpuUsage?: number } | null;
+    errors?: Record<string, string>;
 };
 export function ObsControls({ enabled }: { enabled: boolean }) {
     const client = useQueryClient();
@@ -28,10 +29,20 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
         onSuccess: () =>
             void client.invalidateQueries({ queryKey: ["obs-outputs"] }),
     });
+    const available = (action: string) => {
+        const key = action.includes("replay")
+            ? "replay"
+            : action.includes("virtual")
+              ? "camera"
+              : action.includes("record")
+                ? "record"
+                : "stream";
+        return Boolean(status.data?.[key]) && !status.isError;
+    };
     const button = (action: string, label: string) => (
         <Button
             key={action}
-            disabled={!enabled || control.isPending}
+            disabled={!enabled || control.isPending || !available(action)}
             onClick={() => control.mutate(action)}
         >
             {label}
@@ -43,9 +54,11 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
             <p>
                 {!enabled
                     ? "OBS nicht verbunden"
-                    : status.data?.stream?.outputActive
-                      ? "Stream läuft"
-                      : "Stream gestoppt"}
+                    : status.isError || !status.data?.stream
+                      ? "Streamstatus unbekannt"
+                      : status.data.stream.outputActive
+                        ? "Stream läuft"
+                        : "Stream gestoppt"}
             </p>
             <div className="flex flex-wrap gap-2">
                 {button(
@@ -100,6 +113,11 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
                     {status.data.stats.cpuUsage?.toFixed(1)} %
                 </p>
             )}
+            {Object.entries(status.data?.errors ?? {}).map(([key, error]) => (
+                <p key={key} role="status">
+                    {key}: {error}
+                </p>
+            ))}
             {(status.error || control.error) && (
                 <p role="alert">{String(control.error ?? status.error)}</p>
             )}

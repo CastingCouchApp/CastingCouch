@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
+import { ObsSourceSetup } from "../features/overlay/ObsSourceSetup";
 import { OverlayLibrary } from "../features/overlay/OverlayLibrary";
 import { queryKeys, tauriInvoke, type CanvasDto } from "../lib/api";
 
@@ -265,6 +266,7 @@ function OverlayPage() {
                     </tbody>
                 </table>
             </Card>
+            <ObsSourceSetup canvases={rows} />
             {healthUrl.data && (
                 <OverlayLibrary
                     baseUrl={healthUrl.data.replace(/\/health$/, "")}

@@ -120,15 +120,108 @@ impl ObsClient {
         let (name, data) = control.request();
         self.send_request(name, Some(data)).await
     }
+    /// Explicit user action: create a browser source or update its URL and dimensions.
+    /// Existing scene-item visibility, transforms, filters and other input settings survive.
+    pub async fn ensure_overlay_source(
+        &self,
+        scene: &str,
+        input: &str,
+        url: &str,
+        width: u32,
+        height: u32,
+    ) -> ModuleResult<Value> {
+        if scene.trim().is_empty()
+            || input.trim().is_empty()
+            || !(1..=16384).contains(&width)
+            || !(1..=16384).contains(&height)
+        {
+            return Err(crate::ModuleError::Message(
+                "Szene, Quellenname und gültige Canvas-Größe sind erforderlich.".into(),
+            ));
+        }
+        let address =
+            url::Url::parse(url).map_err(|e| crate::ModuleError::Message(e.to_string()))?;
+        if address.scheme() != "http"
+            || address.host_str() != Some("127.0.0.1")
+            || !address.path().starts_with("/view/")
+        {
+            return Err(crate::ModuleError::Message(
+                "Lokale Canvas-URL erwartet.".into(),
+            ));
+        }
+        let scenes = self.get_scene_list().await?;
+        if !scenes.iter().any(|s| s.name == scene) {
+            return Err(crate::ModuleError::Message(
+                "OBS-Zielszene existiert nicht.".into(),
+            ));
+        }
+        let inputs = self.send_request("GetInputList", None).await?;
+        let entries = inputs["inputs"]
+            .as_array()
+            .ok_or_else(|| crate::ModuleError::Message("Ungültige OBS-Quellenliste".into()))?;
+        let settings = json!({"url":url,"width":width,"height":height});
+        if let Some(existing) = entries.iter().find(|i| i["inputName"] == input) {
+            if existing["inputKind"] != "browser_source"
+                && existing["unversionedInputKind"] != "browser_source"
+            {
+                return Err(crate::ModuleError::Message(
+                    "Dieser Quellenname gehört zu einer anderen Quellenart.".into(),
+                ));
+            }
+            let items = self
+                .send_request("GetSceneItemList", Some(json!({"sceneName":scene})))
+                .await?;
+            let items = items["sceneItems"].as_array().ok_or_else(|| {
+                crate::ModuleError::Message("Ungültige OBS-Szenenelemente".into())
+            })?;
+            self.send_request(
+                "SetInputSettings",
+                Some(json!({"inputName":input,"inputSettings":settings,"overlay":true})),
+            )
+            .await?;
+            let attached = items.iter().any(|i| i["sourceName"] == input);
+            if !attached {
+                self.send_request(
+                    "CreateSceneItem",
+                    Some(json!({"sceneName":scene,"sourceName":input,"sceneItemEnabled":true})),
+                )
+                .await?;
+            }
+            Ok(
+                json!({"created":false,"attached":!attached,"inputName":input,"sceneName":scene,"url":url}),
+            )
+        } else {
+            self.send_request("CreateInput",Some(json!({"sceneName":scene,"inputName":input,"inputKind":"browser_source","inputSettings":settings,"sceneItemEnabled":true}))).await?;
+            Ok(
+                json!({"created":true,"attached":true,"inputName":input,"sceneName":scene,"url":url}),
+            )
+        }
+    }
     pub async fn output_status(&self) -> ModuleResult<Value> {
-        let (stream, record, replay, camera, stats) = tokio::try_join!(
+        let (stream, record, replay, camera, stats) = tokio::join!(
             self.send_request("GetStreamStatus", None),
             self.send_request("GetRecordStatus", None),
             self.send_request("GetReplayBufferStatus", None),
             self.send_request("GetVirtualCamStatus", None),
             self.send_request("GetStats", None),
-        )?;
-        Ok(json!({"stream":stream,"record":record,"replay":replay,"camera":camera,"stats":stats}))
+        );
+        let stream = stream?;
+        let mut result = json!({"stream":stream,"errors":{}});
+        for (key, response) in [
+            ("record", record),
+            ("replay", replay),
+            ("camera", camera),
+            ("stats", stats),
+        ] {
+            match response {
+                Ok(value) => result[key] = value,
+                Err(error) => {
+                    result[key] = Value::Null;
+                    result["errors"][key] = json!(error.to_string());
+                }
+            }
+        }
+        Ok(result)
     }
     pub async fn video_settings(&self) -> ModuleResult<Value> {
         let mut value = self.send_request("GetVideoSettings", None).await?;

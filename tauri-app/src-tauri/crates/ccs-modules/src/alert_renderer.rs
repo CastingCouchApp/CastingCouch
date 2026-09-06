@@ -160,22 +160,26 @@ pub async fn show(
     }
     Ok(())
 }
-pub async fn hide(obs: &ObsClient, settings: &AlertSettings) {
-    let _=request(obs,"TriggerMediaInputAction",json!({"inputName":settings.obs_media_source_name,"mediaAction":"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP"})).await;
-    let _ = visible(
-        obs,
-        &settings.obs_scene_name,
+pub async fn hide(obs: &ObsClient, settings: &AlertSettings) -> Result<(), String> {
+    // Attempt every cleanup action even if one source is unavailable.
+    let mut errors = Vec::new();
+    if let Err(e)=request(obs,"TriggerMediaInputAction",json!({"inputName":settings.obs_media_source_name,"mediaAction":"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP"})).await {errors.push(e);}
+    for name in [
         &settings.obs_media_source_name,
-        false,
-    )
-    .await;
-    let _ = visible(
-        obs,
-        &settings.obs_scene_name,
         &settings.obs_text_source_name,
-        false,
-    )
-    .await;
+    ] {
+        if let Err(e) = visible(obs, &settings.obs_scene_name, name, false).await {
+            errors.push(e);
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Alert konnte nicht vollständig ausgeblendet werden: {}",
+            errors.join("; ")
+        ))
+    }
 }
 #[cfg(test)]
 mod tests {
