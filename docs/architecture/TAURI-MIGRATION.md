@@ -1,6 +1,9 @@
 # Tauri-Migration — Status und Verträge
 
-Stand: 30. August 2026
+Stand: 6. September 2026
+
+Aktueller Umsetzungs- und Abnahmestand: [`TAURI-FEATURE-PARITY.md`](TAURI-FEATURE-PARITY.md).
+Die folgende Bestandsaufnahme vom August beschreibt den Ausgangspunkt; ihre Stub- und Sidecar-Angaben sind historisch. Tauri startet inzwischen keinen .NET-Sidecar mehr.
 
 Agent-Prompts für die nächsten Slices: [`TAURI-PHASE-PROMPTS.md`](TAURI-PHASE-PROMPTS.md).
 
@@ -41,7 +44,7 @@ Mehrere Pfade sind in Tauri nur gemountet, nicht verhaltensgleich (501/204/Hardc
 Gleicher Ordner wie WPF: `%LocalAppData%/CreatorControlSuite` bzw. `~/Library/Application Support/CreatorControlSuite`.
 Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt DPAPI.
 
-## Modul-Status
+## Historischer Modul-Status (30. August 2026)
 
 | Modul | Status |
 |-------|--------|
@@ -56,7 +59,7 @@ Datei: `settings.json` (SchemaVersion 2, PascalCase). Secrets: OS-Keyring statt 
 | Updates | SHA-256 + RSA-Manifest-Verifier (`ccs-core::updates`); GitHub-Check + Download; Apply startet NSIS/MSI/DMG nach Backup; Tag-Pipeline in Phase 5 |
 | Haupt-UI | Dashboard Live (OBS-Szene, Twitch-Login, Spotify Now Playing; Events + 15s-Fallback), Dienste (Connect/Login/Logout + Fehlerdetail), Musik (`/music`: Spotify always, YTM-Karte nur bei Sidecar healthy), Workflow (`/workflow`: Status + Schritt `workflow.*`), Overlay-Canvas-Tabelle (TanStack Table, Duplicate kopiert Layout, Editor-WebView auf `/editor/{id}`), Alerts-Library (TanStack Table), Settings-Formulare (General/OBS/Twitch/Spotify/Overlay/Branding, `data-theme` CSS-Tokens), Updates (Prüfen/RSA+SHA-256/Installer), About (Version, Datenpfad, Overlay-Health) |
 
-## Sidecar (Übergang)
+## Historischer Sidecar (in Tauri entfernt)
 
 Komplexe Rest-Module (YouTube Music, Workflow-Schritt, Multi-PC-Agent) bleiben in .NET, bis Rust-Parität steht.
 Der Tauri-Host spawnt optional `CreatorControlSuite.CommandClient.exe --sidecar --port 18765` (Windows, Loopback-JSON), wenn `Sidecar.Enabled` oder `CCS_SIDECAR=1` gesetzt ist und die Binary existiert. macOS überspringt den Spawn. Vertrag: [`TAURI-SIDECAR.md`](TAURI-SIDECAR.md).
@@ -73,7 +76,7 @@ Unverändert (WPF bleibt Default):
 - Default-Makefile: `make ci` = .NET; `make tauri-ci` = Tauri+Overlay-Frontend; `make tauri-release` = Installer nach `artifacts/tauri`.
 - Nach Parität: WPF-Jobs auf `legacy` setzen, `src/CreatorControlSuite.App` nach `legacy/` verschieben. Prompt 6 dann erneut.
 
-### Blocker Overlay
+### Historische Blocker Overlay
 
 | Route | Tauri | WPF |
 |-------|-------|-----|
@@ -91,11 +94,11 @@ Unverändert (WPF bleibt Default):
 
 Weitere: kein EventSub-Chat ins Overlay; WS-Hello/Layout-PUT-Envelope weicht ab; Port-Änderung startet den Server nicht neu; `overlay-data.json` ohne Live-Writer.
 
-### Blocker OBS
+### Historische Blocker OBS
 
 Nur Auth, `GetSceneList`, `SetCurrentProgramScene`, Reconnect, Program-Scene → Hub. Fehlend für Overlay-Kern: `GetVideoSettings`, `GetSourceScreenshot` (Editor-Preview). Professional (Sources, Audio, Stream/Record, Scene Items, Automation) ist kein Cutover-Gate, aber unportiert.
 
-### Blocker Twitch
+### Historische Blocker Twitch
 
 Kein `channel.chat.message` / delete / clear → Overlay-Chat tot. Helix nur `GET /users`. EventSub ohne Reconnect nach hartem Drop. React hört `twitch-event` nicht. Professional (Polls/Predictions/Rewards/Outgoing-Raid) ist kein Cutover-Gate.
 

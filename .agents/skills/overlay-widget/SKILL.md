@@ -165,3 +165,10 @@ Nicht `destination-out` — bricht in OBS/CEF-Compositing oft zu opakem Schwarz.
 - Effects: Skill `overlay-effect`
 - ZIP-Packs: Skill `overlay-extension-pack`
 - Docs: `docs/modules/OVERLAY-EDITOR.md`, `OVERLAY-SYSTEM.md`
+
+
+## Tauri-Host und Distribution
+
+Das gemeinsame Canvas-Frontend wird auch vom Rust-Host verwendet. Bei Änderungen am Built-in-Katalog zusätzlich `tauri-app/src-tauri/crates/ccs-overlay-server/src/assets.rs` (`list_widget_types` / `list_shape_types`) synchron halten. Der Katalog muss weiterhin dem C#-`OverlayWebServer` entsprechen.
+
+Vor einem Rust-Test/Build zuerst im `CanvasOverlay` `npm ci` und `npm run build` ausführen. `ccs-overlay-server/build.rs` bettet `editor/`, `view/`, `solo/`, `shared/` einschließlich der generierten Bundles in die Binary ein. Installation benötigt keinen Checkout. `CCS_OVERLAY_ASSETS` ist ausschließlich ein Debug-Override. Bei Änderungen am Buildablauf auch `build/Build-Tauri-Release.ps1` und den Tauri-CI-Job prüfen. Verifikation: `cargo test --workspace` unter `tauri-app/src-tauri`, insbesondere `tests/distribution.rs` und `tests/http_contract.rs`.

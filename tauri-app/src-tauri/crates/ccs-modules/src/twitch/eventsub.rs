@@ -89,7 +89,10 @@ pub fn parse_eventsub_message_at(
                 .pointer("/payload/event")
                 .cloned()
                 .unwrap_or(Value::Object(Default::default()));
-            let data = flatten_event_data(&event_data);
+            let mut data = flatten_event_data(&event_data);
+            if event_type == "channel.chat.message" {
+                enrich_chat(&event_data, &mut data);
+            }
             let summary = create_summary(&event_type, &data);
             Ok(EventSubMessage::Notification(TwitchEvent {
                 event_type,
@@ -100,6 +103,33 @@ pub fn parse_eventsub_message_at(
         }
         _ => Ok(EventSubMessage::Unknown),
     }
+}
+
+fn enrich_chat(event: &Value, data: &mut BTreeMap<String, String>) {
+    for (output, input) in [
+        ("userName", "chatter_user_name"),
+        ("userLogin", "chatter_user_login"),
+        ("userId", "chatter_user_id"),
+        ("messageId", "message_id"),
+        ("color", "color"),
+    ] {
+        data.insert(output.into(), event[input].as_str().unwrap_or("").into());
+    }
+    data.insert(
+        "text".into(),
+        event["message"]["text"].as_str().unwrap_or("").into(),
+    );
+    let parts:Vec<Value>=event["message"]["fragments"].as_array().map(|fragments|fragments.iter().map(|fragment|{
+        let text=fragment["text"].as_str().unwrap_or("");
+        if fragment["type"]=="emote" {
+            if let Some(id)=fragment["emote"]["id"].as_str().filter(|id|id.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_')) {
+                return serde_json::json!({"type":"emote","text":text,"url":format!("https://static-cdn.jtvnw.net/emoticons/v2/{id}/default/dark/2.0"),"provider":"twitch"});
+            }
+        }
+        serde_json::json!({"type":"text","text":text})
+    }).collect()).unwrap_or_else(||vec![serde_json::json!({"type":"text","text":data["text"]})]);
+    data.insert("parts".into(), serde_json::to_string(&parts).unwrap());
+    data.insert("badges".into(), "[]".into());
 }
 
 pub fn create_summary(event_type: &str, data: &BTreeMap<String, String>) -> String {
@@ -160,6 +190,7 @@ struct LiveSession {
 
 /// EventSub WebSocket client: welcome, subscriptions, keepalive, reconnect.
 pub struct EventSubClient {
+    alive: AtomicBool,
     cancel: AtomicBool,
     session: Mutex<Option<LiveSession>>,
     receive_task: Mutex<Option<JoinHandle<()>>>,
@@ -168,6 +199,7 @@ pub struct EventSubClient {
 impl EventSubClient {
     pub fn new() -> Self {
         Self {
+            alive: AtomicBool::new(false),
             cancel: AtomicBool::new(false),
             session: Mutex::new(None),
             receive_task: Mutex::new(None),
@@ -220,6 +252,10 @@ Bitte Twitch erneut autorisieren und die benötigten Berechtigungen bestätigen.
         Ok(())
     }
 
+    pub fn is_running(&self) -> bool {
+        self.alive.load(Ordering::SeqCst)
+    }
+
     async fn spawn_receive(
         self: &Arc<Self>,
         mut reader: WsReader,
@@ -228,6 +264,7 @@ Bitte Twitch erneut autorisieren und die benötigten Berechtigungen bestätigen.
         if let Some(handle) = self.receive_task.lock().await.take() {
             handle.abort();
         }
+        self.alive.store(true, Ordering::SeqCst);
         let this = Arc::clone(self);
         *self.receive_task.lock().await = Some(tokio::spawn(async move {
             loop {
@@ -267,10 +304,12 @@ Bitte Twitch erneut autorisieren und die benötigten Berechtigungen bestätigen.
                     Err(_) => break,
                 }
             }
+            this.alive.store(false, Ordering::SeqCst);
         }));
     }
 
     pub async fn stop(&self) {
+        self.alive.store(false, Ordering::SeqCst);
         self.cancel.store(true, Ordering::SeqCst);
         if let Some(handle) = self.receive_task.lock().await.take() {
             handle.abort();
@@ -362,7 +401,31 @@ async fn subscribe_events(
     session_id: &str,
     events_tx: &broadcast::Sender<TwitchEvent>,
 ) -> ModuleResult<usize> {
-    let specs: [(&str, &str, Value, bool); 9] = [
+    let specs: [(&str, &str, Value, bool); 13] = [
+        (
+            "channel.chat.message",
+            "1",
+            serde_json::json!({"broadcaster_user_id":broadcaster_user_id,"user_id":user_id}),
+            false,
+        ),
+        (
+            "channel.chat.message_delete",
+            "1",
+            serde_json::json!({"broadcaster_user_id":broadcaster_user_id,"user_id":user_id}),
+            false,
+        ),
+        (
+            "channel.chat.clear",
+            "1",
+            serde_json::json!({"broadcaster_user_id":broadcaster_user_id,"user_id":user_id}),
+            false,
+        ),
+        (
+            "channel.chat.clear_user_messages",
+            "1",
+            serde_json::json!({"broadcaster_user_id":broadcaster_user_id,"user_id":user_id}),
+            false,
+        ),
         (
             "channel.follow",
             "2",
@@ -629,5 +692,25 @@ mod tests {
         assert_eq!(evt.summary, "alice folgt dem Kanal.");
         client.stop().await;
         let _ = server.await;
+    }
+}
+
+#[cfg(test)]
+mod chat_contract_tests {
+    #[test]
+    fn eventsub_fragments_produce_the_shared_chat_contract() {
+        let mut data = std::collections::BTreeMap::new();
+        super::enrich_chat(
+            &serde_json::json!({"chatter_user_name":"Alice","chatter_user_id":"42","message_id":"m1","message":{"text":"Hello Kappa","fragments":[{"type":"text","text":"Hello "},{"type":"emote","text":"Kappa","emote":{"id":"25"}}]}}),
+            &mut data,
+        );
+        assert_eq!(data["messageId"], "m1");
+        assert_eq!(data["userName"], "Alice");
+        let parts: serde_json::Value = serde_json::from_str(&data["parts"]).unwrap();
+        assert_eq!(parts[0]["text"], "Hello ");
+        assert_eq!(
+            parts[1]["url"],
+            "https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0"
+        );
     }
 }

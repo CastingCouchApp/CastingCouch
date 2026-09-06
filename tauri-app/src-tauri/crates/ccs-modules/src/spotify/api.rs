@@ -7,8 +7,8 @@ pub const API_BASE_URL: &str = "https://api.spotify.com/v1/";
 
 #[derive(Clone)]
 pub struct SpotifyApiClient {
-    http: reqwest::Client,
-    api_base: String,
+    pub(super) http: reqwest::Client,
+    pub(super) api_base: String,
 }
 
 impl SpotifyApiClient {
@@ -104,6 +104,7 @@ pub fn map_currently_playing(body: &str) -> ModuleResult<NowPlaying> {
                 artist: String::new(),
                 album: String::new(),
                 is_playing: parsed.is_playing,
+                ..Default::default()
             })
         }
     };
@@ -117,6 +118,17 @@ pub fn map_currently_playing(body: &str) -> ModuleResult<NowPlaying> {
     Ok(NowPlaying {
         title: item.name,
         artist,
+        cover_url: item
+            .album
+            .as_ref()
+            .and_then(|a| a.images.first())
+            .map(|i| i.url.clone())
+            .unwrap_or_default(),
+        progress_ms: parsed
+            .progress_ms
+            .unwrap_or(0)
+            .clamp(0, item.duration_ms.max(0)),
+        duration_ms: item.duration_ms.max(0),
         album: item.album.map(|a| a.name).unwrap_or_default(),
         is_playing: parsed.is_playing,
     })
@@ -182,6 +194,8 @@ struct MeResponse {
 #[derive(Deserialize)]
 struct CurrentlyPlayingResponse {
     #[serde(default)]
+    progress_ms: Option<i64>,
+    #[serde(default)]
     is_playing: bool,
     #[serde(default)]
     currently_playing_type: String,
@@ -191,6 +205,8 @@ struct CurrentlyPlayingResponse {
 
 #[derive(Deserialize)]
 struct ItemResponse {
+    #[serde(default)]
+    duration_ms: i64,
     #[serde(default)]
     name: String,
     #[serde(default, rename = "type")]
@@ -210,5 +226,24 @@ struct ArtistResponse {
 #[derive(Deserialize)]
 struct AlbumResponse {
     #[serde(default)]
+    images: Vec<ImageResponse>,
+    #[serde(default)]
     name: String,
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    #[test]
+    fn overlay_metadata_includes_cover_and_clamped_progress() {
+        let value=super::map_currently_playing(r#"{"is_playing":true,"progress_ms":9000,"item":{"type":"track","name":"Song","duration_ms":8000,"album":{"name":"Album","images":[{"url":"https://example.org/cover.png"}]},"artists":[{"name":"Artist"}]}}"#).unwrap();
+        assert_eq!(value.cover_url, "https://example.org/cover.png");
+        assert_eq!(value.duration_ms, 8000);
+        assert_eq!(value.progress_ms, 8000);
+    }
+}
+
+#[derive(Deserialize)]
+struct ImageResponse {
+    #[serde(default)]
+    url: String,
 }

@@ -6,7 +6,7 @@ description = "Loopback overlay HTTP + WebSocket server (OBS-compatible routes)"
 
 [dependencies]
 ccs-core = { path = "../ccs-core" }
-axum = { version = "0.8", features = ["ws", "json"] }
+axum = { version = "0.8", features = ["ws", "json", "multipart"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "fs", "time"] }
 tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
 serde = { version = "1", features = ["derive"] }
@@ -16,9 +16,13 @@ tracing = "0.1"
 futures-util = "0.3"
 uuid = { version = "1", features = ["v4"] }
 mime_guess = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 http-body-util = "0.1"
 tower = { version = "0.5", features = ["util"] }
 tempfile = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart"] }

@@ -5,19 +5,15 @@ use ccs_core::{
     UpdateCheckResult, UpdateError, UpdatePackage, DEFAULT_GITHUB_OWNER, DEFAULT_GITHUB_REPO,
 };
 use ccs_modules::alerts::{AlertDefinition, AlertEngine, AlertRuntime};
-use ccs_modules::obs::{ObsClient, ObsConnectOptions, ObsSceneInfo};
+use ccs_modules::obs::{ObsClient, ObsConnectOptions, ObsControl, ObsSceneInfo};
 use ccs_modules::overlay_bridge::OverlayEventBridge;
-use ccs_modules::sidecar::{
-    self, SidecarStartOptions, SidecarSupervisor, WorkflowRunResponse, YtmNowPlaying,
-    DEFAULT_SIDECAR_PORT, WORKFLOW_PREPARE,
-};
 use ccs_modules::spotify::{NowPlaying, SpotifyClient, SpotifyConnectOptions};
 use ccs_modules::twitch::{TwitchClient, TwitchConnectOptions};
 use ccs_modules::ServiceStatus;
 use ccs_overlay_server::{OverlayCanvasService, OverlayLayoutStore, OverlayServer, RealtimeHub};
 use ccs_secrets::{KeyringSecretStore, SecretStore};
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -28,12 +24,13 @@ use tracing::{error, info, warn};
 const OBS_PASSWORD_SECRET_KEY: &str = "obs.password";
 
 pub struct AppState {
+    pub ytm: Mutex<Option<Arc<ccs_overlay_server::YouTubeMusicBridge>>>,
     pub paths: AppPaths,
+    pub settings_mutation: Mutex<()>,
     pub settings: Arc<JsonSettingsStore>,
     pub secrets: Arc<KeyringSecretStore>,
     pub hub: Arc<RealtimeHub>,
     pub overlay: Mutex<Option<OverlayServer>>,
-    pub sidecar: Arc<SidecarSupervisor>,
     pub obs: Arc<ObsClient>,
     pub twitch: Arc<TwitchClient>,
     pub spotify: Arc<SpotifyClient>,
@@ -52,17 +49,221 @@ pub struct CanvasDto {
 }
 
 #[tauri::command]
-async fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
-    state.settings.load().await.map_err(|e| e.to_string())
+async fn open_twitch_chat(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("twitch-chat") {
+        return window.set_focus().map_err(|e| e.to_string());
+    }
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    let channel = if settings.twitch.channel_name.trim().is_empty() {
+        state
+            .twitch
+            .current_user()
+            .await
+            .ok_or("Twitch nicht verbunden")?
+            .login
+    } else {
+        settings.twitch.channel_name
+    };
+    if !channel
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    {
+        return Err("Ungültiger Twitch-Kanal".into());
+    }
+    let url = format!("https://www.twitch.tv/popout/{channel}/chat?popout=")
+        .parse()
+        .map_err(|e| format!("{e}"))?;
+    let builder = WebviewWindowBuilder::new(&app, "twitch-chat", WebviewUrl::External(url))
+        .title("Twitch-Chat")
+        .inner_size(450.0, 800.0);
+    #[cfg(target_os = "windows")]
+    let builder = builder.data_directory(state.paths.data_root.join("WebView/Twitch"));
+    builder.build().map_err(|e| e.to_string())?;
+    Ok(())
+}
+#[tauri::command]
+async fn twitch_action(
+    state: State<'_, AppState>,
+    action: ccs_modules::twitch::TwitchAction,
+) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    state
+        .twitch
+        .action(
+            &settings.twitch.client_id,
+            &settings.twitch.channel_name,
+            action,
+        )
+        .await
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn twitch_query(
+    state: State<'_, AppState>,
+    query: ccs_modules::twitch::TwitchQuery,
+    after: Option<String>,
+) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    state
+        .twitch
+        .query(
+            &settings.twitch.client_id,
+            &settings.twitch.channel_name,
+            query,
+            after,
+        )
+        .await
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn chat_history(state: State<'_, AppState>) -> Value {
+    state.hub.history()
+}
+#[tauri::command]
+fn countdown_status(state: State<'_, AppState>) -> Value {
+    state.hub.countdown()
+}
+#[tauri::command]
+fn set_countdown(state: State<'_, AppState>, seconds: i64, label: String) -> Result<(), String> {
+    state.hub.set_countdown(seconds, &label)
 }
 
 #[tauri::command]
-async fn save_settings(state: State<'_, AppState>, settings: AppSettings) -> Result<(), String> {
+async fn spotify_action(
+    state: State<'_, AppState>,
+    action: ccs_modules::spotify::SpotifyAction,
+) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     state
-        .settings
-        .save(&settings)
+        .spotify
+        .action(&settings.spotify.client_id, action)
         .await
         .map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn spotify_query(
+    state: State<'_, AppState>,
+    query: ccs_modules::spotify::SpotifyQuery,
+    offset: Option<u64>,
+) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    state
+        .spotify
+        .query(&settings.spotify.client_id, query, offset)
+        .await
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn obs_control(state: State<'_, AppState>, control: ObsControl) -> Result<Value, String> {
+    state.obs.control(control).await.map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn obs_output_status(state: State<'_, AppState>) -> Result<Value, String> {
+    state.obs.output_status().await.map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn ytm_connect(state: State<'_, AppState>) -> Result<String, String> {
+    let mut current = state.ytm.lock().await;
+    if current.is_none() {
+        let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+        let port = settings
+            .you_tube_music
+            .extra
+            .get("BridgePort")
+            .and_then(Value::as_u64)
+            .unwrap_or(43831);
+        let port = u16::try_from(port).map_err(|_| "Ungültiger YouTube-Music-Port")?;
+        if port == 0 {
+            return Err("YouTube-Music-Port muss positiv sein".into());
+        }
+        *current = Some(ccs_overlay_server::YouTubeMusicBridge::start(port).await?);
+    }
+    Ok(format!(
+        "http://127.0.0.1:{}/ytmusic/install",
+        current.as_ref().unwrap().port
+    ))
+}
+#[tauri::command]
+async fn ytm_disconnect(state: State<'_, AppState>) -> Result<(), String> {
+    if let Some(bridge) = state.ytm.lock().await.take() {
+        bridge.stop();
+    }
+    Ok(())
+}
+#[tauri::command]
+async fn ytm_now_playing(
+    state: State<'_, AppState>,
+) -> Result<ccs_overlay_server::MusicSnapshot, String> {
+    Ok(state
+        .ytm
+        .lock()
+        .await
+        .as_ref()
+        .map(|bridge| bridge.snapshot())
+        .unwrap_or_else(|| ccs_overlay_server::MusicSnapshot {
+            provider: "ytmusic".into(),
+            status_text: "Bridge gestoppt".into(),
+            ..Default::default()
+        }))
+}
+#[tauri::command]
+async fn ytm_command(state: State<'_, AppState>, command: String) -> Result<(), String> {
+    state
+        .ytm
+        .lock()
+        .await
+        .as_ref()
+        .ok_or("YouTube Music nicht verbunden")?
+        .command(&command)
+}
+
+#[tauri::command]
+async fn get_settings(state: State<'_, AppState>) -> Result<Value, String> {
+    state.settings.read_value().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn save_settings(
+    state: State<'_, AppState>,
+    settings: Value,
+    original: Value,
+) -> Result<(), String> {
+    let _guard = state.settings_mutation.lock().await;
+    let requested: AppSettings =
+        serde_json::from_value(settings.clone()).map_err(|e| e.to_string())?;
+    ccs_core::store::validate_settings(&requested).map_err(|e| e.to_string())?;
+    let old = state.settings.load().await.map_err(|e| e.to_string())?;
+    let original_port = original
+        .pointer("/Overlay/WebServerPort")
+        .and_then(Value::as_u64);
+    let port_changed = original_port != Some(requested.overlay.web_server_port as u64);
+    let replacement =
+        if port_changed && requested.overlay.web_server_port != old.overlay.web_server_port {
+            Some(
+                OverlayServer::start(
+                    state.settings.clone(),
+                    state.paths.clone(),
+                    state.hub.clone(),
+                    requested.overlay.web_server_port,
+                )
+                .await
+                .map_err(|e| e.to_string())?,
+            )
+        } else {
+            None
+        };
+    if let Err(error) = state.settings.save_edit(&original, &settings).await {
+        if let Some(server) = replacement {
+            server.stop();
+        }
+        return Err(error.to_string());
+    }
+    if let Some(server) = replacement {
+        if let Some(previous) = state.overlay.lock().await.replace(server) {
+            previous.stop();
+        }
+    }
+    Ok(())
 }
 
 fn canvas_dto(settings: &AppSettings, id: &str, name: &str) -> CanvasDto {
@@ -92,6 +293,7 @@ async fn list_canvases(state: State<'_, AppState>) -> Result<Vec<CanvasDto>, Str
 
 #[tauri::command]
 async fn create_canvas(state: State<'_, AppState>, name: String) -> Result<CanvasDto, String> {
+    let _guard = state.settings_mutation.lock().await;
     let mut settings = state.settings.load().await.map_err(|e| e.to_string())?;
     let canvas = canvas_service(&state)
         .create(&mut settings, state.settings.as_ref(), &name)
@@ -102,6 +304,7 @@ async fn create_canvas(state: State<'_, AppState>, name: String) -> Result<Canva
 
 #[tauri::command]
 async fn delete_canvas(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let _guard = state.settings_mutation.lock().await;
     let mut settings = state.settings.load().await.map_err(|e| e.to_string())?;
     canvas_service(&state)
         .delete(&mut settings, state.settings.as_ref(), &id)
@@ -111,6 +314,7 @@ async fn delete_canvas(state: State<'_, AppState>, id: String) -> Result<(), Str
 
 #[tauri::command]
 async fn duplicate_canvas(state: State<'_, AppState>, id: String) -> Result<CanvasDto, String> {
+    let _guard = state.settings_mutation.lock().await;
     let mut settings = state.settings.load().await.map_err(|e| e.to_string())?;
     let source_name = settings
         .overlay
@@ -122,6 +326,28 @@ async fn duplicate_canvas(state: State<'_, AppState>, id: String) -> Result<Canv
     let name = format!("{source_name} (Kopie)");
     let canvas = canvas_service(&state)
         .duplicate(&mut settings, state.settings.as_ref(), &id, &name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(canvas_dto(&settings, &canvas.id, &canvas.name))
+}
+
+#[tauri::command]
+async fn update_canvas(
+    state: State<'_, AppState>,
+    id: String,
+    name: Option<String>,
+    selected: Option<bool>,
+) -> Result<CanvasDto, String> {
+    let _guard = state.settings_mutation.lock().await;
+    let mut settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    let canvas = canvas_service(&state)
+        .update(
+            &mut settings,
+            state.settings.as_ref(),
+            &id,
+            name.as_deref(),
+            selected.unwrap_or(false),
+        )
         .await
         .map_err(|e| e.to_string())?;
     Ok(canvas_dto(&settings, &canvas.id, &canvas.name))
@@ -170,7 +396,6 @@ async fn service_statuses(state: State<'_, AppState>) -> Result<Vec<ServiceStatu
         state.obs.status().await,
         state.twitch.status().await,
         state.spotify.status().await,
-        state.sidecar.status().await,
     ])
 }
 
@@ -301,6 +526,23 @@ async fn spotify_logout(state: State<'_, AppState>) -> Result<ServiceStatus, Str
 }
 
 #[tauri::command]
+async fn alert_install_sources(
+    state: State<'_, AppState>,
+    alert_type: String,
+) -> Result<(), String> {
+    state.alerts.install_sources(&alert_type).await
+}
+#[tauri::command]
+async fn alert_stop(state: State<'_, AppState>) -> Result<(), String> {
+    state.alerts.stop_current();
+    Ok(())
+}
+#[tauri::command]
+async fn alert_clear_queue(state: State<'_, AppState>) -> Result<(), String> {
+    state.alerts.clear_queue().await;
+    Ok(())
+}
+#[tauri::command]
 async fn list_alerts(state: State<'_, AppState>) -> Result<Vec<AlertDefinition>, String> {
     state.alerts.list().await
 }
@@ -310,11 +552,13 @@ async fn upsert_alert(
     state: State<'_, AppState>,
     alert: AlertDefinition,
 ) -> Result<AlertDefinition, String> {
+    let _guard = state.settings_mutation.lock().await;
     state.alerts.upsert(alert).await
 }
 
 #[tauri::command]
 async fn delete_alert(state: State<'_, AppState>, alert_type: String) -> Result<(), String> {
+    let _guard = state.settings_mutation.lock().await;
     state.alerts.delete(&alert_type).await
 }
 
@@ -324,6 +568,7 @@ async fn alert_runtime(
     enabled: Option<bool>,
     obs_scene_name: Option<String>,
 ) -> Result<AlertRuntime, String> {
+    let _guard = state.settings_mutation.lock().await;
     state.alerts.set_runtime(enabled, obs_scene_name).await
 }
 
@@ -511,29 +756,6 @@ async fn apply_update(state: State<'_, AppState>) -> Result<String, String> {
     Ok("Installer gestartet. Die App kann beendet werden, sobald das Setup läuft.".into())
 }
 
-#[tauri::command]
-async fn sidecar_status(state: State<'_, AppState>) -> Result<ServiceStatus, String> {
-    Ok(state.sidecar.status().await)
-}
-
-#[tauri::command]
-async fn sidecar_ytm_now_playing(state: State<'_, AppState>) -> Result<YtmNowPlaying, String> {
-    Ok(state.sidecar.ytm_now_playing().await)
-}
-
-#[tauri::command]
-async fn sidecar_workflow_run(
-    state: State<'_, AppState>,
-    command: String,
-) -> Result<WorkflowRunResponse, String> {
-    let command = if command.trim().is_empty() {
-        WORKFLOW_PREPARE.to_string()
-    } else {
-        command
-    };
-    Ok(state.sidecar.run_workflow(&command).await)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -542,20 +764,14 @@ pub fn run() {
             let paths = AppPaths::from_os().map_err(|e| e.to_string())?;
             paths.ensure_dirs().map_err(|e| e.to_string())?;
             let _ = logging::init_logging(&paths.logs);
-            let lock = match SingleInstanceLock::acquire(&paths.lock_file) {
-                Ok(lock) => Some(lock),
-                Err(e) => {
-                    warn!("single instance: {e}");
-                    None
-                }
-            };
+            let lock = Some(SingleInstanceLock::acquire(&paths.lock_file)?);
             let settings = Arc::new(JsonSettingsStore::new(paths.settings_file.clone()));
             let hub = Arc::new(RealtimeHub::new());
             let bridge = OverlayEventBridge::new(hub.clone());
             let secrets: Arc<KeyringSecretStore> = Arc::new(KeyringSecretStore::new());
             let secrets_dyn: Arc<dyn SecretStore> = secrets.clone();
 
-            let loaded = tauri::async_runtime::block_on(settings.load()).unwrap_or_default();
+            let loaded = tauri::async_runtime::block_on(settings.load())?;
             let overlay_port = loaded.overlay.web_server_port;
             let overlay_server = tauri::async_runtime::block_on(OverlayServer::start(
                 settings.clone(),
@@ -563,19 +779,17 @@ pub fn run() {
                 hub.clone(),
                 overlay_port,
             ));
-            let overlay_failed = overlay_server.is_err();
             match &overlay_server {
                 Ok(server) => info!(port = server.port, "overlay server started"),
                 Err(e) => error!("overlay server failed: {e}"),
             }
 
-            let sidecar = SidecarSupervisor::new_shared();
-            spawn_sidecar(sidecar.clone(), &loaded, overlay_failed, overlay_port);
-
             let obs = ObsClient::new_shared(loaded.obs.host.clone(), loaded.obs.port);
+            *hub.obs.write().unwrap() = Some(obs.clone());
             let twitch = TwitchClient::new_shared(secrets_dyn.clone());
             let spotify = SpotifyClient::new_shared(secrets_dyn);
             let alerts = Arc::new(AlertEngine::from_store(settings.clone(), bridge.clone()));
+            alerts.attach_obs(obs.clone());
 
             spawn_live_event_bridges(
                 app.handle().clone(),
@@ -686,12 +900,13 @@ pub fn run() {
             }
 
             app.manage(AppState {
+                ytm: Mutex::new(None),
                 paths,
+                settings_mutation: Mutex::new(()),
                 settings,
                 secrets,
                 hub,
                 overlay: Mutex::new(overlay_server.ok()),
-                sidecar,
                 obs,
                 twitch,
                 spotify,
@@ -700,15 +915,31 @@ pub fn run() {
                 verified_update: Mutex::new(None),
                 _lock: lock,
             });
+            spawn_runtime(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            open_twitch_chat,
+            twitch_action,
+            twitch_query,
+            chat_history,
+            countdown_status,
+            set_countdown,
+            spotify_action,
+            spotify_query,
+            obs_control,
+            obs_output_status,
+            ytm_connect,
+            ytm_disconnect,
+            ytm_now_playing,
+            ytm_command,
             get_settings,
             save_settings,
             list_canvases,
             create_canvas,
             delete_canvas,
             duplicate_canvas,
+            update_canvas,
             open_overlay_editor,
             service_statuses,
             connect_obs,
@@ -722,6 +953,9 @@ pub fn run() {
             twitch_logout,
             spotify_login,
             spotify_logout,
+            alert_install_sources,
+            alert_stop,
+            alert_clear_queue,
             list_alerts,
             upsert_alert,
             delete_alert,
@@ -734,66 +968,144 @@ pub fn run() {
             check_updates,
             download_update,
             apply_update,
-            sidecar_status,
-            sidecar_ytm_now_playing,
-            sidecar_workflow_run,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                if let Some(state) = app.try_state::<AppState>() {
+                    if let Err(error) = state.hub.flush_history() {
+                        error!(%error,"Chat-Verlauf konnte nicht gespeichert werden");
+                    }
+                }
+            }
+        });
 }
 
-fn spawn_sidecar(
-    sidecar: Arc<SidecarSupervisor>,
-    loaded: &AppSettings,
-    overlay_failed: bool,
-    overlay_port: u16,
-) {
-    let enabled = loaded.sidecar.enabled || sidecar::env_enabled();
-    let port = if loaded.sidecar.port == 0 {
-        DEFAULT_SIDECAR_PORT
-    } else {
-        loaded.sidecar.port
-    };
-    let explicit = {
-        let trimmed = loaded.sidecar.binary_path.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(PathBuf::from(trimmed))
-        }
-    };
-    let binary = sidecar::resolve_binary(explicit.as_deref(), &sidecar_search_dirs());
+fn spawn_runtime(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let status = sidecar
-            .start(SidecarStartOptions {
-                enabled,
-                port,
-                overlay_failed,
-                overlay_port,
-                binary,
-                is_windows: cfg!(windows),
-            })
-            .await;
-        match status.state {
-            ccs_modules::ConnectionState::Connected => {
-                info!(detail = %status.detail, "sidecar connected");
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
+        let mut previous_music = String::new();
+        let mut outputs = Value::Null;
+        let mut counter = 0u64;
+        loop {
+            tick.tick().await;
+            let state = app.state::<AppState>();
+            let settings = match state.settings.load().await {
+                Ok(s) => s,
+                Err(error) => {
+                    warn!(%error,"Overlay-Einstellungen nicht lesbar");
+                    continue;
+                }
+            };
+            if counter % 3 == 0 {
+                outputs = state.obs.output_status().await.unwrap_or(Value::Null);
             }
-            ccs_modules::ConnectionState::Error => {
-                warn!(detail = %status.detail, "sidecar not started");
+            if counter % settings.general.connection_watchdog_seconds.max(1) as u64 == 0
+                && settings.general.connection_watchdog_enabled
+                && settings.general.reconnect_twitch
+                && settings.twitch.enable_event_sub
+                && state.twitch.needs_eventsub_reconnect().await
+            {
+                if let Err(error) = state
+                    .twitch
+                    .connect(&TwitchConnectOptions {
+                        client_id: settings.twitch.client_id.clone(),
+                        channel_name: settings.twitch.channel_name.clone(),
+                        scopes: settings.twitch.scopes.clone(),
+                        enable_event_sub: true,
+                    })
+                    .await
+                {
+                    warn!(%error,"Twitch-Neuverbindung fehlgeschlagen");
+                }
             }
-            _ => {}
+            counter += 1;
+            let spotify = state.spotify.now_playing().await;
+            let ytm = state
+                .ytm
+                .lock()
+                .await
+                .as_ref()
+                .map(|bridge| bridge.snapshot());
+            let mut music = if settings.music_player.source.eq_ignore_ascii_case("ytmusic")
+                || settings
+                    .music_player
+                    .source
+                    .eq_ignore_ascii_case("YouTubeMusic")
+            {
+                serde_json::to_value(ytm.unwrap_or_default()).unwrap_or(Value::Null)
+            } else {
+                json!({"provider":"spotify","connected":state.spotify.status().await.state==ccs_modules::ConnectionState::Connected,"isPlaying":spotify.is_playing,"title":spotify.title,"artist":spotify.artist,"album":spotify.album,"coverUrl":spotify.cover_url,"cover":spotify.cover_url,"progressMs":spotify.progress_ms,"durationMs":spotify.duration_ms})
+            };
+            music["cover"] = music["coverUrl"].clone();
+            music["providerDisplayName"] = json!(if music["provider"] == "ytmusic" {
+                "YouTube Music"
+            } else {
+                "Spotify"
+            });
+            for (key, fallback) in [
+                ("showInOverlay", true),
+                ("showTitle", true),
+                ("showArtist", true),
+                ("showAlbumCover", true),
+                ("showProgress", true),
+                ("hideWhenPaused", false),
+                ("hideWhenMuted", true),
+            ] {
+                let pascal = format!("{}{}", key[..1].to_uppercase(), &key[1..]);
+                music[key] = json!(settings
+                    .music_player
+                    .extra
+                    .get(&pascal)
+                    .and_then(Value::as_bool)
+                    .unwrap_or(fallback));
+            }
+            let signature = format!(
+                "{}|{}|{}",
+                music["provider"], music["title"], music["artist"]
+            );
+            if signature != previous_music {
+                state.bridge.app_music_track(
+                    music["provider"].as_str().unwrap_or("spotify"),
+                    music["title"].as_str().unwrap_or(""),
+                    music["artist"].as_str().unwrap_or(""),
+                    music["coverUrl"].as_str().unwrap_or(""),
+                );
+                previous_music = signature;
+            }
+            let runtime = state.alerts.runtime().await.ok();
+            let scene = state.obs.current_program_scene().await;
+            let snapshot = {
+                let mut snapshot = state.hub.live.data.write().unwrap();
+                snapshot["music"] = music.clone();
+                snapshot["spotify"] = music;
+                snapshot["obs"] =
+                    json!({"currentScene":scene,"connected":!outputs.is_null(),"outputs":outputs});
+                snapshot["stream"] = json!({"isLive":outputs.pointer("/stream/outputActive").and_then(Value::as_bool).unwrap_or(false),"currentScene":scene,"elapsedSeconds":outputs.pointer("/stream/outputDuration").and_then(Value::as_u64).unwrap_or(0)/1000});
+                snapshot["branding"] = json!({"displayName":settings.branding.display_name,"channelName":settings.branding.channel_name,"accentColor":settings.branding.accent_color,"logoPath":settings.branding.logo_path});
+                snapshot["alerts"] = runtime.map(|r|json!({"isRunning":r.current_type.is_some(),"currentType":r.current_type.unwrap_or_default(),"queueLength":r.pending_count})).unwrap_or_else(||json!({"isRunning":false,"currentType":"","queueLength":0}));
+                snapshot["countdown"] = state.hub.live.countdown_state();
+                snapshot["updatedAt"] = state.hub.countdown()["at"].clone();
+                snapshot.clone()
+            };
+            let dir = state.paths.data_root.join("data");
+            if let Err(error) = async {
+                tokio::fs::create_dir_all(&dir).await?;
+                let temp = dir.join("overlay-data.json.tmp");
+                tokio::fs::write(&temp, snapshot.to_string()).await?;
+                tokio::fs::rename(temp, dir.join("overlay-data.json")).await
+            }
+            .await
+            {
+                warn!(%error,"Overlay-Daten konnten nicht geschrieben werden");
+            }
+            if let Err(error) = state.hub.flush_history() {
+                warn!(%error,"Chat-Verlauf konnte nicht gespeichert werden");
+            }
+            state.hub.publish(&state.hub.countdown());
         }
     });
-}
-
-fn sidecar_search_dirs() -> Vec<PathBuf> {
-    let mut dirs = Vec::new();
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(parent) = exe.parent() {
-            dirs.push(parent.to_path_buf());
-        }
-    }
-    dirs
 }
 
 fn spawn_live_event_bridges(

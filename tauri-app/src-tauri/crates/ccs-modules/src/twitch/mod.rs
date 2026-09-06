@@ -1,7 +1,9 @@
 mod eventsub;
 mod helix;
 mod oauth;
+mod operations;
 mod tokens;
+pub use operations::{TwitchAction, TwitchQuery};
 
 pub use eventsub::{alert_type_for_event, EventSubClient, TwitchEvent};
 pub use helix::{TwitchHelixClient, HELIX_BASE_URL};
@@ -153,6 +155,12 @@ impl TwitchClient {
 
     pub async fn current_user(&self) -> Option<TwitchHelixUser> {
         self.current_user.read().await.clone()
+    }
+
+    pub async fn needs_eventsub_reconnect(&self) -> bool {
+        self.current_user.read().await.is_some()
+            && self.eventsub_url.is_some()
+            && !self.eventsub.is_running()
     }
 
     pub fn has_token(&self) -> bool {

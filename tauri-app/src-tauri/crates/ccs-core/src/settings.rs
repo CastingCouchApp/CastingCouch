@@ -421,6 +421,12 @@ fn default_spotify_scopes() -> Vec<String> {
     vec![
         "user-read-playback-state".into(),
         "user-read-currently-playing".into(),
+        "user-modify-playback-state".into(),
+        "playlist-read-private".into(),
+        "playlist-read-collaborative".into(),
+        "user-library-read".into(),
+        "user-library-modify".into(),
+        "user-read-recently-played".into(),
     ]
 }
 
@@ -1115,8 +1121,7 @@ mod tests {
         assert_eq!(parsed.channel_name, "demo");
         assert_eq!(parsed.extra["StreamEndMode"], 2);
 
-        let built_in: TwitchSettings =
-            serde_json::from_str(r#"{ "ChatUiMode": 0 }"#).unwrap();
+        let built_in: TwitchSettings = serde_json::from_str(r#"{ "ChatUiMode": 0 }"#).unwrap();
         assert_eq!(built_in.chat_ui_mode, "BuiltIn");
 
         let as_string: TwitchSettings =

@@ -21,6 +21,12 @@ fn default_token_type() -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct NowPlaying {
+    #[serde(default)]
+    pub cover_url: String,
+    #[serde(default)]
+    pub progress_ms: i64,
+    #[serde(default)]
+    pub duration_ms: i64,
     pub title: String,
     pub artist: String,
     pub album: String,

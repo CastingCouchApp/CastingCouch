@@ -1,7 +1,7 @@
+mod alert_renderer;
 pub mod alerts;
 pub mod obs;
 pub mod overlay_bridge;
-pub mod sidecar;
 pub mod spotify;
 pub mod twitch;
 

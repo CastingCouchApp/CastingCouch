@@ -175,6 +175,12 @@ jobs:
         with:
           workspaces: tauri-app/src-tauri
 
+      - name: Shared Canvas install and bundle
+        working-directory: src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+        run: |
+          npm ci
+          npm run build
+
       - name: Rust tests
         working-directory: tauri-app/src-tauri
         run: cargo test --workspace

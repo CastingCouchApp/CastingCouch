@@ -1,122 +1,98 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
-import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+    RouterProvider,
+    createMemoryHistory,
+    createRouter,
+} from "@tanstack/react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { routeTree } from "../../routeTree.gen";
-import type { NowPlaying, ServiceStatus, YtmNowPlaying } from "../../lib/api";
-
+import { defaultAppSettings } from "../../lib/app-settings";
 const invokeMock = vi.fn();
-
-vi.mock("../../lib/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../lib/api")>();
-  return {
-    ...actual,
-    tauriInvoke: <T,>(cmd: string, args?: Record<string, unknown>) =>
-      invokeMock(cmd, args) as Promise<T>,
-  };
-});
-
+vi.mock("../../lib/api", async (original) => ({
+    ...(await original<typeof import("../../lib/api")>()),
+    tauriInvoke: (cmd: string, args: unknown) => invokeMock(cmd, args),
+}));
 function renderMusic() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({ initialEntries: ["/music"] }),
-  });
-  return render(
-    <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-}
-
-function sidecarStatus(state: ServiceStatus["state"], detail = ""): ServiceStatus {
-  return { id: "sidecar", name: "Sidecar", state, detail };
-}
-
-function spotifyTrack(): NowPlaying {
-  return {
-    title: "Contract Song",
-    artist: "Contract Artist",
-    album: "Contract Album",
-    is_playing: true,
-  };
-}
-
-function ytmTrack(): YtmNowPlaying {
-  return {
-    provider: "ytmusic",
-    connected: true,
-    isPlaying: true,
-    title: "YTM Track",
-    artist: "YTM Artist",
-    album: "YTM Album",
-    statusText: "Spielt",
-  };
-}
-
-function card(name: string): HTMLElement {
-  const heading = screen.getByText(name);
-  const found = heading.closest(".rounded-xl");
-  if (!found) {
-    throw new Error(`Card for ${name} not found`);
-  }
-  return found as HTMLElement;
-}
-
-describe("Music page", () => {
-  beforeEach(() => {
-    invokeMock.mockReset();
-    invokeMock.mockImplementation(async (cmd: string) => {
-      if (cmd === "now_playing") {
-        return spotifyTrack();
-      }
-      if (cmd === "sidecar_status") {
-        return sidecarStatus("disconnected");
-      }
-      if (cmd === "sidecar_ytm_now_playing") {
-        return ytmTrack();
-      }
-      return undefined;
+    const client = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
     });
-  });
-
-  it("shows Spotify now playing and a sidecar hint when sidecar is down", async () => {
-    renderMusic();
-    expect(await screen.findByRole("heading", { name: "Musik" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Musik" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Workflow" })).toBeInTheDocument();
-
-    const spotify = await waitFor(() => card("Spotify"));
-    expect(within(spotify).getByText("Contract Song")).toBeInTheDocument();
-    expect(within(spotify).getByText("Contract Artist")).toBeInTheDocument();
-    expect(within(spotify).getByText("Spielt")).toBeInTheDocument();
-
-    expect(screen.getByText("YouTube Music braucht den Sidecar.")).toBeInTheDocument();
-    expect(screen.queryByText("YTM Track")).not.toBeInTheDocument();
-    expect(invokeMock).not.toHaveBeenCalledWith("sidecar_ytm_now_playing", undefined);
-  });
-
-  it("shows the YouTube Music card when sidecar is connected", async () => {
-    invokeMock.mockImplementation(async (cmd: string) => {
-      if (cmd === "now_playing") {
-        return spotifyTrack();
-      }
-      if (cmd === "sidecar_status") {
-        return sidecarStatus("connected", "http://127.0.0.1:18765");
-      }
-      if (cmd === "sidecar_ytm_now_playing") {
-        return ytmTrack();
-      }
-      return undefined;
+    const router = createRouter({
+        routeTree,
+        history: createMemoryHistory({ initialEntries: ["/music"] }),
     });
-
-    renderMusic();
-    expect(await screen.findByText("YTM Track")).toBeInTheDocument();
-    const ytm = card("YouTube Music");
-    expect(within(ytm).getByText("YTM Artist")).toBeInTheDocument();
-    expect(within(ytm).getByText("Spielt")).toBeInTheDocument();
-    expect(screen.queryByText("YouTube Music braucht den Sidecar.")).not.toBeInTheDocument();
-    expect(invokeMock).toHaveBeenCalledWith("sidecar_ytm_now_playing", undefined);
-    expect(within(card("Spotify")).getByText("Contract Song")).toBeInTheDocument();
-  });
+    render(
+        <QueryClientProvider client={client}>
+            <RouterProvider router={router} />
+        </QueryClientProvider>,
+    );
+}
+describe("Native music", () => {
+    beforeEach(() => {
+        invokeMock.mockReset().mockImplementation(async (cmd: string) => {
+            if (cmd === "get_settings") return defaultAppSettings();
+            if (cmd === "now_playing")
+                return {
+                    title: "Contract Song",
+                    artist: "Artist",
+                    album: "Album",
+                    is_playing: true,
+                };
+            if (cmd === "ytm_now_playing")
+                return { connected: false, statusText: "Bridge gestoppt" };
+            if (cmd === "spotify_query") return { devices: [], items: [] };
+            if (cmd === "ytm_connect")
+                return "http://127.0.0.1:43831/ytmusic/install";
+            return null;
+        });
+    });
+    it("uses native playback commands and removes workflow navigation", async () => {
+        renderMusic();
+        expect(await screen.findByText("Contract Song")).toBeInTheDocument();
+        expect(
+            screen.queryByRole("link", { name: "Workflow" }),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/Sidecar/)).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Spotify pausieren" }),
+        );
+        await waitFor(() =>
+            expect(invokeMock).toHaveBeenCalledWith("spotify_action", {
+                action: { action: "pause" },
+            }),
+        );
+    });
+    it("connects the native YouTube Music bridge", async () => {
+        renderMusic();
+        fireEvent.click(
+            await screen.findByRole("button", {
+                name: "YouTube Music verbinden",
+            }),
+        );
+        expect(
+            await screen.findByRole("link", { name: "Bookmarklet einrichten" }),
+        ).toHaveAttribute("href", "http://127.0.0.1:43831/ytmusic/install");
+        expect(invokeMock).toHaveBeenCalledWith("ytm_connect", undefined);
+    });
+    it("persists provider choice without replacing unrelated settings", async () => {
+        renderMusic();
+        const select = await screen.findByLabelText(
+            "Musikprovider für das Overlay",
+        );
+        await waitFor(() => expect(select).not.toBeDisabled());
+        fireEvent.change(select, { target: { value: "ytmusic" } });
+        await waitFor(() =>
+            expect(invokeMock).toHaveBeenCalledWith(
+                "save_settings",
+                expect.objectContaining({
+                    original: expect.any(Object),
+                    settings: expect.objectContaining({
+                        MusicPlayer: expect.objectContaining({
+                            Source: "ytmusic",
+                        }),
+                    }),
+                }),
+            ),
+        );
+    });
 });

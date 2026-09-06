@@ -1,26 +1,31 @@
 use mime_guess::from_path;
 use std::path::PathBuf;
 
-pub fn canvas_root() -> PathBuf {
-    if let Ok(p) = std::env::var("CCS_OVERLAY_ASSETS") {
-        return PathBuf::from(p);
-    }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../../src/CreatorControlSuite.Modules.Overlay/CanvasOverlay")
-}
+include!(concat!(env!("OUT_DIR"), "/canvas_assets.rs"));
 
 pub fn get_asset(asset_path: &str) -> Option<(Vec<u8>, String)> {
-    let trimmed = asset_path.trim_start_matches('/');
-    let path = canvas_root().join(trimmed);
-    if !path.exists() || !path.is_file() {
+    let safe = asset_path
+        .split('/')
+        .all(|p| !p.is_empty() && p != "." && p != ".." && !p.contains(['\\', ':']));
+    if !safe {
         return None;
     }
-    let bytes = std::fs::read(&path).ok()?;
-    let mime = from_path(&path)
-        .first_or_octet_stream()
-        .essence_str()
-        .to_string();
-    Some((bytes, mime))
+    // A checkout override is deliberately limited to debug builds.
+    if cfg!(debug_assertions) {
+        if let Ok(root) = std::env::var("CCS_OVERLAY_ASSETS") {
+            let path = PathBuf::from(root).join(asset_path);
+            if let Ok(bytes) = std::fs::read(path) {
+                return Some((
+                    bytes,
+                    from_path(asset_path)
+                        .first_or_octet_stream()
+                        .essence_str()
+                        .to_string(),
+                ));
+            }
+        }
+    }
+    embedded_asset(asset_path)
 }
 
 pub fn html_shell(kind: &str) -> Option<String> {
@@ -30,18 +35,31 @@ pub fn html_shell(kind: &str) -> Option<String> {
         "solo" => "solo/index.html",
         _ => return None,
     };
-    std::fs::read_to_string(canvas_root().join(file)).ok()
+    String::from_utf8(get_asset(file)?.0).ok()
 }
 
 pub fn list_widget_types() -> Vec<String> {
     [
-        "now-playing",
+        "online",
+        "alert",
+        "music",
         "chat",
+        "ending-stats",
+        "text",
+        "image",
         "countdown",
-        "viewer-count",
         "socials",
+        "partner-roulette",
+        "goal-bar",
+        "event-ticker",
+        "viewer-count",
+        "lower-third",
         "qr-code",
+        "brb-panel",
         "announcement-bar",
+        "animated-background",
+        "bubatz-cantina",
+        "fruppis-landadel",
     ]
     .into_iter()
     .map(str::to_string)
@@ -49,10 +67,19 @@ pub fn list_widget_types() -> Vec<String> {
 }
 
 pub fn list_shape_types() -> Vec<String> {
-    ["rectangle", "ellipse", "divider"]
-        .into_iter()
-        .map(str::to_string)
-        .collect()
+    [
+        "frame",
+        "frame.card",
+        "shape.vignette",
+        "shape.scene-bg",
+        "shape.cutout",
+        "shape.divider",
+        "shape.cam-ring",
+        "shape.sticker",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect()
 }
 
 #[cfg(test)]

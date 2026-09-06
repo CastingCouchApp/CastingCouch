@@ -16,12 +16,14 @@ help:
 	@echo "Release-Kopie nach artifacts/tauri: make -C .. tauri-release (Build-Tauri-Release.ps1)"
 
 install:
-	npm install --no-audit --no-fund
+	npm ci --no-audit --no-fund
+	npm ci --prefix ../src/CreatorControlSuite.Modules.Overlay/CanvasOverlay --no-audit --no-fund
 
 dev: install
 	npm run tauri dev
 
 test: install
+	npm run build:overlay
 	npm test
 	cd src-tauri && cargo test --workspace
 

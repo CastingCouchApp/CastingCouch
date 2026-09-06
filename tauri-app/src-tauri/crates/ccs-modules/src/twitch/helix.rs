@@ -8,10 +8,10 @@ pub const HELIX_BASE_URL: &str = "https://api.twitch.tv/helix/";
 
 #[derive(Clone)]
 pub struct TwitchHelixClient {
-    http: reqwest::Client,
-    helix_base: String,
-    client_id: String,
-    access_token: String,
+    pub(super) http: reqwest::Client,
+    pub(super) helix_base: String,
+    pub(super) client_id: String,
+    pub(super) access_token: String,
 }
 
 impl TwitchHelixClient {
@@ -168,7 +168,7 @@ fn urlencoding_encode(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect::<String>()
 }
 
-fn parse_helix_error(body: &str) -> String {
+pub(super) fn parse_helix_error(body: &str) -> String {
     #[derive(Deserialize)]
     struct ErrBody {
         #[serde(default)]

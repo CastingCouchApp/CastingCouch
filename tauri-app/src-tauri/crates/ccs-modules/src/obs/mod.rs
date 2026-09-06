@@ -1,4 +1,6 @@
+mod controls;
 mod protocol;
+pub use controls::ObsControl;
 
 pub use protocol::{ObsSceneInfo, DEFAULT_EVENT_SUBSCRIPTIONS, SUPPORTED_RPC_VERSION};
 
@@ -502,7 +504,7 @@ impl ObsClient {
         Ok(())
     }
 
-    async fn send_request(
+    pub(crate) async fn send_request(
         &self,
         request_type: &str,
         request_data: Option<Value>,

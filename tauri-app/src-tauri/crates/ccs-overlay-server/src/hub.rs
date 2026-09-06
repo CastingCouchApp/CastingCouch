@@ -9,6 +9,8 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct RealtimeHub {
+    pub live: Arc<crate::live::LiveState>,
+    pub obs: Arc<std::sync::RwLock<Option<Arc<dyn crate::ObsOverlayProvider>>>>,
     tx: broadcast::Sender<String>,
     clients: Arc<AtomicUsize>,
     sockets: Arc<RwLock<HashMap<Uuid, ()>>>,
@@ -18,6 +20,8 @@ impl RealtimeHub {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(256);
         Self {
+            live: Arc::new(crate::live::LiveState::default()),
+            obs: Arc::new(std::sync::RwLock::new(None)),
             tx,
             clients: Arc::new(AtomicUsize::new(0)),
             sockets: Arc::new(RwLock::new(HashMap::new())),
@@ -33,7 +37,26 @@ impl RealtimeHub {
     }
 
     pub fn publish(&self, event: &Value) {
+        self.live.record(event);
         let _ = self.tx.send(event.to_string());
+    }
+
+    pub fn configure_history(&self, path: std::path::PathBuf) -> Result<(), String> {
+        self.live.configure_history(path)
+    }
+    pub fn history(&self) -> Value {
+        self.live.history()
+    }
+    pub fn flush_history(&self) -> Result<(), String> {
+        self.live.flush_history()
+    }
+    pub fn set_countdown(&self, seconds: i64, label: &str) -> Result<(), String> {
+        self.live.set_countdown(seconds, label)?;
+        self.publish(&self.countdown());
+        Ok(())
+    }
+    pub fn countdown(&self) -> Value {
+        self.live.countdown()
     }
 
     pub fn publish_raw(&self, payload: impl Into<String>) {
@@ -49,10 +72,23 @@ impl RealtimeHub {
         let mut rx = self.tx.subscribe();
 
         let hello = serde_json::json!({
+            "source":"app",
             "type": "app.ws.hello",
-            "clientId": id.to_string(),
+            "at":chrono::Utc::now().to_rfc3339(),
+            "summary":"Verbunden",
+            "data":{"clientId": id.to_string()},
         });
         let _ = sink.send(Message::Text(hello.to_string().into())).await;
+        let _ = sink
+            .send(Message::Text(self.countdown().to_string().into()))
+            .await;
+        let history = self.history()["events"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for event in history {
+            let _ = sink.send(Message::Text(event.to_string().into())).await;
+        }
 
         loop {
             tokio::select! {

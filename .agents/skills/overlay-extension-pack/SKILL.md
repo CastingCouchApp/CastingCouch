@@ -118,3 +118,8 @@ Root: `%LocalAppData%\CreatorControlSuite\Overlay\extensions\{packId}\`
 ## Fixture
 
 `tests/CreatorControlSuite.Tests/Fixtures/overlay-pack/cool-kit/`
+
+
+## Tauri-Backend
+
+Tauri verwendet dieselben HTTP-Routen und dasselbe gemeinsame Canvas-Frontend ohne .NET-Sidecar. ZIP-Validierung, atomarer Austausch, Katalog und Deinstallation liegen in `tauri-app/src-tauri/crates/ccs-overlay-server/src/library.rs`; HTTP und Multipart in `routes.rs`. Änderungen an Pack-Manifest oder Dateiregeln in beiden Hosts nachvollziehen und mit `tests/library.rs` sowie HTTP-Vertragstests absichern. Höchstgröße: 50 MB komprimiert und entpackt. Fehlerhafte Updates müssen das bestehende Pack erhalten. Einträge mit Traversal, Symlinks, unerlaubten Endungen oder doppelten Namen ablehnen.

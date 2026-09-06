@@ -103,6 +103,36 @@ impl<L: OverlayLayoutOps> OverlayCanvasService<L> {
         Self { layouts }
     }
 
+    pub async fn update<S: CanvasSettingsPersist>(
+        &self,
+        settings: &mut AppSettings,
+        persist: &S,
+        id: &str,
+        name: Option<&str>,
+        selected: bool,
+    ) -> Result<OverlayCanvasSettings, CanvasError> {
+        let previous = settings.clone();
+        let name = name.map(normalize_name).transpose()?;
+        let canvas = settings
+            .overlay
+            .canvases
+            .iter_mut()
+            .find(|c| c.id == id)
+            .ok_or_else(|| CanvasError::Message("Canvas nicht gefunden".into()))?;
+        if let Some(name) = name {
+            canvas.name = name;
+        }
+        let result = canvas.clone();
+        if selected {
+            settings.overlay.selected_canvas_id = id.to_string();
+        }
+        if let Err(error) = persist.save(settings).await {
+            *settings = previous;
+            return Err(error);
+        }
+        Ok(result)
+    }
+
     pub async fn create<S: CanvasSettingsPersist>(
         &self,
         settings: &mut AppSettings,

@@ -1,4 +1,6 @@
 mod api;
+mod playback;
+pub use playback::{SpotifyAction, SpotifyQuery};
 mod oauth;
 mod tokens;
 
@@ -182,8 +184,22 @@ impl SpotifyClient {
 
     pub async fn begin_login(
         self: &Arc<Self>,
-        options: SpotifyConnectOptions,
+        mut options: SpotifyConnectOptions,
     ) -> ModuleResult<(ServiceStatus, String)> {
+        for scope in [
+            "user-read-playback-state",
+            "user-read-currently-playing",
+            "user-modify-playback-state",
+            "playlist-read-private",
+            "playlist-read-collaborative",
+            "user-library-read",
+            "user-library-modify",
+            "user-read-recently-played",
+        ] {
+            if !options.scopes.iter().any(|s| s == scope) {
+                options.scopes.push(scope.into());
+            }
+        }
         OAuth::validate_client_id(&options.client_id)?;
         self.cancel_pending_login().await;
 
@@ -763,6 +779,20 @@ mod tests {
         assert!(uri.contains("code_challenge_method=S256"));
         assert!(uri.contains("show_dialog=true"));
         let parsed = url::Url::parse(&uri).unwrap();
+        let scopes = parsed
+            .query_pairs()
+            .find(|(key, _)| key == "scope")
+            .unwrap()
+            .1
+            .into_owned();
+        for required in [
+            "user-modify-playback-state",
+            "playlist-read-private",
+            "user-library-modify",
+            "user-read-recently-played",
+        ] {
+            assert!(scopes.split_whitespace().any(|scope| scope == required));
+        }
         let state = parsed
             .query_pairs()
             .find(|(k, _)| k == "state")

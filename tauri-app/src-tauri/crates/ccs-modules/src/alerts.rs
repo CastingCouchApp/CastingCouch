@@ -117,13 +117,16 @@ fn default_volume_percent() -> i32 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertRuntime {
+    pub current_type: Option<String>,
+    pub last_error: Option<String>,
     pub pending_count: usize,
     pub enabled: bool,
     pub obs_scene_name: String,
 }
 
 struct QueuedAlert {
-    type_name: String,
+    definition: AlertDefinition,
+    variables: BTreeMap<String, String>,
     user: String,
     duration: Duration,
 }
@@ -192,6 +195,10 @@ impl SettingsBackend {
 }
 
 struct AlertEngineInner {
+    obs: std::sync::Mutex<Option<Arc<crate::obs::ObsClient>>>,
+    current: std::sync::Mutex<Option<String>>,
+    last_error: std::sync::Mutex<Option<String>>,
+    stop: tokio::sync::watch::Sender<u64>,
     store: SettingsBackend,
     bridge: OverlayEventBridge,
     queue: Mutex<VecDeque<QueuedAlert>>,
@@ -217,6 +224,10 @@ impl AlertEngine {
     fn start(store: SettingsBackend, bridge: OverlayEventBridge) -> Self {
         Self {
             inner: Arc::new(AlertEngineInner {
+                obs: std::sync::Mutex::new(None),
+                current: std::sync::Mutex::new(None),
+                last_error: std::sync::Mutex::new(None),
+                stop: tokio::sync::watch::channel(0).0,
                 store,
                 bridge,
                 queue: Mutex::new(VecDeque::new()),
@@ -226,6 +237,35 @@ impl AlertEngine {
             }),
             worker: std::sync::Mutex::new(None),
         }
+    }
+
+    pub fn attach_obs(&self, obs: Arc<crate::obs::ObsClient>) {
+        *self.inner.obs.lock().unwrap() = Some(obs);
+    }
+    pub fn stop_current(&self) {
+        self.inner.stop.send_modify(|generation| *generation += 1);
+    }
+    pub async fn clear_queue(&self) {
+        let count = self.inner.queue.lock().await.drain(..).count();
+        self.inner.pending.fetch_sub(count, Ordering::SeqCst);
+    }
+    pub async fn install_sources(&self, type_name: &str) -> Result<(), String> {
+        let obs = self
+            .inner
+            .obs
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or("OBS nicht verfügbar")?;
+        let settings = self.inner.store.load().await?;
+        let key = find_definition_key(&settings.alerts.definitions, type_name)
+            .ok_or("Alert nicht gefunden")?;
+        crate::alert_renderer::install(
+            &obs,
+            &settings.alerts,
+            &to_dto(&key, &settings.alerts.definitions[&key]),
+        )
+        .await
     }
 
     fn ensure_worker(&self) {
@@ -298,6 +338,8 @@ impl AlertEngine {
     pub async fn runtime(&self) -> Result<AlertRuntime, String> {
         let settings = self.inner.store.load().await?;
         Ok(AlertRuntime {
+            current_type: self.inner.current.lock().unwrap().clone(),
+            last_error: self.inner.last_error.lock().unwrap().clone(),
             pending_count: self.pending_count(),
             enabled: settings.alerts.enabled,
             obs_scene_name: settings.alerts.obs_scene_name,
@@ -339,7 +381,8 @@ impl AlertEngine {
         if !def.enabled {
             return Ok(0);
         }
-        self.enqueue_request(to_dto(&key, def), user).await?;
+        self.enqueue_request(to_dto(&key, def), user, BTreeMap::new())
+            .await?;
         Ok(1)
     }
 
@@ -373,11 +416,17 @@ impl AlertEngine {
             return Ok(0);
         };
         let user = user_from_event(data);
-        self.enqueue_request(to_dto(key, def), &user).await?;
+        self.enqueue_request(to_dto(key, def), &user, data.clone())
+            .await?;
         Ok(1)
     }
 
-    async fn enqueue_request(&self, def: AlertDefinition, user: &str) -> Result<(), String> {
+    async fn enqueue_request(
+        &self,
+        def: AlertDefinition,
+        user: &str,
+        variables: BTreeMap<String, String>,
+    ) -> Result<(), String> {
         self.ensure_worker();
         let settings = self.inner.store.load().await?;
         let cap = settings.alerts.queue_capacity.max(1) as usize;
@@ -388,7 +437,8 @@ impl AlertEngine {
             self.inner.pending.fetch_sub(1, Ordering::SeqCst);
         }
         queue.push_back(QueuedAlert {
-            type_name: def.type_name,
+            definition: def,
+            variables,
             user: user.to_string(),
             duration,
         });
@@ -425,11 +475,52 @@ async fn worker_loop(inner: Arc<AlertEngineInner>) {
         match next {
             Some(alert) => {
                 drop(notified);
-                inner.bridge.app_alert(&alert.type_name, &alert.user);
-                if !alert.duration.is_zero() {
+                let mut stopped = inner.stop.subscribe();
+                let obs = inner.obs.lock().unwrap().clone();
+                let settings = match inner.store.load().await {
+                    Ok(settings) => settings,
+                    Err(error) => {
+                        *inner.last_error.lock().unwrap() = Some(error);
+                        inner.pending.fetch_sub(1, Ordering::SeqCst);
+                        continue;
+                    }
+                };
+                *inner.current.lock().unwrap() = Some(alert.definition.type_name.clone());
+                *inner.last_error.lock().unwrap() = None;
+                let text = crate::alert_renderer::render_text(
+                    &alert.definition.text_template,
+                    &alert.user,
+                    &alert.variables,
+                );
+                let play = async {
+                    if let Some(obs) = &obs {
+                        crate::alert_renderer::show(
+                            obs,
+                            &settings.alerts,
+                            &alert.definition,
+                            &text,
+                        )
+                        .await?;
+                    }
+                    inner
+                        .bridge
+                        .app_alert(&alert.definition.type_name, &alert.user);
                     tokio::time::sleep(alert.duration).await;
+                    Ok::<(), String>(())
+                };
+                tokio::select! {
+                    result=play=>{if let Err(error)=result{*inner.last_error.lock().unwrap()=Some(error);}},
+                    _=stopped.changed()=>{},
                 }
+                if let Some(obs) = &obs {
+                    crate::alert_renderer::hide(obs, &settings.alerts).await;
+                }
+                *inner.current.lock().unwrap() = None;
                 inner.pending.fetch_sub(1, Ordering::SeqCst);
+                let delay = settings.alerts.inter_alert_delay_milliseconds.max(0) as u64;
+                if delay > 0 {
+                    tokio::time::sleep(Duration::from_millis(delay)).await;
+                }
             }
             None => notified.await,
         }

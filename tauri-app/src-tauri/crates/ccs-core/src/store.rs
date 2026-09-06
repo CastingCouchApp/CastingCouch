@@ -13,6 +13,10 @@ pub enum SettingsError {
     Json(#[from] serde_json::Error),
     #[error("unsupported settings schema {0}; current is {CURRENT_SCHEMA_VERSION}")]
     UnsupportedSchema(u32),
+    #[error("Einstellungen wurden zwischenzeitlich geändert: {0}. Bitte neu laden.")]
+    Conflict(String),
+    #[error("Ungültige Einstellungen: {0}")]
+    Validation(String),
 }
 
 pub struct JsonSettingsStore {
@@ -53,13 +57,47 @@ impl JsonSettingsStore {
 
     pub async fn save(&self, settings: &AppSettings) -> Result<(), SettingsError> {
         let _guard = self.save_lock.lock().await;
+        let mut next = serde_json::to_value(settings)?;
+        if self.path.exists() {
+            let raw: Value = serde_json::from_slice(&fs::read(&self.path).await?)?;
+            let known = serde_json::to_value(serde_json::from_value::<AppSettings>(raw.clone())?)?;
+            preserve_unknown(&raw, &known, &mut next);
+        }
+        self.write_value(&next).await
+    }
+
+    pub async fn read_value(&self) -> Result<Value, SettingsError> {
+        let known = serde_json::to_value(self.load().await?)?;
+        let raw: Value = serde_json::from_slice(&fs::read(&self.path).await?)?;
+        let mut result = known.clone();
+        preserve_unknown(&raw, &known, &mut result);
+        Ok(result)
+    }
+
+    pub async fn save_edit(
+        &self,
+        original: &Value,
+        edited: &Value,
+    ) -> Result<Value, SettingsError> {
+        let _guard = self.save_lock.lock().await;
+        // load() is not used while holding the write lock: it may perform a migration.
+        let raw: Value = serde_json::from_slice(&fs::read(&self.path).await?)?;
+        let known = serde_json::to_value(serde_json::from_value::<AppSettings>(raw.clone())?)?;
+        let mut current = known.clone();
+        preserve_unknown(&raw, &known, &mut current);
+        merge_edit(original, edited, &mut current, "")?;
+        let settings: AppSettings = serde_json::from_value(current.clone())?;
+        validate_settings(&settings)?;
+        self.write_value(&current).await?;
+        Ok(current)
+    }
+
+    async fn write_value(&self, value: &Value) -> Result<(), SettingsError> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent).await?;
         }
-
-        let mut clone = settings.clone();
-        clone.schema_version = CURRENT_SCHEMA_VERSION;
-        clone.overlay.ensure_canvases_migrated();
+        let mut clone = value.clone();
+        clone["SchemaVersion"] = Value::from(CURRENT_SCHEMA_VERSION);
         let json = serde_json::to_vec_pretty(&clone)?;
 
         let tmp = self
@@ -79,6 +117,95 @@ impl JsonSettingsStore {
         fs::rename(&tmp, &self.path).await?;
         Ok(())
     }
+}
+
+fn preserve_unknown(raw: &Value, known: &Value, next: &mut Value) {
+    if let (Some(raw), Some(known), Some(next)) =
+        (raw.as_array(), known.as_array(), next.as_array_mut())
+    {
+        for (index, new) in next.iter_mut().enumerate() {
+            // Identified records may move or disappear; never transfer extras to a different record.
+            let identity = new.get("Id").or_else(|| new.get("id")).cloned();
+            let old_index = match identity {
+                Some(id) => known
+                    .iter()
+                    .position(|old| old.get("Id").or_else(|| old.get("id")) == Some(&id)),
+                None => (index < known.len()).then_some(index),
+            };
+            if let Some(i) = old_index {
+                if let (Some(original), Some(old)) = (raw.get(i), known.get(i)) {
+                    preserve_unknown(original, old, new);
+                }
+            }
+        }
+        return;
+    }
+    if let (Some(raw), Some(known), Some(next)) =
+        (raw.as_object(), known.as_object(), next.as_object_mut())
+    {
+        for (key, value) in raw {
+            if let Some(old) = known.get(key) {
+                if let Some(new) = next.get_mut(key) {
+                    preserve_unknown(value, old, new);
+                }
+            } else {
+                next.entry(key.clone()).or_insert_with(|| value.clone());
+            }
+        }
+    }
+}
+
+fn merge_edit(
+    base: &Value,
+    edited: &Value,
+    current: &mut Value,
+    path: &str,
+) -> Result<(), SettingsError> {
+    if base == edited {
+        return Ok(());
+    }
+    if let (Some(base), Some(edited), Some(current)) = (
+        base.as_object(),
+        edited.as_object(),
+        current.as_object_mut(),
+    ) {
+        for (key, next) in edited {
+            let previous = base.get(key).unwrap_or(&Value::Null);
+            merge_edit(
+                previous,
+                next,
+                current.entry(key.clone()).or_insert(Value::Null),
+                &format!("{path}/{key}"),
+            )?;
+        }
+        for (key, previous) in base {
+            if !edited.contains_key(key) {
+                if current.get(key).is_some_and(|v| v != previous) {
+                    return Err(SettingsError::Conflict(format!("{path}/{key}")));
+                }
+                current.remove(key);
+            }
+        }
+    } else if current == base || current == edited {
+        *current = edited.clone();
+    } else {
+        return Err(SettingsError::Conflict(path.to_string()));
+    }
+    Ok(())
+}
+
+pub fn validate_settings(settings: &AppSettings) -> Result<(), SettingsError> {
+    if settings.overlay.web_server_port == 0 || settings.obs.port == 0 {
+        return Err(SettingsError::Validation(
+            "Port muss zwischen 1 und 65535 liegen.".into(),
+        ));
+    }
+    if settings.obs.host.trim().is_empty() || settings.general.connection_watchdog_seconds < 1 {
+        return Err(SettingsError::Validation(
+            "OBS-Host und positives Wiederverbindungsintervall sind erforderlich.".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Sequential schema migrations, matching the WPF SettingsSchemaMigrator.

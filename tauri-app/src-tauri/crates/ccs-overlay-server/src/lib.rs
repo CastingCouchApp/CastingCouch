@@ -2,8 +2,15 @@ mod assets;
 mod canvas;
 mod hub;
 mod layout_store;
+mod live;
+mod providers;
 mod routes;
 mod state;
+pub use providers::{ObsOverlayProvider, OverlayFuture};
+mod library;
+mod ytmusic;
+pub use library::MediaLibrary;
+pub use ytmusic::{MusicSnapshot, YouTubeMusicBridge};
 
 use axum::Router;
 use ccs_core::{AppPaths, JsonSettingsStore};
@@ -12,6 +19,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
 
+pub use assets::embedded_asset;
 pub use canvas::{CanvasError, CanvasSettingsPersist, OverlayCanvasService};
 pub use hub::RealtimeHub;
 pub use layout_store::OverlayLayoutStore;
@@ -41,7 +49,9 @@ impl OverlayServer {
         hub: Arc<RealtimeHub>,
         port: u16,
     ) -> Result<Self, OverlayServerError> {
-        let overlay_data = paths.overlay_root.join("overlay-data.json");
+        hub.configure_history(paths.overlay_root.join("chat-history.json"))
+            .map_err(std::io::Error::other)?;
+        let overlay_data = paths.data_root.join("data/overlay-data.json");
         let state = OverlayState {
             settings,
             paths,

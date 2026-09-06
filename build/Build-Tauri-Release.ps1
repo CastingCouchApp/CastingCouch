@@ -26,9 +26,13 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 }
 
 Set-Location $tauriApp
+npm ci --prefix ../src/CreatorControlSuite.Modules.Overlay/CanvasOverlay
+if ($LASTEXITCODE -ne 0) { throw "Canvas npm ci fehlgeschlagen." }
 npm ci
+if ($LASTEXITCODE -ne 0) { throw "Tauri npm ci fehlgeschlagen." }
 if (-not $SkipTests) {
     npm test
+    if ($LASTEXITCODE -ne 0) { throw "Tauri Frontend-Tests fehlgeschlagen." }
 }
 
 $bundles = if ($onWindows) { "nsis,msi" } else { "dmg" }
