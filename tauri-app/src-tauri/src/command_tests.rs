@@ -27,6 +27,7 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
         })
         .invoke_handler(tauri::generate_handler![
             setup_overlay_source,
+            obs_query,
             open_overlay_editor,
             test_alert,
             delete_alert,
@@ -148,4 +149,29 @@ fn source_setup_contract_rejects_unknown_canvas_before_touching_obs() {
         .unwrap_err(),
         json!("Canvas existiert nicht")
     );
+}
+
+#[test]
+fn obs_queries_use_typed_camel_case_arguments_through_ipc() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = test_app(dir.path().to_path_buf());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    assert_eq!(
+        call(
+            &window,
+            "obs_query",
+            json!({"query":{"query":"scene_items","sceneName":""}})
+        )
+        .unwrap_err(),
+        json!("OBS-Abfrage benötigt einen gültigen Namen.")
+    );
+    let error = call(
+        &window,
+        "obs_query",
+        json!({"query":{"query":"audio_monitor","input_name":"Mic"}}),
+    )
+    .unwrap_err();
+    assert!(error.as_str().unwrap().contains("inputName"));
 }

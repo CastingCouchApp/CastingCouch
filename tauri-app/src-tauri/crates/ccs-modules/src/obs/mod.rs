@@ -1,4 +1,6 @@
 mod controls;
+mod queries;
+pub use queries::ObsQuery;
 mod protocol;
 pub use controls::ObsControl;
 

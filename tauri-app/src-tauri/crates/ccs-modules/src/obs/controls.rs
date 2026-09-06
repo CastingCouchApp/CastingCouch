@@ -111,6 +111,9 @@ impl ObsControl {
         };
         let mut data = serde_json::to_value(self).expect("serializable OBS control");
         data.as_object_mut().unwrap().remove("action");
+        if matches!(self, Self::SetInputSettings { .. }) {
+            data["overlay"] = json!(true);
+        }
         (name, data)
     }
 }

@@ -45,9 +45,9 @@ DA2 enthält keine Workflow-Steuerung. Die Workflow- und EX-Abhängigkeiten der 
 |---|---|---|---|
 | [ ] | OBS1 | Implementiert | Stream und Aufnahme starten/stoppen, Aufnahme pausieren/fortsetzen, Status in Dienste/Dashboard. |
 | [ ] | OBS2 | Implementiert | Replay Buffer starten/stoppen/speichern und virtuelle Kamera. |
-| [ ] | OBS3 | Teilweise | Typisierte Backend-Befehle für Profile, Sammlungen und Übergänge/Dauer; Auswahl-/Verwaltungsoberfläche fehlt. |
-| [ ] | OBS4 | Teilweise | Backend-Befehle für Quellen, Scene Items, Transformation und Filter sowie Alert-Quelleneinrichtung. Vollständiger Editor fehlt. |
-| [ ] | OBS5 | Teilweise | Backend für Mute, Lautstärke, Monitoring, Sync-Offset. Geräte-/Quellenanzeige und Audiobedienung fehlen. |
+| [ ] | OBS3 | Teilweise | Typisierte Abfragen und Bedienoberfläche für Profile, Szenensammlungen, Übergänge und Dauer vorhanden. Betriebsabnahme mit OBS steht aus. |
+| [ ] | OBS4 | Teilweise | Quellen-/Gruppenauswahl, Sichtbarkeit, Sperre, Reihenfolge, Transformation und Filter-Schalter bedienbar. Häufige Quellenparameter können geändert werden; andere Einstellungen bleiben erhalten. Vollständige Filterparameter- und quellentypspezifische Editoren fehlen. |
+| [ ] | OBS5 | Teilweise | Quellenauswahl mit tatsächlichem Mute-, Lautstärke-, Monitoring- und Sync-Offset-Zustand sowie Bedienung vorhanden. Nicht unterstützte Audioabfragen bleiben als Fehler sichtbar. Betriebsabnahme steht aus. |
 | [ ] | OBS6 | Teilweise | Regelmäßige Ausgangsstatus-/FPS-/CPU-Abfrage und Fehleranzeige. Optionale Ausgangsfehler werden einzeln angezeigt; Streamstatus bleibt erhalten. Bei fehlendem Status bleiben Schaltflächen deaktiviert. Umfassendes Monitoring fehlt. |
 
 ## Twitch
@@ -110,7 +110,7 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 
 1. Weitere native Command-Verträge und OBS-Playback mit Verbindungsabbrüchen/Stopprennen absichern; bestehende C#-Datenfixtures vollständig übernehmen.
 2. B5–B7 und O5/O6 vervollständigen; vollständige Twitch-Daten-/Zielversorgung und Sessionerfassung als Grundlage für DA3/DA4.
-3. OBS3–5-Oberflächen, Twitch-Verwaltung, Alert-Sound und Musikautomationen/Ducking/Zustände fertigstellen.
+3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung, Alert-Sound und Musikautomationen/Ducking/Zustände fertigstellen.
 4. Dashboard, Einrichtung, Rechtstexte, Profile, Migration/Backups und Diagnostik umsetzen.
 5. Windows-/macOS-Installer bauen und jeden gewählten Nutzerablauf dokumentiert abnehmen; erst danach Cutover entscheiden.
 
@@ -124,3 +124,11 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 - Windows: Common-Controls-v6-Manifest wird einmalig vom Linker für App und Tests eingebettet; Tauri-Ressourcen enthalten kein zweites Manifest. Keine Änderung am Berechtigungsniveau.
 
 Validierung dieses Schritts: 154 Rust-Tests (Workspace einschließlich ergänzter nativer IPC-Prüfung), 47 Frontend-Tests sowie TypeScript-/Vite-Produktionsbuild. Die Windows-/macOS-Abnahme mit echten OBS-/Twitch-/Musikverbindungen und installiertem Paket bleibt offen.
+
+## Fortsetzung: OBS-Verwaltung
+
+Die Dienste-Seite bietet jetzt Profile, Szenensammlungen und Übergänge, Scene Items einschließlich verschachtelter Gruppen sowie Audioeinstellungen. Transformationswerte werden über eine separate OBS-Abfrage geladen. Änderungen einzelner Quellenparameter verwenden ausdrücklich `overlay: true`, damit übrige Einstellungen erhalten bleiben. Nach Änderungen werden die betroffenen Abfragen aktualisiert; eine manuelle Aktualisierung ist ebenfalls verfügbar.
+
+Neue Tests prüfen echte Tauri-Command-Deserialisierung, OBS-WebSocket-Abfragen und Fehlerantworten sowie UI-Auswahl, Mute, Sichtbarkeit und gezielte Transformationsänderungen. Die kontrollierte WebSocket-Gegenstelle ersetzt keine Live-Abnahme. Vollständige Filterparameter, sämtliche quellentypspezifischen Einstellungen und laufende Synchronisierung externer OBS-Änderungen bleiben offen.
+
+Validierung: 157 Rust-Tests, 51 Frontend-Tests und TypeScript-/Vite-Build erfolgreich. Windows-/macOS-Installations- und Live-Abnahme bleiben offen.

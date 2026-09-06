@@ -1,7 +1,7 @@
 use ccs_core::AppSettings;
 use ccs_modules::{
     alerts::{AlertEngine, MemorySettingsStore},
-    obs::ObsClient,
+    obs::{ObsClient, ObsControl, ObsQuery},
     overlay_bridge::OverlayEventBridge,
 };
 use ccs_overlay_server::RealtimeHub;
@@ -63,6 +63,19 @@ async fn server(
                 "GetSceneItemList" => {
                     json!({"sceneItems":[{"sourceName":"Existing","sceneItemId":20,"sceneItemEnabled":false}]})
                 }
+                "GetProfileList" => {
+                    json!({"currentProfileName":"Streaming","profiles":[{"profileName":"Streaming"}]})
+                }
+                "GetSceneCollectionList" => {
+                    json!({"currentSceneCollectionName":"Main","sceneCollections":[{"sceneCollectionName":"Main"}]})
+                }
+                "GetSceneItemTransform" => {
+                    json!({"sceneItemTransform":{"positionX":12,"positionY":20}})
+                }
+                "GetInputAudioSyncOffset" => json!({"inputAudioSyncOffset":120}),
+                "GetInputAudioMonitorType" => json!({"monitorType":"OBS_MONITORING_TYPE_NONE"}),
+                "GetInputMute" => json!({"inputMuted":false}),
+                "GetInputVolume" => json!({"inputVolumeDb":-12,"inputVolumeMul":0.25}),
                 "GetStats" => json!({"activeFps":60}),
                 "GetSceneItemId" => {
                     json!({"sceneItemId":if d["requestData"]["sourceName"]=="_alert_text" {1}else{2}})
@@ -249,6 +262,89 @@ async fn alert_cleanup_errors_are_visible_after_playback_finishes() {
         .unwrap()
         .last_error
         .unwrap()
+        .contains("contract failure"));
+    obs.disconnect().await.unwrap();
+    task.await.unwrap();
+}
+
+#[tokio::test]
+async fn management_queries_and_audio_controls_roundtrip_obs_fields() {
+    let (obs, requests, task) = server("").await;
+    assert_eq!(
+        obs.query(ObsQuery::Profiles).await.unwrap()["currentProfileName"],
+        "Streaming"
+    );
+    assert_eq!(
+        obs.query(ObsQuery::SceneCollections).await.unwrap()["sceneCollections"][0]
+            ["sceneCollectionName"],
+        "Main"
+    );
+    assert_eq!(
+        obs.query(ObsQuery::Transform {
+            scene_name: "Live".into(),
+            scene_item_id: 42
+        })
+        .await
+        .unwrap()["sceneItemTransform"]["positionX"],
+        12
+    );
+    let query: ObsQuery =
+        serde_json::from_value(json!({"query":"audio_sync_offset","inputName":"Mic"})).unwrap();
+    assert_eq!(obs.query(query).await.unwrap()["inputAudioSyncOffset"], 120);
+    obs.control(ObsControl::SetMonitor {
+        input_name: "Mic".into(),
+        monitor_type: "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT".into(),
+    })
+    .await
+    .unwrap();
+    obs.control(ObsControl::SetSyncOffset {
+        input_name: "Mic".into(),
+        input_audio_sync_offset: 120,
+    })
+    .await
+    .unwrap();
+    obs.control(ObsControl::SetInputSettings {
+        input_name: "Existing".into(),
+        input_settings: json!({"url":"http://127.0.0.1:8765/view/default"}),
+    })
+    .await
+    .unwrap();
+    let commands = requests.lock().unwrap().clone();
+    assert!(commands
+        .iter()
+        .any(|r| r["requestType"] == "GetSceneItemTransform"
+            && r["requestData"]["sceneName"] == "Live"
+            && r["requestData"]["sceneItemId"] == 42));
+    assert!(commands
+        .iter()
+        .any(|r| r["requestType"] == "SetInputSettings" && r["requestData"]["overlay"] == true));
+    assert!(commands
+        .iter()
+        .any(|r| r["requestType"] == "GetInputAudioSyncOffset"
+            && r["requestData"]["inputName"] == "Mic"));
+    assert!(commands
+        .iter()
+        .any(|r| r["requestType"] == "SetInputAudioMonitorType"
+            && r["requestData"]["monitorType"] == "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT"));
+    assert!(obs
+        .query(ObsQuery::SceneItems {
+            scene_name: "".into()
+        })
+        .await
+        .is_err());
+    obs.disconnect().await.unwrap();
+    task.await.unwrap();
+}
+#[tokio::test]
+async fn failed_audio_query_remains_an_error_not_a_default_value() {
+    let (obs, _, task) = server("GetInputMute").await;
+    assert!(obs
+        .query(ObsQuery::Mute {
+            input_name: "Camera".into()
+        })
+        .await
+        .unwrap_err()
+        .to_string()
         .contains("contract failure"));
     obs.disconnect().await.unwrap();
     task.await.unwrap();

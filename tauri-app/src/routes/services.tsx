@@ -1,4 +1,5 @@
 import { TwitchPanel } from "../features/services/TwitchPanel";
+import { ObsManager } from "../features/obs/ObsManager";
 import { ObsControls } from "../features/obs/ObsControls";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -305,6 +306,7 @@ function ServicesPage() {
                 ))}
             </div>
             <ObsControls enabled={connected} />
+            <ObsManager enabled={connected} />
             <TwitchPanel enabled={twitchConnected} />
         </div>
     );

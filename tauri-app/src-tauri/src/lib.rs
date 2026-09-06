@@ -190,6 +190,14 @@ async fn setup_overlay_source(
 }
 
 #[tauri::command]
+async fn obs_query(
+    state: State<'_, AppState>,
+    query: ccs_modules::obs::ObsQuery,
+) -> Result<Value, String> {
+    state.obs.query(query).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn obs_control(state: State<'_, AppState>, control: ObsControl) -> Result<Value, String> {
     state.obs.control(control).await.map_err(|e| e.to_string())
 }
@@ -964,6 +972,7 @@ pub fn run() {
             spotify_action,
             spotify_query,
             obs_control,
+            obs_query,
             setup_overlay_source,
             obs_output_status,
             ytm_connect,
