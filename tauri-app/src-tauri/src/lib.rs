@@ -256,11 +256,85 @@ async fn spotify_action(
                 .map_err(|e| e.to_string());
         }
     }
-    state
+    let playlist = match &action {
+        ccs_modules::spotify::SpotifyAction::PlayPlaylist { uri } => Some(uri.clone()),
+        _ => None,
+    };
+    let result = state
         .spotify
         .action_with_preferences(&settings.spotify.client_id, action, &settings.spotify.extra)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    if let Some(uri) = playlist {
+        let _guard = state.settings_mutation.lock().await;
+        let original = state
+            .settings
+            .read_value()
+            .await
+            .map_err(|e| e.to_string())?;
+        let mut next = original.clone();
+        let mut recent = string_list(&original["Spotify"]["RecentPlaylistUris"]);
+        recent.retain(|previous| !previous.eq_ignore_ascii_case(&uri));
+        recent.insert(0, uri);
+        recent.truncate(5);
+        next["Spotify"]["RecentPlaylistUris"] = json!(recent);
+        state
+            .settings
+            .save_edit(&original, &next)
+            .await
+            .map_err(|e| {
+                format!("Playlist gestartet; Verlauf konnte nicht gespeichert werden: {e}")
+            })?;
+    }
+    Ok(result)
+}
+
+fn string_list(value: &Value) -> Vec<String> {
+    value
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .filter_map(|value| value.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn set_spotify_playlist_favorite(
+    state: State<'_, AppState>,
+    uri: String,
+    favorite: bool,
+) -> Result<(), String> {
+    let uri = uri.trim();
+    if !uri
+        .strip_prefix("spotify:playlist:")
+        .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric()))
+    {
+        return Err("Ungültige Spotify-Playlist-URI".into());
+    }
+    let _guard = state.settings_mutation.lock().await;
+    let original = state
+        .settings
+        .read_value()
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut next = original.clone();
+    let mut favorites = string_list(&original["Spotify"]["FavoritePlaylistUris"]);
+    let present = favorites.iter().any(|item| item.eq_ignore_ascii_case(uri));
+    if favorite && !present {
+        favorites.push(uri.to_string());
+    }
+    if !favorite {
+        favorites.retain(|item| !item.eq_ignore_ascii_case(uri));
+    }
+    next["Spotify"]["FavoritePlaylistUris"] = json!(favorites);
+    state
+        .settings
+        .save_edit(&original, &next)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 #[tauri::command]
 async fn activate_spotify_device(state: State<'_, AppState>, play: bool) -> Result<Value, String> {
@@ -1084,6 +1158,7 @@ pub fn run() {
             countdown_status,
             set_countdown,
             spotify_action,
+            set_spotify_playlist_favorite,
             activate_spotify_device,
             spotify_query,
             obs_control,

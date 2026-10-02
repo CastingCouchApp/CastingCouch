@@ -2,6 +2,12 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
+    test_app_with_spotify(root, None)
+}
+fn test_app_with_spotify(
+    root: PathBuf,
+    spotify: Option<Arc<SpotifyClient>>,
+) -> tauri::App<MockRuntime> {
     let paths = AppPaths::from_root(root);
     let settings = Arc::new(JsonSettingsStore::new(&paths.settings_file));
     let secrets = Arc::new(KeyringSecretStore::new());
@@ -15,7 +21,7 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
             settings_mutation: Mutex::new(()),
             obs: ObsClient::new_shared("127.0.0.1", 4455),
             twitch: TwitchClient::new_shared(secrets.clone()),
-            spotify: SpotifyClient::new_shared(secrets.clone()),
+            spotify: spotify.unwrap_or_else(|| SpotifyClient::new_shared(secrets.clone())),
             paths,
             settings,
             secrets,
@@ -31,6 +37,9 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
             twitch_action,
             twitch_query,
             activate_spotify_device,
+            spotify_query,
+            spotify_action,
+            set_spotify_playlist_favorite,
             startup_error,
             overlay_runtime_status,
             setup_overlay_source,
@@ -56,6 +65,144 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
         ])
         .build(mock_context(noop_assets()))
         .unwrap()
+}
+
+#[test]
+fn playlist_favorites_and_successful_playback_persist_through_native_ipc() {
+    use ccs_modules::spotify::{SpotifyOAuthClient, SpotifyTokenRepository, SpotifyTokenSet};
+    use ccs_secrets::MemorySecretStore;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let (spotify, server) = tauri::async_runtime::block_on(async {
+        let server = MockServer::start().await;
+        let secrets = Arc::new(MemorySecretStore::new());
+        SpotifyTokenRepository::new(secrets.clone())
+            .save(&SpotifyTokenSet {
+                access_token: "token".into(),
+                refresh_token: "refresh".into(),
+                obtained_at: "2099-01-01T00:00:00Z".parse().unwrap(),
+                expires_in_seconds: 3600,
+                token_type: "Bearer".into(),
+                scopes: vec![],
+            })
+            .unwrap();
+        Mock::given(method("PUT"))
+            .and(path("/me/player/play"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path("/me/player/shuffle"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/me/library/contains"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([true])))
+            .mount(&server)
+            .await;
+        (
+            Arc::new(SpotifyClient::with_http(
+                secrets,
+                SpotifyOAuthClient::new(),
+                server.uri(),
+            )),
+            server,
+        )
+    });
+    let app = test_app_with_spotify(dir.path().into(), Some(spotify));
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let mut original = call(&window, "get_settings", json!({})).unwrap();
+    original["Spotify"]["AutoTransferToPreferredDevice"] = json!(false);
+    original["Spotify"]["PreferredDeviceId"] = json!("preferred");
+    original["Spotify"]["RecentPlaylistUris"] = json!([
+        "spotify:playlist:old1",
+        "spotify:playlist:old2",
+        "spotify:playlist:old3",
+        "spotify:playlist:old4",
+        "spotify:playlist:old5"
+    ]);
+    let initial = call(&window, "get_settings", json!({})).unwrap();
+    call(
+        &window,
+        "save_settings",
+        json!({"original":initial,"settings":original}),
+    )
+    .unwrap();
+    for _ in 0..2 {
+        call(
+            &window,
+            "set_spotify_playlist_favorite",
+            json!({"uri":"spotify:playlist:studio","favorite":true}),
+        )
+        .unwrap();
+    }
+    assert!(call(
+        &window,
+        "set_spotify_playlist_favorite",
+        json!({"uri":"bad","favorite":true})
+    )
+    .is_err());
+    call(
+        &window,
+        "spotify_action",
+        json!({"action":{"action":"play_playlist","uri":"spotify:playlist:studio"}}),
+    )
+    .unwrap();
+    assert_eq!(
+        call(
+            &window,
+            "spotify_query",
+            json!({"query":{"query":"saved_status","ids":["song"]}})
+        )
+        .unwrap(),
+        json!([true])
+    );
+    let settings = call(&window, "get_settings", json!({})).unwrap();
+    assert_eq!(
+        settings["Spotify"]["FavoritePlaylistUris"],
+        json!(["spotify:playlist:studio"])
+    );
+    assert_eq!(
+        settings["Spotify"]["RecentPlaylistUris"],
+        json!([
+            "spotify:playlist:studio",
+            "spotify:playlist:old1",
+            "spotify:playlist:old2",
+            "spotify:playlist:old3",
+            "spotify:playlist:old4"
+        ])
+    );
+    tauri::async_runtime::block_on(async {
+        let calls = server.received_requests().await.unwrap();
+        assert_eq!(calls[0].url.path(), "/me/player/play");
+        assert_eq!(calls[1].url.path(), "/me/player/shuffle");
+        server.reset().await;
+    });
+    assert!(call(
+        &window,
+        "spotify_action",
+        json!({"action":{"action":"play_playlist","uri":"spotify:playlist:failed"}})
+    )
+    .is_err());
+    assert_eq!(
+        call(&window, "get_settings", json!({})).unwrap()["Spotify"]["RecentPlaylistUris"],
+        settings["Spotify"]["RecentPlaylistUris"]
+    );
+    let restarted = test_app(dir.path().into());
+    let restarted_window = WebviewWindowBuilder::new(&restarted, "main", Default::default())
+        .build()
+        .unwrap();
+    assert_eq!(
+        call(&restarted_window, "get_settings", json!({})).unwrap()["Spotify"]
+            ["FavoritePlaylistUris"],
+        settings["Spotify"]["FavoritePlaylistUris"]
+    );
 }
 fn call(
     window: &tauri::WebviewWindow<MockRuntime>,

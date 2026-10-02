@@ -1,4 +1,5 @@
-import type { SpotifyAction, SpotifyQuery } from "../lib/command-contract";
+import { SpotifyLibrary } from "../features/music/SpotifyLibrary";
+import type { SpotifyAction } from "../lib/command-contract";
 import { MusicAutomation } from "../features/music/MusicAutomation";
 import { SpotifyDevices } from "../features/music/SpotifyDevices";
 import { createFileRoute } from "@tanstack/react-router";
@@ -20,18 +21,6 @@ import {
     type YtmNowPlaying,
 } from "../lib/api";
 export const Route = createFileRoute("/music")({ component: MusicPage });
-type Track = {
-    id: string;
-    uri: string;
-    name: string;
-    artists?: { name: string }[];
-    track?: Track;
-};
-type Catalog = {
-    items?: Track[];
-    tracks?: { items: Track[] };
-    queue?: Track[];
-};
 function MusicPage() {
     const client = useQueryClient();
     const settings = useQuery({
@@ -66,11 +55,6 @@ function MusicPage() {
         refetchInterval: 5000,
     });
     const [setup, setSetup] = useState("");
-    const [search, setSearch] = useState("");
-    const [catalogQuery, setCatalogQuery] = useState<SpotifyQuery>({
-        query: "playlists",
-    });
-    const [offset, setOffset] = useState(0);
     const now = useQuery({
         queryKey: queryKeys.nowPlaying,
         queryFn: () => tauriInvoke<NowPlaying>("now_playing"),
@@ -81,21 +65,13 @@ function MusicPage() {
         queryFn: () => tauriInvoke<YtmNowPlaying>("ytm_now_playing"),
         refetchInterval: 2000,
     });
-    const catalog = useQuery({
-        queryKey: ["spotify-catalog", catalogQuery, offset],
-        queryFn: () =>
-            tauriInvoke<Catalog>("spotify_query", {
-                query: catalogQuery,
-                offset,
-            }),
-    });
     const act = useMutation({
         mutationFn: (action: SpotifyAction) =>
             tauriInvoke("spotify_action", { action }),
         onSuccess: () => {
             void client.invalidateQueries({ queryKey: ["spotify-playback"] });
             void client.invalidateQueries({ queryKey: queryKeys.nowPlaying });
-            void client.invalidateQueries({ queryKey: ["spotify-catalog"] });
+            void client.invalidateQueries({ queryKey: ["spotify-library"] });
             void client.invalidateQueries({ queryKey: ["spotify-devices"] });
         },
     });
@@ -116,11 +92,6 @@ function MusicPage() {
             });
         },
     });
-    const items =
-        catalog.data?.items ??
-        catalog.data?.tracks?.items ??
-        catalog.data?.queue ??
-        [];
     const error =
         provider.error ??
         act.error ??
@@ -308,145 +279,7 @@ function MusicPage() {
                     </div>
                 </Card>
             </div>
-            <Card className="space-y-4">
-                <h2 className="text-lg font-semibold">Spotify-Bibliothek</h2>
-                <div className="flex flex-wrap gap-2">
-                    {(
-                        [
-                            ["playlists", "Playlists"],
-                            ["saved", "Favoriten"],
-                            ["queue", "Warteschlange"],
-                            ["recent", "Zuletzt gehört"],
-                        ] as const
-                    ).map(([query, label]) => (
-                        <Button
-                            key={query}
-                            onClick={() => {
-                                setOffset(0);
-                                setCatalogQuery({ query });
-                            }}
-                        >
-                            {label}
-                        </Button>
-                    ))}
-                </div>
-                <form
-                    className="flex gap-2"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        setOffset(0);
-                        setCatalogQuery({ query: "search", text: search });
-                    }}
-                >
-                    <Input
-                        aria-label="Titel suchen"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                    <Button type="submit">Suchen</Button>
-                </form>
-                {catalog.error && <p role="alert">{String(catalog.error)}</p>}
-                {catalog.isLoading && <p>Lädt…</p>}
-                <ul className="divide-y divide-border">
-                    {items.map((item, index) => {
-                        const track = item.track ?? item;
-                        return (
-                            <li
-                                key={`${track.id}-${index}`}
-                                className="flex flex-wrap items-center gap-2 py-2"
-                            >
-                                <span className="flex-1">
-                                    {track.name}
-                                    {track.artists?.length
-                                        ? ` · ${track.artists.map((a) => a.name).join(", ")}`
-                                        : ""}
-                                </span>
-                                {catalogQuery.query === "playlists" ? (
-                                    <>
-                                        <Button
-                                            onClick={() =>
-                                                act.mutate({
-                                                    action: "play_playlist",
-                                                    uri: track.uri,
-                                                })
-                                            }
-                                        >
-                                            Abspielen
-                                        </Button>
-                                        <Button
-                                            onClick={() => {
-                                                setOffset(0);
-                                                setCatalogQuery({
-                                                    query: "playlist_tracks",
-                                                    id: track.id,
-                                                });
-                                            }}
-                                        >
-                                            Titel anzeigen
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Button
-                                            onClick={() =>
-                                                act.mutate({
-                                                    action: "play_track",
-                                                    uri: track.uri,
-                                                })
-                                            }
-                                        >
-                                            Abspielen
-                                        </Button>
-                                        <Button
-                                            onClick={() =>
-                                                act.mutate({
-                                                    action: "queue",
-                                                    uri: track.uri,
-                                                })
-                                            }
-                                        >
-                                            Einreihen
-                                        </Button>
-                                        <Button
-                                            onClick={() =>
-                                                act.mutate({
-                                                    action:
-                                                        catalogQuery.query ===
-                                                        "saved"
-                                                            ? "remove_saved_track"
-                                                            : "save_track",
-                                                    id: track.id,
-                                                })
-                                            }
-                                        >
-                                            {catalogQuery.query === "saved"
-                                                ? "Entfernen"
-                                                : "Merken"}
-                                        </Button>
-                                    </>
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
-                <div className="flex gap-2">
-                    <Button
-                        disabled={!offset}
-                        onClick={() => setOffset(Math.max(0, offset - 50))}
-                    >
-                        Vorherige Seite
-                    </Button>
-                    <Button
-                        disabled={
-                            items.length < 50 ||
-                            ["queue", "recent"].includes(catalogQuery.query)
-                        }
-                        onClick={() => setOffset(offset + 50)}
-                    >
-                        Nächste Seite
-                    </Button>
-                </div>
-            </Card>
+            <SpotifyLibrary />
         </div>
     );
 }

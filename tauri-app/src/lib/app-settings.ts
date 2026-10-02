@@ -73,6 +73,9 @@ export type SpotifySettings = {
   AutoTransferToPreferredDevice?: boolean;
   UseActiveDeviceWhenPreferredUnavailable?: boolean;
   StartPlaylistUri?: string;
+  FavoritePlaylistUris?: string[];
+  RecentPlaylistUris?: string[];
+  ShuffleSelectedPlaylist?: boolean;
   ClientId: string;
   RedirectUri: string;
   AutoConnect: boolean;

@@ -66,6 +66,8 @@ export type SpotifyQuery =
   | { query: "recent" }
   | { query: "saved" }
   | { query: "playlists" }
+  | { query: "all_playlists" }
+  | { query: "saved_status"; ids: Array<string> }
   | { query: "playlist_tracks"; id: string }
   | { query: "search"; text: string };
 
@@ -116,6 +118,7 @@ export type CommandInvocation =
   | [command: "countdown_status", args?: Record<string, never>]
   | [command: "set_countdown", args: { seconds: number; label: string }]
   | [command: "spotify_action", args: { action: SpotifyAction }]
+  | [command: "set_spotify_playlist_favorite", args: { uri: string; favorite: boolean }]
   | [command: "activate_spotify_device", args: { play: boolean }]
   | [command: "spotify_query", args: { query: SpotifyQuery; offset?: number | null }]
   | [command: "setup_overlay_source", args: { canvasId: string; sceneName: string; inputName: string }]

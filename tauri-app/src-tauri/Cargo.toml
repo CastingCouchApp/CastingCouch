@@ -46,3 +46,4 @@ lto = true
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }
 tempfile = "3"
+wiremock = "0.6"

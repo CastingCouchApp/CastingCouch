@@ -105,8 +105,8 @@ async fn player_commands_target_saved_device_without_changing_library_requests()
         .await
         .unwrap();
     Mock::given(method("PUT"))
-        .and(path("/me/tracks"))
-        .and(body_json(json!({"ids":["track123"]})))
+        .and(path("/me/library"))
+        .and(query_param("uris", "spotify:track:track123"))
         .respond_with(ResponseTemplate::new(204))
         .expect(1)
         .mount(&server)
@@ -124,7 +124,7 @@ async fn player_commands_target_saved_device_without_changing_library_requests()
     let requests = server.received_requests().await.unwrap();
     assert!(!requests
         .iter()
-        .find(|r| r.url.path() == "/me/tracks")
+        .find(|r| r.url.path() == "/me/library")
         .unwrap()
         .url
         .query_pairs()
@@ -136,6 +136,11 @@ async fn playlist_auto_transfer_uses_fallback_and_can_be_disabled() {
     let (client, server) =
         player(json!([{"id":"current","name":"Active","is_active":true,"is_restricted":false}]))
             .await;
+    Mock::given(method("PUT"))
+        .and(path("/me/player/shuffle"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
     Mock::given(method("PUT"))
         .and(path("/me/player/play"))
         .and(query_param("device_id", "current"))

@@ -39,6 +39,8 @@ pub enum SpotifyQuery {
     Recent,
     Saved,
     Playlists,
+    AllPlaylists,
+    SavedStatus { ids: Vec<String> },
     PlaylistTracks { id: String },
     Search { text: String },
 }
@@ -74,6 +76,11 @@ fn valid_id(value: &str) -> ModuleResult<&str> {
     } else {
         Err(ModuleError::Message("Ungültige Spotify-ID".into()))
     }
+}
+fn track_uri(value: &str) -> ModuleResult<String> {
+    let value = value.trim();
+    let id = value.strip_prefix("spotify:track:").unwrap_or(value);
+    Ok(format!("spotify:track:{}", valid_id(id)?))
 }
 impl SpotifyAction {
     fn request(&self) -> ModuleResult<Request> {
@@ -113,10 +120,10 @@ impl SpotifyAction {
             }
             Self::Queue { uri } => Request::new(Method::POST, "me/player/queue").param("uri", uri),
             Self::SaveTrack { id } => {
-                Request::new(Method::PUT, "me/tracks").body(json!({"ids":[valid_id(id)?]}))
+                Request::new(Method::PUT, "me/library").param("uris", track_uri(id)?)
             }
             Self::RemoveSavedTrack { id } => {
-                Request::new(Method::DELETE, "me/tracks").body(json!({"ids":[valid_id(id)?]}))
+                Request::new(Method::DELETE, "me/library").param("uris", track_uri(id)?)
             }
         })
     }
@@ -133,14 +140,28 @@ impl SpotifyQuery {
             }
             Self::Saved => Request::new(Method::GET, "me/tracks").param("limit", 50),
             Self::Playlists => Request::new(Method::GET, "me/playlists").param("limit", 50),
-            Self::PlaylistTracks { id } => {
-                Request::new(Method::GET, format!("playlists/{}/tracks", valid_id(id)?))
-                    .param("limit", 50)
+            Self::AllPlaylists => Request::new(Method::GET, "me/playlists").param("limit", 50),
+            Self::SavedStatus { ids } => {
+                if ids.is_empty() || ids.len() > 40 {
+                    return Err(ModuleError::Message(
+                        "Favoritenprüfung benötigt 1–40 Titel".into(),
+                    ));
+                }
+                let uris = ids
+                    .iter()
+                    .map(|id| track_uri(id))
+                    .collect::<ModuleResult<Vec<_>>>()?;
+                Request::new(Method::GET, "me/library/contains").param("uris", uris.join(","))
             }
+            Self::PlaylistTracks { id } => Request::new(
+                Method::GET,
+                format!("playlists/{}/items", valid_id(id.trim())?),
+            )
+            .param("limit", 50),
             Self::Search { text } => Request::new(Method::GET, "search")
-                .param("q", text)
+                .param("q", text.trim())
                 .param("type", "track")
-                .param("limit", 50),
+                .param("limit", 10),
         })
     }
 }
@@ -253,11 +274,36 @@ impl SpotifyClient {
             let selected = self
                 .activate_preferred_device(client_id, options, false)
                 .await?;
-            self.action_on_device(client_id, action, selected["id"].as_str())
+            self.start_with_preferences(client_id, action, selected["id"].as_str(), options)
                 .await
         } else {
-            self.action_on_device(client_id, action, preferred).await
+            self.start_with_preferences(client_id, action, preferred, options)
+                .await
         }
+    }
+
+    async fn start_with_preferences(
+        &self,
+        client_id: &str,
+        action: SpotifyAction,
+        device: Option<&str>,
+        options: &Value,
+    ) -> ModuleResult<Value> {
+        let playlist = matches!(&action, SpotifyAction::PlayPlaylist { .. });
+        let result = self.action_on_device(client_id, action, device).await?;
+        if playlist {
+            self.action_on_device(
+                client_id,
+                SpotifyAction::Shuffle {
+                    enabled: options["ShuffleSelectedPlaylist"]
+                        .as_bool()
+                        .unwrap_or(false),
+                },
+                device,
+            )
+            .await?;
+        }
+        Ok(result)
     }
 
     pub async fn action_on_device(
@@ -313,6 +359,65 @@ impl SpotifyClient {
         }
     }
     pub async fn query(
+        &self,
+        client_id: &str,
+        query: SpotifyQuery,
+        offset: Option<u64>,
+    ) -> ModuleResult<Value> {
+        if let SpotifyQuery::Search { text } = &query {
+            if text.trim().is_empty() {
+                return Ok(
+                    json!({"tracks":{"items":[],"next":null,"limit":10,"offset":0,"total":0}}),
+                );
+            }
+            if offset.unwrap_or(0) > 1000 {
+                return Err(ModuleError::Message(
+                    "Spotify-Suche unterstützt höchstens Offset 1000".into(),
+                ));
+            }
+        }
+        if matches!(&query, SpotifyQuery::AllPlaylists) {
+            let mut items = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            let mut offset = 0;
+            for _ in 0..2000 {
+                let page = self
+                    .query_page(client_id, SpotifyQuery::Playlists, Some(offset))
+                    .await?;
+                let rows = page["items"].as_array().ok_or_else(|| {
+                    ModuleError::Message("Spotify-Playlistliste ist ungültig".into())
+                })?;
+                for item in rows {
+                    if let Some(id) = item["id"].as_str() {
+                        if seen.insert(id.to_string()) {
+                            items.push(item.clone());
+                        }
+                    }
+                }
+                if rows.is_empty() || !page["next"].as_str().is_some_and(|s| !s.trim().is_empty()) {
+                    items.sort_by_key(|item| item["name"].as_str().unwrap_or("").to_lowercase());
+                    return Ok(json!({"total":items.len(),"items":items,"next":null}));
+                }
+                offset += rows.len() as u64;
+            }
+            return Err(ModuleError::Message(
+                "Spotify-Playlistliste liefert zu viele Seiten".into(),
+            ));
+        }
+        let offset = if matches!(
+            &query,
+            SpotifyQuery::Search { .. }
+                | SpotifyQuery::Saved
+                | SpotifyQuery::Playlists
+                | SpotifyQuery::PlaylistTracks { .. }
+        ) {
+            offset
+        } else {
+            None
+        };
+        self.query_page(client_id, query, offset).await
+    }
+    async fn query_page(
         &self,
         client_id: &str,
         query: SpotifyQuery,
