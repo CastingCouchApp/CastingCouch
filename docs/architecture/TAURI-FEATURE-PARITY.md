@@ -62,8 +62,8 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | [ ] | TW4 | Teilweise | Ban/Unban/Timeout/Delete-Backend, UI für Timeout/Löschen/Clear; EventSub-Synchronisierung. Vollständige Moderationsoberfläche fehlt. |
 | [ ] | TW5 | Teilweise | Helix-Abfragen und einfache Anzeige für Follower/Subs/Chatter. B7 versorgt Viewer-Daten und vorhandene Zielkonfiguration im Overlay; der vollständige Ziele-Editor fehlt. |
 | [ ] | TW6 | Teilweise | Kanal-/Live-/Followed-Suche und ausgehender Raid; Backend für Abbruch. Vollständiger Community-Ablauf noch prüfen. |
-| [ ] | TW7 | Teilweise | Reward erstellen/anzeigen; Einlösungen laden und Status ändern. Reward bearbeiten/löschen und vollständiger Verwaltungsablauf fehlen. |
-| [ ] | TW8 | Teilweise | Polls/Predictions erstellen, laden, beenden/auflösen. Vollständige C#-Optionen und Ereignissynchronisierung fehlen. |
+| [ ] | TW7 | Implementiert | Rewards erstellen/bearbeiten/pausieren/fortsetzen/löschen; Titel, Kosten, Beschreibung, Farbe, Aktivierung und Eingabepflicht. Teiländerungen erhalten übrige Twitch-Felder. Einlösungen mit Zuschauereingabe, Statusfilter, Paging und Erfüllen/Erstatten; externe Änderungen über EventSub und periodische Abfrage. Twitch-Ownership-/Berechtigungsfehler bleiben sichtbar. Live-Abnahme offen. |
+| [ ] | TW8 | Implementiert | Getrennte Umfragen-/Vorhersagenverwaltung mit Ergebnissen, Paging, C#-Normalisierung und Zeitgrenzen. Umfragen beenden/archivieren; Vorhersagen sperren/auflösen/abbrechen, Gewinner bestätigen. EventSub-Beginn/Fortschritt/Ende aktualisiert die UI; periodische Abfragen decken verlorene Events ab. Live-Abnahme offen. |
 | [ ] | TW9 | Offen | Chat-History ist vorhanden; Ereignis- und Streamhistorien sind noch nicht portiert. |
 
 ## Musik und Alerts
@@ -150,3 +150,13 @@ Neue Regressionstests fanden und beheben: weiterlaufende deaktivierte Alerts, fe
 Der letzte CI-Lauf auf main (`fe55c78`, Run 34040850347) bestätigte Windows-Build/Packaging, scheiterte aber bei macOS-IPC-Tests am Windows-spezifischen Invoke-Origin. Die Tests verwenden jetzt die tatsächliche WebView-URL. Drei bestehende WPF-Testannahmen wurden an den aktuellen Vertrag angepasst (Sidecar-Feld, kompakte Breite 1120, plattformunabhängige Zeilenenden). Der Canvas-Lockfile erhält mit npm 11 behebbare Updates innerhalb der bestehenden Versionsbereiche; npm audit meldet lokal keine Schwachstellen. Kein Tauri-Cutover und keine Live-/Installationsfreigabe.
 
 Lokale Validierung dieses Schritts: 192 Rust-Tests (190 im gesamten Workspace plus die danach ergänzten Prüfungen aller sechs Twitch-Alerttypen und der Deaktivierung über die allgemeinen Einstellungen), 59 Tauri-Frontend-Tests, 98 Canvas-Tests, 600 C#-Tests sowie TypeScript- und Produktionsbuilds erfolgreich. Die aktualisierten macOS-IPC-Prüfungen müssen durch den neuen CI-Lauf bestätigt werden.
+
+## Fortsetzung: Twitch-Verwaltung TW7/TW8
+
+Die Dienste-Seite nutzt eigenständige Reward-, Umfragen- und Vorhersagenkomponenten mit typisierten Rust-Actions. PATCH für Rewards überträgt ausschließlich angegebene Felder und erhält Limits oder andere Optionen. Einlösungen können nach offen/erfüllt/erstattet gefiltert und mit Cursor abgefragt werden; die Sortierung entspricht C# (`OLDEST`). Fehlgeschlagene Änderungen behalten den Editorentwurf und zeigen den API-Fehler.
+
+Umfragen und Vorhersagen haben getrennte Entwürfe, Grenzprüfung und Ergebnisse. Der Backend-Vertrag trimmt Texte und begrenzt Zeitwerte wie C#. Ungültige Statuswechsel und fehlende Gewinner werden vor OAuth-/Netzwerkzugriff abgelehnt. Zwölf zusätzliche EventSub-Abonnements aktualisieren Rewards, Einlösungen, Umfragen und Vorhersagen; Fortschrittsbursts werden in React zusammengefasst. Wiederverbindung verwendet dieselbe Subscription-Liste. Keine Workflow- oder EX-Funktion wurde eingeführt.
+
+Verträge abgeglichen mit dem C#-Client sowie [Twitch Helix](https://dev.twitch.tv/docs/api/reference/) und [EventSub-Typen](https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/). Tests prüfen konkrete Loopback-HTTP-Anfragen, 204-Löschung, Ownership-Fehler, Paging, echte WebSocket-Notifications und native Tauri-Argumentdeserialisierung. Lokal bestehen 199 Rust-Tests, 63 Frontend-Tests und TypeScript-/Vite-Build. Keine echte Twitch-Belohnung, Umfrage oder Vorhersage wurde verändert.
+
+Der CI-Lauf für `9c3e681` (Run 37074486729) bestätigt inzwischen Rust-Tests auf Windows und macOS, .NET-Tests, Architektur, Overlay und Dependency-Audit. Die Installer-Builds laufen zum Dokumentationszeitpunkt noch. Gesamte Feature-Parität und plattformübergreifende Betriebsabnahme bleiben offen.

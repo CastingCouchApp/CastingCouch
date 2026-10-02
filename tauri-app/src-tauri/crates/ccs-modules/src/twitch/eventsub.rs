@@ -402,7 +402,7 @@ async fn subscribe_events(
     session_id: &str,
     events_tx: &broadcast::Sender<TwitchEvent>,
 ) -> ModuleResult<usize> {
-    let specs: [(&str, &str, Value, bool); 13] = [
+    let mut specs: Vec<(&str, &str, Value, bool)> = vec![
         (
             "channel.chat.message",
             "1",
@@ -489,6 +489,27 @@ async fn subscribe_events(
         ),
     ];
 
+    for ty in [
+        "channel.poll.begin",
+        "channel.poll.progress",
+        "channel.poll.end",
+        "channel.prediction.begin",
+        "channel.prediction.progress",
+        "channel.prediction.lock",
+        "channel.prediction.end",
+        "channel.channel_points_custom_reward.add",
+        "channel.channel_points_custom_reward.update",
+        "channel.channel_points_custom_reward.remove",
+        "channel.channel_points_custom_reward_redemption.add",
+        "channel.channel_points_custom_reward_redemption.update",
+    ] {
+        specs.push((
+            ty,
+            "1",
+            serde_json::json!({"broadcaster_user_id":broadcaster_user_id}),
+            false,
+        ));
+    }
     let mut active = 0usize;
     for (ty, version, condition, silent) in specs {
         match helix
@@ -698,6 +719,129 @@ mod tests {
 
 #[cfg(test)]
 mod chat_contract_tests {
+    #[tokio::test]
+    async fn management_notifications_preserve_results_over_the_websocket() {
+        use super::*;
+        use serde_json::json;
+        use tokio::net::TcpListener;
+        use tokio_tungstenite::accept_async;
+        use wiremock::{
+            matchers::{method, path},
+            Mock, MockServer, ResponseTemplate,
+        };
+        let http = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/eventsub/subscriptions"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(json!({"data":[]})))
+            .mount(&http)
+            .await;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("ws://{}", listener.local_addr().unwrap());
+        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(socket).await.unwrap();
+            ws.send(Message::Text(json!({"metadata":{"message_type":"session_welcome"},"payload":{"session":{"id":"session"}}}).to_string().into())).await.unwrap();
+            ready_rx.await.unwrap();
+            for (ty, event) in [
+                (
+                    "channel.poll.progress",
+                    json!({"id":"p","title":"Game?","choices":[{"id":"a","title":"Chess","votes":12}]}),
+                ),
+                (
+                    "channel.prediction.end",
+                    json!({"id":"prediction","status":"resolved","winning_outcome_id":"a","outcomes":[{"id":"a","title":"Yes","channel_points":400}]}),
+                ),
+                (
+                    "channel.channel_points_custom_reward_redemption.add",
+                    json!({"id":"r","user_name":"Alice","user_input":"My song","reward":{"id":"reward","title":"Song"}}),
+                ),
+            ] {
+                ws.send(Message::Text(json!({"metadata":{"message_type":"notification"},"payload":{"subscription":{"type":ty},"event":event}}).to_string().into())).await.unwrap();
+            }
+            let _ = done_rx.await;
+            let _ = ws.close(None).await;
+        });
+        let (tx, mut rx) = broadcast::channel(32);
+        let client = EventSubClient::new_shared();
+        let helix = TwitchHelixClient::with_base_url(format!("{}/", http.uri()), "client", "token");
+        client
+            .connect(&url, helix, "channel", "user", tx)
+            .await
+            .unwrap();
+        ready_tx.send(()).unwrap();
+        let poll = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(poll.event_type, "channel.poll.progress");
+        assert_eq!(
+            serde_json::from_str::<Value>(&poll.data["choices"]).unwrap()[0]["votes"],
+            12
+        );
+        let prediction = rx.recv().await.unwrap();
+        assert_eq!(prediction.data["winning_outcome_id"], "a");
+        let redemption = rx.recv().await.unwrap();
+        assert_eq!(redemption.data["user_input"], "My song");
+        client.stop().await;
+        let _ = done_tx.send(());
+        server.await.unwrap();
+    }
+    #[tokio::test]
+    async fn management_subscriptions_have_broadcaster_conditions_and_report_denied_scopes() {
+        use super::*;
+        use serde_json::json;
+        use wiremock::{
+            matchers::{method, path},
+            Mock, MockServer, ResponseTemplate,
+        };
+        let http = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/eventsub/subscriptions"))
+            .respond_with(
+                ResponseTemplate::new(403).set_body_json(json!({"message":"Missing scope"})),
+            )
+            .mount(&http)
+            .await;
+        let helix = TwitchHelixClient::with_base_url(format!("{}/", http.uri()), "client", "token");
+        let (tx, mut rx) = broadcast::channel(64);
+        subscribe_events(&helix, "channel", "user", "session", &tx)
+            .await
+            .unwrap();
+        let requests = http.received_requests().await.unwrap();
+        for ty in [
+            "channel.poll.begin",
+            "channel.poll.progress",
+            "channel.poll.end",
+            "channel.prediction.begin",
+            "channel.prediction.progress",
+            "channel.prediction.lock",
+            "channel.prediction.end",
+            "channel.channel_points_custom_reward.add",
+            "channel.channel_points_custom_reward.update",
+            "channel.channel_points_custom_reward.remove",
+            "channel.channel_points_custom_reward_redemption.add",
+            "channel.channel_points_custom_reward_redemption.update",
+        ] {
+            let body = requests
+                .iter()
+                .map(|r| serde_json::from_slice::<Value>(&r.body).unwrap())
+                .find(|b| b["type"] == ty)
+                .unwrap_or_else(|| panic!("Missing {ty}"));
+            assert_eq!(body["version"], "1");
+            assert_eq!(body["condition"], json!({"broadcaster_user_id":"channel"}));
+        }
+        let mut warnings = vec![];
+        while let Ok(event) = rx.try_recv() {
+            warnings.push(event);
+        }
+        assert!(warnings.iter().any(|e| e
+            .data
+            .get("subscription_type")
+            .is_some_and(|t| t == "channel.poll.begin")
+            && e.summary.contains("Missing scope")));
+    }
     #[test]
     fn eventsub_fragments_produce_the_shared_chat_contract() {
         let mut data = std::collections::BTreeMap::new();

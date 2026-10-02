@@ -5,6 +5,8 @@ import { listenTwitchEvents, tauriInvoke } from "../../lib/api";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { TwitchRewards } from "./TwitchRewards";
+import { TwitchVotes } from "./TwitchVotes";
 type Event = { type: string; summary?: string; data: Record<string, string> };
 type Item = {
     id: string;
@@ -34,11 +36,6 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
         query: "channel",
     });
     const [after, setAfter] = useState<string>();
-    const [rewardTitle, setRewardTitle] = useState("");
-    const [cost, setCost] = useState(100);
-    const [question, setQuestion] = useState("");
-    const [choices, setChoices] = useState("Ja\nNein");
-    const [duration, setDuration] = useState(60);
     const history = useQuery({
         queryKey: ["twitch-chat-history"],
         queryFn: () => tauriInvoke<{ events: Event[] }>("chat_history"),
@@ -245,9 +242,6 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                             ["chatters", "Chatter"],
                             ["followed_channels", "Gefolgte Kanäle"],
                             ["followed_streams", "Live-Kanäle"],
-                            ["rewards", "Rewards"],
-                            ["polls", "Umfragen"],
-                            ["predictions", "Vorhersagen"],
                         ] as const
                     ).map(([query, label]) => (
                         <Button
@@ -304,95 +298,6 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                                     Raid starten
                                 </Button>
                             )}
-                            {query.query === "rewards" && (
-                                <Button
-                                    onClick={() =>
-                                        select({
-                                            query: "redemptions",
-                                            rewardId: item.id,
-                                        })
-                                    }
-                                >
-                                    Einlösungen
-                                </Button>
-                            )}
-                            {query.query === "redemptions" && (
-                                <>
-                                    <Button
-                                        onClick={() =>
-                                            mutate({
-                                                action: "update_redemption",
-                                                rewardId: query.rewardId,
-                                                id: item.id,
-                                                status: "FULFILLED",
-                                            })
-                                        }
-                                    >
-                                        Erfüllt
-                                    </Button>
-                                    <Button
-                                        onClick={() =>
-                                            mutate({
-                                                action: "update_redemption",
-                                                rewardId: query.rewardId,
-                                                id: item.id,
-                                                status: "CANCELED",
-                                            })
-                                        }
-                                    >
-                                        Erstatten
-                                    </Button>
-                                </>
-                            )}
-                            {query.query === "polls" &&
-                                item.status === "ACTIVE" && (
-                                    <Button
-                                        onClick={() =>
-                                            mutate({
-                                                action: "end_poll",
-                                                id: item.id,
-                                                status: "TERMINATED",
-                                            })
-                                        }
-                                    >
-                                        Beenden
-                                    </Button>
-                                )}
-                            {query.query === "predictions" &&
-                                ["ACTIVE", "LOCKED"].includes(
-                                    item.status ?? "",
-                                ) && (
-                                    <div className="flex gap-2">
-                                        {item.outcomes?.map((outcome) => (
-                                            <Button
-                                                key={outcome.id}
-                                                onClick={() =>
-                                                    mutate({
-                                                        action: "end_prediction",
-                                                        id: item.id,
-                                                        status: "RESOLVED",
-                                                        winningOutcomeId:
-                                                            outcome.id,
-                                                    })
-                                                }
-                                            >
-                                                {outcome.title} gewinnt
-                                            </Button>
-                                        ))}
-                                        <Button
-                                            onClick={() =>
-                                                mutate({
-                                                    action: "end_prediction",
-                                                    id: item.id,
-                                                    status: "CANCELED",
-                                                    winningOutcomeId: null,
-                                                })
-                                            }
-                                        >
-                                            Abbrechen
-                                        </Button>
-                                    </div>
-                                )}
                         </li>
                     ))}
                 </ul>
@@ -407,101 +312,8 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                     </Button>
                 )}
             </Card>
-            <Card className="space-y-3">
-                <h2 className="text-lg font-semibold">Channel-Points-Reward</h2>
-                <label className="block">
-                    Titel
-                    <Input
-                        value={rewardTitle}
-                        onChange={(e) => setRewardTitle(e.target.value)}
-                    />
-                </label>
-                <label className="block">
-                    Punkte
-                    <Input
-                        type="number"
-                        min="1"
-                        value={cost}
-                        onChange={(e) => setCost(Number(e.target.value))}
-                    />
-                </label>
-                <Button
-                    disabled={
-                        !enabled || !rewardTitle.trim() || action.isPending
-                    }
-                    onClick={() =>
-                        mutate({
-                            action: "create_reward",
-                            title: rewardTitle,
-                            cost,
-                            prompt: "",
-                        })
-                    }
-                >
-                    Reward anlegen
-                </Button>
-            </Card>
-            <Card className="space-y-3">
-                <h2 className="text-lg font-semibold">
-                    Umfrage oder Vorhersage
-                </h2>
-                <label className="block">
-                    Frage
-                    <Input
-                        value={question}
-                        onChange={(e) => setQuestion(e.target.value)}
-                    />
-                </label>
-                <label className="block">
-                    Antworten (eine pro Zeile)
-                    <textarea
-                        className="w-full bg-panel border border-border rounded p-2"
-                        value={choices}
-                        onChange={(e) => setChoices(e.target.value)}
-                    />
-                </label>
-                <label className="block">
-                    Dauer in Sekunden
-                    <Input
-                        type="number"
-                        min="30"
-                        value={duration}
-                        onChange={(e) => setDuration(Number(e.target.value))}
-                    />
-                </label>
-                <div className="flex gap-2">
-                    <Button
-                        disabled={
-                            !enabled || !question.trim() || action.isPending
-                        }
-                        onClick={() =>
-                            mutate({
-                                action: "create_poll",
-                                title: question,
-                                choices: choices.split("\n").filter(Boolean),
-                                duration,
-                            })
-                        }
-                    >
-                        Umfrage starten
-                    </Button>
-                    <Button
-                        disabled={
-                            !enabled || !question.trim() || action.isPending
-                        }
-                        onClick={() =>
-                            mutate({
-                                action: "create_prediction",
-                                title: question,
-                                outcomes: choices.split("\n").filter(Boolean),
-                                window: duration,
-                            })
-                        }
-                    >
-                        Vorhersage starten
-                    </Button>
-                </div>
-            </Card>
+            <TwitchRewards enabled={enabled} />
+            <TwitchVotes enabled={enabled} />
         </div>
     );
 }

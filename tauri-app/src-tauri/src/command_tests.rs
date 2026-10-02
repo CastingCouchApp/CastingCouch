@@ -29,6 +29,7 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
         .invoke_handler(tauri::generate_handler![
             chat_history,
             twitch_action,
+            twitch_query,
             startup_error,
             overlay_runtime_status,
             setup_overlay_source,
@@ -378,4 +379,31 @@ fn disabled_twitch_chat_rejects_send_before_credentials_or_network() {
         .unwrap_err(),
         "Twitch-Chat ist deaktiviert."
     );
+}
+
+#[test]
+fn twitch_management_arguments_and_validation_cross_native_ipc() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = test_app(dir.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    for (action, error) in [
+        (
+            json!({"action":"update_reward","id":"r","title":" ","isPaused":true,"isUserInputRequired":false,"backgroundColor":"#123456"}),
+            "Reward-Titel",
+        ),
+        (json!({"action":"delete_reward","id":" "}), "Reward-ID"),
+        (
+            json!({"action":"end_prediction","id":"p","status":"RESOLVED","winningOutcomeId":null}),
+            "Gewinnendes Ergebnis",
+        ),
+    ] {
+        assert!(call(&window, "twitch_action", json!({"action":action}))
+            .unwrap_err()
+            .as_str()
+            .unwrap()
+            .contains(error));
+    }
+    assert_eq!(call(&window,"twitch_query",json!({"query":{"query":"redemptions","rewardId":"r","status":"ACTIVE"},"after":"cursor"})).unwrap_err(),"Ungültiger Twitch-Status");
 }

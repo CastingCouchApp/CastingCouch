@@ -77,7 +77,9 @@ export type TwitchAction =
   | { action: "delete_chat"; messageId?: string | null }
   | { action: "raid"; id: string }
   | { action: "cancel_raid" }
-  | { action: "create_reward"; title: string; cost: number; prompt: string }
+  | { action: "create_reward"; title: string; cost: number; prompt: string; isEnabled?: boolean | null; isUserInputRequired?: boolean | null; backgroundColor?: string | null }
+  | { action: "update_reward"; id: string; title?: string | null; cost?: number | null; prompt?: string | null; isEnabled?: boolean | null; isPaused?: boolean | null; isUserInputRequired?: boolean | null; backgroundColor?: string | null }
+  | { action: "delete_reward"; id: string }
   | { action: "update_redemption"; rewardId: string; id: string; status: string }
   | { action: "create_poll"; title: string; choices: Array<string>; duration: number }
   | { action: "end_poll"; id: string; status: string }
@@ -97,7 +99,7 @@ export type TwitchQuery =
   | { query: "predictions" }
   | { query: "search_categories"; text: string }
   | { query: "search_channels"; text: string }
-  | { query: "redemptions"; rewardId: string };
+  | { query: "redemptions"; rewardId: string; status?: string | null };
 // Generated from src-tauri/src/lib.rs. Run npm run contracts:generate.
 export type CommandInvocation =
   | [command: "open_twitch_chat", args?: Record<string, never>]
