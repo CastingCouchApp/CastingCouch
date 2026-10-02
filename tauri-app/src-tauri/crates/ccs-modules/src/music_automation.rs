@@ -158,6 +158,14 @@ impl AlertDucking {
 
     /// Manual volume changes during alerts become the desired restoration volume.
     pub async fn set_volume(&self, client_id: &str, percent: u8) -> ModuleResult<Value> {
+        self.set_volume_on_device(client_id, percent, None).await
+    }
+    pub async fn set_volume_on_device(
+        &self,
+        client_id: &str,
+        percent: u8,
+        device_id: Option<&str>,
+    ) -> ModuleResult<Value> {
         if percent > 100 {
             return Err(ModuleError::Message(
                 "Lautstärke muss zwischen 0 und 100 liegen".into(),
@@ -169,7 +177,11 @@ impl AlertDucking {
             Ok(serde_json::json!({"deferred":true}))
         } else {
             self.player
-                .action(client_id, crate::spotify::SpotifyAction::Volume { percent })
+                .action_on_device(
+                    client_id,
+                    crate::spotify::SpotifyAction::Volume { percent },
+                    device_id,
+                )
                 .await
         }
     }

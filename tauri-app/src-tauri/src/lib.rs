@@ -149,14 +149,27 @@ async fn spotify_action(
     if let ccs_modules::spotify::SpotifyAction::Volume { percent } = &action {
         if let Some(music) = state.alerts.music_ducking() {
             return music
-                .set_volume(&settings.spotify.client_id, *percent)
+                .set_volume_on_device(
+                    &settings.spotify.client_id,
+                    *percent,
+                    settings.spotify.extra["PreferredDeviceId"].as_str(),
+                )
                 .await
                 .map_err(|e| e.to_string());
         }
     }
     state
         .spotify
-        .action(&settings.spotify.client_id, action)
+        .action_with_preferences(&settings.spotify.client_id, action, &settings.spotify.extra)
+        .await
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn activate_spotify_device(state: State<'_, AppState>, play: bool) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    state
+        .spotify
+        .activate_preferred_device(&settings.spotify.client_id, &settings.spotify.extra, play)
         .await
         .map_err(|e| e.to_string())
 }
@@ -952,6 +965,7 @@ pub fn run() {
             countdown_status,
             set_countdown,
             spotify_action,
+            activate_spotify_device,
             spotify_query,
             obs_control,
             obs_query,

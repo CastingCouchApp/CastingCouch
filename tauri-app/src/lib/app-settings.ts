@@ -69,6 +69,10 @@ export type TwitchSettings = {
 };
 
 export type SpotifySettings = {
+  PreferredDeviceId?: string;
+  AutoTransferToPreferredDevice?: boolean;
+  UseActiveDeviceWhenPreferredUnavailable?: boolean;
+  StartPlaylistUri?: string;
   ClientId: string;
   RedirectUri: string;
   AutoConnect: boolean;

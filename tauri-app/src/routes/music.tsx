@@ -1,5 +1,6 @@
 import type { SpotifyAction, SpotifyQuery } from "../lib/command-contract";
 import { MusicAutomation } from "../features/music/MusicAutomation";
+import { SpotifyDevices } from "../features/music/SpotifyDevices";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -71,14 +72,6 @@ function MusicPage() {
         queryKey: queryKeys.ytmNowPlaying,
         queryFn: () => tauriInvoke<YtmNowPlaying>("ytm_now_playing"),
         refetchInterval: 2000,
-    });
-    const devices = useQuery({
-        queryKey: ["spotify-devices"],
-        queryFn: () =>
-            tauriInvoke<{
-                devices: { id: string; name: string; is_active: boolean }[];
-            }>("spotify_query", { query: { query: "devices" } }),
-        refetchInterval: FALLBACK_POLL_MS,
     });
     const catalog = useQuery({
         queryKey: ["spotify-catalog", catalogQuery, offset],
@@ -259,35 +252,7 @@ function MusicPage() {
                             <option value="track">Titel</option>
                         </select>
                     </label>
-                    <label className="block">
-                        Wiedergabegerät{" "}
-                        <select
-                            aria-label="Wiedergabegerät"
-                            className="bg-panel p-2"
-                            value={
-                                devices.data?.devices?.find((d) => d.is_active)
-                                    ?.id ?? ""
-                            }
-                            onChange={(e) =>
-                                act.mutate({
-                                    action: "transfer",
-                                    deviceId: e.target.value,
-                                })
-                            }
-                        >
-                            <option value="">Gerät auswählen</option>
-                            {devices.data?.devices?.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                    {d.name}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    {devices.error && (
-                        <p className="text-text-secondary">
-                            {String(devices.error)}
-                        </p>
-                    )}
+                    <SpotifyDevices />
                 </Card>
                 <Card className="space-y-4">
                     <h2 className="text-lg font-semibold">YouTube Music</h2>

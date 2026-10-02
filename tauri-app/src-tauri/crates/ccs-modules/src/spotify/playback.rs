@@ -182,6 +182,112 @@ impl SpotifyApiClient {
     }
 }
 impl SpotifyClient {
+    pub async fn activate_preferred_device(
+        &self,
+        client_id: &str,
+        options: &Value,
+        play: bool,
+    ) -> ModuleResult<Value> {
+        let devices = self.query(client_id, SpotifyQuery::Devices, None).await?;
+        let list = devices["devices"]
+            .as_array()
+            .ok_or_else(|| ModuleError::Message("Spotify-Geräteliste ist ungültig".into()))?;
+        let preferred = options["PreferredDeviceId"].as_str().unwrap_or("").trim();
+        let mut selected = list
+            .iter()
+            .find(|device| !preferred.is_empty() && device["id"].as_str() == Some(preferred));
+        if selected.is_none()
+            && options["UseActiveDeviceWhenPreferredUnavailable"]
+                .as_bool()
+                .unwrap_or(true)
+        {
+            let usable = |device: &&Value| {
+                device["is_restricted"] != true
+                    && device["id"].as_str().is_some_and(|id| !id.is_empty())
+            };
+            selected = list
+                .iter()
+                .filter(usable)
+                .find(|device| device["is_active"] == true)
+                .or_else(|| list.iter().find(usable));
+        }
+        let selected=selected.ok_or_else(||ModuleError::Message("Das gespeicherte Spotify-Standardgerät ist nicht erreichbar. Spotify dort öffnen und kurz einen Titel starten.".into()))?;
+        if selected["is_restricted"] == true {
+            return Err(ModuleError::Message(format!(
+                "Das Spotify-Gerät '{}' ist eingeschränkt und kann nicht ferngesteuert werden.",
+                selected["name"].as_str().unwrap_or("Unbekannt")
+            )));
+        }
+        let id = selected["id"]
+            .as_str()
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| ModuleError::Message("Spotify-Geräte-ID fehlt".into()))?;
+        let playback = self.query(client_id, SpotifyQuery::Playback, None).await?;
+        if selected["is_active"] != true || playback["device"]["id"].as_str() != Some(id) {
+            self.perform_request(
+                client_id,
+                Request::new(reqwest::Method::PUT, "me/player")
+                    .body(json!({"device_ids":[id],"play":play})),
+            )
+            .await?;
+        }
+        Ok(selected.clone())
+    }
+
+    pub async fn action_with_preferences(
+        &self,
+        client_id: &str,
+        action: SpotifyAction,
+        options: &Value,
+    ) -> ModuleResult<Value> {
+        let preferred = options["PreferredDeviceId"]
+            .as_str()
+            .filter(|id| !id.trim().is_empty());
+        if matches!(
+            &action,
+            SpotifyAction::PlayPlaylist { .. } | SpotifyAction::PlayTrack { .. }
+        ) && options["AutoTransferToPreferredDevice"]
+            .as_bool()
+            .unwrap_or(true)
+        {
+            let selected = self
+                .activate_preferred_device(client_id, options, false)
+                .await?;
+            self.action_on_device(client_id, action, selected["id"].as_str())
+                .await
+        } else {
+            self.action_on_device(client_id, action, preferred).await
+        }
+    }
+
+    pub async fn action_on_device(
+        &self,
+        client_id: &str,
+        action: SpotifyAction,
+        device_id: Option<&str>,
+    ) -> ModuleResult<Value> {
+        let mut request = action.request()?;
+        if matches!(
+            &action,
+            SpotifyAction::Play
+                | SpotifyAction::Pause
+                | SpotifyAction::Next
+                | SpotifyAction::Previous
+                | SpotifyAction::Volume { .. }
+                | SpotifyAction::Seek { .. }
+                | SpotifyAction::Shuffle { .. }
+                | SpotifyAction::Repeat { .. }
+                | SpotifyAction::PlayTrack { .. }
+                | SpotifyAction::PlayPlaylist { .. }
+                | SpotifyAction::Queue { .. }
+        ) {
+            if let Some(id) = device_id.filter(|id| !id.trim().is_empty()) {
+                request = request.param("device_id", id.trim());
+            }
+        }
+        self.perform_request(client_id, request).await
+    }
+
     pub async fn set_device_volume(
         &self,
         client_id: &str,
@@ -194,8 +300,7 @@ impl SpotifyClient {
         self.perform_request(client_id, request).await
     }
     pub async fn action(&self, client_id: &str, action: SpotifyAction) -> ModuleResult<Value> {
-        let request = action.request()?;
-        self.perform_request(client_id, request).await
+        self.action_on_device(client_id, action, None).await
     }
     async fn perform_request(&self, client_id: &str, request: Request) -> ModuleResult<Value> {
         let token = self.get_valid_token(client_id).await?;

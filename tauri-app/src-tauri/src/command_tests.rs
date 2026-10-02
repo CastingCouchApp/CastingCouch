@@ -30,6 +30,7 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
             chat_history,
             twitch_action,
             twitch_query,
+            activate_spotify_device,
             startup_error,
             overlay_runtime_status,
             setup_overlay_source,
@@ -406,4 +407,44 @@ fn twitch_management_arguments_and_validation_cross_native_ipc() {
             .contains(error));
     }
     assert_eq!(call(&window,"twitch_query",json!({"query":{"query":"redemptions","rewardId":"r","status":"ACTIVE"},"after":"cursor"})).unwrap_err(),"Ungültiger Twitch-Status");
+}
+
+#[test]
+fn spotify_preferences_persist_through_ipc_and_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    {
+        let app = test_app(dir.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let original = call(&window, "get_settings", json!({})).unwrap();
+        let mut next = original.clone();
+        next["Spotify"]["PreferredDeviceId"] = json!("studio");
+        next["Spotify"]["UseActiveDeviceWhenPreferredUnavailable"] = json!(false);
+        next["Spotify"]["AutoTransferToPreferredDevice"] = json!(true);
+        call(
+            &window,
+            "save_settings",
+            json!({"original":original,"settings":next}),
+        )
+        .unwrap();
+        let error = call(
+            &window,
+            "activate_spotify_device",
+            json!({"play":"invalid"}),
+        )
+        .unwrap_err();
+        assert!(error.as_str().unwrap().contains("boolean"));
+    }
+    let app = test_app(dir.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let loaded = call(&window, "get_settings", json!({})).unwrap();
+    assert_eq!(loaded["Spotify"]["PreferredDeviceId"], "studio");
+    assert_eq!(
+        loaded["Spotify"]["UseActiveDeviceWhenPreferredUnavailable"],
+        false
+    );
+    assert_eq!(loaded["Spotify"]["AutoTransferToPreferredDevice"], true);
 }

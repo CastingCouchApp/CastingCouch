@@ -109,6 +109,7 @@ export type CommandInvocation =
   | [command: "countdown_status", args?: Record<string, never>]
   | [command: "set_countdown", args: { seconds: number; label: string }]
   | [command: "spotify_action", args: { action: SpotifyAction }]
+  | [command: "activate_spotify_device", args: { play: boolean }]
   | [command: "spotify_query", args: { query: SpotifyQuery; offset?: number | null }]
   | [command: "setup_overlay_source", args: { canvasId: string; sceneName: string; inputName: string }]
   | [command: "obs_query", args: { query: ObsQuery }]

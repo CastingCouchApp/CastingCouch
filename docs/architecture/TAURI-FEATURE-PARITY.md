@@ -71,7 +71,7 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | Abnahme | ID | Stand | Implementierung und verbleibende Arbeit |
 |---|---|---|---|
 | [ ] | MU1 | Implementiert | Spotify Play/Pause, Vor/Zurück, Seek, Volume, Shuffle, Repeat; echte HTTP-Vertragstests, neue OAuth-Rechte bei erneuter Anmeldung. |
-| [ ] | MU2 | Teilweise | Geräte anzeigen und Wiedergabe übertragen; persistente Gerätepräferenz fehlt. |
+| [ ] | MU2 | Implementiert | Geräte anzeigen, eingeschränkte Geräte kennzeichnen, Wiedergabe übertragen und Standardgerät persistent auswählen/aktivieren. Konfigurierbarer Rückfall auf aktives/steuerbares Gerät; automatisches Aktivieren beim Start von Titeln/Playlists. Player-Befehle und manuelle Lautstärke verwenden die Präferenz; Alert-Restaurierung bleibt am ursprünglichen Gerät. Live-Abnahme offen. |
 | [ ] | MU3 | Teilweise | Playlists/Titel, Suche, Play, Queue, Favoriten, zuletzt gehört. Gesamte Bibliotheks-/Paging-Parität noch prüfen. |
 | [ ] | MU4 | Offen | Szenenmusik, Start/Ende und Fades fehlen. |
 | [ ] | MU5 | Implementiert | Native Alert-Engine senkt Spotify ab und hält die Lautstärke über überlappende Aktivitäten und die Queue. Wiederherstellung erfolgt auf dem ursprünglichen Gerät; manuelle Änderungen werden als neue Ziellautstärke übernommen. Abbruch, HTTP-Fehler und Retry sind getestet. Einstellungen auf der Musikseite; externe EX-Integrationen entfallen. Betriebsabnahme bleibt offen. |
@@ -160,3 +160,13 @@ Umfragen und Vorhersagen haben getrennte Entwürfe, Grenzprüfung und Ergebnisse
 Verträge abgeglichen mit dem C#-Client sowie [Twitch Helix](https://dev.twitch.tv/docs/api/reference/) und [EventSub-Typen](https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/). Tests prüfen konkrete Loopback-HTTP-Anfragen, 204-Löschung, Ownership-Fehler, Paging, echte WebSocket-Notifications und native Tauri-Argumentdeserialisierung. Lokal bestehen 199 Rust-Tests, 63 Frontend-Tests und TypeScript-/Vite-Build. Keine echte Twitch-Belohnung, Umfrage oder Vorhersage wurde verändert.
 
 Der CI-Lauf für `9c3e681` (Run 37074486729) bestätigt inzwischen Rust-Tests auf Windows und macOS, .NET-Tests, Architektur, Overlay und Dependency-Audit. Die Installer-Builds laufen zum Dokumentationszeitpunkt noch. Gesamte Feature-Parität und plattformübergreifende Betriebsabnahme bleiben offen.
+
+## Fortsetzung: Spotify-Geräte MU2
+
+Die Musikseite bietet eine gespeicherte Gerätepräferenz, Aktivierung ohne erzwungenen Wiedergabestart, manuelle Übertragung und die vorhandenen C#-Optionen `AutoTransferToPreferredDevice` und `UseActiveDeviceWhenPreferredUnavailable`. Nicht erreichbare Präferenzen bleiben gespeichert und sichtbar. Eingeschränkte Geräte werden bei Aktivierung abgewiesen. Die Auswahl-/Rückfallreihenfolge entspricht `SpotifyModule.ActivatePreferredDeviceAsync`.
+
+Der Rust-Client bindet Player-Befehle an das konfigurierte Gerät. Beim Titel-/Playliststart mit aktivierter Transferoption wird zuerst das Gerät ausgewählt und aktiviert; Bibliotheksbefehle erhalten keine Geräteparameter. Die Volume-Fachlogik berücksichtigt die Präferenz, während aktive Alert-Absenkungen ihren ursprünglichen Gerätebezug behalten. Einstellungen werden über den vorhandenen Dreiwege-Merge gespeichert; übrige Spotify-Optionen bleiben erhalten.
+
+Fünf zusätzliche echte Loopback-HTTP-Tests prüfen expliziten Play-Zustand, fehlende/eingeschränkte Geräte, Rückfall, Geräteparameter, deaktivierte Transferautomatik und Volume. Native IPC prüft Persistenz nach Neustart und die neuen Command-Argumente; der React-Test prüft Speicherung und Aktivierung. Lokal bestehen 205 Rust-Tests, 64 Frontend-Tests und TypeScript-/Produktionsbuild.
+
+CI-Stand: Run 37074486729 (`9c3e681`) wurde durch den folgenden Push beendet, nachdem die Tests bestanden waren. Run 37075644434 (`71da6a3`) bestätigt den vollständigen macOS-Tauri-Test-/DMG-Build sowie .NET, Architektur, Overlay und Dependency-Audit. Der Windows-Tauri-Installer läuft zum Dokumentationszeitpunkt noch. Erfolgreiches Packaging belegt keine Installation oder Live-Verbindung. Der Gesamtumfang mit O4/O6, verbleibenden OBS-/Twitch-Paketen, MU4/MU6–MU9, AL1/AL2, Dashboard und Systempaketen bleibt verbindlich offen.
