@@ -4,7 +4,11 @@ import { SpotifyDevices } from "../features/music/SpotifyDevices";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { cloneSettings, type AppSettings } from "../lib/app-settings";
+import {
+    cloneSettings,
+    musicProvider,
+    type AppSettings,
+} from "../lib/app-settings";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -38,7 +42,11 @@ function MusicPage() {
         mutationFn: async (source: string) => {
             if (!settings.data) throw new Error("Einstellungen fehlen");
             const next = cloneSettings(settings.data);
-            next.MusicPlayer = { ...next.MusicPlayer, Source: source };
+            next.MusicPlayer = {
+                ...next.MusicPlayer,
+                Source: source,
+                ProviderId: source,
+            };
             await tauriInvoke("save_settings", {
                 original: settings.data,
                 settings: next,
@@ -134,9 +142,7 @@ function MusicPage() {
                     aria-label="Musikprovider für das Overlay"
                     className="bg-panel p-2"
                     disabled={!settings.data || provider.isPending}
-                    value={String(
-                        settings.data?.MusicPlayer?.Source || "spotify",
-                    ).toLowerCase()}
+                    value={musicProvider(settings.data?.MusicPlayer)}
                     onChange={(e) => provider.mutate(e.target.value)}
                 >
                     <option value="spotify">Spotify</option>

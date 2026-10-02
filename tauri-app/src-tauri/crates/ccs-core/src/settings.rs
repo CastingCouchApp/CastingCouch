@@ -466,6 +466,23 @@ pub struct MusicPlayerSettings {
     pub extra: serde_json::Value,
 }
 
+impl MusicPlayerSettings {
+    pub fn provider_id(&self) -> &'static str {
+        let provider = if self.source.trim().is_empty() {
+            self.extra["ProviderId"].as_str().unwrap_or("spotify")
+        } else {
+            &self.source
+        };
+        if provider.trim().eq_ignore_ascii_case("ytmusic")
+            || provider.trim().eq_ignore_ascii_case("YouTubeMusic")
+        {
+            "ytmusic"
+        } else {
+            "spotify"
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct YouTubeMusicSettings {
@@ -1154,5 +1171,24 @@ mod tests {
         assert_eq!(back["StartPlaylistUri"], "spotify:playlist:x");
         assert_eq!(back["RedirectUri"], "http://127.0.0.1:43821/callback/");
         assert_eq!(back["ClientId"], "cid");
+    }
+
+    #[test]
+    fn music_provider_resolves_imported_csharp_settings_and_tauri_override() {
+        let imported: MusicPlayerSettings =
+            serde_json::from_value(serde_json::json!({"ProviderId":"ytmusic"})).unwrap();
+        assert_eq!(imported.provider_id(), "ytmusic");
+        assert_eq!(
+            serde_json::to_value(&imported).unwrap()["ProviderId"],
+            "ytmusic"
+        );
+        let override_settings: MusicPlayerSettings =
+            serde_json::from_value(serde_json::json!({"Source":"spotify","ProviderId":"ytmusic"}))
+                .unwrap();
+        assert_eq!(override_settings.provider_id(), "spotify");
+        let alias: MusicPlayerSettings =
+            serde_json::from_value(serde_json::json!({"Source":"YouTubeMusic"})).unwrap();
+        assert_eq!(alias.provider_id(), "ytmusic");
+        assert_eq!(MusicPlayerSettings::default().provider_id(), "spotify");
     }
 }

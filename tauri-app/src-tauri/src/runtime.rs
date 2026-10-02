@@ -29,12 +29,7 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                 .await
                 .as_ref()
                 .map(|bridge| bridge.snapshot());
-            let mut music = if settings.music_player.source.eq_ignore_ascii_case("ytmusic")
-                || settings
-                    .music_player
-                    .source
-                    .eq_ignore_ascii_case("YouTubeMusic")
-            {
+            let mut music = if settings.music_player.provider_id() == "ytmusic" {
                 serde_json::to_value(ytm.unwrap_or_default()).unwrap_or(Value::Null)
             } else {
                 json!({"provider":"spotify","connected":state.spotify.status().await.state==ccs_modules::ConnectionState::Connected,"isPlaying":spotify.is_playing,"title":spotify.title,"artist":spotify.artist,"album":spotify.album,"coverUrl":spotify.cover_url,"cover":spotify.cover_url,"progressMs":spotify.progress_ms,"durationMs":spotify.duration_ms})

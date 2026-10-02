@@ -11,7 +11,12 @@ import { defaultAppSettings } from "../../lib/app-settings";
 const invokeMock = vi.fn();
 vi.mock("../../lib/api", async (original) => ({
     ...(await original<typeof import("../../lib/api")>()),
-    tauriInvoke: (cmd: string, args: unknown) => (cmd === "startup_error" ? Promise.resolve(null) : cmd === "overlay_runtime_status" ? Promise.resolve({ running: true, error: null }) : invokeMock(cmd, args)),
+    tauriInvoke: (cmd: string, args: unknown) =>
+        cmd === "startup_error"
+            ? Promise.resolve(null)
+            : cmd === "overlay_runtime_status"
+              ? Promise.resolve({ running: true, error: null })
+              : invokeMock(cmd, args),
 }));
 function renderMusic() {
     const client = new QueryClient({
@@ -89,10 +94,24 @@ describe("Native music", () => {
                     settings: expect.objectContaining({
                         MusicPlayer: expect.objectContaining({
                             Source: "ytmusic",
+                            ProviderId: "ytmusic",
                         }),
                     }),
                 }),
             ),
         );
+    });
+    it("shows the provider imported from C# settings", async () => {
+        const imported = defaultAppSettings();
+        Object.assign(imported.MusicPlayer, { ProviderId: "ytmusic" });
+        const previous = invokeMock.getMockImplementation()!;
+        invokeMock.mockImplementation(async (cmd: string, args: unknown) =>
+            cmd === "get_settings" ? imported : previous(cmd, args),
+        );
+        renderMusic();
+        const select = await screen.findByLabelText(
+            "Musikprovider für das Overlay",
+        );
+        await waitFor(() => expect(select).toHaveValue("ytmusic"));
     });
 });

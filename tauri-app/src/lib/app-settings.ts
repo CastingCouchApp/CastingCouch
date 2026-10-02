@@ -81,7 +81,13 @@ export type SpotifySettings = {
 
 export type MusicPlayerSettings = {
   Source: string;
+  ProviderId?: string;
 };
+
+export function musicProvider(settings?: MusicPlayerSettings): "spotify" | "ytmusic" {
+  const provider = (settings?.Source?.trim() || settings?.ProviderId || "spotify").trim().toLowerCase();
+  return provider === "ytmusic" || provider === "youtubemusic" ? "ytmusic" : "spotify";
+}
 
 export type YouTubeMusicSettings = Record<string, unknown>;
 export type StreamerBotSettings = Record<string, unknown>;

@@ -578,13 +578,7 @@ async fn worker_loop(inner: Arc<AlertEngineInner>) {
                     &alert.variables,
                 );
                 let play = async {
-                    let provider = if settings.music_player.source.is_empty() {
-                        settings.music_player.extra["ProviderId"]
-                            .as_str()
-                            .unwrap_or("spotify")
-                    } else {
-                        &settings.music_player.source
-                    };
+                    let provider = settings.music_player.provider_id();
                     if provider.eq_ignore_ascii_case("spotify")
                         && !settings.spotify.client_id.is_empty()
                     {
