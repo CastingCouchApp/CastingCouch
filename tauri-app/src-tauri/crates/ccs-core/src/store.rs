@@ -214,6 +214,17 @@ pub fn validate_settings(settings: &AppSettings) -> Result<(), SettingsError> {
     Ok(())
 }
 
+/// Fill model defaults for an imported document while retaining unknown fields.
+pub fn normalize_settings(mut raw: Value) -> Result<Value, SettingsError> {
+    migrate(&mut raw)?;
+    let mut settings: AppSettings = serde_json::from_value(raw.clone())?;
+    settings.overlay.ensure_canvases_migrated();
+    validate_settings(&settings)?;
+    let mut normalized = serde_json::to_value(settings)?;
+    preserve_unknown(&raw, &normalized.clone(), &mut normalized, false);
+    Ok(normalized)
+}
+
 /// Sequential schema migrations, matching the WPF SettingsSchemaMigrator.
 pub fn migrate(root: &mut Value) -> Result<bool, SettingsError> {
     let obj = root.as_object_mut().ok_or_else(|| {

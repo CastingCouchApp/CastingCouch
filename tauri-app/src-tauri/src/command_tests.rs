@@ -44,6 +44,13 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
             alert_runtime,
             get_settings,
             save_settings,
+            list_profiles,
+            create_profile,
+            update_profile,
+            import_profile,
+            export_profile,
+            delete_profile,
+            apply_profile,
             list_canvases,
             update_canvas
         ])
@@ -447,4 +454,126 @@ fn spotify_preferences_persist_through_ipc_and_restart() {
         false
     );
     assert_eq!(loaded["Spotify"]["AutoTransferToPreferredDevice"], true);
+}
+
+#[test]
+fn profiles_cross_native_ipc_and_failed_apply_preserves_current_settings() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = test_app(dir.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let original = call(&window, "get_settings", json!({})).unwrap();
+    let profile = call(
+        &window,
+        "create_profile",
+        json!({"name":"Studio","description":"Test"}),
+    )
+    .unwrap();
+    let id = profile["Id"].as_str().unwrap();
+    assert_eq!(
+        call(&window, "list_profiles", json!({})).unwrap()["profiles"][0]["name"],
+        "Studio"
+    );
+    let export = dir.path().join("saved.ccsprofile");
+    call(&window, "export_profile", json!({"id":id,"path":export})).unwrap();
+    let imported = call(&window, "import_profile", json!({"path":export})).unwrap();
+    assert_ne!(imported["Id"], profile["Id"]);
+    let mut next = original.clone();
+    next["Branding"]["DisplayName"] = json!("Changed");
+    call(
+        &window,
+        "save_settings",
+        json!({"original":original,"settings":next}),
+    )
+    .unwrap();
+    assert!(call(
+        &window,
+        "apply_profile",
+        json!({"id":id,"original":original})
+    )
+    .is_err());
+    assert_eq!(
+        call(&window, "get_settings", json!({})).unwrap()["Branding"]["DisplayName"],
+        "Changed"
+    );
+    let result = call(&window, "apply_profile", json!({"id":id,"original":next})).unwrap();
+    assert_eq!(result["saved"], true);
+    assert_eq!(
+        call(&window, "get_settings", json!({})).unwrap()["Branding"]["DisplayName"],
+        original["Branding"]["DisplayName"]
+    );
+    call(&window, "delete_profile", json!({"id":id})).unwrap();
+    assert_eq!(
+        call(&window, "list_profiles", json!({})).unwrap()["profiles"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn profile_apply_rejects_occupied_port_and_restarts_server_on_success() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = test_app(dir.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let original = call(&window, "get_settings", json!({})).unwrap();
+    let mut profile = call(
+        &window,
+        "create_profile",
+        json!({"name":"Port","description":""}),
+    )
+    .unwrap();
+    let id = profile["Id"].as_str().unwrap().to_string();
+    let file = dir.path().join("Profiles").join(format!("{id}.json"));
+    let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = occupied.local_addr().unwrap().port();
+    profile["Settings"]["Overlay"]["WebServerPort"] = json!(port);
+    std::fs::write(&file, serde_json::to_vec(&profile).unwrap()).unwrap();
+    assert!(call(
+        &window,
+        "apply_profile",
+        json!({"id":id,"original":original})
+    )
+    .is_err());
+    assert_eq!(call(&window, "get_settings", json!({})).unwrap(), original);
+    drop(occupied);
+    assert_eq!(
+        call(
+            &window,
+            "apply_profile",
+            json!({"id":id,"original":original})
+        )
+        .unwrap()["saved"],
+        true
+    );
+    assert_eq!(
+        call(&window, "overlay_runtime_status", json!({})).unwrap()["port"],
+        port
+    );
+    tauri::async_runtime::block_on(async {
+        assert!(reqwest::get(format!("http://127.0.0.1:{port}/health"))
+            .await
+            .unwrap()
+            .status()
+            .is_success());
+        app.state::<AppState>()
+            .overlay
+            .lock()
+            .await
+            .as_ref()
+            .unwrap()
+            .stop();
+    });
+    let restarted = test_app(dir.path().into());
+    let restarted_window = WebviewWindowBuilder::new(&restarted, "main", Default::default())
+        .build()
+        .unwrap();
+    assert_eq!(
+        call(&restarted_window, "get_settings", json!({})).unwrap()["Overlay"]["WebServerPort"],
+        port
+    );
 }

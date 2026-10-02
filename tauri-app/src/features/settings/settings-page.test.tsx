@@ -74,6 +74,29 @@ describe("Settings route", () => {
     });
   });
 
+  it("refreshes settings form and theme after applying a profile", async () => {
+    const baseImplementation = invokeMock.getMockImplementation()!;
+    invokeMock.mockImplementation(async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === "list_profiles") return { profiles: [{ id: "profile", name: "Studio", description: "", updatedAt: "2026-01-01" }], warnings: [] };
+      if (cmd === "apply_profile") {
+        stored.General.ThemeId = "arctic-glass-lab";
+        stored.Twitch.ChannelName = "profile_channel";
+        return { saved: true, warnings: ["Connection retry needed"] };
+      }
+      return baseImplementation(cmd, args);
+    });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+    renderSettings();
+    await user.type((await screen.findAllByLabelText("Kanalname"))[0], "unsaved");
+    await user.click(screen.getByRole("button", { name: "Profil anwenden" }));
+    await waitFor(() => expect(screen.getAllByLabelText("Kanalname")[0]).toHaveValue("profile_channel"));
+    expect(screen.getByLabelText("Theme")).toHaveValue("arctic-glass-lab");
+    expect(document.documentElement.dataset.theme).toBe("arctic-glass-lab");
+    expect(screen.getByText("Connection retry needed")).toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
     it("marks pending desktop options as unavailable", async () => {
         renderSettings();
         expect(

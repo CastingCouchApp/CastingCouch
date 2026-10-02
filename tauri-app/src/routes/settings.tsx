@@ -13,6 +13,7 @@ import {
     type AppSettings,
 } from "../lib/app-settings";
 import { queryKeys, tauriInvoke } from "../lib/api";
+import { Profiles } from "../features/settings/Profiles";
 
 export const Route = createFileRoute("/settings")({
     component: SettingsPage,
@@ -22,6 +23,7 @@ const selectClass =
     "mt-1 w-full rounded-md border border-white/15 bg-black/30 px-3 py-1.5 text-sm";
 
 function SettingsPage() {
+    const [profileRevision, setProfileRevision] = useState(0);
     const queryClient = useQueryClient();
     const settings = useQuery({
         queryKey: queryKeys.settings,
@@ -76,6 +78,7 @@ function SettingsPage() {
                 </p>
             ))}
             <SettingsForm
+                key={profileRevision}
                 initial={settings.data}
                 obsHasPassword={hasPassword.data === true}
                 onSave={(next, original, obsPassword) =>
@@ -85,6 +88,7 @@ function SettingsPage() {
                 }
                 saving={save.isPending}
             />
+            <Profiles onApplied={() => setProfileRevision(value => value + 1)} />
         </>
     );
 }

@@ -25,6 +25,104 @@ use tracing::{error, info, warn};
 
 const OBS_PASSWORD_SECRET_KEY: &str = "obs.password";
 
+fn profile_store(state: &AppState) -> ccs_core::profiles::ProfileStore {
+    ccs_core::profiles::ProfileStore::new(state.paths.data_root.join("Profiles"))
+}
+
+#[tauri::command]
+async fn list_profiles(
+    state: State<'_, AppState>,
+) -> Result<ccs_core::profiles::ProfileList, String> {
+    profile_store(&state)
+        .list()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn create_profile(
+    state: State<'_, AppState>,
+    name: String,
+    description: String,
+) -> Result<ccs_core::profiles::CreatorProfile, String> {
+    let _guard = state.settings_mutation.lock().await;
+    let settings = state
+        .settings
+        .read_value()
+        .await
+        .map_err(|e| e.to_string())?;
+    profile_store(&state)
+        .create(&name, &description, settings)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_profile(
+    state: State<'_, AppState>,
+    id: String,
+    name: String,
+    description: String,
+) -> Result<ccs_core::profiles::CreatorProfile, String> {
+    let _guard = state.settings_mutation.lock().await;
+    profile_store(&state)
+        .rename(&id, &name, &description)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn import_profile(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<ccs_core::profiles::CreatorProfile, String> {
+    let _guard = state.settings_mutation.lock().await;
+    profile_store(&state)
+        .import_from(&PathBuf::from(path))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn export_profile(
+    state: State<'_, AppState>,
+    id: String,
+    path: String,
+) -> Result<(), String> {
+    profile_store(&state)
+        .export_to(&id, &PathBuf::from(path))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_profile(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let _guard = state.settings_mutation.lock().await;
+    profile_store(&state)
+        .delete(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn apply_profile(
+    state: State<'_, AppState>,
+    id: String,
+    original: Value,
+) -> Result<Value, String> {
+    let current = state
+        .settings
+        .read_value()
+        .await
+        .map_err(|e| e.to_string())?;
+    let settings = profile_store(&state)
+        .prepare_apply(&id, &current)
+        .await
+        .map_err(|e| e.to_string())?;
+    // Use the same validation, conflict handling, server restart and reconnection as manual edits.
+    save_settings_impl(state, settings, original, None, true).await
+}
+
 pub struct AppState {
     pub ytm: Mutex<Option<Arc<ccs_overlay_server::YouTubeMusicBridge>>>,
     pub paths: AppPaths,
@@ -306,7 +404,27 @@ async fn save_settings(
     original: Value,
     obs_password: Option<String>,
 ) -> Result<Value, String> {
+    save_settings_impl(state, settings, original, obs_password, false).await
+}
+
+async fn save_settings_impl(
+    state: State<'_, AppState>,
+    settings: Value,
+    original: Value,
+    obs_password: Option<String>,
+    replace_profile: bool,
+) -> Result<Value, String> {
     let _guard = state.settings_mutation.lock().await;
+    if replace_profile
+        && state
+            .settings
+            .read_value()
+            .await
+            .map_err(|e| e.to_string())?
+            != original
+    {
+        return Err("Einstellungen wurden inzwischen geändert. Bitte neu laden und das Profil erneut anwenden.".into());
+    }
     let requested: AppSettings =
         serde_json::from_value(settings.clone()).map_err(|e| e.to_string())?;
     ccs_core::store::validate_settings(&requested).map_err(|e| e.to_string())?;
@@ -940,6 +1058,7 @@ async fn apply_update(state: State<'_, AppState>) -> Result<String, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(StartupState::default())
         .setup(|app| {
             if let Err(error) = initialize(app) {
@@ -977,6 +1096,13 @@ pub fn run() {
             ytm_command,
             get_settings,
             save_settings,
+            list_profiles,
+            create_profile,
+            update_profile,
+            import_profile,
+            export_profile,
+            delete_profile,
+            apply_profile,
             list_canvases,
             create_canvas,
             delete_canvas,

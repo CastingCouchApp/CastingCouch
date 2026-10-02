@@ -1,6 +1,7 @@
 pub mod instance;
 pub mod logging;
 pub mod paths;
+pub mod profiles;
 pub mod settings;
 pub mod store;
 pub mod updates;

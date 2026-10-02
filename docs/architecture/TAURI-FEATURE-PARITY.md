@@ -94,7 +94,7 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | [ ] | DA4 | Offen | Sessionanalyse, Creator Score und Wochenberichte. |
 | [ ] | SYS1 | Offen | Ersteinrichtung mit Schritten, Prüfungen und Abschluss. |
 | [ ] | SYS2 | Offen | Dokumentanzeige und versionierte Zustimmungen; getrennt von gestrichener kommerzieller Lizenzierung. |
-| [ ] | SYS3 | Offen | App-Profile einschließlich Import/Export. |
+| [ ] | SYS3 | Implementiert | Profile aus gespeicherten Einstellungen erstellen, Metadaten bearbeiten, anwenden, löschen und über native Dateidialoge importieren/exportieren. C#-Dateiformat und vorhandener Profilordner bleiben verwendbar; Konflikte und belegte Ports brechen das Anwenden ohne Änderung ab. Installierte Betriebsabnahme steht aus. |
 | [ ] | SYS4 | Offen | Migration mit Vorschau/Backup und vollständige Wiederherstellung; Settings-Kompatibilität ist nur die Grundlage. |
 | [ ] | SYS5 | Teilweise | Vorhandene Logs, Health und sichtbare Operationsfehler; Diagnoseoberfläche/Filter/API-Inspektor/Readiness fehlen. |
 | [ ] | SYS6 | Teilweise | Bisherige Signaturprüfung, Download, Backup und Installerstart erhalten. Kein Nachweis abgeschlossener Windows-/macOS-Installation. |
@@ -113,7 +113,7 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 1. Installierte Pakete und echte Dienstverbindungen abnehmen; weitere Alert-Playback-Abbruchfälle im Feature-Paket AL2/AL3 prüfen.
 2. O4/O6, vollständige Twitch-Oberflächen und Sessionerfassung für DA3/DA4 fertigstellen.
 3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung, Alert-Sound und Szenenmusik und Musikzustände fertigstellen.
-4. Dashboard, Einrichtung, Rechtstexte, Profile, Migration/Backups und Diagnostik umsetzen.
+4. Dashboard, Einrichtung, Rechtstexte, Migration/Backups und Diagnostik umsetzen; Profile im installierten Paket abnehmen.
 5. Windows-/macOS-Installer bauen und jeden gewählten Nutzerablauf dokumentiert abnehmen; erst danach Cutover entscheiden.
 
 
@@ -175,4 +175,12 @@ CI-Stand: Run 37074486729 (`9c3e681`) wurde durch den folgenden Push beendet, na
 
 Ein Regressionstest belegte, dass importiertes `MusicPlayer.ProviderId=ytmusic` im Tauri-Overlay und auf der Musikseite fälschlich Spotify auswählte. Eine gemeinsame Rust-Auflösung berücksichtigt jetzt C#-`ProviderId` und eine explizite Tauri-`Source`; Overlay und Alert-Ducking verwenden dieselbe Auflösung. Die Musikseite zeigt den importierten Provider und schreibt bei einer bewussten Änderung beide Felder, damit die Auswahl auch beim Öffnen in WPF erhalten bleibt. Unveränderte importierte Felder bleiben verlustfrei erhalten.
 
-Lokale abschließende Validierung: 206 Rust-Tests, 65 Frontend-Tests und TypeScript-/Vite-Produktionsbuild. MU9 bleibt für gemeinsame Playerdarstellung und vollständige Anzeigeoptionen teilweise offen. Run 37075644434 für `71da6a3` ist erfolgreich einschließlich Windows-/macOS-Packaging; Geräteverwaltung und Provider-Korrektur erhalten nach Push einen eigenen CI-Lauf. Keine Live-/Installationsabnahme und kein Cutover.
+Lokale abschließende Validierung dieses Schritts: 206 Rust-Tests, 65 Frontend-Tests und TypeScript-/Vite-Produktionsbuild. MU9 bleibt für gemeinsame Playerdarstellung und vollständige Anzeigeoptionen teilweise offen. Run 37076605267 für `3b7a255` ist erfolgreich einschließlich Windows-/macOS-Packaging, Geräteverwaltung und Provider-Korrektur. Keine Live-/Installationsabnahme und kein Cutover.
+
+## Fortsetzung: App-Profile (SYS3)
+
+Die Einstellungen enthalten eine Profilverwaltung mit Erstellen, Umbenennen/Beschreibung, Anwenden, Import, Export und Löschen. Rust speichert die PascalCase-Dokumente atomar unter `Profiles/<Id>.json` im bestehenden Datenverzeichnis. Import liest `.ccsprofile` oder JSON, vergibt eine neue ID und ergänzt den Namen um „(Import)“. Unbekannte Einstellungen und Profilmetadaten bleiben erhalten. Das historische StreamerBot-Passwort wird beim Speichern/Exportieren geleert und beim Anwenden aus den aktuellen Einstellungen beibehalten; OS-Keyring-Zugangsdaten werden nicht verändert. Profile enthalten Einstellungen, keine Layout- oder Mediendateien; vollständige Sicherung/Wiederherstellung bleibt SYS4.
+
+Das Anwenden verwendet denselben Backend-Ablauf wie das Speichern von Einstellungen, einschließlich Validierung, Portreservierung, Serveraustausch und Wiederverbindung. Bei zwischenzeitlich geänderten Einstellungen wird abgebrochen. Die Oberfläche lädt die Einstellungen und das Formular anschließend neu, zeigt Verbindungswarnungen und aktualisiert das Theme. Import-/Exportdialoge sind nur für das Hauptfenster freigegeben.
+
+Regressionen prüfen C#-Import, unbekannte Felder, Passwortbehandlung, Neustart, Datei-Ersetzung, defekte/überlange Dokumente, Pfadvalidierung und fehlschlagende Schreibvorgänge. Native Tauri-IPC prüft den vollständigen Profilablauf sowie belegte Ports und einen erfolgreichen Portwechsel mit echter HTTP-Health-Abfrage. UI-Tests prüfen Bedienung, Dialogabbruch, Bestätigung, Fehler/Warnungen und das erneuerte Einstellungsformular. Lokale Validierung: 212 Rust-Tests, 69 Frontend-Tests sowie TypeScript-/Vite-Produktionsbuild; npm-Audit ohne Befunde. Die native Dateidialog- und Dienstabnahme in installierten Windows-/macOS-Paketen bleibt offen.
