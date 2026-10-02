@@ -436,19 +436,20 @@ public sealed class ArchitectureGuardTests
             "Services",
             "Twitch",
             "MainWindow.Services.Twitch.DashboardMetrics.cs");
-        string metrics = File.ReadAllText(metricsPath);
+        string metrics = File.ReadAllText(metricsPath).ReplaceLineEndings("\n");
 
         int viewerAssignment = metrics.IndexOf(
             "_currentLiveViewerCount =\n                Math.Max(0, status.ViewerCount);",
             StringComparison.Ordinal);
+        Assert.True(
+            viewerAssignment >= 0,
+            "Der Live-Zuschauerwert muss aus dem Twitch-Status übernommen werden.");
         int communityRefresh = metrics.IndexOf(
             "RefreshCommunityUi();",
             viewerAssignment,
             StringComparison.Ordinal);
 
-        Assert.True(
-            viewerAssignment >= 0,
-            "Der Live-Zuschauerwert muss aus dem Twitch-Status übernommen werden.");
+
         Assert.True(
             communityRefresh > viewerAssignment,
             "Nach einem neuen Live-Zuschauerwert muss die Community-Anzeige direkt aktualisiert werden.");

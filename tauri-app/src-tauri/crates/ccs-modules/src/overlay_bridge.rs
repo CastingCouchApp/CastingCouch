@@ -88,6 +88,24 @@ impl OverlayEventBridge {
         ))
     }
 
+    pub fn app_alert_rendered(
+        &self,
+        alert_type: &str,
+        user: &str,
+        text: &str,
+        variables: &BTreeMap<String, String>,
+    ) -> Value {
+        let mut data = variables.clone();
+        data.insert("alertType".into(), alert_type.into());
+        data.insert("user".into(), user.into());
+        data.insert("text".into(), text.into());
+        self.publish(&app_event(
+            "app.alert",
+            &format!("{alert_type}: {user}"),
+            data,
+        ))
+    }
+
     pub fn music_track(&self, title: &str, artist: &str) -> Value {
         self.app_music_track("spotify", title, artist, "")
     }

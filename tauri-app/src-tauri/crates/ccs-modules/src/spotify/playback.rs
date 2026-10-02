@@ -182,8 +182,22 @@ impl SpotifyApiClient {
     }
 }
 impl SpotifyClient {
+    pub async fn set_device_volume(
+        &self,
+        client_id: &str,
+        device_id: &str,
+        percent: u8,
+    ) -> ModuleResult<Value> {
+        let request = SpotifyAction::Volume { percent }
+            .request()?
+            .param("device_id", device_id);
+        self.perform_request(client_id, request).await
+    }
     pub async fn action(&self, client_id: &str, action: SpotifyAction) -> ModuleResult<Value> {
         let request = action.request()?;
+        self.perform_request(client_id, request).await
+    }
+    async fn perform_request(&self, client_id: &str, request: Request) -> ModuleResult<Value> {
         let token = self.get_valid_token(client_id).await?;
         match self.api.perform(&token.access_token, &request, None).await {
             Err(e) if super::is_unauthorized(&e) => {

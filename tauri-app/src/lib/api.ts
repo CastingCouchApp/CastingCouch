@@ -120,6 +120,8 @@ export type AlertDefinition = {
 };
 
 export type AlertRuntime = {
+    queue_capacity?: number;
+    inter_alert_delay_milliseconds?: number;
     current_type?: string | null;
     last_error?: string | null;
     pending_count: number;

@@ -43,8 +43,15 @@ function AlertsPage() {
     };
 
     const upsert = useMutation({
-        mutationFn: (alert: AlertDefinition) =>
-            tauriInvoke<AlertDefinition>("upsert_alert", { alert }),
+        mutationFn: (
+            value:
+                | AlertDefinition
+                | { alert: AlertDefinition; originalType: string },
+        ) =>
+            tauriInvoke<AlertDefinition>(
+                "upsert_alert",
+                "alert" in value ? value : { alert: value },
+            ),
         onSuccess: invalidate,
     });
     const remove = useMutation({
@@ -72,6 +79,19 @@ function AlertsPage() {
     const patchRuntime = useMutation({
         mutationFn: (patch: { enabled?: boolean; obsSceneName?: string }) =>
             tauriInvoke<AlertRuntime>("alert_runtime", patch),
+        onSuccess: invalidate,
+    });
+    const [capacity, setCapacity] = useState<number | null>(null);
+    const [delay, setDelay] = useState<number | null>(null);
+    const queueSettings = useMutation({
+        mutationFn: () =>
+            tauriInvoke<AlertRuntime>("alert_queue_settings", {
+                capacity: capacity ?? runtime.data?.queue_capacity ?? 250,
+                delayMilliseconds:
+                    delay ??
+                    runtime.data?.inter_alert_delay_milliseconds ??
+                    350,
+            }),
         onSuccess: invalidate,
     });
 
@@ -200,9 +220,12 @@ function AlertsPage() {
                     key={editing.type}
                     initial={editing}
                     onSave={(value) =>
-                        upsert.mutate(value, {
-                            onSuccess: () => setEditing(null),
-                        })
+                        upsert.mutate(
+                            { alert: value, originalType: editing.type },
+                            {
+                                onSuccess: () => setEditing(null),
+                            },
+                        )
                     }
                     onClose={() => setEditing(null)}
                     pending={upsert.isPending}
@@ -214,7 +237,19 @@ function AlertsPage() {
                 </Button>
                 <Button onClick={() => clear.mutate()}>Queue leeren</Button>
             </div>
-            {[install.error, stop.error, clear.error, runtime.data?.last_error]
+            {[
+                alerts.error,
+                runtime.error,
+                upsert.error,
+                remove.error,
+                test.error,
+                patchRuntime.error,
+                queueSettings.error,
+                install.error,
+                stop.error,
+                clear.error,
+                runtime.data?.last_error,
+            ]
                 .filter(Boolean)
                 .map((error, index) => (
                     <p key={index} role="alert">
@@ -235,6 +270,9 @@ function AlertsPage() {
                 <span className="text-sm text-zinc-400">
                     Queue: {runtime.data?.pending_count ?? 0}
                 </span>
+                <span>
+                    Aktiver Alert: {runtime.data?.current_type ?? "Keiner"}
+                </span>
                 <label className="flex min-w-48 flex-1 items-center gap-2 text-sm">
                     OBS-Szene
                     <Input
@@ -250,6 +288,38 @@ function AlertsPage() {
                     }
                 >
                     Szene speichern
+                </Button>
+            </Card>
+            <Card className="flex flex-wrap items-end gap-3">
+                <label>
+                    Maximale Warteschlange
+                    <Input
+                        type="number"
+                        min={1}
+                        max={1000}
+                        value={capacity ?? runtime.data?.queue_capacity ?? 250}
+                        onChange={(e) => setCapacity(Number(e.target.value))}
+                    />
+                </label>
+                <label>
+                    Zwischenpause (Millisekunden)
+                    <Input
+                        type="number"
+                        min={0}
+                        max={60000}
+                        value={
+                            delay ??
+                            runtime.data?.inter_alert_delay_milliseconds ??
+                            350
+                        }
+                        onChange={(e) => setDelay(Number(e.target.value))}
+                    />
+                </label>
+                <Button
+                    disabled={queueSettings.isPending}
+                    onClick={() => queueSettings.mutate()}
+                >
+                    Warteschlange speichern
                 </Button>
             </Card>
 

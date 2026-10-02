@@ -78,7 +78,7 @@ async fn server(
                 "GetInputVolume" => json!({"inputVolumeDb":-12,"inputVolumeMul":0.25}),
                 "GetStats" => json!({"activeFps":60}),
                 "GetSceneItemId" => {
-                    json!({"sceneItemId":if d["requestData"]["sourceName"]=="_alert_text" {1}else{2}})
+                    json!({"sceneItemId":if d["requestData"]["sourceName"]=="ccs_alert_text" {1}else{2}})
                 }
                 _ => json!({}),
             };
@@ -346,6 +346,163 @@ async fn failed_audio_query_remains_an_error_not_a_default_value() {
         .unwrap_err()
         .to_string()
         .contains("contract failure"));
+    obs.disconnect().await.unwrap();
+    task.await.unwrap();
+}
+
+#[tokio::test]
+async fn alert_layout_keeps_the_legacy_text_and_media_regions() {
+    let (obs, requests, task) = server("").await;
+    let mut settings = AppSettings::default();
+    settings.alerts.inter_alert_delay_milliseconds = 0;
+    let definition = settings.alerts.definitions.get_mut("Follow").unwrap();
+    definition.duration_seconds = 0;
+    definition.media_path = "media.mp4".into();
+    definition.x = 100;
+    definition.y = 200;
+    definition.width = 1000;
+    definition.height = 250;
+    let engine = AlertEngine::from_memory(
+        Arc::new(MemorySettingsStore::new(settings)),
+        OverlayEventBridge::new(Arc::new(RealtimeHub::new())),
+    );
+    engine.attach_obs(obs.clone());
+    engine.test_alert("Follow", "Alice").await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(3), async {
+        while engine.pending_count() != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let transforms: Vec<_> = requests
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|r| r["requestType"] == "SetSceneItemTransform")
+        .map(|r| r["requestData"]["sceneItemTransform"].clone())
+        .collect();
+    assert_eq!(transforms.len(), 2);
+    assert_eq!(transforms[0]["positionX"], 470.0);
+    assert_eq!(transforms[0]["boundsWidth"], 630.0);
+    assert_eq!(transforms[1]["positionX"], 100.0);
+    assert_eq!(transforms[1]["boundsWidth"], 340.0);
+    obs.disconnect().await.unwrap();
+    task.await.unwrap();
+}
+
+#[tokio::test]
+async fn disabling_the_engine_cancels_playback_and_discards_queued_alerts() {
+    let (obs, requests, task) = server("").await;
+    let mut settings = AppSettings::default();
+    settings.alerts.inter_alert_delay_milliseconds = 0;
+    settings
+        .alerts
+        .definitions
+        .get_mut("Follow")
+        .unwrap()
+        .duration_seconds = 60;
+    let engine = AlertEngine::from_memory(
+        Arc::new(MemorySettingsStore::new(settings)),
+        OverlayEventBridge::new(Arc::new(RealtimeHub::new())),
+    );
+    engine.attach_obs(obs.clone());
+    engine.test_alert("Follow", "First").await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(3), async {
+        while !requests.lock().unwrap().iter().any(|r| {
+            r["requestType"] == "SetSceneItemEnabled"
+                && r["requestData"]["sceneItemEnabled"] == true
+        }) {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    engine.test_alert("Follow", "Second").await.unwrap();
+    engine.set_runtime(Some(false), None).await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while engine.pending_count() != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("disabling must cancel the 60-second alert");
+    assert!(engine.runtime().await.unwrap().current_type.is_none());
+    assert_eq!(
+        requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r["requestType"] == "SetInputSettings")
+            .count(),
+        1
+    );
+    obs.disconnect().await.unwrap();
+    task.await.unwrap();
+}
+
+#[tokio::test]
+async fn all_selected_twitch_events_render_default_templates_through_obs() {
+    let (obs, requests, task) = server("").await;
+    let mut settings = AppSettings::default();
+    settings.alerts.inter_alert_delay_milliseconds = 0;
+    for definition in settings.alerts.definitions.values_mut() {
+        definition.duration_seconds = 0;
+    }
+    let engine = AlertEngine::from_memory(
+        Arc::new(MemorySettingsStore::new(settings)),
+        OverlayEventBridge::new(Arc::new(RealtimeHub::new())),
+    );
+    engine.attach_obs(obs.clone());
+    for (event, payload, expected) in [
+        (
+            "channel.follow",
+            json!({"user_name":"Alice"}),
+            "Alice folgt jetzt!",
+        ),
+        (
+            "channel.subscribe",
+            json!({"user_name":"Alice","tier":"1000"}),
+            "Alice hat abonniert!",
+        ),
+        (
+            "channel.subscription.message",
+            json!({"user_name":"Alice","cumulative_months":12,"message":{"text":"Hi"}}),
+            "Alice ist seit 12 Monaten dabei!",
+        ),
+        (
+            "channel.subscription.gift",
+            json!({"is_anonymous":true,"total":5}),
+            "Anonym verschenkt 5 Subs!",
+        ),
+        (
+            "channel.cheer",
+            json!({"user_name":"Alice","bits":500}),
+            "Alice cheeret 500 Bits!",
+        ),
+        (
+            "channel.raid",
+            json!({"from_broadcaster_user_name":"Raider","viewers":25}),
+            "Raid von Raider mit 25 Zuschauern!",
+        ),
+    ] {
+        let data = ccs_modules::overlay_bridge::flatten_event_data(&payload);
+        assert_eq!(engine.enqueue_matching(event, &data).await, 1);
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            while engine.pending_count() != 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let commands = requests.lock().unwrap();
+        let text = commands
+            .iter()
+            .rev()
+            .find(|r| r["requestType"] == "SetInputSettings")
+            .unwrap();
+        assert_eq!(text["requestData"]["inputSettings"]["text"], expected);
+    }
     obs.disconnect().await.unwrap();
     task.await.unwrap();
 }

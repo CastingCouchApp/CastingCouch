@@ -146,6 +146,14 @@ async fn spotify_action(
     action: ccs_modules::spotify::SpotifyAction,
 ) -> Result<Value, String> {
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    if let ccs_modules::spotify::SpotifyAction::Volume { percent } = &action {
+        if let Some(music) = state.alerts.music_ducking() {
+            return music
+                .set_volume(&settings.spotify.client_id, *percent)
+                .await
+                .map_err(|e| e.to_string());
+        }
+    }
     state
         .spotify
         .action(&settings.spotify.client_id, action)
@@ -325,6 +333,10 @@ async fn save_settings(
         state.hub.live.data.write().unwrap()["serverError"] = Value::Null;
     }
     let next: AppSettings = serde_json::from_value(saved).map_err(|e| e.to_string())?;
+    if old.alerts.enabled && !next.alerts.enabled {
+        state.alerts.stop_current();
+        state.alerts.clear_queue().await;
+    }
     let mut warnings = Vec::<String>::new();
     let mut password_updated = false;
     if let Some(password) = obs_password.filter(|p| !p.is_empty()) {
@@ -690,9 +702,33 @@ async fn list_alerts(state: State<'_, AppState>) -> Result<Vec<AlertDefinition>,
 async fn upsert_alert(
     state: State<'_, AppState>,
     alert: AlertDefinition,
+    original_type: Option<String>,
 ) -> Result<AlertDefinition, String> {
     let _guard = state.settings_mutation.lock().await;
-    state.alerts.upsert(alert).await
+    state
+        .alerts
+        .upsert_from(original_type.as_deref(), alert)
+        .await
+}
+
+#[tauri::command]
+async fn alert_preview(alert: AlertDefinition, user: String) -> Result<Value, String> {
+    tokio::task::spawn_blocking(move || ccs_modules::alert_preview::preview(&alert, &user))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn alert_queue_settings(
+    state: State<'_, AppState>,
+    capacity: i32,
+    delay_milliseconds: i32,
+) -> Result<AlertRuntime, String> {
+    let _guard = state.settings_mutation.lock().await;
+    state
+        .alerts
+        .configure_queue(capacity, delay_milliseconds)
+        .await
 }
 
 #[tauri::command]
@@ -950,6 +986,8 @@ pub fn run() {
             alert_clear_queue,
             list_alerts,
             upsert_alert,
+            alert_preview,
+            alert_queue_settings,
             delete_alert,
             alert_runtime,
             test_alert,
@@ -964,6 +1002,23 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = &event {
+                static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+                if !SHUTTING_DOWN.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                    api.prevent_exit();
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Some(state) = app.try_state::<AppState>() {
+                            match tokio::time::timeout(std::time::Duration::from_secs(12), state.alerts.shutdown()).await {
+                                Ok(Ok(())) => {},
+                                Ok(Err(error)) => error!(%error, "Alerts konnten beim Beenden nicht aufgeräumt werden"),
+                                Err(_) => error!("Alert-Cleanup beim Beenden hat das Zeitlimit überschritten"),
+                            }
+                        }
+                        app.exit(0);
+                    });
+                }
+            }
             if matches!(event, tauri::RunEvent::Exit) {
                 if let Some(state) = app.try_state::<AppState>() {
                     if let Err(error) = state.hub.flush_history() {
@@ -1024,6 +1079,9 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let spotify = SpotifyClient::new_shared(secrets_dyn);
     let alerts = Arc::new(AlertEngine::from_store(settings.clone(), bridge.clone()));
     alerts.attach_obs(obs.clone());
+    alerts.attach_music(Arc::new(ccs_modules::music_automation::AlertDucking::new(
+        spotify.clone(),
+    )));
 
     spawn_live_event_bridges(
         app.handle().clone(),

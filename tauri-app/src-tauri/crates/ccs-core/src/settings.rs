@@ -544,6 +544,8 @@ fn default_inter_alert_delay() -> i32 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct AlertDefinitionSettings {
+    #[serde(flatten)]
+    pub extra: serde_json::Value,
     #[serde(default)]
     pub r#type: String,
     #[serde(default = "default_true")]
@@ -587,6 +589,7 @@ pub struct AlertDefinitionSettings {
 impl Default for AlertDefinitionSettings {
     fn default() -> Self {
         Self {
+            extra: serde_json::json!({}),
             r#type: String::new(),
             enabled: true,
             text_template: String::new(),

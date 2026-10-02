@@ -122,9 +122,12 @@ pub struct AlertRuntime {
     pub pending_count: usize,
     pub enabled: bool,
     pub obs_scene_name: String,
+    pub queue_capacity: i32,
+    pub inter_alert_delay_milliseconds: i32,
 }
 
 struct QueuedAlert {
+    id: String,
     definition: AlertDefinition,
     variables: BTreeMap<String, String>,
     user: String,
@@ -196,6 +199,7 @@ impl SettingsBackend {
 
 struct AlertEngineInner {
     obs: std::sync::Mutex<Option<Arc<crate::obs::ObsClient>>>,
+    music: std::sync::Mutex<Option<Arc<crate::music_automation::AlertDucking>>>,
     current: std::sync::Mutex<Option<String>>,
     last_error: std::sync::Mutex<Option<String>>,
     stop: tokio::sync::watch::Sender<u64>,
@@ -225,6 +229,7 @@ impl AlertEngine {
         Self {
             inner: Arc::new(AlertEngineInner {
                 obs: std::sync::Mutex::new(None),
+                music: std::sync::Mutex::new(None),
                 current: std::sync::Mutex::new(None),
                 last_error: std::sync::Mutex::new(None),
                 stop: tokio::sync::watch::channel(0).0,
@@ -242,12 +247,34 @@ impl AlertEngine {
     pub fn attach_obs(&self, obs: Arc<crate::obs::ObsClient>) {
         *self.inner.obs.lock().unwrap() = Some(obs);
     }
+    pub fn attach_music(&self, music: Arc<crate::music_automation::AlertDucking>) {
+        *self.inner.music.lock().unwrap() = Some(music);
+    }
+    pub fn music_ducking(&self) -> Option<Arc<crate::music_automation::AlertDucking>> {
+        self.inner.music.lock().unwrap().clone()
+    }
     pub fn stop_current(&self) {
         self.inner.stop.send_modify(|generation| *generation += 1);
+    }
+    pub async fn shutdown(&self) -> Result<(), String> {
+        self.inner.cancel.store(true, Ordering::SeqCst);
+        self.stop_current();
+        self.inner.notify.notify_waiters();
+        self.clear_queue().await;
+        let handle = self.worker.lock().unwrap().take();
+        if let Some(handle) = handle {
+            handle.await.map_err(|error| error.to_string())?;
+        }
+        Ok(())
     }
     pub async fn clear_queue(&self) {
         let count = self.inner.queue.lock().await.drain(..).count();
         self.inner.pending.fetch_sub(count, Ordering::SeqCst);
+        if let Some(music) = self.music_ducking() {
+            if let Err(error) = music.end("", self.pending_count() > 0).await {
+                *self.inner.last_error.lock().unwrap() = Some(format!("Musiklautstärke: {error}"));
+            }
+        }
     }
     pub async fn install_sources(&self, type_name: &str) -> Result<(), String> {
         let obs = self
@@ -290,8 +317,31 @@ impl AlertEngine {
     }
 
     pub async fn upsert(&self, dto: AlertDefinition) -> Result<AlertDefinition, String> {
+        self.upsert_from(None, dto).await
+    }
+
+    pub async fn upsert_from(
+        &self,
+        original_type: Option<&str>,
+        dto: AlertDefinition,
+    ) -> Result<AlertDefinition, String> {
+        validate_definition(&dto)?;
         let mut settings = self.inner.store.load().await?;
         let requested = dto.type_name.trim().to_string();
+        let mut original_definition = None;
+        if let Some(original) = original_type {
+            let original_key = find_definition_key(&settings.alerts.definitions, original)
+                .ok_or("Der ursprüngliche Alert wurde nicht gefunden.")?;
+            if requested.is_empty() {
+                return Err("Der Alert-Name darf nicht leer sein.".into());
+            }
+            if let Some(existing) = find_definition_key(&settings.alerts.definitions, &requested) {
+                if existing != original_key {
+                    return Err("Dieser Alert-Name wird bereits verwendet.".into());
+                }
+            }
+            original_definition = settings.alerts.definitions.remove(&original_key);
+        }
         let (key, created) = if requested.is_empty() {
             (
                 create_unique_type(&settings.alerts.definitions, "Eigener Alert"),
@@ -304,7 +354,7 @@ impl AlertEngine {
             (requested, true)
         };
 
-        let mut stored = if created {
+        let mut stored = if created && original_type.is_none() {
             let mut def = apply_dto(&dto, &key);
             if def.text_template.trim().is_empty() {
                 def.text_template = "{user} hat einen Alert ausgelöst!".into();
@@ -314,6 +364,12 @@ impl AlertEngine {
         } else {
             apply_dto(&dto, &key)
         };
+        if let Some(previous) = original_definition
+            .as_ref()
+            .or_else(|| settings.alerts.definitions.get(&key))
+        {
+            stored.extra = previous.extra.clone();
+        }
         stored.r#type = key.clone();
         settings
             .alerts
@@ -343,7 +399,26 @@ impl AlertEngine {
             pending_count: self.pending_count(),
             enabled: settings.alerts.enabled,
             obs_scene_name: settings.alerts.obs_scene_name,
+            queue_capacity: settings.alerts.queue_capacity,
+            inter_alert_delay_milliseconds: settings.alerts.inter_alert_delay_milliseconds,
         })
+    }
+
+    pub async fn configure_queue(
+        &self,
+        capacity: i32,
+        delay_milliseconds: i32,
+    ) -> Result<AlertRuntime, String> {
+        if !(1..=1000).contains(&capacity) || !(0..=60000).contains(&delay_milliseconds) {
+            return Err(
+                "Warteschlange: 1–1000 Alerts; Zwischenpause: 0–60000 Millisekunden.".into(),
+            );
+        }
+        let mut settings = self.inner.store.load().await?;
+        settings.alerts.queue_capacity = capacity;
+        settings.alerts.inter_alert_delay_milliseconds = delay_milliseconds;
+        self.inner.store.save(&settings).await?;
+        self.runtime().await
     }
 
     pub async fn set_runtime(
@@ -367,6 +442,10 @@ impl AlertEngine {
             };
         }
         self.inner.store.save(&settings).await?;
+        if enabled == Some(false) {
+            self.stop_current();
+            self.clear_queue().await;
+        }
         self.runtime().await
     }
 
@@ -381,7 +460,7 @@ impl AlertEngine {
         if !def.enabled {
             return Ok(0);
         }
-        self.enqueue_request(to_dto(&key, def), user, BTreeMap::new())
+        self.enqueue_request(to_dto(&key, def), user, test_variables(type_name))
             .await?;
         Ok(1)
     }
@@ -416,7 +495,7 @@ impl AlertEngine {
             return Ok(0);
         };
         let user = user_from_event(data);
-        self.enqueue_request(to_dto(key, def), &user, data.clone())
+        self.enqueue_request(to_dto(key, def), &user, event_variables(event_type, data))
             .await?;
         Ok(1)
     }
@@ -437,6 +516,7 @@ impl AlertEngine {
             self.inner.pending.fetch_sub(1, Ordering::SeqCst);
         }
         queue.push_back(QueuedAlert {
+            id: uuid::Uuid::new_v4().to_string(),
             definition: def,
             variables,
             user: user.to_string(),
@@ -477,6 +557,7 @@ async fn worker_loop(inner: Arc<AlertEngineInner>) {
                 drop(notified);
                 let mut stopped = inner.stop.subscribe();
                 let obs = inner.obs.lock().unwrap().clone();
+                let music = inner.music.lock().unwrap().clone();
                 let settings = match inner.store.load().await {
                     Ok(settings) => settings,
                     Err(error) => {
@@ -485,6 +566,10 @@ async fn worker_loop(inner: Arc<AlertEngineInner>) {
                         continue;
                     }
                 };
+                if !settings.alerts.enabled {
+                    inner.pending.fetch_sub(1, Ordering::SeqCst);
+                    continue;
+                }
                 *inner.current.lock().unwrap() = Some(alert.definition.type_name.clone());
                 *inner.last_error.lock().unwrap() = None;
                 let text = crate::alert_renderer::render_text(
@@ -493,6 +578,30 @@ async fn worker_loop(inner: Arc<AlertEngineInner>) {
                     &alert.variables,
                 );
                 let play = async {
+                    let provider = if settings.music_player.source.is_empty() {
+                        settings.music_player.extra["ProviderId"]
+                            .as_str()
+                            .unwrap_or("spotify")
+                    } else {
+                        &settings.music_player.source
+                    };
+                    if provider.eq_ignore_ascii_case("spotify")
+                        && !settings.spotify.client_id.is_empty()
+                    {
+                        if let Some(music) = &music {
+                            if let Err(error) = music
+                                .begin(
+                                    &alert.id,
+                                    &settings.spotify.client_id,
+                                    &settings.spotify.extra,
+                                )
+                                .await
+                            {
+                                *inner.last_error.lock().unwrap() =
+                                    Some(format!("Musiklautstärke: {error}"));
+                            }
+                        }
+                    }
                     if let Some(obs) = &obs {
                         crate::alert_renderer::show(
                             obs,
@@ -502,9 +611,12 @@ async fn worker_loop(inner: Arc<AlertEngineInner>) {
                         )
                         .await?;
                     }
-                    inner
-                        .bridge
-                        .app_alert(&alert.definition.type_name, &alert.user);
+                    inner.bridge.app_alert_rendered(
+                        &alert.definition.type_name,
+                        &alert.user,
+                        &text,
+                        &alert.variables,
+                    );
                     tokio::time::sleep(alert.duration).await;
                     Ok::<(), String>(())
                 };
@@ -521,11 +633,26 @@ async fn worker_loop(inner: Arc<AlertEngineInner>) {
                         });
                     }
                 }
+                if let Some(music) = &music {
+                    if let Err(error) = music
+                        .end(&alert.id, inner.pending.load(Ordering::SeqCst) > 1)
+                        .await
+                    {
+                        let mut stored = inner.last_error.lock().unwrap();
+                        *stored = Some(match stored.take() {
+                            Some(previous) => format!("{previous}; Musiklautstärke: {error}"),
+                            None => format!("Musiklautstärke: {error}"),
+                        });
+                    }
+                }
                 *inner.current.lock().unwrap() = None;
                 inner.pending.fetch_sub(1, Ordering::SeqCst);
                 let delay = settings.alerts.inter_alert_delay_milliseconds.max(0) as u64;
-                if delay > 0 {
-                    tokio::time::sleep(Duration::from_millis(delay)).await;
+                if delay > 0 && !inner.cancel.load(Ordering::SeqCst) {
+                    tokio::select! {
+                        _ = tokio::time::sleep(Duration::from_millis(delay)) => {},
+                        _ = stopped.changed() => {},
+                    }
                 }
             }
             None => notified.await,
@@ -559,6 +686,7 @@ fn to_dto(key: &str, def: &AlertDefinitionSettings) -> AlertDefinition {
 
 fn apply_dto(dto: &AlertDefinition, key: &str) -> AlertDefinitionSettings {
     AlertDefinitionSettings {
+        extra: serde_json::json!({}),
         r#type: key.to_string(),
         enabled: dto.enabled,
         text_template: dto.text_template.clone(),
@@ -630,6 +758,12 @@ fn definition_matches(
 }
 
 fn user_from_event(data: &BTreeMap<String, String>) -> String {
+    if data
+        .get("is_anonymous")
+        .is_some_and(|value| value.eq_ignore_ascii_case("true"))
+    {
+        return "Anonym".into();
+    }
     data.get("user_name")
         .filter(|v| !v.trim().is_empty())
         .cloned()
@@ -641,11 +775,208 @@ fn user_from_event(data: &BTreeMap<String, String>) -> String {
         .unwrap_or_else(|| "Twitch".into())
 }
 
+pub(crate) fn validate_definition(def: &AlertDefinition) -> Result<(), String> {
+    if !(0..=3600).contains(&def.duration_seconds)
+        || !(1..=7680).contains(&def.width)
+        || !(1..=4320).contains(&def.height)
+        || !(8..=300).contains(&def.font_size)
+        || !(0..=100).contains(&def.volume_percent)
+    {
+        return Err(
+            "Alert: Dauer, Größe, Schriftgröße oder Lautstärke außerhalb des zulässigen Bereichs."
+                .into(),
+        );
+    }
+    if !def.sound_start_seconds.is_finite()
+        || !def.sound_end_seconds.is_finite()
+        || def.sound_start_seconds < 0.0
+        || def.sound_end_seconds < 0.0
+        || (def.sound_end_seconds > 0.0 && def.sound_end_seconds <= def.sound_start_seconds)
+    {
+        return Err(
+            "Sound-Ausschnitt: Das Ende muss nach dem Start liegen (0 = Dateiende).".into(),
+        );
+    }
+    Ok(())
+}
+
+pub(crate) fn test_variables(type_name: &str) -> BTreeMap<String, String> {
+    let values = match type_name.to_ascii_lowercase().as_str() {
+        "resub" => vec![("months", "12"), ("tier", "1000"), ("message", "Danke!")],
+        "giftsub" => vec![("count", "5"), ("tier", "1000")],
+        "cheer" => vec![("bits", "500"), ("message", "Danke!")],
+        "raid" => vec![("viewers", "25")],
+        "sub" => vec![("tier", "1000")],
+        _ => vec![],
+    };
+    values
+        .into_iter()
+        .map(|(key, value)| (key.into(), value.into()))
+        .collect()
+}
+
+fn event_variables(event_type: &str, data: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+    let mut variables = data.clone();
+    if let Some(raw) = data.get("message") {
+        if let Ok(message) = serde_json::from_str::<serde_json::Value>(raw) {
+            if let Some(text) = message["text"].as_str() {
+                variables
+                    .entry("message_text".into())
+                    .or_insert_with(|| text.into());
+            }
+        }
+    }
+    for (alias, source) in match event_type {
+        "channel.subscription.message" => {
+            vec![("months", "cumulative_months"), ("message", "message.text")]
+        }
+        "channel.subscription.gift" => vec![("count", "total")],
+        _ => vec![],
+    } {
+        if !variables.contains_key(alias) {
+            if let Some(value) = data.get(source) {
+                variables.insert(alias.into(), value.clone());
+            }
+        }
+    }
+    variables
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use ccs_overlay_server::RealtimeHub;
     use serde_json::Value;
+
+    #[test]
+    fn event_variables_support_legacy_templates_without_losing_original_fields() {
+        let resub = event_variables(
+            "channel.subscription.message",
+            &BTreeMap::from([
+                ("cumulative_months".into(), "12".into()),
+                ("tier".into(), "2000".into()),
+                ("message.text".into(), "Hallo!".into()),
+            ]),
+        );
+        assert_eq!(
+            crate::alert_renderer::render_text(
+                "{user}: {months} {tier} {message}",
+                "Alice",
+                &resub
+            ),
+            "Alice: 12 2000 Hallo!"
+        );
+        assert_eq!(resub["cumulative_months"], "12");
+        let gift = event_variables(
+            "channel.subscription.gift",
+            &BTreeMap::from([("total".into(), "5".into())]),
+        );
+        assert_eq!(gift["count"], "5");
+        assert_eq!(
+            user_from_event(&BTreeMap::from([("is_anonymous".into(), "true".into())])),
+            "Anonym"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resub_has_realistic_template_variables() {
+        let mut settings = default_settings();
+        settings
+            .alerts
+            .definitions
+            .get_mut("ReSub")
+            .unwrap()
+            .duration_seconds = 0;
+        let (engine, _, mut rx) = engine_with(settings);
+        engine.test_alert("ReSub", "Tester").await.unwrap();
+        let frame = tokio::time::timeout(Duration::from_secs(1), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let event: Value = serde_json::from_str(&frame).unwrap();
+        assert_eq!(event["data"]["text"], "Tester ist seit 12 Monaten dabei!");
+    }
+
+    #[tokio::test]
+    async fn invalid_sound_trim_is_rejected_before_persistence() {
+        let (engine, store, _) = engine_with(default_settings());
+        let dto = AlertDefinition {
+            sound_start_seconds: 5.0,
+            sound_end_seconds: 2.0,
+            ..Default::default()
+        };
+        assert!(engine.upsert(dto).await.is_err());
+        assert_eq!(store.save_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn rename_replaces_the_original_and_rejects_existing_names() {
+        let (engine, store, _) = engine_with(default_settings());
+        let original = engine
+            .list()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|d| d.type_name == "Follow")
+            .unwrap();
+        let mut renamed = original.clone();
+        renamed.type_name = "Sub".into();
+        assert!(engine
+            .upsert_from(Some("Follow"), renamed.clone())
+            .await
+            .is_err());
+        assert_eq!(store.save_count(), 0);
+        renamed.type_name = "Neuer Name".into();
+        engine.upsert_from(Some("Follow"), renamed).await.unwrap();
+        let settings = store.snapshot().await;
+        assert!(!settings.alerts.definitions.contains_key("Follow"));
+        assert_eq!(
+            settings.alerts.definitions["Neuer Name"].text_template,
+            original.text_template
+        );
+    }
+
+    #[tokio::test]
+    async fn rename_preserves_unrecognized_definition_properties() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Arc::new(JsonSettingsStore::new(root.path().join("settings.json")));
+        let original = store.read_value().await.unwrap();
+        let mut imported = original.clone();
+        imported["Alerts"]["Definitions"]["Follow"]["ImportedCustomLayout"] =
+            serde_json::json!({"padding":12});
+        store.save_edit(&original, &imported).await.unwrap();
+        let engine = AlertEngine::from_store(
+            store.clone(),
+            OverlayEventBridge::new(Arc::new(RealtimeHub::new())),
+        );
+        let mut definition = engine
+            .list()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|d| d.type_name == "Follow")
+            .unwrap();
+        definition.type_name = "Renamed".into();
+        engine
+            .upsert_from(Some("Follow"), definition)
+            .await
+            .unwrap();
+        assert_eq!(
+            store.read_value().await.unwrap()["Alerts"]["Definitions"]["Renamed"]
+                ["ImportedCustomLayout"]["padding"],
+            12
+        );
+    }
+
+    #[tokio::test]
+    async fn queue_configuration_validates_and_persists() {
+        let (engine, store, _) = engine_with(default_settings());
+        assert!(engine.configure_queue(0, 500).await.is_err());
+        engine.configure_queue(10, 1000).await.unwrap();
+        let settings = store.snapshot().await;
+        assert_eq!(settings.alerts.queue_capacity, 10);
+        assert_eq!(settings.alerts.inter_alert_delay_milliseconds, 1000);
+    }
 
     fn engine_with(
         settings: AppSettings,

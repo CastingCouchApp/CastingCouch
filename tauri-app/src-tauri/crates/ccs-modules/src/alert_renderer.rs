@@ -138,7 +138,7 @@ pub async fn show(
     )
     .await?;
     request(obs,"SetInputSettings",json!({"inputName":settings.obs_text_source_name,"inputSettings":text_settings(def,text),"overlay":true})).await?;
-    request(obs,"SetSceneItemTransform",json!({"sceneName":settings.obs_scene_name,"sceneItemId":text_id,"sceneItemTransform":{"positionX":def.x,"positionY":def.y,"boundsType":"OBS_BOUNDS_SCALE_INNER","boundsWidth":def.width.max(1),"boundsHeight":def.height.max(1)}})).await?;
+    request(obs,"SetSceneItemTransform",json!({"sceneName":settings.obs_scene_name,"sceneItemId":text_id,"sceneItemTransform":{"positionX":def.x as f64+def.width as f64*0.37,"positionY":def.y,"boundsType":"OBS_BOUNDS_SCALE_INNER","boundsWidth":def.width.max(1) as f64*0.63,"boundsHeight":def.height.max(1)}})).await?;
     visible(
         obs,
         &settings.obs_scene_name,
@@ -147,6 +147,13 @@ pub async fn show(
     )
     .await?;
     if !def.media_path.trim().is_empty() {
+        let media_id = item_id(
+            obs,
+            &settings.obs_scene_name,
+            &settings.obs_media_source_name,
+        )
+        .await?;
+        request(obs,"SetSceneItemTransform",json!({"sceneName":settings.obs_scene_name,"sceneItemId":media_id,"sceneItemTransform":{"positionX":def.x as f64,"positionY":def.y,"boundsType":"OBS_BOUNDS_SCALE_INNER","boundsWidth":def.width.max(1) as f64*0.34,"boundsHeight":def.height.max(1)}})).await?;
         request(obs,"SetInputSettings",json!({"inputName":settings.obs_media_source_name,"inputSettings":{"local_file":def.media_path,"is_local_file":true,"looping":false,"restart_on_activate":false,"close_when_inactive":true,"clear_on_media_end":true},"overlay":true})).await?;
         request(obs,"SetInputVolume",json!({"inputName":settings.obs_media_source_name,"inputVolumeMul":def.volume_percent.clamp(0,100) as f64/100.0})).await?;
         visible(

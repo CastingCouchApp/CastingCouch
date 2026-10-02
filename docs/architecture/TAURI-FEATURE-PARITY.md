@@ -1,6 +1,6 @@
 # Tauri: Feature-Parität und Abnahme
 
-Stand: 6. September 2026. Referenz ist der vom Nutzer ausgewählte C#-Funktionsumfang. **Die Umsetzung ist noch nicht abgeschlossen. Kein Cutover und keine vollständige Feature-Parität.**
+Stand: 3. Oktober 2026. Referenz ist der vom Nutzer ausgewählte C#-Funktionsumfang. **Die Umsetzung ist noch nicht abgeschlossen. Kein Cutover und keine vollständige Feature-Parität.**
 
 ## Verbindlicher Umfang
 
@@ -74,15 +74,15 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | [ ] | MU2 | Teilweise | Geräte anzeigen und Wiedergabe übertragen; persistente Gerätepräferenz fehlt. |
 | [ ] | MU3 | Teilweise | Playlists/Titel, Suche, Play, Queue, Favoriten, zuletzt gehört. Gesamte Bibliotheks-/Paging-Parität noch prüfen. |
 | [ ] | MU4 | Offen | Szenenmusik, Start/Ende und Fades fehlen. |
-| [ ] | MU5 | Offen | Überlappungssicheres Alert-Ducking fehlt. Externe EX-Integrationen sind gestrichen. |
+| [ ] | MU5 | Implementiert | Native Alert-Engine senkt Spotify ab und hält die Lautstärke über überlappende Aktivitäten und die Queue. Wiederherstellung erfolgt auf dem ursprünglichen Gerät; manuelle Änderungen werden als neue Ziellautstärke übernommen. Abbruch, HTTP-Fehler und Retry sind getestet. Einstellungen auf der Musikseite; externe EX-Integrationen entfallen. Betriebsabnahme bleibt offen. |
 | [ ] | MU6 | Offen | Musikzustände, Profile, Historie und Wiederherstellung fehlen. |
 | [ ] | MU7 | Offen | Musikstatistik fehlt. |
 | [ ] | MU8 | Teilweise | Native Loopback-Bridge, Einrichtung/Bookmarklet, Frischeprüfung, Metadaten, unterstützte Befehle; echter HTTP-Test. Browserfreigaben und Betriebsabnahme auf Windows/macOS fehlen. |
 | [ ] | MU9 | Teilweise | Providerwahl gespeichert, Metadaten/Cover/Fortschritt im Overlay-Snapshot; Anzeigeoptionen aus MusicPlayer. Vollständige gemeinsame Playerdarstellung und Einstellungen fehlen. |
-| [ ] | AL1 | Teilweise | Text-/Medien-/Typ-/Dauer-/Font-/Farbe-/Positions-/Größeneditor und Textvorschau. Sound, Audio-Gerät, Ausschnitt, Animation und vollständige Medienvorschau fehlen. |
-| [ ] | AL2 | Teilweise | Explizite OBS-Quelleneinrichtung, vorhandene Text-/Medienquellen abspielen/stoppen/ausblenden. Separate Soundwiedergabe, alle Layout-/Animationsdetails und zuverlässige Fehler-/Abbruchabnahme fehlen. |
-| [ ] | AL3 | Teilweise | Aktiver Typ/Fehler, Stoppen, Queue leeren, aktivieren/deaktivieren, Zwischenpause. Fehler-/Stopprennen über echte OBS-Grenze noch testen. |
-| [ ] | AL4 | Teilweise | Vollständige Event-Daten an Vorlagenausführung weitergereicht. Legacy-Variablennamen und Formatierung pro Ereignis müssen noch vollständig angeglichen werden. |
+| [ ] | AL1 | Teilweise | Namen/Typen, Text, Medien, Soundpfad, Ausschnitt, Dauer, Priorität, Schrift, Farbe, Position, Größe und Animationsauswahl bedienbar. Native lokale Medien-/Soundvorschau mit begrenzter Dateigröße und Fehleranzeige; Umbenennung erhält Zusatzfelder. Auswahl des tatsächlichen Audioausgangs und animierte räumliche Vorschau fehlen. |
+| [ ] | AL2 | Teilweise | Explizite OBS-Quelleneinrichtung, vorhandene Text-/Medienquellen abspielen/stoppen/ausblenden. Text-/Medienregionen entsprechen jetzt dem C#-Layout. Separate Soundwiedergabe und OBS-Animationen fehlen; Fehler-/Abbruchtests nutzen echte lokale WebSocket-Grenzen, Betriebsabnahme steht aus. |
+| [ ] | AL3 | Implementiert | Aktiven Typ und Fehler anzeigen, stoppen, Queue leeren, aktivieren/deaktivieren sowie Queue-Kapazität und Zwischenpause speichern. Deaktivieren stoppt den aktuellen Alert und verwirft die Queue. App-Ende wartet auf Cleanup einschließlich Musikrestaurierung; Fehler und Stoppen über lokale OBS-/Spotify-Gegenstellen geprüft. |
+| [ ] | AL4 | Implementiert | Follow/Sub/ReSub/GiftSub/Cheer/Raid verwenden sämtliche originalen Felder; ReSub/GiftSub erhalten zusätzlich die in C#-Vorlagen verwendeten months/count-Aliase und lesbare message_text-Ergänzung. Anonyme Nutzer und Testvariablen berücksichtigt. Groß-/Kleinschreibung und unbekannte Platzhalter bleiben kompatibel. Overlay-Alert-Ereignisse enthalten gerenderten Text und Variablen. |
 
 ## Dashboard und System
 
@@ -111,8 +111,8 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 ## Nächste Umsetzungsschritte
 
 1. Installierte Pakete und echte Dienstverbindungen abnehmen; weitere Alert-Playback-Abbruchfälle im Feature-Paket AL2/AL3 prüfen.
-2. B5–B7 und O5/O6 vervollständigen; vollständige Twitch-Daten-/Zielversorgung und Sessionerfassung als Grundlage für DA3/DA4.
-3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung, Alert-Sound und Musikautomationen/Ducking/Zustände fertigstellen.
+2. O4/O6, vollständige Twitch-Oberflächen und Sessionerfassung für DA3/DA4 fertigstellen.
+3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung, Alert-Sound und Szenenmusik und Musikzustände fertigstellen.
 4. Dashboard, Einrichtung, Rechtstexte, Profile, Migration/Backups und Diagnostik umsetzen.
 5. Windows-/macOS-Installer bauen und jeden gewählten Nutzerablauf dokumentiert abnehmen; erst danach Cutover entscheiden.
 
@@ -140,3 +140,13 @@ Validierung: 157 Rust-Tests, 51 Frontend-Tests und TypeScript-/Vite-Build erfolg
 Die technische Basis ist implementiert. Die Instanzsperre wurde durch einen Test mit einem zweiten Prozess korrigiert; der vorherige Stand wertete `Ok(false)` fälschlich als Erfolg. Weitere gefundene und behobene Fehler: Editor-WebSocket-Frames ohne Speicherung, unvollständiges Hello, falsche Layout-Defaults und Health-Ports, veränderte C#-Wertdarstellungen, parallele Token-Erneuerungen und verlorene Hardlinks bzw. Zusatzfelder bei der Datenversorgung.
 
 Nicht portierte Desktop-Komfortoptionen und Drittanbieter-Emotes werden in den Einstellungen als noch nicht verfügbar angezeigt. Diese Feature-Arbeit bleibt in SYS7/O6; sie wird nicht als abgeschlossen gezählt. Windows-/macOS-Installation, echte OAuth-/OBS-Verbindungen und ein vollständiger Streamablauf sind weiterhin nicht abgenommen.
+
+## Fortsetzung: Alerts, Musikabsenkung und CI
+
+Die Alert-Engine ist mit einem nativen Spotify-Ducking-Koordinator verbunden. Er serialisiert Volume-Anfragen, erhält den ursprünglichen Gerätebezug und speichert einen offenen Wiederherstellungsauftrag auch bei Abbruch oder HTTP-Fehler. Der Watchdog versucht fehlgeschlagene Wiederherstellungen erneut. Lautstärkeabsenkung erhöht keine bereits leisere Wiedergabe. Die gemeinsame Fachlogik wird von UI-Commands und Alert-Worker verwendet; keine EX-Integration wird wieder eingeführt.
+
+Neue Regressionstests fanden und beheben: weiterlaufende deaktivierte Alerts, fehlende Medien-Transformation und verlorene Zusatzfelder beim Umbenennen. Die Vorschau liest lokale Dateien nur auf ausdrücklichen Vorschauaufruf, begrenzt sie auf 64 MB und verwendet dieselbe Textvorlage wie die Engine. Soundwiedergabe während des echten Alerts und Audioausgangsauswahl bleiben AL1/AL2.
+
+Der letzte CI-Lauf auf main (`fe55c78`, Run 34040850347) bestätigte Windows-Build/Packaging, scheiterte aber bei macOS-IPC-Tests am Windows-spezifischen Invoke-Origin. Die Tests verwenden jetzt die tatsächliche WebView-URL. Drei bestehende WPF-Testannahmen wurden an den aktuellen Vertrag angepasst (Sidecar-Feld, kompakte Breite 1120, plattformunabhängige Zeilenenden). Der Canvas-Lockfile erhält mit npm 11 behebbare Updates innerhalb der bestehenden Versionsbereiche; npm audit meldet lokal keine Schwachstellen. Kein Tauri-Cutover und keine Live-/Installationsfreigabe.
+
+Lokale Validierung dieses Schritts: 192 Rust-Tests (190 im gesamten Workspace plus die danach ergänzten Prüfungen aller sechs Twitch-Alerttypen und der Deaktivierung über die allgemeinen Einstellungen), 59 Tauri-Frontend-Tests, 98 Canvas-Tests, 600 C#-Tests sowie TypeScript- und Produktionsbuilds erfolgreich. Die aktualisierten macOS-IPC-Prüfungen müssen durch den neuen CI-Lauf bestätigt werden.

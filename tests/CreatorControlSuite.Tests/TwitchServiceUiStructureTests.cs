@@ -59,7 +59,7 @@ public sealed class TwitchServiceUiStructureTests
             "Services",
             "TwitchServiceView.xaml"));
 
-        Assert.Contains("MaxWidth=\"1380\"", xaml);
+        Assert.Contains("MaxWidth=\"1120\"", xaml);
         Assert.Contains("ServicesOpenTwitchStatisticsButton", xaml);
         Assert.Contains("ServicesOpenTwitchIntelligenceButton", xaml);
         Assert.DoesNotContain("Header=\"STREAM-STATISTIKEN ANZEIGEN\"", xaml);

@@ -77,7 +77,8 @@ public sealed class SettingsStoreTests
                 "Workflow",
                 "StreamDeck",
                 "Dashboard",
-                "Updates"
+                "Updates",
+                "Sidecar"
             ];
 
             Assert.Equal(

@@ -35,6 +35,9 @@ fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
             obs_query,
             open_overlay_editor,
             test_alert,
+            upsert_alert,
+            alert_preview,
+            alert_queue_settings,
             delete_alert,
             alert_runtime,
             get_settings,
@@ -56,7 +59,7 @@ fn call(
             cmd: cmd.into(),
             callback: tauri::ipc::CallbackFn(0),
             error: tauri::ipc::CallbackFn(1),
-            url: "http://tauri.localhost".parse().unwrap(),
+            url: window.url().unwrap(),
             body: tauri::ipc::InvokeBody::Json(body),
             headers: Default::default(),
             invoke_key: tauri::test::INVOKE_KEY.into(),
@@ -105,6 +108,110 @@ fn real_ipc_decodes_camel_case_and_persists_commands() {
         call(&window, "list_canvases", json!({})).unwrap()[0]["name"],
         "Renamed"
     );
+}
+
+#[test]
+fn alert_designer_preview_rename_and_queue_settings_cross_real_ipc() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().to_path_buf());
+    let window = WebviewWindowBuilder::new(&app, "alerts", Default::default())
+        .build()
+        .unwrap();
+    let state = app.state::<AppState>();
+    let before = tauri::async_runtime::block_on(state.alerts.list()).unwrap();
+    let mut definition = before
+        .into_iter()
+        .find(|alert| alert.type_name == "ReSub")
+        .unwrap();
+    definition.type_name = "New ReSub".into();
+    let payload = serde_json::to_value(&definition).unwrap();
+    assert!(call(
+        &window,
+        "upsert_alert",
+        json!({"alert":payload,"original_type":"ReSub"})
+    )
+    .is_ok());
+    // Unknown snake_case optional arguments cannot rename an existing definition.
+    assert!(tauri::async_runtime::block_on(state.alerts.list())
+        .unwrap()
+        .iter()
+        .any(|alert| alert.type_name == "ReSub"));
+    definition.type_name = "Renamed".into();
+    let payload = serde_json::to_value(&definition).unwrap();
+    call(
+        &window,
+        "upsert_alert",
+        json!({"alert":payload,"originalType":"ReSub"}),
+    )
+    .unwrap();
+    assert!(!tauri::async_runtime::block_on(state.alerts.list())
+        .unwrap()
+        .iter()
+        .any(|alert| alert.type_name == "ReSub"));
+    call(
+        &window,
+        "alert_queue_settings",
+        json!({"capacity":12,"delayMilliseconds":750}),
+    )
+    .unwrap();
+    assert_eq!(
+        tauri::async_runtime::block_on(state.settings.load())
+            .unwrap()
+            .alerts
+            .inter_alert_delay_milliseconds,
+        750
+    );
+    assert!(call(
+        &window,
+        "alert_queue_settings",
+        json!({"capacity":0,"delayMilliseconds":750})
+    )
+    .is_err());
+    let preview = call(&window,"alert_preview",json!({"alert":AlertDefinition{type_name:"ReSub".into(),text_template:"{USER}: {months}".into(),..Default::default()},"user":"Tester"})).unwrap();
+    assert_eq!(preview["text"], "Tester: 12");
+}
+
+#[test]
+fn disabling_alerts_via_general_settings_stops_the_running_worker() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().to_path_buf());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    call(
+        &window,
+        "test_alert",
+        json!({"alertType":"Follow","user":"Tester"}),
+    )
+    .unwrap();
+    let state = app.state::<AppState>();
+    tauri::async_runtime::block_on(async {
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            while state.alerts.runtime().await.unwrap().current_type.is_none() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+    });
+    let original = call(&window, "get_settings", json!({})).unwrap();
+    let mut edited = original.clone();
+    edited["Alerts"]["Enabled"] = json!(false);
+    call(
+        &window,
+        "save_settings",
+        json!({"original":original,"settings":edited}),
+    )
+    .unwrap();
+    tauri::async_runtime::block_on(async {
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            while state.alerts.pending_count() != 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("general settings must stop the active alert");
+    });
 }
 #[test]
 fn occupied_port_fails_through_ipc_without_saving_settings() {

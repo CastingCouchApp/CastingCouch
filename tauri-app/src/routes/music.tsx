@@ -1,4 +1,5 @@
 import type { SpotifyAction, SpotifyQuery } from "../lib/command-contract";
+import { MusicAutomation } from "../features/music/MusicAutomation";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -128,6 +129,7 @@ function MusicPage() {
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-semibold">Musik</h1>
+            <MusicAutomation />
             {error && (
                 <p role="alert" className="text-red-400">
                     {String(error)}

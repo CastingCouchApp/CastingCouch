@@ -216,6 +216,18 @@ fn spawn_watchdog(app: AppHandle) {
             let Ok(settings) = state.settings.load().await else {
                 continue;
             };
+            if counter % 15 == 0 {
+                if let Some(music) = state.alerts.music_ducking() {
+                    if let Ok(Err(error)) = tokio::time::timeout(
+                        std::time::Duration::from_secs(8),
+                        music.retry_restore(),
+                    )
+                    .await
+                    {
+                        warn!(%error, "Musiklautstärke konnte noch nicht wiederhergestellt werden");
+                    }
+                }
+            }
             if counter % 15 == 0
                 && state
                     .overlay
