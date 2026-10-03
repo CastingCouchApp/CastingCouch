@@ -2,6 +2,122 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 #[test]
+fn music_overlay_settings_and_snapshot_cross_ipc_file_and_actual_http() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let socket = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = socket.local_addr().unwrap().port();
+    drop(socket);
+    let original = call(&window, "get_settings", json!({})).unwrap();
+    let mut next = original.clone();
+    next["MusicPlayer"]["ProviderId"] = json!("ytmusic");
+    next["MusicPlayer"]["ShowTitle"] = json!(false);
+    next["Spotify"]["OverlayHideWhenMuted"] = json!(false);
+    next["Spotify"]["OverlayObsAudioSource"] = json!("YouTube");
+    next["YouTubeMusic"]["BridgePort"] = json!(port);
+    call(
+        &window,
+        "save_settings",
+        json!({"original":original,"settings":next}),
+    )
+    .unwrap();
+    call(&window, "ytm_connect", json!({})).unwrap();
+    tauri::async_runtime::block_on(async {
+        let http = reqwest::Client::new();
+        http.post(format!("http://127.0.0.1:{port}/ytmusic/state"))
+            .json(&json!({"title":"Shared","artist":"Artist","isPlaying":true,"coverUrl":"Cover"}))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+        let payload = call(&window, "music_overlay_snapshot", json!({})).unwrap();
+        assert_eq!(payload["hideWhenMuted"], false);
+        assert_eq!(payload["showTitle"], true);
+        assert_eq!(payload["obsAudioSource"], "YouTube");
+        assert_eq!(payload["visible"], true);
+        let state = app.state::<AppState>();
+        let settings = state.settings.load().await.unwrap();
+        let snapshot = state.music_player.snapshot().await.unwrap();
+        runtime::update_music_data(&state, &snapshot, &settings);
+        let file = root.path().join("data.json");
+        state
+            .hub
+            .live
+            .write_snapshot_with_music(&file, true)
+            .await
+            .unwrap();
+        let server = OverlayServer::start(
+            state.settings.clone(),
+            state.paths.clone(),
+            state.hub.clone(),
+            0,
+        )
+        .await
+        .unwrap();
+        let data: Value = http
+            .get(format!(
+                "http://127.0.0.1:{}/data/overlay-data.json",
+                server.port
+            ))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(data["music"]["title"], "Shared");
+        assert_eq!(data["spotify"]["cover"], "Cover");
+        assert_eq!(data["music"], data["spotify"]);
+        let disk: Value = serde_json::from_slice(&tokio::fs::read(&file).await.unwrap()).unwrap();
+        assert_eq!(disk["music"], data["music"]);
+        let mut disabled = next.clone();
+        disabled["Spotify"]["OverlayEnabled"] = json!(false);
+        call(
+            &window,
+            "save_settings",
+            json!({"original":next,"settings":disabled}),
+        )
+        .unwrap();
+        tokio::fs::write(
+            &file,
+            json!({"music":{"title":"External"},"spotify":{"title":"External"}}).to_string(),
+        )
+        .await
+        .unwrap();
+        let settings = state.settings.load().await.unwrap();
+        runtime::update_music_data(&state, &snapshot, &settings);
+        state
+            .hub
+            .live
+            .write_snapshot_with_music(&file, false)
+            .await
+            .unwrap();
+        let data: Value = http
+            .get(format!(
+                "http://127.0.0.1:{}/data/overlay-data.json",
+                server.port
+            ))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(data["music"]["title"], "External");
+        assert_eq!(
+            call(&window, "music_player_snapshot", json!({})).unwrap()["title"],
+            "Shared"
+        );
+        server.stop();
+    });
+    call(&window, "music_player_disconnect", json!({})).unwrap();
+}
+
+#[test]
 fn shared_player_commands_cross_native_ipc_and_provider_switch_releases_the_bridge() {
     let root = tempfile::tempdir().unwrap();
     let app = test_app(root.path().into());
@@ -422,14 +538,20 @@ fn test_app_with_spotify(
         ducking,
         ytm.clone(),
     ));
+    let obs = ObsClient::new_shared("127.0.0.1", 4455);
+    let music_overlay = Arc::new(ccs_modules::music_overlay::MusicOverlayRuntime::new(
+        settings.clone(),
+        obs.clone(),
+    ));
     mock_builder()
         .manage(StartupState::default())
         .manage(AppState {
             ytm,
             music_player,
+            music_overlay,
             ytm_error: Mutex::new(None),
             settings_mutation: Mutex::new(()),
-            obs: ObsClient::new_shared("127.0.0.1", 4455),
+            obs,
             twitch: TwitchClient::new_shared(secrets.clone()),
             spotify,
             scene_music,
@@ -458,6 +580,7 @@ fn test_app_with_spotify(
             music_state_snapshot,
             music_statistics_snapshot,
             music_player_snapshot,
+            music_overlay_snapshot,
             music_player_action,
             music_player_disconnect,
             music_player_connect,

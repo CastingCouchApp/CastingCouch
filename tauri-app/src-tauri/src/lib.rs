@@ -126,6 +126,7 @@ async fn apply_profile(
 pub struct AppState {
     pub ytm: Arc<Mutex<Option<Arc<ccs_overlay_server::YouTubeMusicBridge>>>>,
     pub music_player: Arc<ccs_modules::music_player::MusicPlayerRuntime>,
+    pub music_overlay: Arc<ccs_modules::music_overlay::MusicOverlayRuntime>,
     pub ytm_error: Mutex<Option<String>>,
     pub paths: AppPaths,
     pub settings_mutation: Mutex<()>,
@@ -248,6 +249,29 @@ async fn spotify_action(
     state: State<'_, AppState>,
     action: ccs_modules::spotify::SpotifyAction,
 ) -> Result<Value, String> {
+    use ccs_modules::music_player::MusicPlayerAction;
+    let common = match &action {
+        ccs_modules::spotify::SpotifyAction::Play => Some(MusicPlayerAction::Play),
+        ccs_modules::spotify::SpotifyAction::Pause => Some(MusicPlayerAction::Pause),
+        ccs_modules::spotify::SpotifyAction::Next => Some(MusicPlayerAction::Next),
+        ccs_modules::spotify::SpotifyAction::Previous => Some(MusicPlayerAction::Previous),
+        ccs_modules::spotify::SpotifyAction::Volume { percent } => {
+            Some(MusicPlayerAction::Volume { percent: *percent })
+        }
+        ccs_modules::spotify::SpotifyAction::Seek { position_ms } => {
+            Some(MusicPlayerAction::Seek {
+                position_ms: *position_ms,
+            })
+        }
+        _ => None,
+    };
+    if let Some(action) = common {
+        return state
+            .music_player
+            .action_for_provider("spotify", action)
+            .await
+            .map_err(|e| e.to_string());
+    }
     let _provider = state
         .music_player
         .provider_guard("spotify")
@@ -264,18 +288,6 @@ async fn spotify_action(
         None
     };
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
-    if let ccs_modules::spotify::SpotifyAction::Volume { percent } = &action {
-        if let Some(music) = state.alerts.music_ducking() {
-            return music
-                .set_volume_on_device(
-                    &settings.spotify.client_id,
-                    *percent,
-                    settings.spotify.extra["PreferredDeviceId"].as_str(),
-                )
-                .await
-                .map_err(|e| e.to_string());
-        }
-    }
     let playlist = match &action {
         ccs_modules::spotify::SpotifyAction::PlayPlaylist { uri } => Some(uri.clone()),
         _ => None,
@@ -602,6 +614,13 @@ async fn music_player_action(
         .action(action)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn music_overlay_snapshot(state: State<'_, AppState>) -> Result<Value, String> {
+    let snapshot = music_player_snapshot(state.clone()).await?;
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    Ok(state.music_overlay.snapshot(&snapshot, &settings))
 }
 
 #[tauri::command]
@@ -1482,6 +1501,7 @@ pub fn run() {
             obs_output_status,
             ytm_connect,
             music_player_snapshot,
+            music_overlay_snapshot,
             music_player_action,
             music_player_connect,
             music_player_disconnect,
@@ -1797,9 +1817,14 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     tauri::async_runtime::block_on(async {
         *ytm.lock().await = ytm_bridge;
     });
+    let music_overlay = Arc::new(ccs_modules::music_overlay::MusicOverlayRuntime::new(
+        settings.clone(),
+        obs.clone(),
+    ));
     app.manage(AppState {
         ytm,
         music_player,
+        music_overlay,
         ytm_error: Mutex::new(ytm_error),
         paths,
         settings_mutation: Mutex::new(()),

@@ -243,6 +243,12 @@ pub fn validate_settings(settings: &AppSettings) -> Result<(), SettingsError> {
         "SavedStateCleanupIntervalEnabled",
         "HealthMonitorEnabled",
         "AutoRecoverPlayback",
+        "SmartAutomationEnabled",
+        "OverlayEnabled",
+        "OverlayHideWhenPaused",
+        "OverlayHideWhenMuted",
+        "OverlayMuteDetectionObsSource",
+        "OverlayMuteDetectionSpotifyVolume",
     ] {
         if settings
             .spotify
@@ -252,6 +258,22 @@ pub fn validate_settings(settings: &AppSettings) -> Result<(), SettingsError> {
         {
             return Err(SettingsError::Validation(format!(
                 "Spotify {key} muss ein Wahrheitswert sein."
+            )));
+        }
+    }
+    for key in [
+        "OverlayObsAudioSource",
+        "OverlayObsScene",
+        "OverlayObsSource",
+    ] {
+        if settings
+            .spotify
+            .extra
+            .get(key)
+            .is_some_and(|value| !value.is_string())
+        {
+            return Err(SettingsError::Validation(format!(
+                "Spotify {key} muss ein Text sein."
             )));
         }
     }
@@ -331,6 +353,33 @@ fn migrate_v1_to_v2(obj: &mut Map<String, Value>) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn music_overlay_options_reject_wrong_types_but_preserve_unknown_fields() {
+        let mut settings = crate::AppSettings::default();
+        settings.spotify.extra = serde_json::json!({"OverlayEnabled":true,"OverlayHideWhenMuted":false,"OverlayObsAudioSource":"Spotify","Future":{"keep":42}});
+        assert!(super::validate_settings(&settings).is_ok());
+        for key in [
+            "OverlayEnabled",
+            "OverlayHideWhenPaused",
+            "OverlayHideWhenMuted",
+            "OverlayMuteDetectionObsSource",
+            "OverlayMuteDetectionSpotifyVolume",
+            "SmartAutomationEnabled",
+        ] {
+            let mut invalid = settings.clone();
+            invalid.spotify.extra[key] = serde_json::json!("true");
+            assert!(super::validate_settings(&invalid).is_err(), "{key}");
+        }
+        for key in [
+            "OverlayObsAudioSource",
+            "OverlayObsScene",
+            "OverlayObsSource",
+        ] {
+            let mut invalid = settings.clone();
+            invalid.spotify.extra[key] = serde_json::json!(12);
+            assert!(super::validate_settings(&invalid).is_err(), "{key}");
+        }
+    }
     use super::*;
     use tempfile::tempdir;
 

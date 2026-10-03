@@ -178,6 +178,7 @@ export type CommandInvocation =
   | [command: "ytm_disconnect", args?: Record<string, never>]
   | [command: "music_player_snapshot", args?: Record<string, never>]
   | [command: "music_player_action", args: { action: MusicPlayerAction }]
+  | [command: "music_overlay_snapshot", args?: Record<string, never>]
   | [command: "music_player_disconnect", args?: Record<string, never>]
   | [command: "music_player_connect", args?: Record<string, never>]
   | [command: "ytm_runtime_status", args?: Record<string, never>]

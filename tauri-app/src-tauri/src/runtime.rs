@@ -5,6 +5,7 @@ pub(super) fn spawn_runtime(app: AppHandle) {
     spawn_watchdog(app.clone());
     spawn_music_state_monitor(app.clone());
     spawn_music_player_monitor(app.clone());
+    spawn_music_overlay_monitor(app.clone());
     tauri::async_runtime::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -26,37 +27,20 @@ pub(super) fn spawn_runtime(app: AppHandle) {
             );
 
             let outputs = state.hub.live.data.read().unwrap()["obs"]["outputs"].clone();
-            let mut music = match music_player_snapshot(app.state::<AppState>()).await {
-                Ok(snapshot) => serde_json::to_value(snapshot).unwrap_or(Value::Null),
+            let music_snapshot = match music_player_snapshot(app.state::<AppState>()).await {
+                Ok(snapshot) => snapshot,
                 Err(error) => {
                     warn!(%error,"Musikdaten nicht lesbar");
                     continue;
                 }
             };
-            let _ = app.emit("music-player-changed", &music);
-            music["cover"] = music["coverUrl"].clone();
-            for (key, fallback) in [
-                ("showInOverlay", true),
-                ("showTitle", true),
-                ("showArtist", true),
-                ("showAlbumCover", true),
-                ("showProgress", true),
-                ("hideWhenPaused", false),
-                ("hideWhenMuted", true),
-            ] {
-                let pascal = format!("{}{}", key[..1].to_uppercase(), &key[1..]);
-                music[key] = json!(settings
-                    .music_player
-                    .extra
-                    .get(&pascal)
-                    .and_then(Value::as_bool)
-                    .unwrap_or(fallback));
-            }
+            let _ = app.emit("music-player-changed", &music_snapshot);
+            let music = update_music_data(&state, &music_snapshot, &settings);
             let signature = format!(
                 "{}|{}|{}|{}",
                 music["provider"], music["title"], music["artist"], music["coverUrl"]
             );
-            if signature != previous_music {
+            if music["overlayEnabled"] == true && signature != previous_music {
                 state.bridge.app_music_track(
                     music["provider"].as_str().unwrap_or("spotify"),
                     music["title"].as_str().unwrap_or(""),
@@ -76,7 +60,6 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                 json!({"available":false})
             };
             let snapshot = state.hub.live.merge_snapshot(&json!({
-                "music": music, "spotify": music,
                 "obs":{"currentScene":scene,"connected":state.obs.status().await.state==ccs_modules::ConnectionState::Connected,"outputs":outputs},
                 "stream":stream,
                 "branding":{"displayName":settings.branding.display_name,"channelName":settings.branding.channel_name,"accentColor":settings.branding.accent_color,"logoPath":settings.branding.logo_path},
@@ -85,7 +68,12 @@ pub(super) fn spawn_runtime(app: AppHandle) {
             }));
 
             let path = ccs_core::paths::overlay_data_path(&state.paths, &settings);
-            match state.hub.live.write_snapshot(&path).await {
+            match state
+                .hub
+                .live
+                .write_snapshot_with_music(&path, music["overlayEnabled"] == true)
+                .await
+            {
                 Ok(()) => state.hub.live.data.write().unwrap()["dataError"] = Value::Null,
                 Err(error) => {
                     warn!(%error,"Overlay-Daten konnten nicht geschrieben werden");
@@ -306,6 +294,37 @@ fn spawn_music_player_monitor(app: AppHandle) {
                 break;
             }
             state.music_player.refresh_details().await;
+        }
+    });
+}
+
+pub(super) fn update_music_data(
+    state: &AppState,
+    snapshot: &ccs_modules::music_player::MusicPlayerSnapshot,
+    settings: &AppSettings,
+) -> Value {
+    let data = state.music_overlay.snapshot(snapshot, settings);
+    if data["overlayEnabled"] == true {
+        state
+            .hub
+            .live
+            .merge_snapshot(&json!({"music":data,"spotify":data}));
+    }
+    data
+}
+fn spawn_music_overlay_monitor(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tick.tick().await;
+            let state = app.state::<AppState>();
+            if state.scene_music.is_closed() {
+                break;
+            }
+            if let Err(error) = state.music_overlay.tick().await {
+                warn!(%error,"Musik-Overlay in OBS konnte nicht synchronisiert werden");
+            }
         }
     });
 }

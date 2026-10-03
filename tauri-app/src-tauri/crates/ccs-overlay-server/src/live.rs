@@ -126,6 +126,14 @@ impl LiveState {
     }
     /// Preserve the existing file node because imported overlays may hardlink it.
     pub async fn write_snapshot(&self, path: &std::path::Path) -> Result<(), std::io::Error> {
+        self.write_snapshot_with_music(path, true).await
+    }
+    /// The legacy Spotify switch disables ownership of music fields, preserving external writers.
+    pub async fn write_snapshot_with_music(
+        &self,
+        path: &std::path::Path,
+        write_music: bool,
+    ) -> Result<(), std::io::Error> {
         let mut output = tokio::fs::read(path)
             .await
             .ok()
@@ -137,7 +145,7 @@ impl LiveState {
             |key: &str| managed.get(key).is_some() || matches!(key, "serverError" | "dataError");
         let snapshot = self.data.read().unwrap().clone();
         for (key, value) in snapshot.as_object().unwrap() {
-            if owned(key) {
+            if owned(key) && (write_music || !matches!(key.as_str(), "music" | "spotify")) {
                 output[key] = value.clone();
             }
         }
@@ -147,7 +155,7 @@ impl LiveState {
                 .unwrap()
                 .retain(|key, _| owned(key) || output.get(key).is_some());
             for (key, value) in output.as_object().unwrap() {
-                if !owned(key) {
+                if !owned(key) || (!write_music && matches!(key.as_str(), "music" | "spotify")) {
                     data[key] = value.clone();
                 }
             }

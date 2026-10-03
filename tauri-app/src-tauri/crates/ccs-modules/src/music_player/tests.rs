@@ -147,6 +147,10 @@ async fn provider_switch_stops_inactive_player_and_routes_youtube_commands_witho
     assert_eq!(snapshot.volume_percent, None);
     runtime.action(MusicPlayerAction::Next).await.unwrap();
     assert!(runtime
+        .action_for_provider("spotify", MusicPlayerAction::Next)
+        .await
+        .is_err());
+    assert!(runtime
         .action(MusicPlayerAction::Seek { position_ms: 20 })
         .await
         .unwrap_err()
@@ -318,4 +322,60 @@ async fn pending_login_is_visible_and_common_disconnect_cancels_the_callback_lis
     runtime.disconnect().await.unwrap();
     assert!(!runtime.snapshot().await.unwrap().connecting);
     std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).unwrap();
+}
+
+#[test]
+fn requested_volume_precedes_delayed_reporting_for_exactly_four_seconds() {
+    let now = std::time::Instant::now();
+    let details = PlaybackDetails {
+        volume: Some(80),
+        requested: Some((0, now)),
+        ..Default::default()
+    };
+    assert_eq!(
+        details.effective_volume(now + std::time::Duration::from_secs(3)),
+        Some(0)
+    );
+    assert_eq!(
+        details.effective_volume(now + std::time::Duration::from_secs(4)),
+        Some(80)
+    );
+}
+
+#[tokio::test]
+async fn transient_empty_playback_and_api_errors_preserve_verified_track_until_disconnect() {
+    let root = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    let (runtime, _, player) = setup(root.path(), &server).await;
+    connect(&player, &server).await;
+    assert_eq!(runtime.snapshot().await.unwrap().title, "Song");
+    Mock::given(method("GET"))
+        .and(path("/me/player/currently-playing"))
+        .respond_with(ResponseTemplate::new(204))
+        .with_priority(2)
+        .mount(&server)
+        .await;
+    player
+        .refresh_now_playing("contract-client-id-12345")
+        .await
+        .unwrap();
+    assert_eq!(runtime.snapshot().await.unwrap().title, "Song");
+    Mock::given(method("GET"))
+        .and(path("/me/player/currently-playing"))
+        .respond_with(ResponseTemplate::new(503))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    assert!(player
+        .refresh_now_playing("contract-client-id-12345")
+        .await
+        .is_err());
+    let snapshot = runtime.snapshot().await.unwrap();
+    assert!(snapshot.connected);
+    assert_eq!(snapshot.title, "Song");
+    assert!(snapshot.error.unwrap().contains("503"));
+    runtime.disconnect().await.unwrap();
+    let snapshot = runtime.snapshot().await.unwrap();
+    assert!(!snapshot.connected);
+    assert!(snapshot.title.is_empty());
 }

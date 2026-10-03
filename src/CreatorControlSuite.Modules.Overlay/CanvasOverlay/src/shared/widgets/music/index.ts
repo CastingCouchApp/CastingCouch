@@ -241,7 +241,8 @@ export function updateSpotify(
   const showArtist = prop(item, "showArtist", music.showArtist !== false);
   const showCover = prop(item, "showAlbumCover", music.showAlbumCover !== false);
   const showProgress = prop(item, "showProgress", music.showProgress !== false);
-  const hideWhenPaused = prop(item, "hideWhenPaused", music.hideWhenPaused === true);
+  // Server visibility includes the global pause delay; explicit widget settings remain local.
+  const hideWhenPaused = prop(item, "hideWhenPaused", typeof music.visible !== "boolean" && music.hideWhenPaused === true);
 
   const hasSong = Boolean(music.title || music.artist);
   const connected = music.connected === true;

@@ -55,7 +55,18 @@ pub struct MusicPlayerSnapshot {
 #[derive(Default)]
 struct PlaybackDetails {
     volume: Option<u8>,
+    requested: Option<(u8, std::time::Instant)>,
     error: Option<String>,
+}
+impl PlaybackDetails {
+    fn effective_volume(&self, now: std::time::Instant) -> Option<u8> {
+        self.requested
+            .filter(|(_, at)| {
+                now.saturating_duration_since(*at) < std::time::Duration::from_secs(4)
+            })
+            .map(|(value, _)| value)
+            .or(self.volume)
+    }
 }
 
 /// One provider, one command route and one cached snapshot for the app and overlays.
@@ -68,6 +79,7 @@ pub struct MusicPlayerRuntime {
     ytm: Arc<Mutex<Option<Arc<YouTubeMusicBridge>>>>,
     gate: Mutex<Option<String>>,
     details: Mutex<PlaybackDetails>,
+    last_playing: Mutex<Option<crate::spotify::NowPlaying>>,
     revision: AtomicU64,
 }
 impl MusicPlayerRuntime {
@@ -86,6 +98,7 @@ impl MusicPlayerRuntime {
             ytm,
             gate: Mutex::new(None),
             details: Mutex::new(PlaybackDetails::default()),
+            last_playing: Mutex::new(None),
             revision: AtomicU64::new(0),
         }
     }
@@ -100,6 +113,7 @@ impl MusicPlayerRuntime {
         let mut details = self.details.lock().await;
         self.revision.fetch_add(1, Ordering::SeqCst);
         *details = PlaybackDetails::default();
+        *self.last_playing.lock().await = None;
     }
     async fn synchronize(
         &self,
@@ -156,8 +170,29 @@ impl MusicPlayerRuntime {
         Ok(())
     }
     pub async fn action(&self, action: MusicPlayerAction) -> ModuleResult<Value> {
+        self.action_from(None, action).await
+    }
+    pub async fn action_for_provider(
+        &self,
+        provider: &str,
+        action: MusicPlayerAction,
+    ) -> ModuleResult<Value> {
+        self.action_from(Some(provider), action).await
+    }
+    async fn action_from(
+        &self,
+        expected: Option<&str>,
+        action: MusicPlayerAction,
+    ) -> ModuleResult<Value> {
         let mut active = self.gate.lock().await;
         let settings = self.settings().await?;
+        if let Some(provider) =
+            expected.filter(|provider| *provider != settings.music_player.provider_id())
+        {
+            return Err(ModuleError::Message(format!(
+                "Bitte zuerst den Musikprovider {provider} auswählen."
+            )));
+        }
         self.synchronize(&mut active, &settings).await?;
         if settings.music_player.provider_id() == "ytmusic" {
             let command = match action {
@@ -179,10 +214,11 @@ impl MusicPlayerRuntime {
             bridge.command(command).map_err(ModuleError::Message)?;
             return Ok(Value::Null);
         }
-        if self.spotify.status().await.state != ConnectionState::Connected {
+        // A manual command also cancels a pending fade when the connection has failed.
+        let _player = self.scene.manual_player_guard().await;
+        if !self.snapshot().await?.connected {
             return Err(ModuleError::Message("Spotify ist nicht verbunden.".into()));
         }
-        let _player = self.scene.manual_player_guard().await;
         let spotify_action = match action {
             MusicPlayerAction::Play => SpotifyAction::Play,
             MusicPlayerAction::Pause => SpotifyAction::Pause,
@@ -208,6 +244,7 @@ impl MusicPlayerRuntime {
                 let mut details = self.details.lock().await;
                 self.revision.fetch_add(1, Ordering::SeqCst);
                 details.volume = Some(percent);
+                details.requested = Some((percent, std::time::Instant::now()));
                 details.error = None;
                 return Ok(result);
             }
@@ -284,13 +321,29 @@ impl MusicPlayerRuntime {
             });
         }
         let status = self.spotify.status().await;
-        let connected = status.state == ConnectionState::Connected;
-        let connecting = status.state == ConnectionState::Connecting;
-        let playing = if connected {
-            self.spotify.now_playing().await
-        } else {
-            Default::default()
+        let current = self.spotify.now_playing().await;
+        let (connected, playing) = {
+            let mut last = self.last_playing.lock().await;
+            if status.state == ConnectionState::Disconnected
+                || status.state == ConnectionState::Connecting
+            {
+                *last = None;
+            }
+            let connected = status.state == ConnectionState::Connected
+                || (status.state == ConnectionState::Error && last.is_some());
+            if connected && (!current.title.is_empty() || !current.track_id.is_empty()) {
+                *last = Some(current.clone());
+            }
+            (
+                connected,
+                if connected {
+                    last.clone().unwrap_or(current)
+                } else {
+                    Default::default()
+                },
+            )
         };
+        let connecting = status.state == ConnectionState::Connecting;
         let details = self.details.lock().await;
         Ok(MusicPlayerSnapshot {
             provider: "spotify".into(),
@@ -304,7 +357,11 @@ impl MusicPlayerRuntime {
             cover_url: playing.cover_url,
             progress_ms: playing.progress_ms.max(0),
             duration_ms: playing.duration_ms.max(0),
-            volume_percent: if connected { details.volume } else { None },
+            volume_percent: if connected {
+                details.effective_volume(std::time::Instant::now())
+            } else {
+                None
+            },
             supports_seek: true,
             supports_volume: true,
             status_text: if connecting {

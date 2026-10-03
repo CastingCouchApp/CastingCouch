@@ -1,4 +1,5 @@
 import { CommonMusicPlayer } from "../features/music/CommonMusicPlayer";
+import { MusicOverlaySettings } from "../features/music/MusicOverlaySettings";
 import { YouTubeMusicSetup } from "../features/music/YouTubeMusicSetup";
 import { SpotifyLibrary } from "../features/music/SpotifyLibrary";
 import { SceneMusic } from "../features/music/SceneMusic";
@@ -92,6 +93,7 @@ function MusicPage() {
                 provider={musicProvider(settings.data?.MusicPlayer)}
                 changingProvider={provider.isPending}
             />
+            <MusicOverlaySettings />
             {musicProvider(settings.data?.MusicPlayer) === "spotify" ? (
                 <>
                     <Card className="space-y-4">

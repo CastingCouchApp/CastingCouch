@@ -1,5 +1,31 @@
 use ccs_overlay_server::RealtimeHub;
 use serde_json::{json, Value};
+
+#[tokio::test]
+async fn disabled_music_writer_preserves_external_music_fields_in_file_and_http_snapshot() {
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("overlay-data.json");
+    tokio::fs::write(&file,json!({"music":{"title":"External","custom":42},"spotify":{"title":"Legacy"},"customRoot":true}).to_string()).await.unwrap();
+    let hub = RealtimeHub::new();
+    hub.live.merge_snapshot(&json!({"music":{"title":"App"},"spotify":{"title":"App"},"branding":{"channelName":"Channel"}}));
+    hub.live
+        .write_snapshot_with_music(&file, false)
+        .await
+        .unwrap();
+    let file_data: Value = serde_json::from_slice(&tokio::fs::read(&file).await.unwrap()).unwrap();
+    assert_eq!(file_data["music"]["title"], "External");
+    assert_eq!(file_data["spotify"]["title"], "Legacy");
+    assert_eq!(file_data["branding"]["channelName"], "Channel");
+    assert_eq!(hub.live.data.read().unwrap()["music"]["custom"], 42);
+    hub.live
+        .merge_snapshot(&json!({"music":{"title":"Enabled again"}}));
+    hub.live
+        .write_snapshot_with_music(&file, true)
+        .await
+        .unwrap();
+    let file_data: Value = serde_json::from_slice(&tokio::fs::read(&file).await.unwrap()).unwrap();
+    assert_eq!(file_data["music"]["title"], "Enabled again");
+}
 fn contains_fields(reference: &Value, actual: &Value, path: &str) {
     if let Some(map) = reference.as_object() {
         for (k, v) in map {
