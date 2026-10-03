@@ -453,6 +453,11 @@ export function listenMusicPlayer(onSnapshot: (snapshot: MusicPlayerSnapshot) =>
     return listenIfTauri<MusicPlayerSnapshot>("music-player-changed", onSnapshot);
 }
 
+export type ExtensionPackChange = { action: "installed" | "uninstalled" | "refresh"; packId: string };
+export function listenExtensionPacksChanged(onChange: (change: ExtensionPackChange) => void) {
+    return listenIfTauri<ExtensionPackChange>("extension-packs-changed", onChange);
+}
+
 export async function listenTwitchEvents(
     onEvent: (event: Record<string, unknown>) => void,
 ): Promise<() => void> {

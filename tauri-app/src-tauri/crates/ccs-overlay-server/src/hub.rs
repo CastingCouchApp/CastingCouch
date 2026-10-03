@@ -12,6 +12,7 @@ pub struct RealtimeHub {
     pub live: Arc<crate::live::LiveState>,
     pub obs: Arc<std::sync::RwLock<Option<Arc<dyn crate::ObsOverlayProvider>>>>,
     tx: broadcast::Sender<String>,
+    extension_tx: broadcast::Sender<crate::ExtensionPackChange>,
     clients: Arc<AtomicUsize>,
     sockets: Arc<RwLock<HashMap<Uuid, ()>>>,
 }
@@ -23,6 +24,7 @@ impl RealtimeHub {
             live: Arc::new(crate::live::LiveState::default()),
             obs: Arc::new(std::sync::RwLock::new(None)),
             tx,
+            extension_tx: broadcast::channel(32).0,
             clients: Arc::new(AtomicUsize::new(0)),
             sockets: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -34,6 +36,14 @@ impl RealtimeHub {
 
     pub fn subscribe(&self) -> broadcast::Receiver<String> {
         self.tx.subscribe()
+    }
+
+    pub fn subscribe_extension_changes(&self) -> broadcast::Receiver<crate::ExtensionPackChange> {
+        self.extension_tx.subscribe()
+    }
+    pub(crate) fn extension_changed(&self, change: crate::ExtensionPackChange) {
+        let _ = self.extension_tx.send(change.clone());
+        self.publish(&serde_json::json!({"source":"app","type":"app.overlay.extensions.changed","at":chrono::Utc::now().to_rfc3339(),"data":change}));
     }
 
     pub fn publish(&self, event: &Value) {

@@ -146,6 +146,9 @@ export type TwitchQuery =
   | { query: "redemptions"; rewardId: string; status?: string | null };
 // Generated from src-tauri/src/lib.rs. Run npm run contracts:generate.
 export type CommandInvocation =
+  | [command: "list_extension_packs", args?: Record<string, never>]
+  | [command: "import_extension_pack", args: { path: string }]
+  | [command: "uninstall_extension_pack", args: { id: string }]
   | [command: "list_profiles", args?: Record<string, never>]
   | [command: "create_profile", args: { name: string; description: string }]
   | [command: "update_profile", args: { id: string; name: string; description: string }]

@@ -1,5 +1,6 @@
 use super::*;
 pub(super) fn spawn_runtime(app: AppHandle) {
+    spawn_extension_pack_events(app.clone(), app.state::<AppState>().hub.clone());
     spawn_obs_data(app.clone());
     spawn_twitch_data(app.clone());
     spawn_watchdog(app.clone());

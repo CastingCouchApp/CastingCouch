@@ -2,6 +2,114 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 #[test]
+fn extension_commands_use_the_same_persistent_library_as_canvas_http() {
+    use std::io::{Cursor, Write};
+    use tauri::Listener;
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("test.zip");
+    let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    zip.start_file("manifest.json", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    zip.write_all(
+        json!({"id":"native-pack","name":"Native Pack","version":"1.0","apiVersion":1})
+            .to_string()
+            .as_bytes(),
+    )
+    .unwrap();
+    std::fs::write(&file, zip.finish().unwrap().into_inner()).unwrap();
+    let app = test_app(root.path().into());
+    let events = Arc::new(std::sync::Mutex::new(Vec::<Value>::new()));
+    let recorded = events.clone();
+    let listener = app.listen("extension-packs-changed", move |event| {
+        recorded
+            .lock()
+            .unwrap()
+            .push(serde_json::from_str(event.payload()).unwrap())
+    });
+    let forwarding =
+        spawn_extension_pack_events(app.handle().clone(), app.state::<AppState>().hub.clone());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    assert_eq!(
+        call(&window, "list_extension_packs", json!({})).unwrap(),
+        json!([])
+    );
+    let installed = call(
+        &window,
+        "import_extension_pack",
+        json!({"path":file.to_str().unwrap()}),
+    )
+    .unwrap();
+    assert_eq!(installed["id"], "native-pack");
+    assert_eq!(
+        call(&window, "list_extension_packs", json!({})).unwrap()[0]["version"],
+        "1.0"
+    );
+    tauri::async_runtime::block_on(async {
+        let state = app.state::<AppState>();
+        let server = OverlayServer::start(
+            state.settings.clone(),
+            state.paths.clone(),
+            state.hub.clone(),
+            0,
+        )
+        .await
+        .unwrap();
+        let base = format!("http://127.0.0.1:{}", server.port);
+        let data: Value = reqwest::get(format!("{base}/extensions"))
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(data["packs"][0]["id"], "native-pack");
+        std::fs::write(&file, b"invalid zip").unwrap();
+        assert!(call(
+            &window,
+            "import_extension_pack",
+            json!({"path":file.to_str().unwrap()})
+        )
+        .is_err());
+        assert!(call(
+            &window,
+            "import_extension_pack",
+            json!({"path":root.path().to_str().unwrap()})
+        )
+        .is_err());
+        assert_eq!(
+            call(&window, "list_extension_packs", json!({})).unwrap()[0]["version"],
+            "1.0"
+        );
+        call(
+            &window,
+            "uninstall_extension_pack",
+            json!({"id":"native-pack"}),
+        )
+        .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            while events.lock().unwrap().len() < 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let changes = events.lock().unwrap().clone();
+        assert_eq!(changes,json!([{"action":"installed","packId":"native-pack"},{"action":"uninstalled","packId":"native-pack"}]).as_array().unwrap().clone());
+        assert_eq!(
+            reqwest::get(format!("{base}/ext/native-pack/manifest.json"))
+                .await
+                .unwrap()
+                .status(),
+            404
+        );
+        server.stop();
+    });
+    forwarding.abort();
+    app.unlisten(listener);
+}
+
+#[test]
 fn spotify_commands_update_shared_state_and_overlay_through_native_ipc() {
     use ccs_modules::spotify::{SpotifyOAuthClient, SpotifyTokenRepository, SpotifyTokenSet};
     use ccs_secrets::MemorySecretStore;
@@ -740,6 +848,9 @@ fn test_app_with_spotify(
             get_settings,
             save_settings,
             list_profiles,
+            list_extension_packs,
+            import_extension_pack,
+            uninstall_extension_pack,
             create_profile,
             update_profile,
             import_profile,

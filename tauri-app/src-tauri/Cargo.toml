@@ -47,3 +47,4 @@ lto = true
 tauri = { version = "2", features = ["test"] }
 tempfile = "3"
 wiremock = "0.6"
+zip = { version = "2", default-features = false, features = ["deflate"] }

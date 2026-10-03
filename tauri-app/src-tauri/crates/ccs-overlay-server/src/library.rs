@@ -1,3 +1,4 @@
+use crate::pack_manifest;
 use serde_json::{json, Value};
 use std::{
     fs,
@@ -22,11 +23,25 @@ fn safe_segment(id: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 fn safe_relative(path: &str) -> bool {
-    !path.is_empty()
-        && !path.contains(['\\', ':'])
-        && path
-            .split('/')
-            .all(|s| !s.is_empty() && s != "." && s != "..")
+    pack_manifest::relative_path(path)
+}
+
+fn pack_files(root: &Path, relative: &Path, files: &mut Vec<String>) -> Result<()> {
+    for entry in fs::read_dir(root.join(relative)).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        let path = relative.join(entry.file_name());
+        if kind.is_dir() {
+            pack_files(root, &path, files)?;
+        } else if kind.is_file() {
+            files.push(
+                path.to_str()
+                    .ok_or("Ungültiger Dateiname")?
+                    .replace('\\', "/"),
+            );
+        }
+    }
+    Ok(())
 }
 fn ext(path: &str) -> String {
     Path::new(path)
@@ -149,17 +164,40 @@ impl MediaLibrary {
             if path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .is_some_and(safe_segment)
-                && path.is_dir()
+                .is_some_and(pack_manifest::slug)
+                && fs::symlink_metadata(&path)
+                    .map_err(|e| e.to_string())?
+                    .file_type()
+                    .is_dir()
             {
-                let mut manifest = read_json(&path.join("manifest.json"))?;
-                manifest["baseUrl"] = json!(format!(
-                    "/ext/{}/",
-                    manifest["id"].as_str().ok_or("Pack-ID fehlt")?
-                ));
-                result.push(manifest);
+                let parsed = (|| {
+                    let mut files = Vec::new();
+                    pack_files(&path, Path::new(""), &mut files)?;
+                    let manifest_file = files
+                        .iter()
+                        .find(|name| name.eq_ignore_ascii_case("manifest.json"))
+                        .ok_or("manifest.json fehlt")?;
+                    let mut manifest =
+                        pack_manifest::normalize(read_json(&path.join(manifest_file))?, &files)?;
+                    let id = manifest["id"].as_str().unwrap();
+                    if path.file_name().and_then(|n| n.to_str()) != Some(id) {
+                        return Err("Pack-ID passt nicht zum Ordner".into());
+                    }
+                    manifest["baseUrl"] = json!(format!("/ext/{id}/"));
+                    Ok::<_, String>(manifest)
+                })();
+                // Like C#, one damaged pack must not prevent loading the remaining catalog.
+                if let Ok(manifest) = parsed {
+                    result.push(manifest);
+                }
             }
         }
+        result.sort_by_key(|pack| {
+            (
+                pack["name"].as_str().unwrap_or("").to_lowercase(),
+                pack["id"].as_str().unwrap_or("").to_string(),
+            )
+        });
         Ok(result)
     }
     pub fn extension_path(&self, id: &str, path: &str) -> Result<PathBuf> {
@@ -190,12 +228,13 @@ impl MediaLibrary {
         let mut seen = std::collections::HashSet::new();
         for i in 0..archive.len() {
             let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
-            let name = entry.name().trim_end_matches('/').to_string();
+            let normalized = entry.name().replace('\\', "/");
+            let name = normalized.trim_end_matches('/').to_string();
             if !safe_relative(&name) || entry.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000)
             {
                 return Err("Unsicherer ZIP-Pfad".into());
             }
-            if entry.is_dir() {
+            if entry.is_dir() || normalized.ends_with('/') {
                 continue;
             }
             total = total.checked_add(entry.size()).ok_or("ZIP zu groß")?;
@@ -220,42 +259,21 @@ impl MediaLibrary {
             }
             files.push((name, bytes));
         }
-        let manifest_bytes = &files
+        let manifest_index = files
             .iter()
-            .find(|(name, _)| name == "manifest.json")
-            .ok_or("manifest.json fehlt")?
-            .1;
-        let manifest: Value = serde_json::from_slice(manifest_bytes).map_err(|e| e.to_string())?;
-        let id = manifest["id"].as_str().ok_or("Pack-ID fehlt")?;
-        if !safe_segment(id)
-            || !id
-                .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-            || manifest["apiVersion"] != 1
-            || manifest["name"].as_str().unwrap_or("").trim().is_empty()
-            || manifest["version"].as_str().unwrap_or("").trim().is_empty()
-        {
-            return Err("Ungültiges Pack-Manifest (apiVersion 1 erforderlich)".into());
-        }
-        for kind in ["widgets", "effects", "animations", "fonts"] {
-            if let Some(entries) = manifest.get(kind) {
-                let entries = entries.as_array().ok_or("Manifest-Liste erwartet")?;
-                let mut ids = std::collections::HashSet::new();
-                for entry in entries {
-                    let key = if kind == "fonts" { "src" } else { "entry" };
-                    let path = entry[key].as_str().ok_or("Manifest-Dateipfad fehlt")?;
-                    if !safe_relative(path) || !files.iter().any(|(name, _)| name == path) {
-                        return Err("Manifest referenziert fehlende oder unsichere Datei".into());
-                    }
-                    if kind != "fonts" {
-                        let item_id = entry["id"].as_str().ok_or("Modul-ID fehlt")?;
-                        if !safe_segment(item_id) || !ids.insert(item_id) {
-                            return Err("Ungültige oder doppelte Modul-ID".into());
-                        }
-                    }
-                }
-            }
-        }
+            .position(|(name, _)| name.eq_ignore_ascii_case("manifest.json"))
+            .ok_or("manifest.json fehlt")?;
+        files[manifest_index].0 = "manifest.json".into();
+        let manifest = pack_manifest::normalize(
+            serde_json::from_slice(&files[manifest_index].1).map_err(|e| e.to_string())?,
+            &files
+                .iter()
+                .map(|(name, _)| name.clone())
+                .collect::<Vec<_>>(),
+        )?;
+        files[manifest_index].1 =
+            serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
+        let id = manifest["id"].as_str().unwrap();
         let root = self.root.join("extensions");
         fs::create_dir_all(&root).map_err(|e| e.to_string())?;
         let staging = root.join(format!(".installing-{}", uuid::Uuid::new_v4()));

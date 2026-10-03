@@ -142,7 +142,10 @@ function registerPackFonts(packId: string, fonts: PackFont[] | undefined): void 
     const weight = font.weight || font.Weight || "400";
     const style = font.style || font.Style || "normal";
     const url = absoluteUrl(extUrl(packId, src));
-    css += `@font-face{font-family:${JSON.stringify(family)};src:url(${JSON.stringify(url)}) format("woff2");font-weight:${weight};font-style:${style};font-display:swap;}`;
+    const extension = src.split(/[?#]/)[0].split(".").pop()?.toLowerCase();
+    const format = ({ woff2: "woff2", woff: "woff", ttf: "truetype", otf: "opentype" } as Record<string, string>)[extension || ""];
+    const hint = format ? ` format(${JSON.stringify(format)})` : "";
+    css += `@font-face{font-family:${JSON.stringify(family)};src:url(${JSON.stringify(url)})${hint};font-weight:${weight};font-style:${style};font-display:swap;}`;
     try {
       const w = window as unknown as { __ccsPackFonts?: string[] };
       const list = w.__ccsPackFonts || [];

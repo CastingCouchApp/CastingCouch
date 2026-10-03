@@ -25,6 +25,25 @@ use tracing::{error, info, warn};
 
 const OBS_PASSWORD_SECRET_KEY: &str = "obs.password";
 
+fn extension_pack_service(state: &AppState) -> ccs_overlay_server::ExtensionPackService {
+    ccs_overlay_server::ExtensionPackService::new(&state.paths.overlay_root, state.hub.clone())
+}
+
+#[tauri::command]
+async fn list_extension_packs(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
+    extension_pack_service(&state).list().await
+}
+#[tauri::command]
+async fn import_extension_pack(state: State<'_, AppState>, path: String) -> Result<Value, String> {
+    extension_pack_service(&state)
+        .import(PathBuf::from(path))
+        .await
+}
+#[tauri::command]
+async fn uninstall_extension_pack(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    extension_pack_service(&state).uninstall(id).await
+}
+
 fn profile_store(state: &AppState) -> ccs_core::profiles::ProfileStore {
     ccs_core::profiles::ProfileStore::new(state.paths.data_root.join("Profiles"))
 }
@@ -1512,6 +1531,9 @@ pub fn run() {
             get_settings,
             save_settings,
             list_profiles,
+            list_extension_packs,
+            import_extension_pack,
+            uninstall_extension_pack,
             create_profile,
             update_profile,
             import_profile,
@@ -1944,6 +1966,30 @@ fn spawn_status_forward(app: AppHandle, mut rx: broadcast::Receiver<ServiceStatu
             }
         }
     });
+}
+
+fn spawn_extension_pack_events<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    hub: Arc<RealtimeHub>,
+) -> tauri::async_runtime::JoinHandle<()> {
+    let mut changes = hub.subscribe_extension_changes();
+    tauri::async_runtime::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
+        loop {
+            tokio::select! {
+                change=changes.recv()=>match change {
+                    Ok(change)=> {let _=app.emit("extension-packs-changed",change);},
+                    Err(broadcast::error::RecvError::Lagged(_))=> {
+                        let _=app.emit("extension-packs-changed",ccs_overlay_server::ExtensionPackChange {
+                            action:ccs_overlay_server::ExtensionPackAction::Refresh,pack_id:String::new()
+                        });
+                    },
+                    Err(broadcast::error::RecvError::Closed)=>break,
+                },
+                _=tick.tick()=>if app.try_state::<AppState>().is_none_or(|state|state.scene_music.is_closed()) {break;}
+            }
+        }
+    })
 }
 
 #[cfg(test)]

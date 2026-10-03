@@ -72,6 +72,21 @@ describe("loadExtensions (OBS-safe fetch inject)", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false })));
     await expect(loadExtensions()).resolves.toEqual([]);
   });
+
+  it("declares all allowed font formats correctly instead of treating TTF and OTF as WOFF2", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ok:true,json:async()=>({packs:[{
+      id:"font-kit",fonts:[
+        {family:"Woff2",src:"fonts/font.woff2"}, {family:"Woff",src:"fonts/font.woff"},
+        {family:"TrueType",src:"fonts/font.ttf"}, {family:"OpenType",src:"fonts/font.otf"}
+      ]
+    }]})})));
+    await loadExtensions();
+    const css=document.head.querySelector('style[data-ccs-ext-fonts="font-kit"]')?.textContent || "";
+    expect(css).toContain('font.woff2") format("woff2")');
+    expect(css).toContain('font.woff") format("woff")');
+    expect(css).toContain('font.ttf") format("truetype")');
+    expect(css).toContain('font.otf") format("opentype")');
+  });
 });
 
 describe("rewriteCssUrls / absoluteUrl", () => {

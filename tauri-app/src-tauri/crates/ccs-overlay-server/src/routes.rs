@@ -313,8 +313,12 @@ async fn library_call<T: Send + 'static>(
 
 async fn list_extensions(State(state): State<OverlayState>) -> Result<Json<Value>, ApiError> {
     Ok(Json(
-        json!({"packs":library_call(state, |lib| lib.packs()).await?}),
+        json!({"packs":extension_service(&state).list().await.map_err(api_error)?}),
     ))
+}
+
+fn extension_service(state: &OverlayState) -> crate::ExtensionPackService {
+    crate::ExtensionPackService::new(&state.paths.overlay_root, state.hub.clone())
 }
 
 async fn uploaded_file(mut multipart: Multipart) -> Result<(String, Vec<u8>), ApiError> {
@@ -336,7 +340,10 @@ async fn install_extension(
     let (_, bytes) = uploaded_file(multipart).await?;
 
     Ok(Json(
-        library_call(state, move |lib| lib.install_pack(&bytes)).await?,
+        extension_service(&state)
+            .install(bytes)
+            .await
+            .map_err(api_error)?,
     ))
 }
 
@@ -344,7 +351,10 @@ async fn delete_extension(
     Path(id): Path<String>,
     State(state): State<OverlayState>,
 ) -> Result<Json<Value>, ApiError> {
-    library_call(state, move |lib| lib.delete_pack(&id)).await?;
+    extension_service(&state)
+        .uninstall(id)
+        .await
+        .map_err(api_error)?;
 
     Ok(Json(json!({"ok":true})))
 }
