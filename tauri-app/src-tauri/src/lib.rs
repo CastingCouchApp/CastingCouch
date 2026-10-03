@@ -1202,6 +1202,19 @@ async fn obs_query(
 
 #[tauri::command]
 async fn obs_control(state: State<'_, AppState>, control: ObsControl) -> Result<Value, String> {
+    if matches!(control, ObsControl::StartStream) {
+        let _stream_gate = state.stream_end_gate.lock().await;
+        let _settings_gate = state.settings_mutation.lock().await;
+        if state.stream_end.snapshot().await.active {
+            return Err("Streamende läuft; zuerst im Assistenten abbrechen".into());
+        }
+        let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+        return state
+            .obs
+            .start_stream_with_scene(&settings.obs.start_scene)
+            .await
+            .map_err(|e| e.to_string());
+    }
     state.obs.control(control).await.map_err(|e| e.to_string())
 }
 #[tauri::command]
@@ -2753,3 +2766,5 @@ fn spawn_extension_pack_events<R: tauri::Runtime>(
 mod command_tests;
 #[cfg(test)]
 mod stream_end_boundary_tests;
+#[cfg(test)]
+mod stream_start_tests;

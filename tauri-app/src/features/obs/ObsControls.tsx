@@ -42,17 +42,25 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
               : action.includes("record")
                 ? "record"
                 : "stream";
-        return Boolean(status.data?.[key]) && !status.isError;
+        return (
+            typeof status.data?.[key]?.outputActive === "boolean" &&
+            !status.isError
+        );
     };
     const button = (action: OutputAction, label: string) => (
         <Button
             key={action}
             disabled={!enabled || control.isPending || !available(action)}
-            onClick={() =>
-                action === "stop_stream"
-                    ? setEnding(true)
-                    : control.mutate(action)
-            }
+            onClick={() => {
+                if (action === "stop_stream") {
+                    setEnding(true);
+                } else if (
+                    action !== "start_stream" ||
+                    window.confirm("OBS-Stream wirklich starten?")
+                ) {
+                    control.mutate(action);
+                }
+            }}
         >
             {label}
         </Button>
@@ -64,7 +72,9 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
                 <p>
                     {!enabled
                         ? "OBS nicht verbunden"
-                        : status.isError || !status.data?.stream
+                        : status.isError ||
+                            typeof status.data?.stream?.outputActive !==
+                                "boolean"
                           ? "Streamstatus unbekannt"
                           : status.data.stream.outputActive
                             ? "Stream läuft"

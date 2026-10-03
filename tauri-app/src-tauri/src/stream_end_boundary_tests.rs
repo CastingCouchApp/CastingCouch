@@ -146,7 +146,7 @@ fn native_raid_waits_for_actual_outgoing_proof_and_exposes_subscription_failure_
         let accepted = connections.clone();
         let (close_obs, mut obs_disconnect) = tokio::sync::mpsc::unbounded_channel::<()>();
         let obs_task = tokio::spawn(async move {
-            let mut active = true;
+            let mut active = false;
             for _ in 0..2 {
                 let (socket, _) = obs_listener.accept().await.unwrap();
                 accepted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -176,6 +176,9 @@ fn native_raid_waits_for_actual_outgoing_proof_and_exposes_subscription_failure_
                     if kind == "StopStream" {
                         active = false;
                         requested_stops.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    if kind == "StartStream" {
+                        active = true;
                     }
                     if matches!(kind, "StartStream" | "StopStream") {
                         ws.send(Message::Text(json!({"op":5,"d":{"eventType":"StreamStateChanged","eventData":{"outputActive":active,"outputState":if active {"OBS_WEBSOCKET_OUTPUT_STARTED"}else{"OBS_WEBSOCKET_OUTPUT_STOPPED"}}}}).to_string().into())).await.unwrap();
@@ -224,6 +227,12 @@ fn native_raid_waits_for_actual_outgoing_proof_and_exposes_subscription_failure_
         app.listen("twitch-event", move |event| {
             let _ = events.send(serde_json::from_str::<Value>(event.payload()).unwrap());
         });
+        call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"start_stream"}}),
+        )
+        .unwrap();
         assert!(
             !call(&window, "stream_end_snapshot", json!({})).unwrap()["outgoingRaid"]["available"]
                 .as_bool()
@@ -243,12 +252,6 @@ fn native_raid_waits_for_actual_outgoing_proof_and_exposes_subscription_failure_
         outgoing_denied.store(false, std::sync::atomic::Ordering::SeqCst);
         twitch.connect(&options).await.unwrap();
         assert!(twitch.outgoing_raid_subscription().await.available);
-        call(
-            &window,
-            "obs_control",
-            json!({"control":{"action":"start_stream"}}),
-        )
-        .unwrap();
         let reviewed = call(&window, "stream_end_snapshot", json!({})).unwrap()["original"].clone();
         let mut stale = reviewed.clone();
         stale["Obs"]["EndScene"] = json!("Different");

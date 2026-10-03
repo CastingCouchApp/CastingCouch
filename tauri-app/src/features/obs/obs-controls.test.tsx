@@ -28,6 +28,59 @@ function show() {
     );
 }
 describe("OBS output availability", () => {
+    it("keeps an incomplete stream-status response unknown and disables stream mutations", async () => {
+        invoke.mockReset();
+        invoke.mockResolvedValue({
+            stream: {},
+            record: { outputActive: false },
+        });
+        show();
+        await waitFor(() =>
+            expect(
+                screen.getByRole("button", { name: "Aufnahme starten" }),
+            ).toBeEnabled(),
+        );
+        expect(
+            await screen.findByText("Streamstatus unbekannt"),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Stream starten" }),
+        ).toBeDisabled();
+        expect(
+            screen.getByRole("button", { name: "Aufnahme starten" }),
+        ).toBeEnabled();
+    });
+    it("starts only after confirmation and reports an unsuccessful start without claiming live", async () => {
+        invoke.mockReset();
+        invoke.mockImplementation(async (command: string) => {
+            if (command === "obs_output_status")
+                return { stream: { outputActive: false } };
+            if (command === "obs_control")
+                throw Error("Startszene fehlt in OBS");
+            return null;
+        });
+        const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+        show();
+        const start = await screen.findByRole("button", {
+            name: "Stream starten",
+        });
+        await waitFor(() => expect(start).toBeEnabled());
+        fireEvent.click(start);
+        expect(confirm).toHaveBeenCalledWith("OBS-Stream wirklich starten?");
+        expect(
+            invoke.mock.calls.some(([command]) => command === "obs_control"),
+        ).toBe(false);
+        confirm.mockReturnValue(true);
+        fireEvent.click(start);
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+            "Startszene fehlt in OBS",
+        );
+        expect(invoke).toHaveBeenCalledWith("obs_control", {
+            control: { action: "start_stream" },
+        });
+        expect(screen.getByText("Stream gestoppt")).toBeInTheDocument();
+        confirm.mockRestore();
+    });
     it("opens the shared assistant and sends no OBS stop before an explicit choice", async () => {
         invoke.mockReset();
         invoke.mockImplementation(async (command: string, args: any) => {

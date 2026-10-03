@@ -119,6 +119,28 @@ impl ObsControl {
 }
 
 impl ObsClient {
+    /// User-approved app start: select the configured scene before starting OBS.
+    /// Session and music remain driven by actual OBS output events/status.
+    pub async fn start_stream_with_scene(&self, scene: &str) -> ModuleResult<Value> {
+        let status = self.send_request("GetStreamStatus", None).await?;
+        match status["outputActive"].as_bool() {
+            Some(false) => {}
+            Some(true) => {
+                return Err(crate::ModuleError::Message(
+                    "OBS-Stream läuft bereits".into(),
+                ))
+            }
+            None => {
+                return Err(crate::ModuleError::Message(
+                    "OBS-Streamstatus unbekannt".into(),
+                ))
+            }
+        }
+        if !scene.trim().is_empty() {
+            self.set_current_program_scene(scene).await?;
+        }
+        self.control(ObsControl::StartStream).await
+    }
     pub async fn control(&self, control: ObsControl) -> ModuleResult<Value> {
         let (name, data) = control.request();
         self.send_request(name, Some(data)).await
