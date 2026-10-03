@@ -19,6 +19,8 @@ struct Active {
     scene: String,
     #[serde(default)]
     seen: HashSet<String>,
+    #[serde(default)]
+    track: Option<String>,
     #[serde(skip)]
     recovered: bool,
 }
@@ -39,6 +41,12 @@ struct State {
     blocked: Option<String>,
     #[serde(skip)]
     ids: HashMap<PathBuf, HashSet<String>>,
+    #[serde(skip)]
+    metrics: Value,
+    #[serde(skip)]
+    settings: Value,
+    #[serde(skip)]
+    stream_transition: Option<DateTime<Utc>>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -49,6 +57,9 @@ impl Default for State {
             error: None,
             blocked: None,
             ids: HashMap::new(),
+            metrics: Value::Null,
+            settings: Value::Null,
+            stream_transition: None,
         }
     }
 }
@@ -77,6 +88,7 @@ impl StreamHistoryRuntime {
                 _=>State{blocked:Some("Gespeicherte aktive Sitzung ist beschädigt oder hat ein unbekanntes Format; die Datei bleibt erhalten. Sicherung und Reparatur erforderlich.".into()),..Default::default()},
             },
             Err(error) if error.kind()==std::io::ErrorKind::NotFound=>State::default(),
+            Err(error) if error.kind()==std::io::ErrorKind::NotADirectory=>State{error:Some(format!("Sitzungsverzeichnis nicht verfügbar: {error}")),..Default::default()},
             Err(error)=>State{blocked:Some(format!("Aktive Sitzung konnte nicht geladen werden: {error}")),..Default::default()},
         };
         if state.active.as_ref().is_some_and(|a| {
@@ -84,7 +96,28 @@ impl StreamHistoryRuntime {
                 || parse_at(&a.row["StartedAt"]).is_none()
                 || a.row["SessionId"].as_str().is_none()
                 || a.row["ViewerSamples"].as_array().is_none()
-        }) {
+                || !valid_session(&a.row)
+        }) || state
+            .pending
+            .iter()
+            .any(|pending| match pending.kind.as_str() {
+                "session" => {
+                    !valid_session(&pending.record)
+                        || parse_at(&pending.record["StartedAt"]).is_none()
+                        || pending.record["SessionId"]
+                            .as_str()
+                            .is_none_or(str::is_empty)
+                }
+                "journal" => {
+                    !valid_month(&pending.month)
+                        || parse_at(&pending.record["TimestampUtc"]).is_none()
+                        || ["EventId", "SessionId", "Type"]
+                            .iter()
+                            .any(|key| pending.record[*key].as_str().is_none_or(str::is_empty))
+                }
+                _ => true,
+            })
+        {
             state = State {
                 blocked: Some("Ungültiger Sitzungs-Checkpoint; Datei bleibt erhalten.".into()),
                 ..Default::default()
@@ -104,12 +137,75 @@ impl StreamHistoryRuntime {
         settings: &Value,
         now: DateTime<Utc>,
     ) -> Result<bool, String> {
+        self.observe_internal(data, metrics, settings, now, None, false)
+    }
+    pub fn update_context(&self, metrics: &Value, settings: &Value) -> Result<(), String> {
         let mut state = self.state.lock().unwrap();
         if let Some(error) = &state.blocked {
             return Err(error.clone());
         }
+        state.metrics = metrics.clone();
+        state.settings = settings.clone();
+        Ok(())
+    }
+    pub fn begin_poll(&self) -> DateTime<Utc> {
+        Utc::now()
+    }
+    pub fn observe_polled_now(
+        &self,
+        data: &Value,
+        metrics: &Value,
+        settings: &Value,
+        requested_at: DateTime<Utc>,
+    ) -> Result<bool, String> {
+        self.observe_polled(data, metrics, settings, requested_at, Utc::now())
+    }
+    pub fn observe_polled(
+        &self,
+        data: &Value,
+        metrics: &Value,
+        settings: &Value,
+        requested_at: DateTime<Utc>,
+        now: DateTime<Utc>,
+    ) -> Result<bool, String> {
+        self.observe_internal(data, metrics, settings, now, Some(requested_at), false)
+    }
+    fn observe_internal(
+        &self,
+        data: &Value,
+        metrics: &Value,
+        settings: &Value,
+        now: DateTime<Utc>,
+        requested_at: Option<DateTime<Utc>>,
+        stream_event: bool,
+    ) -> Result<bool, String> {
+        let mut state = self.state.lock().unwrap();
+        let stale = requested_at.is_some_and(|requested| {
+            state
+                .stream_transition
+                .is_some_and(|event| event > requested)
+        });
+        if stream_event {
+            state.stream_transition = Some(now);
+        }
+        let merged = if !stale && (requested_at.is_some() || stream_event) {
+            Some(self.hub.live.merge_snapshot(data))
+        } else {
+            None
+        };
+        let data = merged.as_ref().unwrap_or(data);
+        // History protection must not suppress independent live OBS state.
+        if let Some(error) = &state.blocked {
+            return Err(error.clone());
+        }
+        state.metrics = metrics.clone();
+        state.settings = settings.clone();
+        let previous_active = state.active.as_ref().map(|active| active.row.clone());
+        if let Some(active) = &mut state.active {
+            refresh_metadata(active, metrics);
+        }
         let mut changed = false;
-        if data["stream"]["available"] == true {
+        if !stale && data["stream"]["available"] == true {
             let live = data["stream"]["isLive"] == true;
             let elapsed = data["stream"]["elapsedSeconds"]
                 .as_i64()
@@ -154,6 +250,7 @@ impl StreamHistoryRuntime {
                     follower_start: None,
                     scene: String::new(),
                     seen: HashSet::new(),
+                    track: None,
                     recovered: false,
                 });
                 changed = true;
@@ -172,26 +269,15 @@ impl StreamHistoryRuntime {
                 .unwrap_or(&active.scene)
                 .to_string();
             let started = parse_at(&active.row["StartedAt"]).unwrap_or(now);
-            active.row["ObservationAvailable"] = json!(data["stream"]["available"] == true);
+            if !stale {
+                active.row["ObservationAvailable"] = json!(data["stream"]["available"] == true);
+            }
             active.row["DurationSeconds"] =
                 json!((active.last_observed - started).num_seconds().max(0));
             if metrics["connected"] == true {
-                if metrics["channelError"].is_null() {
-                    if let Some(title) = metrics["title"].as_str() {
-                        active.row["Title"] = json!(title);
-                    }
-                    if let Some(category) = metrics["category"].as_str() {
-                        active.row["Category"] = json!(category);
-                    }
-                }
-                if metrics["followers"]["error"].is_null() {
-                    if let Some(followers) = metrics["followers"]["value"].as_u64() {
-                        let baseline = *active.follower_start.get_or_insert(followers);
-                        active.row["FollowersGained"] = json!(followers.saturating_sub(baseline));
-                        active.row["FollowersKnown"] = json!(true);
-                    }
-                }
+                refresh_metadata(active, metrics);
                 if metrics["viewerCount"]["error"].is_null()
+                    && !stale
                     && data["stream"]["available"] == true
                     && data["stream"]["isLive"] == true
                 {
@@ -229,6 +315,7 @@ impl StreamHistoryRuntime {
         if let Some((id, payload, at)) = viewer_event {
             queue_event(&mut state, &id, "twitch.viewer.sample", payload, at);
         }
+        changed |= previous_active != state.active.as_ref().map(|active| active.row.clone());
         self.apply_stats(&state);
         let result = self.flush_locked(&mut state);
         if changed || result.is_err() {
@@ -238,6 +325,39 @@ impl StreamHistoryRuntime {
         Ok(changed)
     }
     pub fn record(&self, event: &Value) {
+        // Overlay track notifications intentionally carry reduced metadata. The player
+        // snapshot owns journal capture, even when music overlay output is disabled.
+        if event["type"] == "app.music.track" {
+            return;
+        }
+        self.record_event(event);
+    }
+    pub fn observe_stream_event(&self, active: bool, at: DateTime<Utc>) -> Result<bool, String> {
+        let (metrics, settings) = {
+            let state = self.state.lock().unwrap();
+            (state.metrics.clone(), state.settings.clone())
+        };
+        let mut data = json!({"obs":{"outputs":{"stream":{"outputActive":active}}},"stream":{"available":true,"isLive":active}});
+        if active {
+            data["obs"]["outputs"]["stream"]["outputDuration"] = json!(0);
+            data["stream"]["elapsedSeconds"] = json!(0);
+        }
+        self.observe_internal(&data, &metrics, &settings, at, None, true)
+    }
+    pub fn record_music(
+        &self,
+        music: &crate::music_player::MusicPlayerSnapshot,
+        now: DateTime<Utc>,
+    ) {
+        if !music.connected || music.title.trim().is_empty() {
+            return;
+        }
+        self.record_event(&json!({"source":"app","type":"session.music.track","at":now.to_rfc3339(),"data":{"provider":music.provider,"title":music.title,"artist":music.artist,"album":music.album,"isPlaying":music.is_playing}}));
+    }
+    pub fn record_music_now(&self, music: &crate::music_player::MusicPlayerSnapshot) {
+        self.record_music(music, Utc::now());
+    }
+    fn record_event(&self, event: &Value) {
         let mut state = self.state.lock().unwrap();
         if state.blocked.is_some() {
             return;
@@ -247,7 +367,8 @@ impl StreamHistoryRuntime {
         };
         let kind = event["type"].as_str().unwrap_or("");
         let source = event["source"].as_str().unwrap_or("");
-        if source != "twitch" && !matches!(kind, "app.alert" | "app.obs.scene" | "app.music.track")
+        if source != "twitch"
+            && !matches!(kind, "app.alert" | "app.obs.scene" | "session.music.track")
         {
             return;
         }
@@ -256,15 +377,32 @@ impl StreamHistoryRuntime {
             .or_else(|| event["data"]["message_id"].as_str())
             .unwrap_or("");
         let event_id = event["data"]["eventSubMessageId"].as_str().unwrap_or("");
-        let key = if !event_id.is_empty() {
-            Some(format!("event:{event_id}"))
-        } else if kind == "channel.chat.message" && !message.is_empty() {
-            Some(format!("chat:{message}"))
-        } else {
-            None
-        };
-        if key.is_some_and(|key| !active.seen.insert(key)) {
+        let mut keys = vec![];
+        if !event_id.is_empty() {
+            keys.push(format!("event:{event_id}"));
+        }
+        if kind == "channel.chat.message" && !message.is_empty() {
+            keys.push(format!("chat:{message}"));
+        }
+        if keys.iter().any(|key| active.seen.contains(key)) {
+            // The live hub receives the envelope before journal capture. Restore
+            // authoritative counters when an EventSub delivery is repeated.
+            self.apply_stats(&state);
             return;
+        }
+        active.seen.extend(keys);
+        if kind == "session.music.track" {
+            let signature = json!([
+                event["data"]["provider"],
+                event["data"]["artist"],
+                event["data"]["title"],
+                event["data"]["album"]
+            ])
+            .to_string();
+            if active.track.as_ref() == Some(&signature) {
+                return;
+            }
+            active.track = Some(signature);
         }
         let at = parse_at(&event["at"]).unwrap_or_else(Utc::now);
         let metric = match kind {
@@ -287,25 +425,39 @@ impl StreamHistoryRuntime {
             .and_then(|s| s.last())
             .and_then(|s| s["ViewerCount"].as_u64())
             .unwrap_or(0);
-        let mut payload = json!({"type":kind,"summary":event["summary"],"scene":active.scene,"viewers":viewers,"event":event});
-        let journal_kind = if kind == "channel.chat.message" {
-            payload["user"] = event["data"]
+        let (journal_kind, payload) = if kind == "channel.chat.message" {
+            let user = event["data"]
                 .get("userName")
                 .or_else(|| event["data"].get("chatter_user_name"))
                 .cloned()
                 .unwrap_or(Value::Null);
-            "twitch.chat.message"
+            (
+                "twitch.chat.message",
+                json!({"user":user,"scene":active.scene,"viewers":viewers}),
+            )
         } else if source == "twitch" {
-            "twitch.event"
+            (
+                "twitch.event",
+                json!({"type":kind,"summary":event["summary"],"scene":active.scene,"viewers":viewers}),
+            )
         } else if kind == "app.obs.scene" {
-            payload["scene"] = event["data"]["scene"].clone();
-            "obs.scene.changed"
-        } else if kind == "app.music.track" {
-            payload["title"] = event["data"]["title"].clone();
-            payload["artist"] = event["data"]["artist"].clone();
-            "spotify.track.changed"
+            if let Some(scene) = event["data"]["scene"].as_str() {
+                active.scene = scene.into();
+            }
+            (
+                "obs.scene.changed",
+                json!({"scene":active.scene,"viewers":viewers}),
+            )
+        } else if kind == "session.music.track" {
+            (
+                "spotify.track.changed",
+                json!({"title":event["data"]["title"],"artist":event["data"]["artist"],"album":event["data"]["album"],"isPlaying":event["data"]["isPlaying"],"scene":active.scene,"viewers":viewers}),
+            )
         } else {
-            "alert.played"
+            (
+                "alert.played",
+                json!({"type":kind,"summary":event["summary"],"scene":active.scene,"viewers":viewers}),
+            )
         };
         queue_event(&mut state, &id, journal_kind, payload, at);
         if kind == "channel.follow" {
@@ -313,7 +465,7 @@ impl StreamHistoryRuntime {
                 &mut state,
                 &id,
                 "twitch.follow",
-                json!({"Summary":event["summary"],"event":event}),
+                json!({"Summary":event["summary"]}),
                 at,
             );
         }
@@ -332,6 +484,9 @@ impl StreamHistoryRuntime {
         });
         if let Some(row) = row {
             let mut data = self.hub.live.data.write().unwrap();
+            data["stream"]["elapsedSeconds"] = row["DurationSeconds"].clone();
+            data["stream"]["startedAt"] = row["StartedAt"].clone();
+            data["stream"]["endedAt"] = row["EndedAt"].clone();
             for (field, key) in [
                 ("DurationSeconds", "streamTimeSeconds"),
                 ("PeakViewers", "peakViewers"),
@@ -482,19 +637,29 @@ impl StreamHistoryRuntime {
         {
             return Err("Exportziel muss eine CSV- oder HTML-Datei sein.".into());
         }
-        let snapshot = self.snapshot(None)?;
+        let rows = read_jsonl(&self.root.join("StreamHistory/history.jsonl"), &mut vec![]);
         let bytes = if format == "csv" {
-            csv(&snapshot.sessions)
+            csv(&rows)
         } else {
-            html(&snapshot.sessions, &snapshot.statistics)
+            let rows = rows
+                .into_iter()
+                .filter(|row| valid_session(row) && parse_at(&row["StartedAt"]).is_some())
+                .collect::<Vec<_>>();
+            if rows.is_empty() {
+                return Err(
+                    "Für einen Stream-Report werden abgeschlossene Streams benötigt.".into(),
+                );
+            }
+            html(&rows, &statistics(&rows))
         };
         checkpoint(path, format!("\u{feff}{bytes}").as_bytes())
     }
     pub fn latest_summary(&self) -> Result<String, String> {
-        let snapshot = self.snapshot(None)?;
-        let row = snapshot
-            .sessions
-            .first()
+        let rows = read_jsonl(&self.root.join("StreamHistory/history.jsonl"), &mut vec![]);
+        let row = rows
+            .iter()
+            .rev()
+            .find(|row| valid_session(row) && parse_at(&row["StartedAt"]).is_some())
             .ok_or("Noch kein abgeschlossener Stream gespeichert.")?;
         let start = parse_at(&row["StartedAt"])
             .map(|t| t.with_timezone(&Local).format("%d.%m.%Y").to_string())
@@ -521,6 +686,26 @@ fn finish(state: &mut State, at: DateTime<Utc>, interrupted: bool) {
             month: String::new(),
             record: active.row,
         });
+    }
+}
+fn refresh_metadata(active: &mut Active, metrics: &Value) {
+    if metrics["connected"] != true {
+        return;
+    }
+    if metrics["channelError"].is_null() {
+        if let Some(title) = metrics["title"].as_str() {
+            active.row["Title"] = json!(title);
+        }
+        if let Some(category) = metrics["category"].as_str() {
+            active.row["Category"] = json!(category);
+        }
+    }
+    if metrics["followers"]["error"].is_null() {
+        if let Some(followers) = metrics["followers"]["value"].as_u64() {
+            let baseline = *active.follower_start.get_or_insert(followers);
+            active.row["FollowersGained"] = json!(followers.saturating_sub(baseline));
+            active.row["FollowersKnown"] = json!(true);
+        }
     }
 }
 fn queue_event(state: &mut State, id: &str, kind: &str, payload: Value, at: DateTime<Utc>) {
@@ -759,7 +944,7 @@ fn csv(rows: &[Value]) -> String {
         "Title",
     ];
     let mut lines = vec![keys.join(";")];
-    for row in rows.iter().rev() {
+    for row in rows {
         lines.push(
             keys.iter()
                 .map(|k| text(&row[*k]).replace(';', ",").replace(['\r', '\n'], " "))
@@ -778,8 +963,10 @@ fn html(rows: &[Value], stats: &Value) -> String {
             .replace('"', "&quot;")
             .replace('\'', "&#39;")
     }
-    let table=rows.iter().take(50).map(|r|format!("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{:.1}</td><td>{}</td><td>{}</td></tr>",h(&r["StartedAt"]),h(&r["Title"]),h(&r["Category"]),duration_hms(numeric(&r["DurationSeconds"])),numeric(&r["PeakViewers"]),r["AverageViewers"].as_f64().unwrap_or(0.0),numeric(&r["FollowersGained"]),numeric(&r["ChatMessages"]))).collect::<Vec<_>>().join("");
-    let recent = rows.iter().take(5).collect::<Vec<_>>();
+    let mut ordered = rows.iter().collect::<Vec<_>>();
+    ordered.sort_by(|a, b| parse_at(&b["StartedAt"]).cmp(&parse_at(&a["StartedAt"])));
+    let table=ordered.iter().take(50).map(|r|format!("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{:.1}</td><td>{}</td><td>{}</td></tr>",parse_at(&r["StartedAt"]).map(|t|t.with_timezone(&Local).format("%d.%m.%Y %H:%M").to_string()).unwrap_or_else(||"-".into()),h(&r["Title"]),h(&r["Category"]),duration_hms(numeric(&r["DurationSeconds"])),numeric(&r["PeakViewers"]),r["AverageViewers"].as_f64().unwrap_or(0.0),numeric(&r["FollowersGained"]),numeric(&r["ChatMessages"]))).collect::<Vec<_>>().join("");
+    let recent = ordered.iter().take(5).collect::<Vec<_>>();
     let avg = if recent.is_empty() {
         0.0
     } else {
@@ -789,24 +976,40 @@ fn html(rows: &[Value], stats: &Value) -> String {
             .sum::<f64>()
             / recent.len() as f64
     };
-    let best = stats["categories"]
-        .as_array()
-        .and_then(|cs| {
-            cs.iter()
-                .filter(|c| c["name"] != "Nicht angegeben" && c["name"] != "-")
-                .max_by(|a, b| {
-                    a["averageViewers"]
-                        .as_f64()
-                        .unwrap_or(0.0)
-                        .total_cmp(&b["averageViewers"].as_f64().unwrap_or(0.0))
-                })
-        })
-        .map(|c| h(&c["name"]))
+    let recent_peak = if recent.is_empty() {
+        0.0
+    } else {
+        recent
+            .iter()
+            .map(|r| numeric(&r["PeakViewers"]) as f64)
+            .sum::<f64>()
+            / recent.len() as f64
+    };
+    // The C# report intentionally groups case-sensitively and uses raw means,
+    // while the statistics page combines categories and rounds individual means.
+    let mut categories: Vec<(String, f64, usize)> = vec![];
+    for row in rows {
+        let name = text(&row["Category"]);
+        if name.trim().is_empty() || name == "-" {
+            continue;
+        }
+        let average = row["AverageViewers"].as_f64().unwrap_or(0.0);
+        if let Some(category) = categories.iter_mut().find(|c| c.0 == name) {
+            category.1 += average;
+            category.2 += 1;
+        } else {
+            categories.push((name, average, 1));
+        }
+    }
+    categories.sort_by(|a, b| (b.1 / b.2 as f64).total_cmp(&(a.1 / a.2 as f64)));
+    let best = categories
+        .first()
+        .map(|c| h(&json!(c.0)))
         .unwrap_or_else(|| "-".into());
     let hours = stats["totalSeconds"].as_f64().unwrap_or(0.0) / 3600.0;
     let chat = rows
         .iter()
         .map(|r| numeric(&r["ChatMessages"]))
         .sum::<u64>();
-    format!("<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><title>Twitch Stream-Report</title><style>body{{font-family:Segoe UI,Arial;background:#0b1014;color:#eef3f6;margin:32px}}table{{width:100%;border-collapse:collapse}}th,td{{padding:10px;border-bottom:1px solid #2a3740;text-align:left}}</style></head><body><h1>CastingCouch – Twitch Stream-Report</h1><p>Streams: {} · Rekord-Peak: {} · Bestes Ø: {:.1} · Livezeit: {} · Follower: {} · Chat / Std.: {:.1}</p><h2>Auswertung</h2><p>Die letzten {} Streams erreichten durchschnittlich {:.1} Zuschauer. Beste Kategorie nach Zuschauerdurchschnitt: {best}.</p><h2>Letzte Streams</h2><table><thead><tr><th>Start</th><th>Titel</th><th>Kategorie</th><th>Dauer</th><th>Peak</th><th>Ø</th><th>Follower</th><th>Chat</th></tr></thead><tbody>{table}</tbody></table></body></html>",rows.len(),numeric(&stats["peakViewers"]),rows.iter().map(|r|r["AverageViewers"].as_f64().unwrap_or(0.0)).fold(0.0,f64::max),h(&stats["totalDuration"]),numeric(&stats["followers"]),if hours>0.0{chat as f64/hours}else{0.0},recent.len(),avg)
+    format!("<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><title>Twitch Stream-Report</title><style>body{{font-family:Segoe UI,Arial;background:#0b1014;color:#eef3f6;margin:32px}}table{{width:100%;border-collapse:collapse}}th,td{{padding:10px;border-bottom:1px solid #2a3740;text-align:left}}</style></head><body><h1>CastingCouch – Twitch Stream-Report</h1><p>Streams: {} · Rekord-Peak: {} · Bestes Ø: {:.1} · Livezeit: {} · Follower: {} · Chat / Std.: {:.1}</p><h2>Auswertung</h2><p>Die letzten {} Streams erreichten durchschnittlich {:.1} Zuschauer bei einem mittleren Peak von {recent_peak:.1}. Beste Kategorie nach Zuschauerdurchschnitt: <strong>{best}</strong>.</p><h2>Letzte Streams</h2><table><thead><tr><th>Start</th><th>Titel</th><th>Kategorie</th><th>Dauer</th><th>Peak</th><th>Ø</th><th>Follower</th><th>Chat</th></tr></thead><tbody>{table}</tbody></table></body></html>",rows.len(),numeric(&stats["peakViewers"]),rows.iter().map(|r|r["AverageViewers"].as_f64().unwrap_or(0.0)).fold(0.0,f64::max),h(&stats["totalDuration"]),numeric(&stats["followers"]),if hours>0.0{chat as f64/hours}else{0.0},recent.len(),avg)
 }

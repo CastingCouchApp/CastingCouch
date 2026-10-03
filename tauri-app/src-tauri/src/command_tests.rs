@@ -1,6 +1,167 @@
 use super::*;
 
 #[test]
+fn native_obs_commands_capture_immediate_session_events_and_forward_history_changes() {
+    use futures_util::{SinkExt, StreamExt};
+    use tauri::Listener;
+    use tokio_tungstenite::tungstenite::Message;
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let (changed, mut received) = tokio::sync::mpsc::unbounded_channel();
+        let listener = app.listen("stream-history-changed", move |event| {
+            let _ = changed.send(event.payload().to_string());
+        });
+        runtime::spawn_stream_history_events(app.handle().clone(), state.stream_history.clone());
+        let server = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = server.local_addr().unwrap().port();
+        let task = tokio::spawn(async move {
+            let (socket, _) = server.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_async(socket).await.unwrap();
+            ws.send(Message::Text(
+                json!({"op":0,"d":{"obsWebSocketVersion":"5.6.0","rpcVersion":1}})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            ws.next().await.unwrap().unwrap();
+            ws.send(Message::Text(
+                json!({"op":2,"d":{"negotiatedRpcVersion":1}})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            while let Some(Ok(Message::Text(text))) = ws.next().await {
+                let request: Value = serde_json::from_str(&text).unwrap();
+                let kind = request["d"]["requestType"].as_str().unwrap();
+                if matches!(kind, "StartStream" | "StopStream") {
+                    ws.send(Message::Text(json!({"op":5,"d":{"eventType":"StreamStateChanged","eventData":{"outputActive":kind=="StartStream","outputState":if kind=="StartStream" {"OBS_WEBSOCKET_OUTPUT_STARTED"}else{"OBS_WEBSOCKET_OUTPUT_STOPPED"}}}}).to_string().into())).await.unwrap();
+                }
+                let data = if kind == "GetSceneList" {
+                    json!({"currentProgramSceneName":"Live","scenes":[]})
+                } else {
+                    json!({})
+                };
+                ws.send(Message::Text(json!({"op":7,"d":{"requestId":request["d"]["requestId"],"requestType":kind,"requestStatus":{"result":true,"code":100},"responseData":data}}).to_string().into())).await.unwrap();
+            }
+        });
+        state
+            .obs
+            .connect_simple("127.0.0.1", port, None, false)
+            .await
+            .unwrap();
+        call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"start_stream"}}),
+        )
+        .unwrap();
+        assert!(call(&window, "stream_history_snapshot", json!({})).unwrap()["active"].is_object());
+        state.bridge.from_twitch(
+            "channel.subscription.message",
+            "ReSub",
+            chrono::Utc::now(),
+            Default::default(),
+        );
+        call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"stop_stream"}}),
+        )
+        .unwrap();
+        let snapshot = call(&window, "stream_history_snapshot", json!({})).unwrap();
+        assert!(snapshot["active"].is_null());
+        assert_eq!(snapshot["sessions"][0]["NewSubscriptions"], 1);
+        let notification = tokio::time::timeout(std::time::Duration::from_secs(2), received.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&notification).unwrap(),
+            json!({"changed":true})
+        );
+        state.obs.disconnect().await.unwrap();
+        task.await.unwrap();
+        app.unlisten(listener);
+    });
+}
+
+#[test]
+fn music_history_is_independent_of_overlay_output_and_ignores_pause_cover_and_duplicate_events() {
+    use chrono::TimeZone;
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let at = chrono::Utc.with_ymd_and_hms(2026, 10, 3, 10, 0, 0).unwrap();
+        state
+            .stream_history
+            .observe(
+                &json!({"stream":{"available":true,"isLive":true},"obs":{"currentScene":"Live"}}),
+                &json!({"connected":true,"viewerCount":{"value":7,"at":at.to_rfc3339()}}),
+                &json!({}),
+                at,
+            )
+            .unwrap();
+        let mut settings = state.settings.load().await.unwrap();
+        settings.spotify.extra["OverlayEnabled"] = json!(false);
+        let mut music = ccs_modules::music_player::MusicPlayerSnapshot {
+            provider: "spotify".into(),
+            connected: true,
+            title: "Song".into(),
+            artist: "Artist".into(),
+            album: "Album".into(),
+            is_playing: true,
+            ..Default::default()
+        };
+        let data = runtime::update_music_data(&state, &music, &settings);
+        assert_eq!(data["overlayEnabled"], false);
+        music.is_playing = false;
+        music.cover_url = "cover-changed".into();
+        runtime::update_music_data(&state, &music, &settings);
+        state
+            .bridge
+            .app_music_track("spotify", "Song", "Artist", "cover-changed");
+        let snapshot = call(&window, "stream_history_snapshot", json!({})).unwrap();
+        let events = snapshot["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["Type"] == "spotify.track.changed")
+            .collect::<Vec<_>>();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0]["Payload"],
+            json!({"title":"Song","artist":"Artist","album":"Album","isPlaying":true,"scene":"Live","viewers":7})
+        );
+        music.album = "Another album".into();
+        runtime::update_music_data(&state, &music, &settings);
+        music.connected = false;
+        music.title = "Stale".into();
+        runtime::update_music_data(&state, &music, &settings);
+        let snapshot = call(&window, "stream_history_snapshot", json!({})).unwrap();
+        assert_eq!(
+            snapshot["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|e| e["Type"] == "spotify.track.changed")
+                .count(),
+            2
+        );
+    });
+}
+
+#[test]
 fn stream_history_commands_read_capture_export_and_restore_across_native_ipc() {
     use chrono::TimeZone;
     use std::collections::BTreeMap;
@@ -1959,6 +2120,7 @@ fn test_app_with_clients(
         hub.clone(),
     ));
     bridge.set_stream_history(stream_history.clone());
+    runtime::bind_stream_history(&obs, stream_history.clone());
     let music_overlay = Arc::new(ccs_modules::music_overlay::MusicOverlayRuntime::new(
         settings.clone(),
         obs.clone(),
@@ -2045,6 +2207,7 @@ fn test_app_with_clients(
             overlay_runtime_status,
             setup_overlay_source,
             obs_query,
+            obs_control,
             open_overlay_editor,
             test_alert,
             upsert_alert,

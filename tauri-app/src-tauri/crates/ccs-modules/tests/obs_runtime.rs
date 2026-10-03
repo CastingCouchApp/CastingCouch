@@ -44,6 +44,22 @@ async fn server(
             let req: Value = serde_json::from_str(&text).unwrap();
             let d = &req["d"];
             let kind = d["requestType"].as_str().unwrap_or("");
+            if fail == "StreamEvents" && matches!(kind, "StartStream" | "StopStream") {
+                for phase in [
+                    if kind == "StartStream" {
+                        "OBS_WEBSOCKET_OUTPUT_STARTING"
+                    } else {
+                        "OBS_WEBSOCKET_OUTPUT_STOPPING"
+                    },
+                    if kind == "StartStream" {
+                        "OBS_WEBSOCKET_OUTPUT_STARTED"
+                    } else {
+                        "OBS_WEBSOCKET_OUTPUT_STOPPED"
+                    },
+                ] {
+                    ws.send(Message::Text(json!({"op":5,"d":{"eventType":"StreamStateChanged","eventData":{"outputActive":kind=="StartStream","outputState":phase}}}).to_string().into())).await.unwrap();
+                }
+            }
             recorded.lock().unwrap().push(d.clone());
             let failed = kind == fail
                 || (fail == "HideSources"
@@ -90,6 +106,50 @@ async fn server(
         .await
         .unwrap();
     (obs, requests, task)
+}
+#[tokio::test]
+async fn actual_obs_stream_events_capture_short_sessions_before_any_status_poll() {
+    use ccs_modules::stream_history::StreamHistoryRuntime;
+    let root = tempfile::tempdir().unwrap();
+    let hub = Arc::new(RealtimeHub::new());
+    let history = Arc::new(StreamHistoryRuntime::new(root.path().into(), hub.clone()));
+    let bridge = OverlayEventBridge::new(hub.clone());
+    bridge.set_stream_history(history.clone());
+    let (obs, requests, task) = server("StreamEvents").await;
+    let captured = history.clone();
+    let states = Arc::new(Mutex::new(vec![]));
+    let changes = states.clone();
+    obs.set_stream_observer(Arc::new(move |event| {
+        captured
+            .observe_stream_event(event.active, event.at)
+            .unwrap();
+        changes.lock().unwrap().push(event.active);
+    }));
+    obs.control(ObsControl::StartStream).await.unwrap();
+    assert!(history.snapshot(None).unwrap().active.is_some());
+    assert_eq!(hub.live.data.read().unwrap()["stream"]["phase"], "Live");
+    assert!(hub.live.data.read().unwrap()["stream"]["startedAt"].is_string());
+    bridge.from_twitch(
+        "channel.subscription.message",
+        "Resub",
+        chrono::Utc::now(),
+        Default::default(),
+    );
+    obs.control(ObsControl::StopStream).await.unwrap();
+    let snapshot = history.snapshot(None).unwrap();
+    assert!(snapshot.active.is_none());
+    assert_eq!(snapshot.sessions.len(), 1);
+    assert_eq!(snapshot.sessions[0]["NewSubscriptions"], 1);
+    assert_eq!(hub.live.data.read().unwrap()["stream"]["phase"], "Idle");
+    assert_eq!(*states.lock().unwrap(), vec![true, false]);
+    assert_eq!(obs.stream_revision(), 2);
+    assert!(!requests
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|r| r["requestType"] == "GetStreamStatus"));
+    obs.disconnect().await.unwrap();
+    task.await.unwrap();
 }
 #[tokio::test]
 async fn optional_output_failure_keeps_stream_status_and_exposes_error() {

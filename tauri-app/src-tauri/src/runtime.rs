@@ -1,4 +1,14 @@
 use super::*;
+pub(super) fn bind_stream_history(
+    obs: &ObsClient,
+    history: Arc<ccs_modules::stream_history::StreamHistoryRuntime>,
+) {
+    obs.set_stream_observer(Arc::new(move |event| {
+        if let Err(error) = history.observe_stream_event(event.active, event.at) {
+            warn!(%error,"OBS-Sitzungsereignis konnte nicht gespeichert werden");
+        }
+    }));
+}
 pub(super) fn spawn_runtime(app: AppHandle) {
     spawn_stream_history_events(app.clone(), app.state::<AppState>().stream_history.clone());
     spawn_extension_pack_events(app.clone(), app.state::<AppState>().hub.clone());
@@ -28,6 +38,14 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                     && settings.general.connection_watchdog_enabled
                     && settings.general.reconnect_spotify,
             );
+            let metrics =
+                serde_json::to_value(state.twitch_metrics.snapshot().await).unwrap_or(Value::Null);
+            if let Err(error) = state
+                .stream_history
+                .update_context(&metrics, &settings.twitch.extra)
+            {
+                warn!(%error,"Sitzungskontext konnte nicht aktualisiert werden");
+            }
             if let Err(error) = state
                 .hub
                 .configure_history(ccs_overlay_server::chat_history_path(
@@ -38,7 +56,6 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                 warn!(%error, "Chat-Verlauf konnte nicht geladen werden");
             }
 
-            let outputs = state.hub.live.data.read().unwrap()["obs"]["outputs"].clone();
             let music_snapshot = match music_player_snapshot(app.state::<AppState>()).await {
                 Ok(snapshot) => snapshot,
                 Err(error) => {
@@ -63,30 +80,13 @@ pub(super) fn spawn_runtime(app: AppHandle) {
             }
             let runtime = state.alerts.runtime().await.ok();
             let scene = state.obs.current_program_scene().await.unwrap_or_default();
-            let stream = if let Some(active) = outputs
-                .pointer("/stream/outputActive")
-                .and_then(Value::as_bool)
-            {
-                json!({"isLive":active,"currentScene":scene,"elapsedSeconds":outputs.pointer("/stream/outputDuration").and_then(Value::as_u64).unwrap_or(0)/1000,"available":true})
-            } else {
-                json!({"available":false})
-            };
             let snapshot = state.hub.live.merge_snapshot(&json!({
-                "obs":{"currentScene":scene,"connected":state.obs.status().await.state==ccs_modules::ConnectionState::Connected,"outputs":outputs},
-                "stream":stream,
+                "obs":{"currentScene":scene,"connected":state.obs.status().await.state==ccs_modules::ConnectionState::Connected},
+                "stream":{"currentScene":scene},
                 "branding":{"displayName":settings.branding.display_name,"channelName":settings.branding.channel_name,"accentColor":settings.branding.accent_color,"logoPath":settings.branding.logo_path},
                 "alerts":runtime.map(|r|json!({"isRunning":r.current_type.is_some(),"currentType":r.current_type.unwrap_or_default(),"queueLength":r.pending_count})).unwrap_or_else(||json!({"isRunning":false,"currentType":"","queueLength":0})),
                 "countdown":state.hub.live.countdown_state()
             }));
-            let metrics =
-                serde_json::to_value(state.twitch_metrics.snapshot().await).unwrap_or(Value::Null);
-            if let Err(error) =
-                state
-                    .stream_history
-                    .observe_now(&snapshot, &metrics, &settings.twitch.extra)
-            {
-                warn!(%error,"Sitzungsverlauf fehlgeschlagen");
-            }
 
             let path = ccs_core::paths::overlay_data_path(&state.paths, &settings);
             match state
@@ -192,7 +192,35 @@ fn spawn_obs_data(app: AppHandle) {
                 continue;
             };
 
+            let revision = state.obs.stream_revision();
+            let requested_at = state.stream_history.begin_poll();
             let outputs = state.obs.output_status().await.unwrap_or(Value::Null);
+            let scene = state.obs.current_program_scene().await.unwrap_or_default();
+            let metrics =
+                serde_json::to_value(state.twitch_metrics.snapshot().await).unwrap_or(Value::Null);
+            // A stream event received during the request is newer than the queried
+            // snapshot. Keep its state instead of overwriting it with a delayed reply.
+            if revision == state.obs.stream_revision() {
+                let stream = match outputs
+                    .pointer("/stream/outputActive")
+                    .and_then(Value::as_bool)
+                {
+                    Some(active) => {
+                        json!({"available":true,"isLive":active,"elapsedSeconds":outputs.pointer("/stream/outputDuration").and_then(Value::as_u64).unwrap_or(0)/1000})
+                    }
+                    None => json!({"available":false}),
+                };
+                let snapshot =
+                    json!({"obs":{"outputs":outputs,"currentScene":scene},"stream":stream});
+                if let Err(error) = state.stream_history.observe_polled_now(
+                    &snapshot,
+                    &metrics,
+                    &settings.twitch.extra,
+                    requested_at,
+                ) {
+                    warn!(%error,"Sitzungsverlauf fehlgeschlagen");
+                }
+            }
             state
                 .scene_music
                 .observe_stream(
@@ -211,8 +239,6 @@ fn spawn_obs_data(app: AppHandle) {
                 })
             );
             state.hub.live.merge_snapshot(&json!({"obs":{"microphoneMuted":mic.as_ref().ok().and_then(|v|v["inputMuted"].as_bool()).unwrap_or(false),"microphoneAvailable":mic.is_ok(),"desktopAudioMuted":desktop.as_ref().ok().and_then(|v|v["inputMuted"].as_bool()).unwrap_or(false),"desktopAudioAvailable":desktop.is_ok()}}));
-
-            state.hub.live.data.write().unwrap()["obs"]["outputs"] = outputs;
 
             counter = counter.wrapping_add(1);
             let _ = counter;
@@ -343,6 +369,7 @@ pub(super) fn update_music_data(
     snapshot: &ccs_modules::music_player::MusicPlayerSnapshot,
     settings: &AppSettings,
 ) -> Value {
+    state.stream_history.record_music_now(snapshot);
     let data = state.music_overlay.snapshot(snapshot, settings);
     if data["overlayEnabled"] == true {
         state

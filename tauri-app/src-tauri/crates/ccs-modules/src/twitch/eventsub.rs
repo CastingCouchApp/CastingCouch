@@ -90,6 +90,9 @@ pub fn parse_eventsub_message_at(
                 .cloned()
                 .unwrap_or(Value::Object(Default::default()));
             let mut data = flatten_event_data(&event_data);
+            if let Some(id) = root.pointer("/metadata/message_id").and_then(Value::as_str).filter(|id| !id.is_empty()) {
+                data.insert("eventSubMessageId".into(), id.into());
+            }
             if event_type == "channel.chat.message" {
                 enrich_chat(&event_data, &mut data);
             }
@@ -601,6 +604,7 @@ mod tests {
                 assert_eq!(evt.summary, "alice folgt dem Kanal.");
                 assert_eq!(evt.data.get("user_name").map(String::as_str), Some("alice"));
                 assert_eq!(evt.data.get("user_id").map(String::as_str), Some("1"));
+                assert_eq!(evt.data.get("eventSubMessageId").map(String::as_str), Some("notif-follow-1"));
             }
             other => panic!("expected notification, got {other:?}"),
         }

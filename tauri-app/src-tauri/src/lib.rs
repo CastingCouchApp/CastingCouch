@@ -2327,6 +2327,7 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         hub.clone(),
     ));
     bridge.set_stream_history(stream_history.clone());
+    runtime::bind_stream_history(&obs, stream_history.clone());
     app.manage(AppState {
         ytm,
         music_player,

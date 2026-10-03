@@ -14,6 +14,137 @@ fn metrics(viewers: u64, followers: u64, seconds: i64) -> Value {
 }
 
 #[test]
+fn protected_history_does_not_block_confirmed_obs_live_data() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(root.path().join("StreamHistory")).unwrap();
+    let checkpoint = root.path().join("StreamHistory/active-session.json");
+    std::fs::write(&checkpoint, "damaged").unwrap();
+    let hub = Arc::new(RealtimeHub::new());
+    let history = StreamHistoryRuntime::new(root.path().into(), hub.clone());
+    assert!(history.observe_stream_event(true, at(0)).is_err());
+    assert_eq!(hub.live.data.read().unwrap()["stream"]["phase"], "Live");
+    assert!(history.observe_stream_event(false, at(1)).is_err());
+    assert_eq!(hub.live.data.read().unwrap()["stream"]["phase"], "Idle");
+    assert_eq!(std::fs::read_to_string(&checkpoint).unwrap(), "damaged");
+}
+
+#[test]
+fn stream_events_use_latest_context_and_final_followers_even_before_first_poll() {
+    let root = tempfile::tempdir().unwrap();
+    let history = StreamHistoryRuntime::new(root.path().into(), Arc::new(RealtimeHub::new()));
+    history
+        .update_context(
+            &metrics(8, 100, 0),
+            &json!({"RaidOnStreamEnd":true,"SelectedRaidChannel":"target"}),
+        )
+        .unwrap();
+    history.observe_stream_event(true, at(1)).unwrap();
+    assert_eq!(
+        history.snapshot(None).unwrap().active.unwrap()["Title"],
+        "Title"
+    );
+    history
+        .observe(&live(false), &metrics(8, 103, 2), &json!({}), at(2))
+        .unwrap();
+    let row = &history.snapshot(None).unwrap().sessions[0];
+    assert_eq!(row["FollowersGained"], 3);
+    assert_eq!(row["RaidTarget"], "target");
+}
+
+#[test]
+fn delayed_obs_poll_cannot_end_or_restart_a_session_after_a_newer_stream_event() {
+    let root = tempfile::tempdir().unwrap();
+    let history = StreamHistoryRuntime::new(root.path().into(), Arc::new(RealtimeHub::new()));
+    history.observe_stream_event(true, at(10)).unwrap();
+    history
+        .observe_polled(&live(false), &metrics(8, 0, 11), &json!({}), at(9), at(11))
+        .unwrap();
+    assert!(history.snapshot(None).unwrap().active.is_some());
+    history.observe_stream_event(false, at(12)).unwrap();
+    history
+        .observe_polled(&live(true), &metrics(8, 0, 13), &json!({}), at(11), at(13))
+        .unwrap();
+    let snapshot = history.snapshot(None).unwrap();
+    assert!(snapshot.active.is_none());
+    assert_eq!(snapshot.sessions.len(), 1);
+    assert_eq!(snapshot.sessions[0]["DurationSeconds"], 2);
+}
+
+#[test]
+fn journal_payloads_match_csharp_without_retaining_chat_content_and_deduplicate_eventsub() {
+    let root = tempfile::tempdir().unwrap();
+    let history = StreamHistoryRuntime::new(root.path().into(), Arc::new(RealtimeHub::new()));
+    history
+        .observe(&live(true), &metrics(8, 10, 0), &json!({}), at(0))
+        .unwrap();
+    history.record(&json!({"source":"twitch","type":"channel.chat.message","at":at(1).to_rfc3339(),"summary":"secret-text","data":{"messageId":"chat","userName":"Alice","text":"secret-text","parts":[]}}));
+    history.record(&json!({"source":"app","type":"app.obs.scene","at":at(2).to_rfc3339(),"data":{"scene":"Talk"}}));
+    for seconds in [3, 4] {
+        history.record(&json!({"source":"twitch","type":"channel.subscribe","at":at(seconds).to_rfc3339(),"summary":"Alice subscribed","data":{"eventSubMessageId":"sub-id"}}));
+    }
+    history.record(&json!({"source":"twitch","type":"channel.follow","at":at(5).to_rfc3339(),"summary":"Alice follows","data":{}}));
+    let snapshot = history.snapshot(None).unwrap();
+    let payload =
+        |kind: &str| snapshot.events.iter().find(|e| e["Type"] == kind).unwrap()["Payload"].clone();
+    assert_eq!(
+        payload("twitch.chat.message"),
+        json!({"user":"Alice","scene":"Live","viewers":8})
+    );
+    assert_eq!(
+        payload("obs.scene.changed"),
+        json!({"scene":"Talk","viewers":8})
+    );
+    assert_eq!(
+        payload("twitch.event"),
+        json!({"type":"channel.follow","summary":"Alice follows","scene":"Talk","viewers":8})
+    );
+    assert_eq!(payload("twitch.follow"), json!({"Summary":"Alice follows"}));
+    assert_eq!(snapshot.active.unwrap()["NewSubscriptions"], 1);
+    assert!(
+        !std::fs::read_to_string(root.path().join("CreatorIntelligence/2026-10/events.jsonl"))
+            .unwrap()
+            .contains("secret-text")
+    );
+    drop(history);
+    let restarted = StreamHistoryRuntime::new(root.path().into(), Arc::new(RealtimeHub::new()));
+    restarted.record(&json!({"source":"twitch","type":"channel.subscribe","at":at(6).to_rfc3339(),"data":{"eventSubMessageId":"sub-id"}}));
+    assert_eq!(
+        restarted.snapshot(None).unwrap().active.unwrap()["NewSubscriptions"],
+        1
+    );
+}
+
+#[test]
+fn exports_keep_receipt_order_and_report_uses_raw_case_sensitive_category_averages() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(root.path().join("StreamHistory")).unwrap();
+    let newer = json!({"StartedAt":at(100).to_rfc3339(),"DurationSeconds":3600,"PeakViewers":20,"AverageViewers":10.04,"Category":"Game","Title":"Newer"});
+    let older = json!({"StartedAt":at(0).to_rfc3339(),"DurationSeconds":3600,"PeakViewers":40,"AverageViewers":10.03,"Category":"game","Title":"Last received"});
+    let third = json!({"StartedAt":at(50).to_rfc3339(),"DurationSeconds":3600,"PeakViewers":30,"AverageViewers":10.035,"Category":"Other","Title":"Third"});
+    std::fs::write(
+        root.path().join("StreamHistory/history.jsonl"),
+        format!("{newer}\n{third}\n{older}\nbroken\n"),
+    )
+    .unwrap();
+    let history = StreamHistoryRuntime::new(root.path().into(), Arc::new(RealtimeHub::new()));
+    let csv = root.path().join("history.csv");
+    history.export("csv", &csv).unwrap();
+    let output = std::fs::read_to_string(csv).unwrap();
+    assert!(output.find("Newer").unwrap() < output.find("Third").unwrap());
+    assert!(output.find("Third").unwrap() < output.find("Last received").unwrap());
+    assert!(history
+        .latest_summary()
+        .unwrap()
+        .contains("Titel: Last received"));
+    let html = root.path().join("history.html");
+    history.export("html", &html).unwrap();
+    let output = std::fs::read_to_string(html).unwrap();
+    assert!(output.contains("Zuschauerdurchschnitt: <strong>Game</strong>"));
+    assert!(output.contains("mittleren Peak von 30.0"));
+    assert!(output.find("Newer").unwrap() < output.find("Third").unwrap());
+}
+
+#[test]
 fn sessions_count_confirmed_samples_followers_resubs_chat_alerts_and_ignore_disconnects() {
     let root = tempfile::tempdir().unwrap();
     let hub = Arc::new(RealtimeHub::new());
@@ -210,6 +341,11 @@ fn disk_failure_is_visible_retry_saves_once_and_corrupt_checkpoint_is_preserved(
         .observe(&live(true), &metrics(0, 0, 0), &json!({}), at(0))
         .is_err());
     assert_eq!(std::fs::read_to_string(&checkpoint).unwrap(), malformed);
+    let unknown = json!({"version":1,"active":null,"pending":[{"kind":"unknown","month":"2026-10","record":{"EventId":"id"}}]}).to_string();
+    std::fs::write(&checkpoint, &unknown).unwrap();
+    let invalid = StreamHistoryRuntime::new(root.path().into(), Arc::new(RealtimeHub::new()));
+    assert!(invalid.retry().is_err());
+    assert_eq!(std::fs::read_to_string(&checkpoint).unwrap(), unknown);
 }
 
 #[tokio::test]
@@ -248,16 +384,33 @@ async fn bridge_persists_real_overlay_events_and_shares_authoritative_counters_o
         "channel.subscription.message",
         "ReSub",
         at(2),
-        BTreeMap::from([("user_name".into(), "Alice".into())]),
+        BTreeMap::from([
+            ("user_name".into(), "Alice".into()),
+            ("eventSubMessageId".into(), "sub-id".into()),
+        ]),
     );
     let message = ws.next().await.unwrap().unwrap();
     assert_eq!(
         serde_json::from_str::<Value>(message.to_text().unwrap()).unwrap(),
         emitted
     );
+    bridge.from_twitch(
+        "channel.subscription.message",
+        "ReSub",
+        at(3),
+        BTreeMap::from([("eventSubMessageId".into(), "sub-id".into())]),
+    );
+    for seconds in [4, 5] {
+        bridge.from_twitch(
+            "channel.subscribe",
+            "Sub",
+            at(seconds),
+            BTreeMap::from([("eventSubMessageId".into(), "new-sub-id".into())]),
+        );
+    }
     assert_eq!(
         hub.live.data.read().unwrap()["stats"]["newSubscriptions"],
-        1
+        2
     );
     let http: Value = reqwest::get(format!(
         "http://127.0.0.1:{}/data/overlay-data.json",
@@ -268,13 +421,12 @@ async fn bridge_persists_real_overlay_events_and_shares_authoritative_counters_o
     .json()
     .await
     .unwrap();
-    assert_eq!(http["stats"]["newSubscriptions"], 1);
+    assert_eq!(http["stats"]["newSubscriptions"], 2);
     let snapshot = history.snapshot(None).unwrap();
     assert!(snapshot
         .events
         .iter()
-        .any(|e| e["Type"] == "twitch.event"
-            && e["Payload"]["event"]["data"]["user_name"] == "Alice"));
+        .any(|e| e["Type"] == "twitch.event" && e["Payload"]["summary"] == "ReSub"));
     ws.close(None).await.unwrap();
     server.stop();
 }

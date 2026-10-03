@@ -15,7 +15,7 @@ use protocol::{
 };
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
@@ -31,6 +31,13 @@ type WsReader = futures_util::stream::SplitStream<WsStream>;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 const DEFAULT_RECONNECT_SECONDS: u64 = 15;
+
+#[derive(Clone, Debug)]
+pub struct ObsStreamEvent {
+    pub active: bool,
+    pub at: chrono::DateTime<chrono::Utc>,
+}
+type StreamObserver = Arc<dyn Fn(&ObsStreamEvent) + Send + Sync>;
 
 #[derive(Debug, Clone)]
 pub struct ObsConnectOptions {
@@ -64,6 +71,8 @@ pub struct ObsClient {
     scene_tx: broadcast::Sender<String>,
     status_tx: broadcast::Sender<ServiceStatus>,
     current_scene: RwLock<Option<String>>,
+    stream_observer: std::sync::RwLock<Option<StreamObserver>>,
+    stream_revision: AtomicU64,
 }
 
 impl ObsClient {
@@ -87,6 +96,8 @@ impl ObsClient {
             scene_tx,
             status_tx,
             current_scene: RwLock::new(None),
+            stream_observer: std::sync::RwLock::new(None),
+            stream_revision: AtomicU64::new(0),
         }
     }
 
@@ -104,6 +115,12 @@ impl ObsClient {
 
     pub fn subscribe_scenes(&self) -> broadcast::Receiver<String> {
         self.scene_tx.subscribe()
+    }
+    pub fn set_stream_observer(&self, observer: StreamObserver) {
+        *self.stream_observer.write().unwrap() = Some(observer);
+    }
+    pub fn stream_revision(&self) -> u64 {
+        self.stream_revision.load(Ordering::SeqCst)
     }
 
     pub async fn current_program_scene(&self) -> Option<String> {
@@ -356,6 +373,25 @@ impl ObsClient {
                 }
             }
             EVENT_OP => {
+                if envelope.data["eventType"] == "StreamStateChanged" {
+                    let data = &envelope.data["eventData"];
+                    let active =
+                        match (data["outputState"].as_str(), data["outputActive"].as_bool()) {
+                            (Some("OBS_WEBSOCKET_OUTPUT_STARTED"), Some(true)) => Some(true),
+                            (Some("OBS_WEBSOCKET_OUTPUT_STOPPED"), Some(false)) => Some(false),
+                            _ => None,
+                        };
+                    if let Some(active) = active {
+                        self.stream_revision.fetch_add(1, Ordering::SeqCst);
+                        let observer = self.stream_observer.read().unwrap().clone();
+                        if let Some(observer) = observer {
+                            observer(&ObsStreamEvent {
+                                active,
+                                at: chrono::Utc::now(),
+                            });
+                        }
+                    }
+                }
                 if let Some(scene) = parse_current_program_scene(&envelope.data) {
                     self.publish_scene(scene).await;
                 }
