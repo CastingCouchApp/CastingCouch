@@ -2319,6 +2319,30 @@ fn spotify_commands_update_shared_state_and_overlay_through_native_ipc() {
             .expect(1)
             .mount(&server)
             .await;
+        Mock::given(method("PUT"))
+            .and(path("/me/player/shuffle"))
+            .and(query_param("state", "false"))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path("/me/player/repeat"))
+            .and(query_param("state", "context"))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path("/me/player/repeat"))
+            .and(query_param("state", "track"))
+            .respond_with(
+                ResponseTemplate::new(403)
+                    .set_body_json(json!({"error":{"message":"Premium required"}})),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
         (
             Arc::new(SpotifyClient::with_http(
                 secrets,
@@ -2373,6 +2397,58 @@ fn spotify_commands_update_shared_state_and_overlay_through_native_ipc() {
     assert_eq!(
         call(&window, "music_player_snapshot", json!({})).unwrap()["progressMs"],
         4000
+    );
+    let journal = call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap();
+    assert!(journal["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|entry| entry["message"] == "Musik: Position ändern angefordert."));
+    assert!(journal["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|entry| entry["message"] == "Spotify: Wiedergabe angefordert."));
+    for action in [
+        json!({"action":"shuffle","enabled":false}),
+        json!({"action":"repeat","mode":"context"}),
+    ] {
+        call(&window, "spotify_action", json!({"action":action})).unwrap();
+    }
+    let accepted = call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap();
+    for label in ["Zufallswiedergabe ändern", "Wiederholung ändern"] {
+        let expected = format!("Spotify: {label} angefordert.");
+        assert_eq!(
+            accepted["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|entry| entry["message"] == expected)
+                .count(),
+            1
+        );
+    }
+    assert!(call(
+        &window,
+        "spotify_action",
+        json!({"action":{"action":"repeat","mode":"track"}})
+    )
+    .is_err());
+    let failure = call(
+        &window,
+        "notifications_snapshot",
+        json!({"filter":"Fehler"}),
+    )
+    .unwrap();
+    assert_eq!(failure["entries"].as_array().unwrap().len(), 1);
+    let message = failure["entries"][0]["message"].as_str().unwrap();
+    assert!(
+        message.contains("Wiederholung ändern fehlgeschlagen")
+            && message.contains("Premium required")
+    );
+    assert_eq!(
+        call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap()["entries"],
+        accepted["entries"]
     );
     tauri::async_runtime::block_on(async {
         let state = app.state::<AppState>();
@@ -2542,6 +2618,18 @@ fn shared_player_commands_cross_native_ipc_and_provider_switch_releases_the_brid
         json!({"action":{"action":"play"}})
     )
     .is_err());
+    assert_eq!(
+        call(
+            &window,
+            "notifications_snapshot",
+            json!({"filter":"Fehler"})
+        )
+        .unwrap()["entries"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
     assert!(
         call(&window, "ytm_connect", json!({})).is_err(),
         "inactive providers cannot connect"
@@ -2585,6 +2673,17 @@ fn shared_player_commands_cross_native_ipc_and_provider_switch_releases_the_brid
             .await
             .unwrap();
         assert_eq!(commands["commands"], json!(["playpause"]));
+        let journal = call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap();
+        assert!(journal["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["message"] == "Musik: Wiedergabe/Pause angefordert."));
+        assert_eq!(
+            call(&window, "music_player_snapshot", json!({})).unwrap()["isPlaying"],
+            true,
+            "queue acknowledgement is not confirmed playback"
+        );
     });
     let mut spotify = next.clone();
     spotify["MusicPlayer"]["ProviderId"] = json!("spotify");
@@ -3343,6 +3442,13 @@ fn playlist_favorites_and_successful_playback_persist_through_native_ipc() {
         settings["Spotify"]["FavoritePlaylistUris"],
         json!(["spotify:playlist:studio"])
     );
+    assert!(
+        call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap()["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["message"] == "Spotify: Playlist abspielen angefordert.")
+    );
     assert_eq!(
         settings["Spotify"]["RecentPlaylistUris"],
         json!([
@@ -3419,6 +3525,56 @@ fn playlist_favorites_and_successful_playback_persist_through_native_ipc() {
         );
         result.unwrap();
     });
+    // The API can accept playback before reading/saving the recent history fails.
+    // Report that partial outcome, rather than implying playback was rejected.
+    let settings_path = app.state::<AppState>().settings.path().to_path_buf();
+    let saved_settings = std::fs::read(&settings_path).unwrap();
+    let corrupt_path = settings_path.clone();
+    tauri::async_runtime::block_on(async {
+        Mock::given(method("PUT"))
+            .and(path("/me/player/play"))
+            .respond_with(move |_: &wiremock::Request| {
+                std::fs::write(&corrupt_path, b"invalid settings").unwrap();
+                ResponseTemplate::new(204)
+            })
+            .with_priority(1)
+            .expect(1)
+            .mount(&server)
+            .await;
+    });
+    let accepted = call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap();
+    let error = call(
+        &window,
+        "spotify_action",
+        json!({"action":{"action":"play_playlist","uri":"spotify:playlist:history-failure"}}),
+    )
+    .unwrap_err();
+    std::fs::write(&settings_path, saved_settings).unwrap();
+    assert!(
+        error
+            .as_str()
+            .unwrap()
+            .starts_with("Playlist gestartet; Verlauf konnte nicht gespeichert werden:"),
+        "{error}"
+    );
+    assert_eq!(
+        call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap()["entries"],
+        accepted["entries"]
+    );
+    let journal = call(
+        &window,
+        "notifications_snapshot",
+        json!({"filter":"Fehler"}),
+    )
+    .unwrap();
+    assert!(journal["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|entry| entry["message"]
+            .as_str()
+            .unwrap()
+            .contains("Playlist gestartet; Verlauf konnte nicht gespeichert werden:")));
 }
 pub(super) fn call(
     window: &tauri::WebviewWindow<MockRuntime>,

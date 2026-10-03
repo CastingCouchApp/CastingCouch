@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { CommonMusicPlayer } from "./CommonMusicPlayer";
+import { defaultAppSettings } from "../../lib/app-settings";
 const invoke = vi.fn();
 const listen = vi.fn(async (_handler: unknown) => () => {});
 vi.mock("../../lib/api", async (original) => ({
@@ -182,4 +183,65 @@ it("shows a pending login and allows cancellation without starting another login
             undefined,
         ),
     );
+});
+
+it("disables cached playback controls after the snapshot query fails", async () => {
+    const client = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+    });
+    client.setQueryData(["music-player"], snapshot);
+    invoke.mockImplementation(async (cmd) => {
+        if (cmd === "music_player_snapshot")
+            throw Error("Musikstatus fehlgeschlagen");
+        return null;
+    });
+    render(
+        <QueryClientProvider client={client}>
+            <CommonMusicPlayer provider="spotify" />
+        </QueryClientProvider>,
+    );
+    expect(
+        await screen.findByText("Error: Musikstatus fehlgeschlagen"),
+    ).toBeInTheDocument();
+    expect(
+        screen.getByRole("button", { name: "Musik abspielen" }),
+    ).toBeDisabled();
+    expect(
+        screen.getByRole("button", { name: "Nächster Musiktitel" }),
+    ).toBeDisabled();
+    expect(screen.queryByText("Song")).not.toBeInTheDocument();
+});
+
+it("mounts Spotify quick playlists in the common player and hides them for YouTube Music", async () => {
+    const settings = defaultAppSettings();
+    settings.Spotify.FavoritePlaylistUris = ["spotify:playlist:studio"];
+    invoke.mockImplementation(async (cmd, args) => {
+        if (cmd === "music_player_snapshot") return snapshot;
+        if (cmd === "get_settings") return settings;
+        if (cmd === "spotify_query")
+            return args.query.query === "playback"
+                ? { shuffle_state: false, repeat_state: "off" }
+                : {
+                      items: [
+                          {
+                              id: "studio",
+                              uri: "spotify:playlist:studio",
+                              name: "Studio",
+                          },
+                      ],
+                  };
+        return null;
+    });
+    const view = show();
+    expect(
+        await screen.findByRole("option", { name: "Studio" }),
+    ).toBeInTheDocument();
+    expect(
+        screen.getByRole("checkbox", { name: "Zufallswiedergabe" }),
+    ).toBeInTheDocument();
+    view.unmount();
+    show("ytmusic");
+    expect(
+        screen.queryByRole("combobox", { name: "Schnellplaylist" }),
+    ).not.toBeInTheDocument();
 });

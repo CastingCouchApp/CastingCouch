@@ -5,7 +5,6 @@ import { SpotifyLibrary } from "../features/music/SpotifyLibrary";
 import { SceneMusic } from "../features/music/SceneMusic";
 import { SavedMusicStates } from "../features/music/SavedMusicStates";
 import { MusicStatistics } from "../features/music/MusicStatistics";
-import type { SpotifyAction } from "../lib/command-contract";
 import { MusicAutomation } from "../features/music/MusicAutomation";
 import { SpotifyDevices } from "../features/music/SpotifyDevices";
 import { createFileRoute } from "@tanstack/react-router";
@@ -41,28 +40,7 @@ function MusicPage() {
         onSuccess: () =>
             client.invalidateQueries({ queryKey: queryKeys.settings }),
     });
-    const playback = useQuery({
-        queryKey: ["spotify-playback"],
-        queryFn: () =>
-            tauriInvoke<{
-                shuffle_state: boolean;
-                repeat_state: string;
-                device?: { volume_percent: number };
-            }>("spotify_query", { query: { query: "playback" } }),
-        refetchInterval: 5000,
-        enabled: musicProvider(settings.data?.MusicPlayer) === "spotify",
-    });
-    const act = useMutation({
-        mutationFn: (action: SpotifyAction) =>
-            tauriInvoke("spotify_action", { action }),
-        onSuccess: () => {
-            void client.invalidateQueries({ queryKey: ["spotify-playback"] });
-            void client.invalidateQueries({ queryKey: queryKeys.nowPlaying });
-            void client.invalidateQueries({ queryKey: ["spotify-library"] });
-            void client.invalidateQueries({ queryKey: ["spotify-devices"] });
-        },
-    });
-    const error = provider.error ?? act.error;
+    const error = provider.error;
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-semibold">Musik</h1>
@@ -98,38 +76,8 @@ function MusicPage() {
                 <>
                     <Card className="space-y-4">
                         <h2 className="text-lg font-semibold">
-                            Spotify-Einstellungen
+                            Spotify-Geräte
                         </h2>
-                        <label className="flex gap-2">
-                            <input
-                                type="checkbox"
-                                checked={playback.data?.shuffle_state ?? false}
-                                onChange={(e) =>
-                                    act.mutate({
-                                        action: "shuffle",
-                                        enabled: e.target.checked,
-                                    })
-                                }
-                            />
-                            Zufallswiedergabe
-                        </label>
-                        <label className="block">
-                            Wiederholung{" "}
-                            <select
-                                className="bg-panel p-2"
-                                value={playback.data?.repeat_state ?? "off"}
-                                onChange={(e) =>
-                                    act.mutate({
-                                        action: "repeat",
-                                        mode: e.target.value,
-                                    })
-                                }
-                            >
-                                <option value="off">Aus</option>
-                                <option value="context">Playlist</option>
-                                <option value="track">Titel</option>
-                            </select>
-                        </label>
                         <SpotifyDevices />
                     </Card>
                     <SpotifyLibrary />

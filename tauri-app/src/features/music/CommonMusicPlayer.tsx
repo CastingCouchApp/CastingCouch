@@ -9,6 +9,7 @@ import {
     type MusicPlayerSnapshot,
 } from "../../lib/api";
 import type { MusicPlayerAction } from "../../lib/command-contract";
+import { SpotifyQuickControls } from "./SpotifyQuickControls";
 
 function time(ms: number) {
     const seconds = Math.floor(Math.max(0, ms) / 1000),
@@ -78,7 +79,7 @@ export function CommonMusicPlayer({
         },
     });
     const snapshot =
-        !changingProvider && now.data?.provider === provider
+        !changingProvider && !now.isError && now.data?.provider === provider
             ? now.data
             : undefined;
     const busy = operation.isPending || changingProvider || !snapshot;
@@ -107,7 +108,9 @@ export function CommonMusicPlayer({
                 )}
                 <div>
                     <p className="font-semibold">
-                        {snapshot?.title || "Keine Wiedergabe"}
+                        {now.isError
+                            ? "Unbekannte Wiedergabe"
+                            : snapshot?.title || "Keine Wiedergabe"}
                     </p>
                     <p>{snapshot?.artist}</p>
                     <p className="text-text-secondary">{snapshot?.album}</p>
@@ -116,7 +119,9 @@ export function CommonMusicPlayer({
             <p role="status">
                 {changingProvider
                     ? "Musikprovider wird gewechselt …"
-                    : snapshot?.statusText || "Musikstatus wird geladen …"}
+                    : now.isError
+                      ? "Musikstatus nicht verfügbar"
+                      : snapshot?.statusText || "Musikstatus wird geladen …"}
             </p>
             {error && (
                 <p role="alert" className="text-red-400">
@@ -245,6 +250,11 @@ export function CommonMusicPlayer({
                         }}
                     />
                 </label>
+            )}
+            {provider === "spotify" && !changingProvider && (
+                <SpotifyQuickControls
+                    enabled={!busy && !!snapshot?.connected && !snapshot.error}
+                />
             )}
         </Card>
     );

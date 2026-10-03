@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+    render,
+    screen,
+    fireEvent,
+    waitFor,
+    within,
+} from "@testing-library/react";
 import {
     RouterProvider,
     createMemoryHistory,
@@ -133,14 +139,30 @@ describe("Dashboard live service status", () => {
         expect(screen.getByText("Twitch")).toBeInTheDocument();
         expect(screen.getByText("Spotify")).toBeInTheDocument();
         expect(screen.queryByText("Sidecar")).not.toBeInTheDocument();
-        expect(screen.getByRole("heading", {name:"Streamende und Raid"})).toBeInTheDocument();
-        expect(screen.getByRole("heading", {name:"Vorprüfung"})).toBeInTheDocument();
-        expect(screen.getByRole("heading", {name:"Benachrichtigungen"})).toBeInTheDocument();
-        expect(screen.getByRole("heading", {name:"Szenen-Schnellwahl"})).toBeInTheDocument();
-        expect(screen.getByRole("heading", {name:"OBS-Audiomixer"})).toBeInTheDocument();
-        expect(screen.getByRole("heading", {name:"Raid-Assistent und Profile"})).toBeInTheDocument();
-        expect(screen.getByRole("heading", {name:"Dienste-Schnellzugriff"})).toBeInTheDocument();
-        expect(screen.getByRole("link",{name:"Twitch öffnen"})).toHaveAttribute("href","/services#twitch");
+        expect(
+            screen.getByRole("heading", { name: "Streamende und Raid" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "Vorprüfung" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "Benachrichtigungen" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "Szenen-Schnellwahl" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "OBS-Audiomixer" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "Raid-Assistent und Profile" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "Dienste-Schnellzugriff" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("link", { name: "Twitch öffnen" }),
+        ).toHaveAttribute("href", "/services#twitch");
         expect(screen.getAllByText("Getrennt")).toHaveLength(3);
     });
 
@@ -384,6 +406,45 @@ describe("Dashboard live service status", () => {
                     "twitch_metrics_snapshot",
                 ]),
             ),
+        );
+    });
+    it("uses the mounted common player for actual dashboard shuffle and repeat actions", async () => {
+        const base = invokeMock.getMockImplementation()!;
+        invokeMock.mockImplementation(async (cmd, args) => {
+            if (cmd === "music_player_snapshot")
+                return {
+                    provider: "spotify",
+                    connected: true,
+                    title: "Dashboard music",
+                    isPlaying: true,
+                    error: null,
+                };
+            if (cmd === "spotify_query")
+                return args?.query.query === "playback"
+                    ? { shuffle_state: true, repeat_state: "track" }
+                    : { items: [] };
+            return base(cmd, args);
+        });
+        renderDashboard();
+        await screen.findByText("Dashboard music");
+        const shuffle = await screen.findByRole("checkbox", {
+            name: "Zufallswiedergabe",
+        });
+        await waitFor(() => expect(shuffle).not.toBeDisabled());
+        expect(shuffle).toBeChecked();
+        fireEvent.click(shuffle);
+        await waitFor(() =>
+            expect(invokeMock).toHaveBeenCalledWith("spotify_action", {
+                action: { action: "shuffle", enabled: false },
+            }),
+        );
+        const repeat = screen.getByRole("combobox", { name: "Wiederholung" });
+        await waitFor(() => expect(repeat).not.toBeDisabled());
+        fireEvent.change(repeat, { target: { value: "context" } });
+        await waitFor(() =>
+            expect(invokeMock).toHaveBeenCalledWith("spotify_action", {
+                action: { action: "repeat", mode: "context" },
+            }),
         );
     });
 });

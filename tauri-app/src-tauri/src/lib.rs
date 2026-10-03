@@ -987,6 +987,52 @@ async fn spotify_action(
     state: State<'_, AppState>,
     action: ccs_modules::spotify::SpotifyAction,
 ) -> Result<Value, String> {
+    use ccs_modules::spotify::SpotifyAction::*;
+    let label = match &action {
+        Play => "Wiedergabe",
+        Pause => "Pause",
+        Next => "Nächster Titel",
+        Previous => "Vorheriger Titel",
+        Volume { .. } => "Lautstärke ändern",
+        Seek { .. } => "Position ändern",
+        Shuffle { .. } => "Zufallswiedergabe ändern",
+        Repeat { .. } => "Wiederholung ändern",
+        Transfer { .. } => "Wiedergabegerät wechseln",
+        PlayTrack { .. } => "Titel abspielen",
+        PlayPlaylist { .. } => "Playlist abspielen",
+        RestorePlayback { .. } => "Wiedergabe wiederherstellen",
+        Queue { .. } => "Titel einreihen",
+        SaveTrack { .. } => "Titel als Favorit speichern",
+        RemoveSavedTrack { .. } => "Titel aus Favoriten entfernen",
+    };
+    let result = spotify_action_impl(&state, action).await;
+    record_music_result(&state, "Spotify", label, &result);
+    result
+}
+
+fn record_music_result(
+    state: &AppState,
+    provider: &str,
+    label: &str,
+    result: &Result<Value, String>,
+) {
+    match result {
+        // Spotify accepts the HTTP command; YTM queues it for the browser bridge.
+        // Neither acknowledgement proves that audio is already playing.
+        Ok(_) => state
+            .notifications
+            .record(&format!("{provider}: {label} angefordert."), "Info"),
+        Err(error) => state.notifications.record(
+            &format!("{provider}: {label} fehlgeschlagen: {error}"),
+            "Fehler",
+        ),
+    }
+}
+
+async fn spotify_action_impl(
+    state: &AppState,
+    action: ccs_modules::spotify::SpotifyAction,
+) -> Result<Value, String> {
     use ccs_modules::music_player::MusicPlayerAction;
     let common = match &action {
         ccs_modules::spotify::SpotifyAction::Play => Some(MusicPlayerAction::Play),
@@ -1040,11 +1086,9 @@ async fn spotify_action(
     drop(_provider);
     if let Some(uri) = playlist {
         let _guard = state.settings_mutation.lock().await;
-        let original = state
-            .settings
-            .read_value()
-            .await
-            .map_err(|e| e.to_string())?;
+        let original = state.settings.read_value().await.map_err(|e| {
+            format!("Playlist gestartet; Verlauf konnte nicht gespeichert werden: {e}")
+        })?;
         let mut next = original.clone();
         let mut recent = string_list(&original["Spotify"]["RecentPlaylistUris"]);
         recent.retain(|previous| !previous.eq_ignore_ascii_case(&uri));
@@ -1394,11 +1438,23 @@ async fn music_player_action(
     state: State<'_, AppState>,
     action: ccs_modules::music_player::MusicPlayerAction,
 ) -> Result<Value, String> {
-    state
+    use ccs_modules::music_player::MusicPlayerAction::*;
+    let label = match &action {
+        Play => "Wiedergabe",
+        Pause => "Pause",
+        PlayPause => "Wiedergabe/Pause",
+        Next => "Nächster Titel",
+        Previous => "Vorheriger Titel",
+        Seek { .. } => "Position ändern",
+        Volume { .. } => "Lautstärke ändern",
+    };
+    let result = state
         .music_player
         .action(action)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    record_music_result(&state, "Musik", label, &result);
+    result
 }
 
 #[tauri::command]

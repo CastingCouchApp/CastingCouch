@@ -6,6 +6,12 @@ import { Input } from "../../components/ui/input";
 import { queryKeys, tauriInvoke } from "../../lib/api";
 import { cloneSettings, type AppSettings } from "../../lib/app-settings";
 import type { SpotifyAction, SpotifyQuery } from "../../lib/command-contract";
+import {
+    quickPlaylistChoices,
+    spotifyPlaylistsKey as playlistsKey,
+    stringList,
+    type SpotifyPlaylist as Playlist,
+} from "./spotify-catalog";
 
 type Track = {
     id?: string | null;
@@ -18,15 +24,6 @@ type Track = {
     is_playable?: boolean;
     is_local?: boolean;
     restrictions?: { reason: string };
-};
-type Playlist = {
-    id: string;
-    uri: string;
-    name: string;
-    owner?: { display_name?: string; id?: string };
-    images?: { url: string }[];
-    items?: { total: number };
-    tracks?: { total: number };
 };
 type Entry = Track & {
     item?: Track | null;
@@ -44,12 +41,6 @@ type Page = {
     total?: number;
 };
 const libraryKey = ["spotify-library"] as const;
-const playlistsKey = ["spotify-playlists"] as const;
-function stringList(value: unknown): string[] {
-    return Array.isArray(value)
-        ? value.filter((v): v is string => typeof v === "string")
-        : [];
-}
 function trackFrom(entry: Entry | null): Track | null {
     if (!entry) return null;
     const track =
@@ -187,18 +178,8 @@ export function SpotifyLibrary() {
         action.mutate(request);
     }
     const favorites = stringList(settings.data?.Spotify.FavoritePlaylistUris);
-    const recent = stringList(settings.data?.Spotify.RecentPlaylistUris);
     const all = playlists.data?.items ?? [];
-    const quickUris = [
-        ...new Set([...favorites, ...recent].map((uri) => uri.toLowerCase())),
-    ];
-    const available = quick
-        ? quickUris.flatMap((uri) =>
-              all
-                  .filter((playlist) => playlist.uri?.toLowerCase() === uri)
-                  .slice(0, 1),
-          )
-        : all;
+    const available = quick ? quickPlaylistChoices(all, settings.data) : all;
     const shown = available.filter((playlist) =>
         `${playlist.name} ${playlist.owner?.display_name ?? playlist.owner?.id ?? ""}`
             .toLowerCase()
