@@ -1088,7 +1088,7 @@ fn native_metric_refresh_uses_helix_and_saving_goals_uses_confirmed_zeroes() {
         ] {
             Mock::given(path(endpoint))
                 .respond_with(ResponseTemplate::new(200).set_body_json(body))
-                .expect(1)
+                .expect(if endpoint == "/channels" { 2 } else { 1 })
                 .mount(&server)
                 .await;
         }
@@ -1153,6 +1153,36 @@ fn native_metric_refresh_uses_helix_and_saving_goals_uses_confirmed_zeroes() {
             metrics
         );
         assert_eq!(updates.lock().unwrap().as_slice(), &[metrics]);
+        let preflight = call(&window, "dashboard_preflight", json!({})).unwrap();
+        let checks = preflight["checks"].as_array().unwrap();
+        assert_eq!(checks.len(), 9);
+        assert!(checks.iter().find(|c| c["key"] == "title").unwrap()["ok"]
+            .as_bool()
+            .unwrap());
+        assert!(
+            checks.iter().find(|c| c["key"] == "category").unwrap()["ok"]
+                .as_bool()
+                .unwrap()
+        );
+        Mock::given(path("/channels"))
+            .respond_with(
+                ResponseTemplate::new(403).set_body_json(json!({"message":"Channel denied"})),
+            )
+            .with_priority(1)
+            .expect(1)
+            .mount(&server)
+            .await;
+        let denied = call(&window, "dashboard_preflight", json!({})).unwrap();
+        assert_eq!(
+            denied["checks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|c| c["key"] == "title")
+                .unwrap()["ok"],
+            false
+        );
+        assert!(denied.to_string().contains("Channel denied"));
         let initial = call(&window, "twitch_goals_snapshot", json!({})).unwrap();
         let result = call(
             &window,
@@ -1171,6 +1201,48 @@ fn native_metric_refresh_uses_helix_and_saving_goals_uses_confirmed_zeroes() {
         let output: Value = serde_json::from_slice(&std::fs::read(file).unwrap()).unwrap();
         assert_eq!(output["music"]["title"], "External");
         assert_eq!(output["custom"]["keep"], true);
+    });
+}
+
+#[test]
+fn native_preflight_offline_is_read_only_and_uses_current_configuration() {
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let before = call(&window, "get_settings", json!({})).unwrap();
+        let first = call(&window, "dashboard_preflight", json!({})).unwrap();
+        let checks = first["checks"].as_array().unwrap();
+        assert_eq!(checks.len(), 9);
+        for key in ["obs", "twitch", "music", "title", "category"] {
+            assert_eq!(
+                checks.iter().find(|c| c["key"] == key).unwrap()["ok"],
+                false
+            );
+        }
+        assert!(first["warningCount"].as_u64().unwrap() >= 5);
+        assert!(!first.to_string().contains("Streamer.bot"));
+        assert_eq!(call(&window, "get_settings", json!({})).unwrap(), before);
+        let mut changed = before.clone();
+        changed["Obs"]["StartScene"] = json!("New Intro");
+        app.state::<AppState>()
+            .settings
+            .save_edit(&before, &changed)
+            .await
+            .unwrap();
+        let second = call(&window, "dashboard_preflight", json!({})).unwrap();
+        assert_eq!(
+            second["checks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|c| c["key"] == "start_scene")
+                .unwrap()["detail"],
+            "New Intro"
+        );
+        assert!(call(&window, "stream_history_snapshot", json!({})).unwrap()["active"].is_null());
     });
 }
 
@@ -2698,6 +2770,7 @@ pub(super) fn test_app_with_clients(
             start_stream_end,
             stream_end_control,
             dashboard_snapshot,
+            dashboard_preflight,
             save_dashboard,
             dashboard_image_preview,
             dashboard_asset_choices,

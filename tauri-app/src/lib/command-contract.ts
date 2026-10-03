@@ -1,4 +1,8 @@
 import type {AlertDefinition, UpdatePackage} from "./api";
+export type PreflightCheck = { key: string; label: string; ok: boolean; detail: string };
+
+export type PreflightSnapshot = { checkedAt: string; warningCount: number; checks: Array<PreflightCheck> };
+
 export type StreamEndPreferences = { mode: string; endSceneSeconds: number; raidOnStreamEnd: boolean; selectedRaidChannel: string; raidCountdownSeconds: number; raidStartTimeoutSeconds: number; stopStreamAfterRaid: boolean; stopMusicAfterRaid: boolean; plannedSeconds: number; plannedMinutes: number };
 
 export type StreamEndSnapshot = { runId: number; active: boolean; phase: string; status: string; remainingSeconds: number; totalSeconds: number; attempt: number; targetLogin: string; targetDisplayName: string; canRaidNow: boolean; raidPending: boolean; pendingAction: string | null; broadcasterId: string; broadcasterLogin: string; error: string | null; warnings: Array<string> };
@@ -271,6 +275,7 @@ export type CommandInvocation =
   | [command: "update_canvas", args: { id: string; name?: string | null; selected?: boolean | null }]
   | [command: "open_overlay_editor", args: { id: string; name: string; editorUrl: string }]
   | [command: "service_statuses", args?: Record<string, never>]
+  | [command: "dashboard_preflight", args?: Record<string, never>]
   | [command: "connect_obs", args?: Record<string, never>]
   | [command: "disconnect_obs", args?: Record<string, never>]
   | [command: "obs_scenes", args?: Record<string, never>]

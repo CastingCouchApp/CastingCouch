@@ -15,6 +15,7 @@ pub mod stream_history;
 pub mod creator_intelligence;
 pub mod dashboard;
 pub mod stream_end;
+pub mod preflight;
 
 use serde::{Deserialize, Serialize};
 

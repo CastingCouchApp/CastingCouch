@@ -38,6 +38,8 @@ Die Commands sind im produktiven Host und in der nativen IPC-Test-App registrier
 
 ## Gemeinsame Live-Panels
 
+- Die Karte `Preflight` führt eine native [Vorprüfung](TAURI-STREAM-START.md) mit neun Einzelpunkten und aktuellem Twitch-Kanalabruf aus. Sie ist der Gruppe `ShowAdvancedTools` zugeordnet, beginnt keine Wiedergabe und zeigt fehlgeschlagene Punkte beziehungsweise Abfragefehler ausdrücklich an.
+
 - Vorhandene OBS-Ausgänge und globaler Overlay-Countdown bleiben bedienbar. Die OBS-Vorschau fragt Videoeinstellungen und Screenshot über denselben OBS-Client ab; kompakt/standard/groß begrenzt die Bildbreite auf 200/400/800 Pixel bei tatsächlichem Seitenverhältnis.
 - `TwitchChat` wird von Dashboard und Serviceseite verwendet: App-Chatfeed, Fragments/Emotes/Badges, Senden, Webchat öffnen, Nachrichten löschen, Timeout und Moderationsauswahl. Empfang und Moderationsbereinigung bleiben über den vorhandenen Ereignisfluss synchronisiert. Ein während des Sendens neu bearbeiteter Nachrichtenentwurf wird nach Erfolg der vorherigen Nachricht nicht gelöscht.
 - `TwitchEventFeed` nutzt den vorhandenen unabhängigen App-Ereignisfeed.

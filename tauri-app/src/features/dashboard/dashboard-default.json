@@ -31,6 +31,7 @@
       "size": "Standard"
     },
     { "key": "Countdown", "visible": true, "zone": "Left", "size": "Standard" },
+    { "key": "Preflight", "visible": true, "zone": "Left", "size": "Standard" },
     {
       "key": "SpotifyPlayer",
       "visible": true,

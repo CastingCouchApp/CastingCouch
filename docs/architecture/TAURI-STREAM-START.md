@@ -1,6 +1,6 @@
 # Streamstart und verbleibende M2-Bedienpultabläufe
 
-Stand: 2026-10-03. Bestätigter Streamstart mit konfigurierter Startszene ist implementiert und automatisiert geprüft. M2 und DA2 sind noch nicht abgeschlossen; die installierte Betriebsabnahme auf Windows/macOS bleibt offen.
+Stand: 2026-10-03. Bestätigter Streamstart mit konfigurierter Startszene und native Vorprüfung sind implementiert und automatisiert geprüft. M2 und DA2 sind noch nicht abgeschlossen; die installierte Betriebsabnahme auf Windows/macOS bleibt offen.
 
 ## Streamstart
 
@@ -23,9 +23,21 @@ Geprüft: vollständiger Rust-Workspace, 178 Frontend-Tests, generierter Command
 
 ## Konkrete weitere C#-Referenzen für M2
 
+### Vorprüfung: implementierter Ablauf
+
+Die Karte `Preflight` ist im nativen Dashboard-Katalog und der produktiven Route enthalten; bestehende Reihenfolge, ausgeblendete Karten und die Gruppe `ShowAdvancedTools` bleiben wirksam. „Vorprüfung ausführen“ fragt den typisierten Command `dashboard_preflight` ab. Die Prüfung verändert weder Einstellungen noch OBS-/Musikwiedergabe und ist unabhängig von der Startbestätigung.
+
+Die neun Prüfungen übernehmen OBS-Verbindung, Twitch-Verbindung, Verbindung des gewählten Musikproviders, konfigurierte Start-/Liveszene, aktuellen Twitch-Titel/Kategorie, erforderliche Spotify-Startplaylist und erforderliches Raid-Ziel. Streamer.bot ist entsprechend dem gestrichenen Integrationsumfang ausgelassen. YouTube Music wird über den tatsächlichen Bridge-Zustand geprüft; seine Auswahl erfordert keine Spotify-Startplaylist. Explizite native Musikflags haben Vorrang vor erhaltenen historischen Workflow-Flags.
+
+Abschlussprüfung dieses Abschnitts: vollständiger Rust-Workspace, 179 Frontend-Tests in 45 Dateien, Command-Vertrag, TypeScript und Produktionsbuild erfolgreich. Die installierte Windows-/macOS-Abnahme bleibt offen.
+
+Anders als ein ungespeicherter C#-Textentwurf verwendet die native Prüfung frisch abgefragte Twitch-Kanalinformationen. HTTP-Fehler werden bei Titel/Kategorie als nicht bestandene Prüfung angezeigt; vorherige erfolgreiche Angaben gelten dabei nicht als aktueller Nachweis. Jede Prüfung zeigt Zeitpunkt, Details und Warnungszahl. Scheitert die gesamte Abfrage, bleibt der Fehler sichtbar und ein vorhandenes Ergebnis ist ausdrücklich als vorherige Prüfung markiert.
+
+UI- und native IPC-Tests wurden vor der Implementierung hinzugefügt. Native Tests verbinden den tatsächlichen Tauri-Command mit lokaler Helix-HTTP einschließlich 403 nach vorherigem Erfolg und prüfen Offline-Verhalten, aktuelle Settings, unveränderte Persistenz und fehlenden Streamstart. Modultests prüfen alte/native Musikflags, Providerwahl und unbekannte Kanalinformationen. UI-Tests prüfen manuelles Auslösen, Prüfliste, Fehler/Wiederholung und die produktive Dashboard-Einbindung. Die Browser-Darstellung wurde zusätzlich mit einer getrennten UI-Testfixture und simulierten Diensten geprüft. Die Einträge in das noch fehlende allgemeine App-Benachrichtigungsjournal folgen im nächsten DA2-Ablauf.
+
 | Ablauf | Referenz und tatsächlich vorhandenes Verhalten | Verbleibende Arbeit |
 |---|---|---|
-| Vorprüfung | `Shell/Dashboard/MainWindow.Dashboard.Runtime.cs`, `RunDashboardPreflightAsync`: Dienste, Start-/Liveszene, Titel, Kategorie, Startplaylist, Raid-Ziel; Ergebnisse als Prüfliste und Warnungszahl. | Native Momentaufnahme und erreichbare Dashboard-Karte; gestrichene Streamer.bot-Verbindung auslassen. Prüfung soll Warnungen zeigen und keinen Stream automatisch starten. |
+| Vorprüfung | `Shell/Dashboard/MainWindow.Dashboard.Runtime.cs`, `RunDashboardPreflightAsync`: Dienste, Start-/Liveszene, Titel, Kategorie, Startplaylist, Raid-Ziel; Ergebnisse als Prüfliste und Warnungszahl. | Native Momentaufnahme und Dashboard-Karte sind implementiert. Einträge in das allgemeine Benachrichtigungsjournal sowie installierte Betriebsabnahme bleiben offen. |
 | App-Benachrichtigungen | Dieselbe Datei: `notifications.json`, PascalCase-Felder Timestamp/Severity/Message/IsRead, letzte 250 Einträge, neueste 100 anzeigen, Filter, ungelesene Zahl. `MainWindow.Dashboard.Bindings.cs`: alle gelesen markieren und leeren. | Kompatible native Persistenz, Fehler-/Erfolgseinträge aus tatsächlichen App-Operationen, Events und UI; keine Gleichsetzung mit Twitch-Ereignisfeed. |
 | Schnellzugriffe | `Views/Pages/Dashboard/DashboardPageView.xaml` und Dashboard-Bindings: konfigurierte Start-/Live-/Pause-/Endszene, Audiomixer, Raid-Zielprüfung, Profile. | Fehlende direkte Karten/Zugriffe ergänzen; Profile sollen vorhandene Settings-Anwendung verwenden. Workflow-/Vorbereitungsaufrufe bleiben ausgeschlossen. |
 | OBS-Monitoring | `Shell/Services/Obs/MainWindow.Services.Obs.ConnectionDashboard.cs`, `RefreshObsProfessionalControlAsync`: Stream-/Aufnahme-Zeitcode, CPU/FPS/RAM, Render-/Encoding-Lag, Replay und Kamera. | Tatsächliche vorhandene Statusfelder anzeigen; unbekannte/fehlgeschlagene Abfragen getrennt behandeln und Wiederverbindung prüfen. |

@@ -1753,6 +1753,64 @@ async fn service_statuses(state: State<'_, AppState>) -> Result<Vec<ServiceStatu
 }
 
 #[tauri::command]
+async fn dashboard_preflight(
+    state: State<'_, AppState>,
+) -> Result<ccs_modules::preflight::PreflightSnapshot, String> {
+    let original = state
+        .settings
+        .read_value()
+        .await
+        .map_err(|e| e.to_string())?;
+    let settings: AppSettings =
+        serde_json::from_value(original.clone()).map_err(|e| e.to_string())?;
+    let obs = state.obs.status().await;
+    let twitch = state.twitch.status().await;
+    let mut music = if settings.music_player.provider_id() == "ytmusic" {
+        let mut status = ServiceStatus::disconnected("ytmusic", "YouTube Music verbunden");
+        match state.music_player.snapshot().await {
+            Ok(snapshot) => {
+                status.state = if snapshot.connected && snapshot.error.is_none() {
+                    ccs_modules::ConnectionState::Connected
+                } else {
+                    ccs_modules::ConnectionState::Disconnected
+                };
+                status.detail = snapshot.error.unwrap_or(snapshot.status_text);
+            }
+            Err(error) => {
+                status.detail = error.to_string();
+            }
+        }
+        status
+    } else {
+        state.spotify.status().await
+    };
+    if music.id == "spotify" {
+        music.name = "Spotify verbunden".into();
+    }
+    let channel = if twitch.state == ccs_modules::ConnectionState::Connected {
+        state
+            .twitch
+            .query(
+                &settings.twitch.client_id,
+                &settings.twitch.channel_name,
+                ccs_modules::twitch::TwitchQuery::Channel,
+                None,
+            )
+            .await
+            .map_err(|e| e.to_string())
+    } else {
+        Err("Twitch nicht verbunden; aktuelle Kanalinformationen unbekannt".into())
+    };
+    Ok(ccs_modules::preflight::evaluate(
+        &original,
+        &obs,
+        &twitch,
+        &music,
+        channel.as_ref().map_err(String::as_str),
+    ))
+}
+
+#[tauri::command]
 async fn connect_obs(state: State<'_, AppState>) -> Result<ServiceStatus, String> {
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     let password = state
@@ -2263,6 +2321,7 @@ pub fn run() {
             update_canvas,
             open_overlay_editor,
             service_statuses,
+            dashboard_preflight,
             connect_obs,
             disconnect_obs,
             obs_scenes,

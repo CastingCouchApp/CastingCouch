@@ -61,6 +61,7 @@ pub const CARD_KEYS: &[&str] = &[
     "StreamControl",
     "StreamEnd",
     "Countdown",
+    "Preflight",
     "SpotifyPlayer",
     "TwitchChat",
     "TwitchEvents",
@@ -110,7 +111,7 @@ fn zone(v: &str) -> &str {
 }
 fn default_zone(key: &str) -> &str {
     match key {
-        "ConnectionStatus" | "Countdown" => "Left",
+        "ConnectionStatus" | "Countdown" | "Preflight" => "Left",
         "SpotifyPlayer" | "TwitchEvents" | "CreatorIntelligence" => "Right",
         _ => "Center",
     }

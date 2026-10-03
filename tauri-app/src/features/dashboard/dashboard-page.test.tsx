@@ -134,6 +134,7 @@ describe("Dashboard live service status", () => {
         expect(screen.getByText("Spotify")).toBeInTheDocument();
         expect(screen.queryByText("Sidecar")).not.toBeInTheDocument();
         expect(screen.getByRole("heading", {name:"Streamende und Raid"})).toBeInTheDocument();
+        expect(screen.getByRole("heading", {name:"Vorprüfung"})).toBeInTheDocument();
         expect(screen.getAllByText("Getrennt")).toHaveLength(3);
     });
 
