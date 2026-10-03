@@ -472,3 +472,14 @@ export type TwitchRealtimeEvent = {
     data: Record<string, string>;
 };
 export type TwitchEventFeedSnapshot = { events: TwitchRealtimeEvent[] };
+export type ModerationResult = {
+    applied: boolean;
+    message: string;
+    warnings: string[];
+};
+export function listenTwitchModeration(onChange: () => void) {
+    return listenIfTauri<{ changed: boolean }>(
+        "twitch-moderation-changed",
+        () => onChange(),
+    );
+}

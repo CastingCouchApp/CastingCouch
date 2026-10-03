@@ -7,9 +7,18 @@ const invoke = vi.fn();
 const listen = vi.fn();
 const listeners = new Set<(event: Record<string, unknown>) => void>();
 vi.mock("../../lib/api", () => ({
-    tauriInvoke: (cmd: string, args: unknown) => invoke(cmd, args),
+    tauriInvoke: (cmd: string, args: unknown) =>
+        cmd === "twitch_moderation_snapshot"
+            ? Promise.resolve({ entries: [] })
+            : invoke(cmd, args),
     listenTwitchEvents: (fn: (event: Record<string, unknown>) => void) =>
         listen(fn),
+    listenTwitchModeration: async (fn: () => void) => {
+        listeners.add(fn);
+        return () => {
+            listeners.delete(fn);
+        };
+    },
     FALLBACK_POLL_MS: 15000,
 }));
 vi.mock("./ChatCatalogStatus", () => ({ ChatCatalogStatusPanel: () => null }));
@@ -21,7 +30,13 @@ function event(text: string, id = "message") {
         type: "channel.chat.message",
         at: "2026-10-03T12:00:00Z",
         summary: text,
-        data: { userName: "Alice", userId: "u", messageId: id, text },
+        data: {
+            userName: "Alice",
+            userLogin: "alice",
+            userId: "u",
+            messageId: id,
+            text,
+        },
     };
 }
 function show(enabled = true) {
@@ -176,4 +191,63 @@ it("keeps disconnected controls disabled and cannot moderate a message without a
     expect(
         screen.getByRole("button", { name: "Twitch-Webchat öffnen" }),
     ).toBeDisabled();
+});
+
+it("selects the chat login and routes quick moderation and confirmed clearing through the shared runtime", async () => {
+    invoke.mockImplementation(async (cmd) =>
+        cmd === "twitch_moderate"
+            ? { applied: true, message: "Angewendet", warnings: [] }
+            : cmd === "twitch_chat_feed"
+              ? { events: [event("Hallo")] }
+              : cmd === "twitch_event_feed"
+                ? { events: [] }
+                : { data: [] },
+    );
+    show();
+    await screen.findByText("Hallo");
+    await userEvent.click(screen.getByRole("button", { name: "Moderieren" }));
+    expect(screen.getByLabelText("Moderationsbenutzer")).toHaveValue("alice");
+    await userEvent.clear(screen.getByLabelText("Moderationsbenutzer"));
+    await userEvent.type(
+        screen.getByLabelText("Moderationsbenutzer"),
+        "Entwurf",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Moderieren" }));
+    expect(screen.getByLabelText("Moderationsbenutzer")).toHaveValue("alice");
+    await userEvent.click(
+        screen.getByRole("button", { name: "10 Min. Timeout" }),
+    );
+    await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith("twitch_moderate", {
+            action: {
+                action: "timeout",
+                user: "u",
+                byId: true,
+                minutes: 10,
+                reason: "Chat-Moderation",
+            },
+        }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Löschen" }));
+    await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith("twitch_moderate", {
+            action: { action: "delete_message", messageId: "message" },
+        }),
+    );
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const before = invoke.mock.calls.filter(
+        ([cmd]) => cmd === "twitch_moderate",
+    ).length;
+    await userEvent.click(screen.getByRole("button", { name: "Chat leeren" }));
+    expect(
+        invoke.mock.calls.filter(([cmd]) => cmd === "twitch_moderate"),
+    ).toHaveLength(before);
+    confirm.mockReturnValue(true);
+    await userEvent.click(screen.getByRole("button", { name: "Chat leeren" }));
+    await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith("twitch_moderate", {
+            action: { action: "clear_chat" },
+        }),
+    );
+    confirm.mockRestore();
 });

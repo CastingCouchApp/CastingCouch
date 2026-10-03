@@ -298,6 +298,45 @@ impl TwitchHelixClient {
     }
 }
 impl TwitchClient {
+    pub(super) async fn perform_moderation(
+        &self,
+        client_id: &str,
+        channel: &str,
+        details: &super::moderation::ModerationDetails,
+    ) -> ModuleResult<String> {
+        let (helix, broadcaster, user) = self.operation_client(client_id, channel).await?;
+        let target = if matches!(details.kind, "TIMEOUT" | "BAN" | "AUFHEBEN") {
+            if details.by_id {
+                details.user.clone()
+            } else {
+                helix
+                    .get_user_by_login(&details.user)
+                    .await?
+                    .ok_or_else(|| invalid("Der Twitch-Benutzer wurde nicht gefunden."))?
+                    .id
+            }
+        } else {
+            String::new()
+        };
+        if matches!(details.kind, "TIMEOUT" | "BAN") && target == broadcaster {
+            return Err(invalid("Der eigene Kanal kann nicht moderiert werden."));
+        }
+        let action = match details.kind {
+            "TIMEOUT" | "BAN" => TwitchAction::Ban {
+                id: target.clone(),
+                duration: details.duration,
+                reason: details.reason.clone(),
+            },
+            "AUFHEBEN" => TwitchAction::Unban { id: target.clone() },
+            _ => TwitchAction::DeleteChat {
+                message_id: details.message_id.clone(),
+            },
+        };
+        helix
+            .perform(action.request(&broadcaster, &user)?, None)
+            .await?;
+        Ok(target)
+    }
     pub(super) async fn operation_client(
         &self,
         client_id: &str,

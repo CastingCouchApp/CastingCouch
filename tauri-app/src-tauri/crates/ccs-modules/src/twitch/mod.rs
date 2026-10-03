@@ -1,8 +1,10 @@
 mod chat_catalog;
 mod eventsub;
 mod helix;
+mod moderation;
 mod oauth;
 mod operations;
+pub use moderation::{ModerationAction, ModerationResult, ModerationRuntime, ModerationSnapshot};
 mod tokens;
 pub use chat_catalog::ChatCatalogStatus;
 pub use operations::{TwitchAction, TwitchQuery};

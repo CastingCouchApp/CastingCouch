@@ -62,7 +62,11 @@ impl TwitchHelixClient {
         }
         match self.get_user(Some(login)).await {
             Ok(user) => Ok(Some(user)),
-            Err(crate::ModuleError::Message(msg)) if msg.contains("kein Benutzer") => Ok(None),
+            Err(crate::ModuleError::Message(msg))
+                if msg == "Twitch Helix /users lieferte keinen Benutzer." =>
+            {
+                Ok(None)
+            }
             Err(e) => Err(e),
         }
     }

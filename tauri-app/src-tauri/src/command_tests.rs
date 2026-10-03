@@ -1,5 +1,147 @@
 use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
+use tauri::Listener;
+
+#[test]
+fn moderation_commands_cross_native_ipc_http_events_and_preserve_the_log() {
+    use ccs_modules::twitch::{TwitchOAuthClient, TwitchTokenRepository, TwitchTokenSet};
+    use ccs_secrets::MemorySecretStore;
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
+    };
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let server = MockServer::start().await;
+        let client_id = "abcdefghijabcdefghijabcdefghij";
+        Mock::given(path("/validate"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"client_id":client_id,"login":"owner","user_id":"10","scopes":[],"expires_in":3600})))
+            .mount(&server).await;
+        Mock::given(path("/users"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({"data":[{"id":"10","login":"owner","display_name":"Owner"}]}),
+            ))
+            .mount(&server)
+            .await;
+        Mock::given(method("DELETE"))
+            .and(path("/moderation/chat"))
+            .and(query_param("message_id", "m"))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let secrets = Arc::new(MemorySecretStore::new());
+        TwitchTokenRepository::new(secrets.clone())
+            .save(&TwitchTokenSet::from_oauth(
+                "token".into(),
+                "refresh".into(),
+                3600,
+                vec![],
+            ))
+            .unwrap();
+        let twitch = Arc::new(TwitchClient::with_http(
+            secrets,
+            TwitchOAuthClient::with_base_urls(
+                format!("{}/device", server.uri()),
+                format!("{}/token", server.uri()),
+                format!("{}/validate", server.uri()),
+            ),
+            format!("{}/", server.uri()),
+        ));
+        twitch
+            .connect(&TwitchConnectOptions {
+                client_id: client_id.into(),
+                channel_name: String::new(),
+                scopes: vec![],
+                enable_event_sub: false,
+            })
+            .await
+            .unwrap();
+        let app = test_app_with_clients(root.path().into(), None, Some(twitch));
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let mut settings = state.settings.load().await.unwrap();
+        settings.twitch.client_id = client_id.into();
+        state.settings.save(&settings).await.unwrap();
+        state.bridge.from_twitch(
+            "channel.chat.message",
+            "Hallo",
+            "2026-10-03T12:00:00Z".parse().unwrap(),
+            std::collections::BTreeMap::from([
+                ("messageId".into(), "m".into()),
+                ("userId".into(), "42".into()),
+            ]),
+        );
+        let notifications = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let received = notifications.clone();
+        let listener = app.listen("twitch-event", move |event| {
+            received
+                .lock()
+                .unwrap()
+                .push(serde_json::from_str::<Value>(event.payload()).unwrap());
+        });
+        let changed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = changed.clone();
+        let changed_listener = app.listen("twitch-moderation-changed", move |_| {
+            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        });
+        let result = call(
+            &window,
+            "twitch_moderate",
+            json!({"action":{"action":"delete_message","messageId":" m "}}),
+        )
+        .unwrap();
+        assert_eq!(result["applied"], true);
+        assert!(result.get("event").is_none());
+        assert_eq!(
+            call(&window, "twitch_chat_feed", json!({})).unwrap()["events"],
+            json!([])
+        );
+        assert_eq!(state.hub.history()["events"], json!([]));
+        assert_eq!(notifications.lock().unwrap()[0]["source"], "app");
+        assert_eq!(notifications.lock().unwrap()[0]["data"]["message_id"], "m");
+        assert_eq!(changed.load(std::sync::atomic::Ordering::SeqCst), 1);
+        let snapshot = call(&window, "twitch_moderation_snapshot", json!({})).unwrap();
+        assert!(snapshot["entries"][0].as_str().unwrap().contains("LÖSCHEN"));
+        let file = root.path().join("Logs/twitch-moderation.log");
+        let bytes = std::fs::read(&file).unwrap();
+        let export = root.path().join("export.txt");
+        call(
+            &window,
+            "export_twitch_moderation_log",
+            json!({"path":export}),
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(export).unwrap(), bytes);
+        call(&window, "clear_twitch_moderation_view", json!({})).unwrap();
+        assert_eq!(
+            call(&window, "twitch_moderation_snapshot", json!({})).unwrap()["entries"],
+            json!([])
+        );
+        assert_eq!(std::fs::read(&file).unwrap(), bytes);
+        assert!(call(
+            &window,
+            "twitch_moderate",
+            json!({"action":{"action":"delete_message","messageId":" "}})
+        )
+        .is_err());
+        assert_eq!(notifications.lock().unwrap().len(), 1);
+        app.unlisten(listener);
+        app.unlisten(changed_listener);
+        drop(app);
+        let restart = test_app(root.path().into());
+        let second = WebviewWindowBuilder::new(&restart, "main", Default::default())
+            .build()
+            .unwrap();
+        assert_eq!(
+            call(&second, "twitch_moderation_snapshot", json!({})).unwrap()["entries"],
+            json!([])
+        );
+        assert_eq!(std::fs::read(file).unwrap(), bytes);
+    });
+}
 
 #[test]
 fn native_app_chat_has_500_entries_independent_of_overlay_and_keeps_moderation_in_sync() {
@@ -1128,6 +1270,13 @@ fn test_app_with_spotify(
     root: PathBuf,
     spotify: Option<Arc<SpotifyClient>>,
 ) -> tauri::App<MockRuntime> {
+    test_app_with_clients(root, spotify, None)
+}
+fn test_app_with_clients(
+    root: PathBuf,
+    spotify: Option<Arc<SpotifyClient>>,
+    twitch: Option<Arc<TwitchClient>>,
+) -> tauri::App<MockRuntime> {
     let paths = AppPaths::from_root(root);
     let settings = Arc::new(JsonSettingsStore::new(&paths.settings_file));
     let secrets = Arc::new(KeyringSecretStore::new());
@@ -1168,6 +1317,13 @@ fn test_app_with_spotify(
         ytm.clone(),
     ));
     let obs = ObsClient::new_shared("127.0.0.1", 4455);
+    let twitch = twitch.unwrap_or_else(|| TwitchClient::new_shared(secrets.clone()));
+    let moderation = Arc::new(ccs_modules::twitch::ModerationRuntime::new(
+        settings.clone(),
+        twitch.clone(),
+        bridge.clone(),
+        &paths.logs,
+    ));
     let music_overlay = Arc::new(ccs_modules::music_overlay::MusicOverlayRuntime::new(
         settings.clone(),
         obs.clone(),
@@ -1181,7 +1337,8 @@ fn test_app_with_spotify(
             ytm_error: Mutex::new(None),
             settings_mutation: Mutex::new(()),
             obs,
-            twitch: TwitchClient::new_shared(secrets.clone()),
+            twitch,
+            moderation,
             spotify,
             scene_music,
             music_states,
@@ -1203,6 +1360,10 @@ fn test_app_with_spotify(
             twitch_event_feed,
             twitch_chat_feed,
             twitch_action,
+            twitch_moderate,
+            twitch_moderation_snapshot,
+            clear_twitch_moderation_view,
+            export_twitch_moderation_log,
             twitch_query,
             chat_catalog_status,
             refresh_chat_catalogs,

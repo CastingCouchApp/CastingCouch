@@ -10,6 +10,7 @@ import { TwitchVotes } from "./TwitchVotes";
 import { ChatCatalogStatusPanel } from "./ChatCatalogStatus";
 import { TwitchChatMessage } from "./TwitchChatMessage";
 import { TwitchEventFeed, TwitchEventTime } from "./TwitchEventFeed";
+import { TwitchModeration, useModerationAction } from "./TwitchModeration";
 type Event = {
     type: string;
     at: string;
@@ -47,6 +48,11 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
     const [chatListenerError, setChatListenerError] = useState<string>();
     const [chatSubscriptionAttempt, setChatSubscriptionAttempt] = useState(0);
     const chatList = useRef<HTMLDivElement>(null);
+    const [moderationUser, setModerationUser] = useState({
+        login: "",
+        version: 0,
+    });
+    const moderation = useModerationAction();
     const history = useQuery({
         queryKey: ["twitch-chat-history"],
         queryFn: () => tauriInvoke<{ events: Event[] }>("twitch_chat_feed"),
@@ -171,12 +177,13 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                                 disabled={
                                     !enabled ||
                                     action.isPending ||
+                                    moderation.isPending ||
                                     !event.data.messageId
                                 }
                                 variant="ghost"
                                 onClick={() =>
-                                    mutate({
-                                        action: "delete_chat",
+                                    moderation.mutate({
+                                        action: "delete_message",
                                         messageId: event.data.messageId,
                                     })
                                 }
@@ -187,20 +194,35 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                                 disabled={
                                     !enabled ||
                                     action.isPending ||
+                                    moderation.isPending ||
                                     !event.data.userId
                                 }
                                 variant="ghost"
                                 onClick={() =>
-                                    mutate({
-                                        action: "ban",
-                                        id: event.data.userId,
-                                        duration: 600,
+                                    moderation.mutate({
+                                        action: "timeout",
+                                        user: event.data.userId,
+                                        byId: true,
+                                        minutes: 10,
                                         reason: "Chat-Moderation",
                                     })
                                 }
                             >
                                 10 Min. Timeout
                             </Button>
+                            {event.data.userLogin && (
+                                <Button
+                                    variant="ghost"
+                                    onClick={() =>
+                                        setModerationUser((previous) => ({
+                                            login: event.data.userLogin,
+                                            version: previous.version + 1,
+                                        }))
+                                    }
+                                >
+                                    Moderieren
+                                </Button>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -237,7 +259,9 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                         Twitch-Webchat öffnen
                     </Button>
                     <Button
-                        disabled={!enabled || action.isPending}
+                        disabled={
+                            !enabled || action.isPending || moderation.isPending
+                        }
                         variant="danger"
                         onClick={() => {
                             if (
@@ -245,18 +269,29 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                                     "Den Twitch-Chat vollständig leeren?",
                                 )
                             )
-                                mutate({
-                                    action: "delete_chat",
-                                    messageId: null,
+                                moderation.mutate({
+                                    action: "clear_chat",
                                 });
                         }}
                     >
                         Chat leeren
                     </Button>
                 </div>
-                {(action.error || webChat.error) && (
-                    <p role="alert">{String(action.error ?? webChat.error)}</p>
+                {(action.error || webChat.error || moderation.error) && (
+                    <p role="alert">
+                        {String(
+                            action.error ?? webChat.error ?? moderation.error,
+                        )}
+                    </p>
                 )}
+                {moderation.data?.message && (
+                    <p role="status">{moderation.data.message}</p>
+                )}
+                {moderation.data?.warnings.map((warning, index) => (
+                    <p role="alert" key={index}>
+                        {warning}
+                    </p>
+                ))}
             </Card>
             <Card className="space-y-3">
                 <h2 className="text-lg font-semibold">Twitch-Kanal</h2>
@@ -390,6 +425,11 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                 )}
             </Card>
             <TwitchRewards enabled={enabled} />
+            <TwitchModeration
+                enabled={enabled}
+                selectedUser={moderationUser.login}
+                selectionVersion={moderationUser.version}
+            />
             <TwitchVotes enabled={enabled} />
         </div>
     );

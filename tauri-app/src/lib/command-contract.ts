@@ -130,6 +130,13 @@ export type TwitchAction =
   | { action: "create_prediction"; title: string; outcomes: Array<string>; window: number }
   | { action: "end_prediction"; id: string; status: string; winningOutcomeId?: string | null };
 
+export type ModerationAction =
+  | { action: "timeout"; user: string; byId: boolean; minutes: number; reason: string }
+  | { action: "ban"; user: string; byId: boolean; reason: string }
+  | { action: "unban"; user: string; byId: boolean }
+  | { action: "delete_message"; messageId: string }
+  | { action: "clear_chat" };
+
 export type TwitchQuery =
   | { query: "channel" }
   | { query: "stream" }
@@ -157,6 +164,10 @@ export type CommandInvocation =
   | [command: "delete_profile", args: { id: string }]
   | [command: "apply_profile", args: { id: string; original: unknown }]
   | [command: "open_twitch_chat", args?: Record<string, never>]
+  | [command: "twitch_moderate", args: { action: ModerationAction }]
+  | [command: "twitch_moderation_snapshot", args?: Record<string, never>]
+  | [command: "clear_twitch_moderation_view", args?: Record<string, never>]
+  | [command: "export_twitch_moderation_log", args: { path: string }]
   | [command: "twitch_action", args: { action: TwitchAction }]
   | [command: "twitch_query", args: { query: TwitchQuery; after?: string | null }]
   | [command: "twitch_event_feed", args?: Record<string, never>]

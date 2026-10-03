@@ -25,6 +25,7 @@ const domainFiles = {
     MusicPlayerAction: ["music_player.rs", "action"],
     MusicStateAction: ["spotify_states.rs", "action"],
     TwitchAction: ["twitch/operations.rs", "action"],
+    ModerationAction: ["twitch/moderation.rs", "action"],
     TwitchQuery: ["twitch/operations.rs", "query"],
 };
 function type(rust) {

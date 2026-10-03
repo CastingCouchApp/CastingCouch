@@ -155,6 +155,7 @@ pub struct AppState {
     pub overlay: Mutex<Option<OverlayServer>>,
     pub obs: Arc<ObsClient>,
     pub twitch: Arc<TwitchClient>,
+    pub moderation: Arc<ccs_modules::twitch::ModerationRuntime>,
     pub spotify: Arc<SpotifyClient>,
     pub scene_music: Arc<ccs_modules::scene_music::SceneMusicEngine>,
     pub music_states: Arc<ccs_modules::spotify_states::SpotifyStateRuntime>,
@@ -205,6 +206,43 @@ async fn open_twitch_chat(app: AppHandle, state: State<'_, AppState>) -> Result<
     let builder = builder.data_directory(state.paths.data_root.join("WebView/Twitch"));
     builder.build().map_err(|e| e.to_string())?;
     Ok(())
+}
+#[tauri::command]
+async fn twitch_moderate<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    action: ccs_modules::twitch::ModerationAction,
+) -> Result<ccs_modules::twitch::ModerationResult, String> {
+    let result = state.moderation.execute(action).await;
+    let _ = app.emit("twitch-moderation-changed", json!({"changed":true}));
+    if let Ok(result) = &result {
+        if let Some(event) = &result.event {
+            let _ = app.emit("twitch-event", event);
+        }
+    }
+    result
+}
+#[tauri::command]
+async fn twitch_moderation_snapshot(
+    state: State<'_, AppState>,
+) -> Result<ccs_modules::twitch::ModerationSnapshot, String> {
+    Ok(state.moderation.snapshot().await)
+}
+#[tauri::command]
+async fn clear_twitch_moderation_view<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state.moderation.clear_view().await;
+    let _ = app.emit("twitch-moderation-changed", json!({"changed":true}));
+    Ok(())
+}
+#[tauri::command]
+async fn export_twitch_moderation_log(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<(), String> {
+    state.moderation.export(&PathBuf::from(path)).await
 }
 #[tauri::command]
 async fn twitch_action(
@@ -1551,6 +1589,10 @@ pub fn run() {
             overlay_runtime_status,
             open_twitch_chat,
             twitch_action,
+            twitch_moderate,
+            twitch_moderation_snapshot,
+            clear_twitch_moderation_view,
+            export_twitch_moderation_log,
             twitch_query,
             chat_catalog_status,
             refresh_chat_catalogs,
@@ -1904,6 +1946,12 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         settings.clone(),
         obs.clone(),
     ));
+    let moderation = Arc::new(ccs_modules::twitch::ModerationRuntime::new(
+        settings.clone(),
+        twitch.clone(),
+        bridge.clone(),
+        &paths.logs,
+    ));
     app.manage(AppState {
         ytm,
         music_player,
@@ -1917,6 +1965,7 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         overlay: Mutex::new(overlay_server.ok()),
         obs,
         twitch,
+        moderation,
         spotify,
         scene_music,
         music_states,
