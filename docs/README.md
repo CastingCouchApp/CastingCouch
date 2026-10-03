@@ -21,6 +21,8 @@ Creator Intelligence in Tauri: [`architecture/TAURI-CREATOR-INTELLIGENCE.md`](ar
 
 Tauri-Dashboard und Bedienpult: [`architecture/TAURI-DASHBOARD.md`](architecture/TAURI-DASHBOARD.md)
 
+Tauri-Streamende und Raid: [`architecture/TAURI-STREAM-END.md`](architecture/TAURI-STREAM-END.md)
+
 Verkaufsrisiken: [`architecture/RISK-REGISTER.md`](architecture/RISK-REGISTER.md)
 
 Betriebsfreigabe: [`operations/SALES-READINESS-RUNBOOK.md`](operations/SALES-READINESS-RUNBOOK.md)

@@ -14,6 +14,7 @@ pub mod twitch;
 pub mod stream_history;
 pub mod creator_intelligence;
 pub mod dashboard;
+pub mod stream_end;
 
 use serde::{Deserialize, Serialize};
 

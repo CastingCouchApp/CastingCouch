@@ -93,6 +93,12 @@ pub fn parse_eventsub_message_at(
             if let Some(id) = root.pointer("/metadata/message_id").and_then(Value::as_str).filter(|id| !id.is_empty()) {
                 data.insert("eventSubMessageId".into(), id.into());
             }
+            if let Some(timestamp) = root
+                .pointer("/metadata/message_timestamp")
+                .and_then(Value::as_str)
+            {
+                data.insert("eventSubMessageTimestamp".into(), timestamp.into());
+            }
             if event_type == "channel.chat.message" {
                 enrich_chat(&event_data, &mut data);
             }
@@ -724,6 +730,21 @@ mod tests {
 
 #[cfg(test)]
 mod chat_contract_tests {
+    #[test]
+    fn notification_preserves_server_timestamp_for_raid_completion_freshness() {
+        let raw = serde_json::json!({
+            "metadata": {"message_type":"notification", "message_id":"raid-proof",
+                "message_timestamp":"2026-10-03T10:00:00Z"},
+            "payload": {"subscription":{"type":"channel.raid"},
+                "event":{"from_broadcaster_user_id":"own","to_broadcaster_user_id":"target"}}
+        }).to_string();
+        let super::EventSubMessage::Notification(event) = super::parse_eventsub_message(&raw).unwrap()
+        else {
+            panic!("notification expected")
+        };
+        assert_eq!(event.data["eventSubMessageTimestamp"], "2026-10-03T10:00:00Z");
+        assert_eq!(event.data["eventSubMessageId"], "raid-proof");
+    }
     #[tokio::test]
     async fn management_notifications_preserve_results_over_the_websocket() {
         use super::*;
