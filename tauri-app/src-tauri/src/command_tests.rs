@@ -22,6 +22,15 @@ fn test_app_with_spotify(
     let scene_music = Arc::new(ccs_modules::scene_music::SceneMusicEngine::new(
         settings.clone(),
         spotify.clone(),
+        ducking.clone(),
+    ));
+    let music_states = Arc::new(ccs_modules::spotify_states::SpotifyStateRuntime::new(
+        Arc::new(ccs_core::spotify_states::SpotifyStateStore::new(
+            paths.data_root.clone(),
+        )),
+        settings.clone(),
+        spotify.clone(),
+        scene_music.clone(),
         ducking,
     ));
     mock_builder()
@@ -33,6 +42,7 @@ fn test_app_with_spotify(
             twitch: TwitchClient::new_shared(secrets.clone()),
             spotify,
             scene_music,
+            music_states,
             paths,
             settings,
             secrets,
@@ -52,6 +62,8 @@ fn test_app_with_spotify(
             spotify_action,
             music_automation_action,
             music_automation_status,
+            music_state_action,
+            music_state_snapshot,
             set_spotify_playlist_favorite,
             startup_error,
             overlay_runtime_status,
@@ -78,6 +90,44 @@ fn test_app_with_spotify(
         ])
         .build(mock_context(noop_assets()))
         .unwrap()
+}
+
+#[test]
+fn music_state_history_profiles_and_backups_cross_native_ipc_and_survive_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("import.json");
+    std::fs::write(&file,json!({"FormatVersion":2,"Entries":["10:00:00 · Intro: Song gespeichert"],"SavedCount":7,"Custom":42}).to_string()).unwrap();
+    let app = test_app(dir.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let action = |action: Value| call(&window, "music_state_action", json!({"action":action}));
+    action(json!({"action":"history_import","path":file.to_string_lossy()})).unwrap();
+    let data = call(&window, "music_state_snapshot", json!({})).unwrap();
+    assert_eq!(data["history"]["SavedCount"], 7);
+    assert_eq!(data["history"]["Custom"], 42);
+    action(json!({"action":"history_edit","entries":["10:00:00 · Intro: Song gespeichert"],"favorite":true,"note":"native","remove":false})).unwrap();
+    let backup = action(json!({"action":"backup"})).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    action(json!({"action":"profile_save","profile":{"Name":"Eigenes Profil","Entries":true,"MergeEntries":true}})).unwrap();
+    let preview = action(json!({"action":"backup_preview","id":backup})).unwrap();
+    assert_eq!(preview["unchanged"], 1);
+    assert!(action(json!({"action":"restore","group":"Standard","fadeSeconds":301})).is_err());
+    let export = dir.path().join("export.csv");
+    action(json!({"action":"history_export","path":export.to_string_lossy(),"csv":true})).unwrap();
+    assert!(std::fs::read_to_string(export).unwrap().contains("native"));
+    let restarted = test_app(dir.path().into());
+    let second = WebviewWindowBuilder::new(&restarted, "main", Default::default())
+        .build()
+        .unwrap();
+    let doc = call(&second, "music_state_snapshot", json!({})).unwrap();
+    assert_eq!(
+        doc["history"]["Notes"]["10:00:00 · Intro: Song gespeichert"],
+        "native"
+    );
+    assert_eq!(doc["profiles"].as_array().unwrap().len(), 4);
 }
 
 #[test]

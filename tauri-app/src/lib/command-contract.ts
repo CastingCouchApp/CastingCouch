@@ -55,6 +55,7 @@ export type SpotifyAction =
   | { action: "transfer"; deviceId: string }
   | { action: "play_track"; uri: string }
   | { action: "play_playlist"; uri: string }
+  | { action: "restore_playback"; contextUri: string; trackUri?: string | null }
   | { action: "queue"; uri: string }
   | { action: "save_track"; id: string }
   | { action: "remove_saved_track"; id: string };
@@ -79,7 +80,29 @@ export type MusicAction =
   | { action: "fade_in" }
   | { action: "fade_out" }
   | { action: "fade_to"; percent: number; milliseconds: number; pauseAtEnd: boolean }
-  | { action: "stop" };
+  | { action: "stop" }
+  | { action: "restore_state"; state: unknown; fadeSeconds: number };
+
+export type MusicStateAction =
+  | { action: "capture"; group: string }
+  | { action: "restore"; group: string; fadeSeconds: number }
+  | { action: "discard"; group: string }
+  | { action: "discard_all" }
+  | { action: "cleanup" }
+  | { action: "history_edit"; entries: Array<string>; favorite?: boolean | null; note?: string | null; remove: boolean }
+  | { action: "history_clear" }
+  | { action: "history_filters"; filters: unknown }
+  | { action: "backup" }
+  | { action: "backup_preview"; id: string }
+  | { action: "backup_restore"; id: string; options: unknown; original: unknown }
+  | { action: "backup_delete"; id: string }
+  | { action: "history_import"; path: string }
+  | { action: "history_export"; path: string; entries?: Array<string> | null; csv: boolean }
+  | { action: "profile_save"; profile: unknown }
+  | { action: "profile_delete"; name: string }
+  | { action: "profiles_preview"; path: string }
+  | { action: "profiles_import"; proposals: unknown; actions: Array<string>; original: unknown }
+  | { action: "profiles_export"; path: string };
 
 export type TwitchAction =
   | { action: "channel"; title: string; categoryId: string }
@@ -130,6 +153,8 @@ export type CommandInvocation =
   | [command: "spotify_action", args: { action: SpotifyAction }]
   | [command: "music_automation_action", args: { action: MusicAction }]
   | [command: "music_automation_status", args?: Record<string, never>]
+  | [command: "music_state_action", args: { action: MusicStateAction }]
+  | [command: "music_state_snapshot", args?: Record<string, never>]
   | [command: "set_spotify_playlist_favorite", args: { uri: string; favorite: boolean }]
   | [command: "activate_spotify_device", args: { play: boolean }]
   | [command: "spotify_query", args: { query: SpotifyQuery; offset?: number | null }]

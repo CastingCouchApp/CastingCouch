@@ -14,16 +14,40 @@ pub enum SpotifyAction {
     Pause,
     Next,
     Previous,
-    Volume { percent: u8 },
-    Seek { position_ms: u32 },
-    Shuffle { enabled: bool },
-    Repeat { mode: String },
-    Transfer { device_id: String },
-    PlayTrack { uri: String },
-    PlayPlaylist { uri: String },
-    Queue { uri: String },
-    SaveTrack { id: String },
-    RemoveSavedTrack { id: String },
+    Volume {
+        percent: u8,
+    },
+    Seek {
+        position_ms: u32,
+    },
+    Shuffle {
+        enabled: bool,
+    },
+    Repeat {
+        mode: String,
+    },
+    Transfer {
+        device_id: String,
+    },
+    PlayTrack {
+        uri: String,
+    },
+    PlayPlaylist {
+        uri: String,
+    },
+    RestorePlayback {
+        context_uri: String,
+        track_uri: Option<String>,
+    },
+    Queue {
+        uri: String,
+    },
+    SaveTrack {
+        id: String,
+    },
+    RemoveSavedTrack {
+        id: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -83,6 +107,9 @@ fn track_uri(value: &str) -> ModuleResult<String> {
     Ok(format!("spotify:track:{}", valid_id(id)?))
 }
 impl SpotifyAction {
+    pub fn validate(&self) -> ModuleResult<()> {
+        self.request().map(|_| ())
+    }
     fn request(&self) -> ModuleResult<Request> {
         use reqwest::Method;
         Ok(match self {
@@ -117,6 +144,38 @@ impl SpotifyAction {
             }
             Self::PlayPlaylist { uri } => {
                 Request::new(Method::PUT, "me/player/play").body(json!({"context_uri":uri}))
+            }
+            Self::RestorePlayback {
+                context_uri,
+                track_uri,
+            } => {
+                let mut body = json!({});
+                if !context_uri.trim().is_empty() {
+                    let parts = context_uri.trim().split(':').collect::<Vec<_>>();
+                    if parts.len() != 3
+                        || parts[0] != "spotify"
+                        || !["album", "playlist", "artist"].contains(&parts[1])
+                    {
+                        return Err(ModuleError::Message("Ungültiger Spotify-Kontext".into()));
+                    }
+                    valid_id(parts[2])?;
+                    body["context_uri"] = json!(context_uri.trim());
+                    if let Some(uri) = track_uri {
+                        if parts[1] == "artist" {
+                            return Err(ModuleError::Message(
+                                "Ein bestimmter Titel kann im Künstler-Kontext nicht wiederhergestellt werden".into(),
+                            ));
+                        }
+                        body["offset"] = json!({"uri":track_uri_checked(uri)?});
+                    }
+                } else if let Some(uri) = track_uri {
+                    body["uris"] = json!([track_uri_checked(uri)?]);
+                } else {
+                    return Err(ModuleError::Message(
+                        "Titel oder Kontext zur Wiederherstellung fehlt".into(),
+                    ));
+                }
+                Request::new(Method::PUT, "me/player/play").body(body)
             }
             Self::Queue { uri } => Request::new(Method::POST, "me/player/queue").param("uri", uri),
             Self::SaveTrack { id } => {
@@ -325,6 +384,7 @@ impl SpotifyClient {
                 | SpotifyAction::Repeat { .. }
                 | SpotifyAction::PlayTrack { .. }
                 | SpotifyAction::PlayPlaylist { .. }
+                | SpotifyAction::RestorePlayback { .. }
                 | SpotifyAction::Queue { .. }
         ) {
             if let Some(id) = device_id.filter(|id| !id.trim().is_empty()) {
@@ -439,6 +499,13 @@ impl SpotifyClient {
             result => result,
         }
     }
+}
+fn track_uri_checked(uri: &str) -> ModuleResult<String> {
+    let id = uri
+        .trim()
+        .strip_prefix("spotify:track:")
+        .ok_or_else(|| ModuleError::Message("Ungültige Spotify-Titel-URI".into()))?;
+    Ok(format!("spotify:track:{}", valid_id(id)?))
 }
 
 #[cfg(test)]

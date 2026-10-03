@@ -135,6 +135,7 @@ pub struct AppState {
     pub twitch: Arc<TwitchClient>,
     pub spotify: Arc<SpotifyClient>,
     pub scene_music: Arc<ccs_modules::scene_music::SceneMusicEngine>,
+    pub music_states: Arc<ccs_modules::spotify_states::SpotifyStateRuntime>,
     pub alerts: Arc<AlertEngine>,
     pub bridge: OverlayEventBridge,
     pub verified_update: Mutex<Option<PathBuf>>,
@@ -323,6 +324,27 @@ async fn music_automation_action(
 #[tauri::command]
 async fn music_automation_status(state: State<'_, AppState>) -> Result<Value, String> {
     Ok(state.scene_music.status().await)
+}
+
+#[tauri::command]
+async fn music_state_action(
+    state: State<'_, AppState>,
+    action: ccs_modules::spotify_states::MusicStateAction,
+) -> Result<Value, String> {
+    state
+        .music_states
+        .action(action)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn music_state_snapshot(state: State<'_, AppState>) -> Result<Value, String> {
+    state
+        .music_states
+        .snapshot()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1194,6 +1216,8 @@ pub fn run() {
             spotify_action,
             music_automation_action,
             music_automation_status,
+            music_state_action,
+            music_state_snapshot,
             set_spotify_playlist_favorite,
             activate_spotify_device,
             spotify_query,
@@ -1338,8 +1362,29 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let scene_music = Arc::new(ccs_modules::scene_music::SceneMusicEngine::new(
         settings.clone(),
         spotify.clone(),
+        ducking.clone(),
+    ));
+    let music_states = Arc::new(ccs_modules::spotify_states::SpotifyStateRuntime::new(
+        Arc::new(ccs_core::spotify_states::SpotifyStateStore::new(
+            paths.data_root.clone(),
+        )),
+        settings.clone(),
+        spotify.clone(),
+        scene_music.clone(),
         ducking,
     ));
+    let mut state_changes = music_states.subscribe();
+    let state_app = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match state_changes.recv().await {
+                Ok(()) | Err(broadcast::error::RecvError::Lagged(_)) => {
+                    let _ = state_app.emit("music-states-changed", json!({"changed": true}));
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
     tauri::async_runtime::spawn(scene_music.bind_obs(&obs));
     let mut music_status = scene_music.subscribe_status();
     let music_app = app.handle().clone();
@@ -1474,6 +1519,7 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         twitch,
         spotify,
         scene_music,
+        music_states,
         alerts,
         bridge,
         verified_update: Mutex::new(None),

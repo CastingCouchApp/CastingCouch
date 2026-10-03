@@ -6,6 +6,7 @@ pub mod scene_music;
 pub mod obs;
 pub mod overlay_bridge;
 pub mod spotify;
+pub mod spotify_states;
 pub mod twitch;
 
 use serde::{Deserialize, Serialize};

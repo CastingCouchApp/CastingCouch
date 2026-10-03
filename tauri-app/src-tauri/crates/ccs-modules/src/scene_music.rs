@@ -52,6 +52,10 @@ pub enum MusicAction {
         pause_at_end: bool,
     },
     Stop,
+    RestoreState {
+        state: Value,
+        fade_seconds: u32,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -470,6 +474,98 @@ impl SceneMusicEngine {
                     .await?;
             }
             MusicAction::Stop => (),
+            MusicAction::RestoreState {
+                state,
+                fade_seconds,
+            } => {
+                if fade_seconds > 300 {
+                    return Err(ModuleError::Message(
+                        "Wiederherstellungs-Fade darf höchstens 300 Sekunden dauern".into(),
+                    ));
+                }
+                let state: ccs_core::spotify_states::SavedPlaybackState =
+                    serde_json::from_value(state)
+                        .map_err(|e| ModuleError::Message(e.to_string()))?;
+                state
+                    .validate()
+                    .map_err(|e| ModuleError::Message(e.to_string()))?;
+                let action = SpotifyAction::RestorePlayback {
+                    context_uri: state.context_uri.clone(),
+                    track_uri: state.track["Uri"].as_str().map(str::to_string),
+                };
+                action.validate()?;
+                let device = self
+                    .player
+                    .activate_preferred_device(client, options, false)
+                    .await?["id"]
+                    .as_str()
+                    .map(str::to_string);
+                if fade_seconds > 0 {
+                    self.ducking
+                        .set_volume_on_device(client, 0, device.as_deref())
+                        .await?;
+                }
+                self.player
+                    .action_on_device(
+                        client,
+                        SpotifyAction::Repeat {
+                            mode: state.repeat_mode.clone(),
+                        },
+                        device.as_deref(),
+                    )
+                    .await?;
+                self.player
+                    .action_on_device(client, action, device.as_deref())
+                    .await?;
+                self.player
+                    .action_on_device(
+                        client,
+                        SpotifyAction::Shuffle {
+                            enabled: state.shuffle_enabled,
+                        },
+                        device.as_deref(),
+                    )
+                    .await?;
+                if state.progress_ms > 0 {
+                    tokio::time::sleep(Duration::from_millis(350)).await;
+                    self.player
+                        .action_on_device(
+                            client,
+                            SpotifyAction::Seek {
+                                position_ms: state.progress_ms,
+                            },
+                            device.as_deref(),
+                        )
+                        .await?;
+                }
+                if fade_seconds == 0 {
+                    self.ducking
+                        .set_volume_on_device(client, state.volume_percent, device.as_deref())
+                        .await?;
+                } else {
+                    let steps = (fade_seconds as u64 * 4).min(120);
+                    for step in 1..=steps {
+                        let volume = (state.volume_percent as f64 * step as f64 / steps as f64)
+                            .round() as u8;
+                        self.ducking
+                            .set_volume_on_device(client, volume, device.as_deref())
+                            .await?;
+                        if step < steps {
+                            tokio::time::sleep(Duration::from_millis(
+                                fade_seconds as u64 * 1000 / steps,
+                            ))
+                            .await;
+                        }
+                    }
+                }
+                if !state.was_playing {
+                    self.player
+                        .action_on_device(client, SpotifyAction::Pause, device.as_deref())
+                        .await?;
+                }
+                self.log("Zustand", true, "Wiedergabe wiederhergestellt")
+                    .await;
+            }
         }
         Ok(())
     }
