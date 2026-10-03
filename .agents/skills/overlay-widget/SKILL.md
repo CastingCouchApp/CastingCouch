@@ -169,6 +169,13 @@ Nicht `destination-out` — bricht in OBS/CEF-Compositing oft zu opakem Schwarz.
 
 ## Tauri-Host und Distribution
 
+### Chat-Konfiguration und laufende Clients
+
+- Globale Chat-Darstellung bleibt unter `Overlay.Chat` gespeichert; `/chat/config` liefert die normalisierte camelCase-Projektion, niemals den lokalen Bildpfad. Rust-Projektion: `ccs-overlay-server/src/chat_config.rs`; React-Bedienung: `features/settings/ChatAppearanceSettings.tsx`. Unbekannte/raw C#-Felder nicht durch Anzeige-Defaults überschreiben.
+- Nach erfolgreicher Änderung der Chat-Einstellungen veröffentlicht der Tauri-Host `app.chat.config` mit dem bestehenden App-Envelope. Das Ereignis ist ein Reload-Hinweis; Standalone (`ChatOverlay/chat.js`) und gemeinsame Runtime (`shared/runtime/create-runtime.ts`) laden `/chat/config` erneut. Ausdrückliche Widget-Props behalten Vorrang. Veraltete Antworten dürfen einen neueren Stand nicht ersetzen.
+- `enabled=false` blendet alle Chat-Varianten aus. Moderationsereignisse müssen weiterhin gespeicherte/zwischengespeicherte Nachrichten entfernen. History-Antworten, deren Anfrage vor einer Moderationsänderung begann, dürfen gelöschte Nachrichten nicht wieder einfügen.
+- Tests: `chat-config-runtime`, `standalone-chat-config` und `chat-entrypoints` im Canvas-Projekt, native IPC in `src-tauri/src/command_tests.rs` sowie tatsächliches HTTP in `ccs-overlay-server/tests/http_contract.rs`. Einstiegspunkt-Tests kompilieren View/Solo und laden HTTP; ihre WebSocket-Transportseite ist kontrolliert. Native IPC prüft einen echten Overlay-WebSocket. OBS/CEF und installierte Pakete bleiben eigene Betriebsabnahme.
+
 Das gemeinsame Canvas-Frontend wird auch vom Rust-Host verwendet. Bei Änderungen am Built-in-Katalog zusätzlich `tauri-app/src-tauri/crates/ccs-overlay-server/src/assets.rs` (`list_widget_types` / `list_shape_types`) synchron halten. Der Katalog muss weiterhin dem C#-`OverlayWebServer` entsprechen.
 
 Vor einem Rust-Test/Build zuerst im `CanvasOverlay` `npm ci` und `npm run build` ausführen. `ccs-overlay-server/build.rs` bettet `editor/`, `view/`, `solo/`, `shared/` einschließlich der generierten Bundles in die Binary ein. Installation benötigt keinen Checkout. `CCS_OVERLAY_ASSETS` ist ausschließlich ein Debug-Override. Bei Änderungen am Buildablauf auch `build/Build-Tauri-Release.ps1` und den Tauri-CI-Job prüfen. Verifikation: `cargo test --workspace` unter `tauri-app/src-tauri`, insbesondere `tests/distribution.rs` und `tests/http_contract.rs`.

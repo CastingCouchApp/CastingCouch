@@ -460,54 +460,7 @@ async fn chat_asset(Path(file): Path<String>) -> Response {
 }
 async fn chat_config(State(state): State<OverlayState>) -> Result<Json<Value>, ApiError> {
     let settings = state.settings.load().await.map_err(api_error)?;
-    let raw = serde_json::to_value(settings.overlay.chat).map_err(api_error)?;
-    let mut config = json!({"backgroundType":"None","backgroundColor":"#000000","backgroundOpacity":0.55,"paddingPx":12,"borderRadiusPx":12,"gapPx":6,"fontSizePx":18,"fontFamily":"Segoe UI, system-ui, sans-serif"});
-    for (key, value) in raw
-        .as_object()
-        .ok_or_else(|| api_error("Chat-Konfiguration ungültig"))?
-    {
-        if key == "BackgroundImagePath" {
-            continue;
-        }
-        let camel = format!("{}{}", key[..1].to_ascii_lowercase(), &key[1..]);
-        config[camel] = value.clone();
-    }
-    for (key, min, max) in [
-        ("backgroundOpacity", 0.0, 1.0),
-        ("paddingPx", 0.0, 120.0),
-        ("borderRadiusPx", 0.0, 64.0),
-        ("gapPx", 0.0, 48.0),
-        ("fontSizePx", 8.0, 72.0),
-    ] {
-        if let Some(value) = config[key].as_f64() {
-            config[key] = if key == "backgroundOpacity" {
-                json!(value.clamp(min, max))
-            } else {
-                json!(value.clamp(min, max) as i64)
-            };
-        }
-    }
-    let kind = config["backgroundType"]
-        .as_str()
-        .unwrap_or("None")
-        .trim()
-        .to_ascii_lowercase();
-    let image = raw["BackgroundImagePath"]
-        .as_str()
-        .map(ccs_core::paths::expand_path)
-        .filter(|p| p.is_file());
-    config["backgroundType"] = json!(match kind.as_str() {
-        "image" if image.is_some() => "Image",
-        "color" => "Color",
-        _ => "None",
-    });
-    config["backgroundVersion"] = json!(image
-        .and_then(|p| std::fs::metadata(p).ok())
-        .and_then(|m| m.modified().ok())
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos().to_string())
-        .unwrap_or_else(|| "0".into()));
-    Ok(Json(config))
+    Ok(Json(crate::chat_config::config(&settings.overlay.chat)))
 }
 async fn chat_history(State(state): State<OverlayState>) -> Json<Value> {
     let config = state.settings.load().await.ok().map(|s| s.overlay.chat);
@@ -525,16 +478,8 @@ async fn chat_history(State(state): State<OverlayState>) -> Json<Value> {
 }
 async fn chat_background(State(state): State<OverlayState>) -> Response {
     if let Ok(settings) = state.settings.load().await {
-        if let Some(path) = settings
-            .overlay
-            .chat
-            .extra
-            .get("BackgroundImagePath")
-            .and_then(Value::as_str)
-        {
-            if !path.is_empty() {
-                return serve_file(ccs_core::paths::expand_path(path)).await;
-            }
+        if let Some(path) = crate::chat_config::background_path(&settings.overlay.chat) {
+            return serve_file(path).await;
         }
     }
     StatusCode::NOT_FOUND.into_response()

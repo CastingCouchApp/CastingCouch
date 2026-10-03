@@ -26,6 +26,9 @@
   };
 
   let showTwitchEvents = true;
+  let enabled = true;
+  let configRevision = 0;
+  let historyRevision = 0;
   const panel = document.getElementById("panel");
   const TWITCH_DEFAULT_COLORS = [
     "#FF0000", "#0000FF", "#00FF00", "#B22222", "#FF7F50",
@@ -139,11 +142,13 @@
   }
 
   function clearChat() {
+    historyRevision++;
     seenMessageIds.clear();
     setStatus("Chat bereit");
   }
 
   function removeMessageById(messageId) {
+    historyRevision++;
     const id = String(messageId || "");
     if (!id) return;
     seenMessageIds.delete(id);
@@ -156,6 +161,7 @@
   }
 
   function removeMessagesByUser(userLogin, userId) {
+    historyRevision++;
     const login = String(userLogin || "").toLowerCase();
     const id = String(userId || "");
     const lines = Array.from(root.querySelectorAll(".line[data-message-id]"));
@@ -233,26 +239,39 @@
   }
 
   async function loadConfig() {
+    const revision = ++configRevision;
     try {
       const response = await fetch("/chat/config", { cache: "no-store" });
       if (!response.ok) {
         return;
       }
       const config = await response.json();
+      if (revision !== configRevision || !config || typeof config !== "object" || Array.isArray(config)) return false;
+      enabled = config.enabled !== false;
+      if (panel) {
+        panel.hidden = !enabled;
+        panel.style.display = enabled ? "" : "none";
+      }
       showTwitchEvents = config.showTwitchEvents !== false;
+      if (!showTwitchEvents) root.querySelectorAll(".event").forEach(line => line.remove());
       applyAppearance(config);
+      return enabled;
     } catch {
       // defaults
     }
   }
 
   async function loadHistory() {
+    if (!enabled) return;
+    const revision = configRevision;
+    const historyAtRequest = historyRevision;
     try {
       const response = await fetch("/chat/history", { cache: "no-store" });
       if (!response.ok) {
         return;
       }
       const payload = await response.json();
+      if (!enabled || revision !== configRevision || historyAtRequest !== historyRevision) return;
       const events = Array.isArray(payload.events) ? payload.events : [];
       for (const evt of events) {
         if (evt?.source === "twitch" && evt?.type === "channel.chat.message") {
@@ -268,7 +287,7 @@
     const socket = new WebSocket(wsUrl());
 
     socket.addEventListener("open", () => {
-      void loadConfig().then(loadHistory);
+      void loadConfig().then(ready => { if (ready) return loadHistory(); });
     });
 
     socket.addEventListener("message", (event) => {
@@ -276,6 +295,10 @@
       try {
         payload = JSON.parse(event.data);
       } catch {
+        return;
+      }
+      if (payload?.source === "app" && payload?.type === "app.chat.config") {
+        void loadConfig().then(ready => { if (ready) return loadHistory(); });
         return;
       }
 
@@ -301,12 +324,13 @@
       }
 
       if (payload?.source === "twitch" && payload?.type === "channel.chat.message") {
+        if (!enabled) return;
         appendMessage(payload.data || {});
         return;
       }
 
       if (
-        showTwitchEvents &&
+        enabled && showTwitchEvents &&
         payload?.source === "twitch" &&
         eventTypes.has(payload?.type)
       ) {

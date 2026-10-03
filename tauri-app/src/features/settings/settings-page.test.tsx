@@ -8,6 +8,8 @@ import { cloneSettings, defaultAppSettings, type AppSettings } from "../../lib/a
 import "../../styles.css";
 
 const invokeMock = vi.fn();
+const openMock = vi.fn();
+vi.mock("@tauri-apps/plugin-dialog", () => ({ open: (...args: unknown[]) => openMock(...args), save: vi.fn() }));
 
 vi.mock("../../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../lib/api")>();
@@ -56,6 +58,7 @@ describe("Settings route", () => {
     stored = wpfLikeSettings();
     document.documentElement.removeAttribute("data-theme");
     invokeMock.mockReset();
+    openMock.mockReset();
     invokeMock.mockImplementation(async (cmd: string, args?: Record<string, unknown>) => {
       if (cmd === "get_settings") {
         return cloneSettings(stored);
@@ -74,6 +77,42 @@ describe("Settings route", () => {
     });
   });
 
+  it("edits chat appearance and retains unedited legacy fields in the save contract", async () => {
+    Object.assign(stored.Overlay.Chat, { FontFamily: "Arial", FutureStyle: { keep: true } });
+    const user = userEvent.setup();
+    renderSettings();
+    await user.selectOptions(await screen.findByLabelText("Chat-Hintergrund"), "Color");
+    for (const [label, value] of [["Chat-Hintergrundfarbe", "#123456"], ["Chat-Schrift", "Verdana"], ["Chat-Schriftgröße (px)", "24"], ["Chat-Innenabstand (px)", "16"], ["Chat-Eckenradius (px)", "8"], ["Chat-Zeilenabstand (px)", "10"], ["Chat-Hintergrunddeckkraft (%)", "30"]]) {
+      const input = screen.getByLabelText(label);
+      await user.clear(input);
+      await user.type(input, value);
+    }
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(stored.Overlay.Chat).toMatchObject({
+      BackgroundType: "Color", BackgroundColor: "#123456", FontFamily: "Verdana",
+      FontSizePx: 24, PaddingPx: 16, BorderRadiusPx: 8, GapPx: 10, BackgroundOpacity: 0.3,
+      FutureStyle: { keep: true }, MaxBufferedMessages: 100,
+    }));
+  });
+
+  it("selects a chat background image, preserves cancellation and exposes dialog errors", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    const button = await screen.findByRole("button", { name: "Chat-Hintergrundbild auswählen" });
+    openMock.mockResolvedValueOnce("C:\\images\\chat.png");
+    await user.click(button);
+    await waitFor(() => expect(screen.getByLabelText("Chat-Hintergrundbild")).toHaveValue("C:\\images\\chat.png"));
+    expect(screen.getByLabelText("Chat-Hintergrund")).toHaveValue("Image");
+    openMock.mockResolvedValueOnce(null);
+    await user.click(button);
+    expect(screen.getByLabelText("Chat-Hintergrundbild")).toHaveValue("C:\\images\\chat.png");
+    openMock.mockRejectedValueOnce(new Error("Dialog unavailable"));
+    await user.click(button);
+    expect(await screen.findByText("Dialog unavailable")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(stored.Overlay.Chat).toMatchObject({ BackgroundType: "Image", BackgroundImagePath: "C:\\images\\chat.png" }));
+  });
+
   it("enables and persists each native third-party chat emote provider", async () => {
     const user = userEvent.setup();
     renderSettings();
@@ -86,6 +125,33 @@ describe("Settings route", () => {
     await waitFor(() => expect(stored.Overlay.Chat.EnableBttv).toBe(false));
     expect(stored.Overlay.Chat.EnableFfz).toBe(false);
     expect(stored.Overlay.Chat.EnableSevenTv).toBe(false);
+  });
+
+  it("preserves edits made while the image dialog is pending", async () => {
+    let resolve!: (value: string) => void;
+    openMock.mockImplementationOnce(() => new Promise(r => { resolve = r; }));
+    const user = userEvent.setup();
+    renderSettings();
+    await user.click(await screen.findByRole("button", { name: "Chat-Hintergrundbild auswählen" }));
+    await user.click(screen.getByLabelText("BTTV-Emotes"));
+    resolve("C:\\images\\chat.png");
+    await waitFor(() => expect(screen.getByLabelText("Chat-Hintergrundbild")).toHaveValue("C:\\images\\chat.png"));
+    expect(screen.getByLabelText("BTTV-Emotes")).not.toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(stored.Overlay.Chat.EnableBttv).toBe(false));
+  });
+
+  it("displays normalized legacy values without blocking an unrelated lossless save", async () => {
+    Object.assign(stored.Overlay.Chat, { FontSizePx: 1, PaddingPx: 999, BackgroundOpacity: 2, FontFamily: null });
+    const user = userEvent.setup();
+    renderSettings();
+    expect(await screen.findByLabelText("Chat-Schriftgröße (px)")).toHaveValue(8);
+    expect(screen.getByLabelText("Chat-Innenabstand (px)")).toHaveValue(120);
+    expect(screen.getByLabelText("Chat-Hintergrunddeckkraft (%)")).toHaveValue(100);
+    await user.selectOptions(screen.getByLabelText("Theme"), "neon-night-market");
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(stored.General.ThemeId).toBe("neon-night-market"));
+    expect(stored.Overlay.Chat).toMatchObject({ FontSizePx: 1, PaddingPx: 999, BackgroundOpacity: 2, FontFamily: null });
   });
 
   it("refreshes settings form and theme after applying a profile", async () => {

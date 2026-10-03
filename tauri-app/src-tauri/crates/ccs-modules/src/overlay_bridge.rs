@@ -67,6 +67,14 @@ impl OverlayEventBridge {
         ))
     }
 
+    pub fn app_chat_config(&self) -> Value {
+        self.publish(&app_event(
+            "app.chat.config",
+            "Chat-Einstellungen geändert",
+            map_of([]),
+        ))
+    }
+
     pub fn app_obs_scene(&self, scene: &str) -> Value {
         self.publish(&app_event(
             "app.obs.scene",

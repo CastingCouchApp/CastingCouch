@@ -14,6 +14,7 @@ import {
 } from "../lib/app-settings";
 import { queryKeys, tauriInvoke } from "../lib/api";
 import { Profiles } from "../features/settings/Profiles";
+import { ChatAppearanceSettings } from "../features/settings/ChatAppearanceSettings";
 
 export const Route = createFileRoute("/settings")({
     component: SettingsPage,
@@ -481,6 +482,9 @@ function SettingsForm({
                             onChange={field.handleChange}
                         />
                     )}
+                </form.Field>
+                <form.Field name="Overlay.Chat">
+                    {(field) => <ChatAppearanceSettings value={field.state.value} onChange={field.handleChange} />}
                 </form.Field>
             </Card>
 

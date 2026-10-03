@@ -1,5 +1,6 @@
 mod assets;
 mod canvas;
+mod chat_config;
 mod hub;
 mod layout_store;
 mod live;

@@ -4,6 +4,93 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 #[tokio::test]
+async fn chat_appearance_normalizes_csharp_values_without_rewriting_settings() {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = AppPaths::from_root(dir.path().into());
+    let settings = Arc::new(JsonSettingsStore::new(&paths.settings_file));
+    let image = dir.path().join("background.png");
+    std::fs::write(&image, b"image-fixture").unwrap();
+    let mut saved = settings.load().await.unwrap();
+    saved.overlay.chat.extra = json!({
+        "BackgroundType":"  cOlOr  ","BackgroundImagePath":format!(" {} ", image.display()),
+        "BackgroundColor":"   ","BackgroundOpacity":2,"PaddingPx":-1,
+        "BorderRadiusPx":999,"GapPx":null,"FontSizePx":1,"FontFamily":"  ",
+        "":true,"ÄltererWert":{"keep":true}
+    });
+    settings.save(&saved).await.unwrap();
+    let original = settings.read_value().await.unwrap();
+    let server = OverlayServer::start(settings.clone(), paths, Arc::new(RealtimeHub::new()), 0)
+        .await
+        .unwrap();
+    let base = format!("http://127.0.0.1:{}", server.port);
+    let http = reqwest::Client::new();
+    let config: Value = http
+        .get(format!("{base}/chat/config"))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(config["backgroundType"], "Color");
+    assert_eq!(config["backgroundVersion"], "0");
+    assert_eq!(config["backgroundColor"], "#000000");
+    assert_eq!(config["backgroundOpacity"], 1.0);
+    assert_eq!(config["paddingPx"], 0);
+    assert_eq!(config["borderRadiusPx"], 64);
+    assert_eq!(config["gapPx"], 6);
+    assert_eq!(config["fontSizePx"], 8);
+    assert_eq!(config["fontFamily"], "Segoe UI, system-ui, sans-serif");
+    assert!(config.get("backgroundImagePath").is_none());
+    assert_eq!(
+        http.get(format!("{base}/chat/background"))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        404
+    );
+    assert_eq!(settings.read_value().await.unwrap(), original);
+    saved.overlay.chat.extra["BackgroundType"] = json!(" image ");
+    saved.overlay.chat.extra["FontFamily"] = json!("  Arial  ");
+    saved.overlay.chat.extra["BackgroundColor"] = json!("  #123456  ");
+    settings.save(&saved).await.unwrap();
+    let config: Value = http
+        .get(format!("{base}/chat/config"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(config["backgroundType"], "Image");
+    assert_ne!(config["backgroundVersion"], "0");
+    assert_eq!(config["fontFamily"], "Arial");
+    assert_eq!(config["backgroundColor"], "#123456");
+    let response = http
+        .get(format!("{base}/chat/background"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.headers()["content-type"], "image/png");
+    assert_eq!(response.bytes().await.unwrap().as_ref(), b"image-fixture");
+    std::fs::remove_file(image).unwrap();
+    let config: Value = http
+        .get(format!("{base}/chat/config"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(config["backgroundType"], "None");
+    assert_eq!(config["backgroundVersion"], "0");
+    server.stop();
+}
+
+#[tokio::test]
 async fn actual_http_upload_read_delete_and_origin_contract() {
     let dir = tempfile::tempdir().unwrap();
     let paths = AppPaths::from_root(dir.path().to_path_buf());

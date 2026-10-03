@@ -28,6 +28,8 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     let layout = opts.layout || { ...DEFAULT_LAYOUT, items: [] };
     let data = opts.data || {};
     let chatConfig = opts.chatConfig || null;
+    let chatConfigRevision = 0;
+    let chatHistoryRevision = 0;
     const itemNodes = new Map();
     let selectedId = null;
     let onSelect = opts.onSelect || null;
@@ -71,11 +73,13 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     }
 
     function clearRuntimeChatHistory() {
+      chatHistoryRevision++;
       chatHistory.length = 0;
       seenMessageIds.clear();
     }
 
     function removeRuntimeChatMessage(messageId) {
+      chatHistoryRevision++;
       const id = String(messageId || "");
       if (!id) return;
       seenMessageIds.delete(id);
@@ -88,6 +92,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     }
 
     function removeRuntimeChatUser(userLogin, userId) {
+      chatHistoryRevision++;
       const login = String(userLogin || "").toLowerCase();
       const id = String(userId || "");
       for (let i = chatHistory.length - 1; i >= 0; i--) {
@@ -105,6 +110,9 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     function restoreChatWidget(el) {
       if (!el || !el._lines) return;
       clearChat(el);
+      el.hidden = chatConfig?.enabled === false;
+      el.style.display = el.hidden ? "none" : "";
+      if (el.hidden) return;
       for (const entry of chatHistory) {
         if (entry.kind === "message") {
           appendChatMessage(el, entry.data || {});
@@ -145,8 +153,10 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     }
 
     async function loadChatHistory() {
+      const revision = chatHistoryRevision;
       try {
         const payload = await fetchJson("/chat/history");
+        if (revision !== chatHistoryRevision) return;
         ingestChatHistory(payload && payload.events);
       } catch (_) { /* optional */ }
     }
@@ -276,10 +286,12 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     }
 
     function setChatConfig(next) {
+      chatConfigRevision++;
       chatConfig = next || null;
       for (const node of itemNodes.values()) {
         if (node.item.type === "chat") {
           updateChat(node.content, node.item, chatConfig);
+          restoreChatWidget(node.content);
         }
       }
     }
@@ -301,6 +313,13 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
 
     function handleRealtime(evt) {
       if (!evt || !evt.type) return;
+      if (evt.source === "app" && evt.type === "app.chat.config") {
+        const revision = ++chatConfigRevision;
+        void fetchJson("/chat/config").then(next => {
+          if (revision === chatConfigRevision && next && typeof next === "object" && !Array.isArray(next)) setChatConfig(next);
+        }).catch(() => { /* Keep the last valid settings; reconnect reloads them. */ });
+        return;
+      }
       if (evt.type === "app.overlay.layout") {
         const instanceId = (evt.data && evt.data.instanceId) || "";
         if (opts.instanceId && instanceId && instanceId !== opts.instanceId) {
@@ -385,6 +404,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
         }
         for (const node of itemNodes.values()) {
           if (node.item.type !== "chat") continue;
+          if (chatConfig?.enabled === false) continue;
           appendChatMessage(node.content, messageData);
         }
         return;
@@ -393,6 +413,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
         rememberChatEvent(evt);
         for (const node of itemNodes.values()) {
           if (node.item.type !== "chat") continue;
+          if (chatConfig?.enabled === false) continue;
           if (node.content._showTwitchEvents === false) continue;
           appendChatEvent(node.content, evt);
         }

@@ -2,6 +2,91 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 #[test]
+fn saved_chat_appearance_notifies_actual_websocket_clients_and_survives_restart() {
+    use futures_util::StreamExt;
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    tauri::async_runtime::block_on(async {
+        let state = app.state::<AppState>();
+        let server = OverlayServer::start(
+            state.settings.clone(),
+            state.paths.clone(),
+            state.hub.clone(),
+            0,
+        )
+        .await
+        .unwrap();
+        let (mut ws, _) =
+            tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{}/ws", server.port))
+                .await
+                .unwrap();
+        ws.next().await.unwrap().unwrap(); // hello
+        ws.next().await.unwrap().unwrap(); // current countdown snapshot
+        let original = call(&window, "get_settings", json!({})).unwrap();
+        let mut edited = original.clone();
+        edited["Overlay"]["Chat"]["FontSizePx"] = json!(28);
+        edited["Overlay"]["Chat"]["BackgroundType"] = json!("Color");
+        edited["Overlay"]["Chat"]["BackgroundColor"] = json!("#123456");
+        call(
+            &window,
+            "save_settings",
+            json!({"original": original,"settings": edited}),
+        )
+        .unwrap();
+        let event = tokio::time::timeout(std::time::Duration::from_secs(2), ws.next())
+            .await
+            .expect("saved config must notify connected overlays")
+            .unwrap()
+            .unwrap();
+        let event: Value = serde_json::from_str(event.to_text().unwrap()).unwrap();
+        assert_eq!(event["type"], "app.chat.config");
+        assert_eq!(event["source"], "app");
+        let config: Value = reqwest::get(format!("http://127.0.0.1:{}/chat/config", server.port))
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(config["fontSizePx"], 28);
+        assert_eq!(config["backgroundColor"], "#123456");
+        call(
+            &window,
+            "save_settings",
+            json!({"original": edited, "settings": edited}),
+        )
+        .unwrap();
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(80), ws.next())
+                .await
+                .is_err()
+        );
+        let mut invalid = edited.clone();
+        invalid["Overlay"]["Chat"]["FontSizePx"] = json!(30);
+        invalid["Obs"]["Host"] = json!("");
+        assert!(call(
+            &window,
+            "save_settings",
+            json!({"original": edited,"settings": invalid})
+        )
+        .is_err());
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(80), ws.next())
+                .await
+                .is_err()
+        );
+        let reloaded = JsonSettingsStore::new(&state.paths.settings_file)
+            .load()
+            .await
+            .unwrap();
+        assert_eq!(reloaded.overlay.chat.extra["FontSizePx"], 28);
+        server.stop();
+    });
+}
+
+#[test]
 fn chat_catalog_status_and_refresh_cross_native_ipc_without_faking_a_connection() {
     let root = tempfile::tempdir().unwrap();
     let app = test_app(root.path().into());

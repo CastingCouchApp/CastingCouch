@@ -159,6 +159,15 @@ export type OverlayChatSettings = {
   EnableSevenTv: boolean;
   ShowTwitchEvents: boolean;
   MaxBufferedMessages: number;
+  BackgroundType?: string | null;
+  BackgroundColor?: string | null;
+  BackgroundImagePath?: string | null;
+  BackgroundOpacity?: number | null;
+  PaddingPx?: number | null;
+  BorderRadiusPx?: number | null;
+  GapPx?: number | null;
+  FontSizePx?: number | null;
+  FontFamily?: string | null;
 };
 
 export type OverlaySettings = {
@@ -453,6 +462,12 @@ export function applyEditedSettings(base: AppSettings, form: AppSettings): AppSe
   next.Overlay.Chat.EnableFfz = form.Overlay.Chat.EnableFfz;
   next.Overlay.Chat.EnableSevenTv = form.Overlay.Chat.EnableSevenTv;
   next.Overlay.Chat.ShowTwitchEvents = form.Overlay.Chat.ShowTwitchEvents;
+  for (const key of ["BackgroundType", "BackgroundColor", "BackgroundImagePath", "BackgroundOpacity", "PaddingPx", "BorderRadiusPx", "GapPx", "FontSizePx", "FontFamily"] as const) {
+    // Do not add defaults to old documents just by saving an unrelated field.
+    if (Object.prototype.hasOwnProperty.call(form.Overlay.Chat, key)) {
+      Object.assign(next.Overlay.Chat, { [key]: form.Overlay.Chat[key] });
+    }
+  }
 
   next.Branding.DisplayName = form.Branding.DisplayName;
   next.Branding.ChannelName = form.Branding.ChannelName;

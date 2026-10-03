@@ -858,6 +858,11 @@ async fn save_settings_impl(
         state.hub.live.data.write().unwrap()["serverError"] = Value::Null;
     }
     let next: AppSettings = serde_json::from_value(saved).map_err(|e| e.to_string())?;
+    if serde_json::to_value(&old.overlay.chat).map_err(|e| e.to_string())?
+        != serde_json::to_value(&next.overlay.chat).map_err(|e| e.to_string())?
+    {
+        state.bridge.app_chat_config();
+    }
     if let Some(bridge) = ytm_replacement {
         let previous = state.ytm.lock().await.replace(bridge);
         if let Some(previous) = previous {
