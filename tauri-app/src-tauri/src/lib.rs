@@ -383,8 +383,17 @@ async fn twitch_action(
     } else {
         None
     };
-    if _raid_gate.is_some() {
+    let _settings_gate = if _raid_gate.is_some() {
+        Some(state.settings_mutation.lock().await)
+    } else {
+        None
+    };
+    let cancelling = matches!(action, ccs_modules::twitch::TwitchAction::CancelRaid);
+    if matches!(action, ccs_modules::twitch::TwitchAction::Raid { .. }) {
+        stream_end_host::reject_new_raid(&state).await?;
+    } else if cancelling {
         stream_end_host::reject_active(&state).await?;
+        stream_end_host::validate_resolution_channel(&state).await?;
     }
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     if !settings.twitch.enable_chat
@@ -392,7 +401,7 @@ async fn twitch_action(
     {
         return Err("Twitch-Chat ist deaktiviert.".into());
     }
-    state
+    let result = state
         .twitch
         .action(
             &settings.twitch.client_id,
@@ -400,7 +409,11 @@ async fn twitch_action(
             action,
         )
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    if result.is_ok() && cancelling {
+        state.stream_end.resolve_pending_raid().await?;
+    }
+    result
 }
 #[tauri::command]
 async fn twitch_query(
@@ -594,8 +607,11 @@ async fn save_twitch_raid_settings<R: tauri::Runtime>(
     Ok(result)
 }
 async fn remember_raid_target(state: &AppState, login: &str) -> Result<Value, String> {
-    let login = ccs_modules::twitch::checked_raid_login(login).map_err(|e| e.to_string())?;
     let _guard = state.settings_mutation.lock().await;
+    remember_raid_target_locked(state, login).await
+}
+async fn remember_raid_target_locked(state: &AppState, login: &str) -> Result<Value, String> {
+    let login = ccs_modules::twitch::checked_raid_login(login).map_err(|e| e.to_string())?;
     let original = state
         .settings
         .read_value()
@@ -694,7 +710,8 @@ async fn start_twitch_raid<R: tauri::Runtime>(
     login: String,
 ) -> Result<ccs_modules::twitch::RaidStarted, String> {
     let _raid_gate = state.stream_end_gate.lock().await;
-    stream_end_host::reject_active(&state).await?;
+    let _settings_gate = state.settings_mutation.lock().await;
+    stream_end_host::reject_new_raid(&state).await?;
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     let result = state
         .twitch
@@ -707,7 +724,7 @@ async fn start_twitch_raid<R: tauri::Runtime>(
         .await;
     let _ = app.emit("twitch-raids-changed", json!({"changed":true}));
     let mut result = result.map_err(|e| e.to_string())?;
-    if let Err(error) = remember_raid_target(&state, &result.target.login).await {
+    if let Err(error) = remember_raid_target_locked(&state, &result.target.login).await {
         result.warnings.push(format!(
             "Raid gestartet; Ziel konnte nicht gespeichert werden: {error}"
         ));
@@ -725,7 +742,9 @@ async fn cancel_twitch_raid<R: tauri::Runtime>(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let _raid_gate = state.stream_end_gate.lock().await;
+    let _settings_gate = state.settings_mutation.lock().await;
     stream_end_host::reject_active(&state).await?;
+    stream_end_host::validate_resolution_channel(&state).await?;
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     let result = state
         .twitch
@@ -744,7 +763,9 @@ async fn acknowledge_twitch_raid<R: tauri::Runtime>(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let _raid_gate = state.stream_end_gate.lock().await;
+    let _settings_gate = state.settings_mutation.lock().await;
     stream_end_host::reject_active(&state).await?;
+    stream_end_host::validate_resolution_channel(&state).await?;
     state.twitch.acknowledge_raid().await;
     state.stream_end.resolve_pending_raid().await?;
     app.emit("twitch-raids-changed", json!({"changed":true}))
@@ -2268,6 +2289,13 @@ pub fn run() {
                     let app = app.clone();
                     tauri::async_runtime::spawn(async move {
                         if let Some(state) = app.try_state::<AppState>() {
+                            let _stream_end_gate=state.stream_end_gate.lock().await;
+                            if let Err(error)=stream_end_host::prepare_shutdown(&state).await {
+                                error!(%error,"App bleibt wegen ausstehendem Streamende-Cleanup geöffnet");
+                                let _=app.emit("app-close-error",&error);
+                                SHUTTING_DOWN.store(false,std::sync::atomic::Ordering::SeqCst);
+                                return;
+                            }
                             state.music_statistics.close().await;
                             if let Err(error) = state.stream_history.retry() {
                                 error!(%error, "Sitzungsverlauf konnte beim Beenden nicht gespeichert werden");
@@ -2589,8 +2617,8 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn spawn_live_event_bridges(
-    app: AppHandle,
+fn spawn_live_event_bridges<R: tauri::Runtime>(
+    app: AppHandle<R>,
     obs: Arc<ObsClient>,
     twitch: Arc<TwitchClient>,
     spotify: Arc<SpotifyClient>,
@@ -2680,7 +2708,10 @@ fn spawn_live_event_bridges(
     });
 }
 
-fn spawn_status_forward(app: AppHandle, mut rx: broadcast::Receiver<ServiceStatus>) {
+fn spawn_status_forward<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    mut rx: broadcast::Receiver<ServiceStatus>,
+) {
     tauri::async_runtime::spawn(async move {
         loop {
             match rx.recv().await {
@@ -2720,3 +2751,5 @@ fn spawn_extension_pack_events<R: tauri::Runtime>(
 
 #[cfg(test)]
 mod command_tests;
+#[cfg(test)]
+mod stream_end_boundary_tests;

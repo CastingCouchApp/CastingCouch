@@ -901,3 +901,57 @@ async fn queued_abort_is_visible_until_the_mutation_settles_and_cleanup_finishes
     assert_eq!(runtime.snapshot().await.phase, "aborted");
     assert_eq!(runtime.snapshot().await.pending_action, None);
 }
+
+#[tokio::test(start_paused = true)]
+async fn shutdown_waits_for_an_inflight_raid_and_cleans_it_up_without_stopping_obs() {
+    let runtime = Arc::new(StreamEndRuntime::default());
+    let io = Arc::new(FakeIo::default());
+    io.hold_start.store(true, Ordering::SeqCst);
+    runtime
+        .start(plan("EndSceneRaidThenStop"), 0, io.clone())
+        .await
+        .unwrap();
+    settle().await;
+    let closing = tokio::spawn({
+        let runtime = runtime.clone();
+        async move { runtime.shutdown().await }
+    });
+    settle().await;
+    assert!(!closing.is_finished());
+    assert!(runtime.snapshot().await.active);
+    io.release_start.notify_one();
+    settle().await;
+    closing.await.unwrap().unwrap();
+    assert_eq!(runtime.snapshot().await.phase, "aborted");
+    assert!(!runtime.snapshot().await.raid_pending);
+    assert_eq!(
+        io.calls
+            .lock()
+            .await
+            .iter()
+            .filter(|op| **op == StreamEndOperation::CancelRaid)
+            .count(),
+        1
+    );
+    assert!(!io
+        .calls
+        .lock()
+        .await
+        .contains(&StreamEndOperation::StopStream));
+}
+
+#[tokio::test(start_paused = true)]
+async fn shutdown_aborts_planning_and_retains_failed_raid_cleanup_for_manual_resolution() {
+    let (planned, io) = setup("Immediate", 60).await;
+    planned.shutdown().await.unwrap();
+    assert!(io.calls.lock().await.is_empty());
+    let (runtime, io) = setup("EndSceneRaidThenStop", 0).await;
+    io.replies
+        .lock()
+        .await
+        .push_back((StreamEndOperation::CancelRaid, Err("Twitch API 403".into())));
+    let error = runtime.shutdown().await.unwrap_err();
+    assert!(error.contains("Raid"));
+    assert!(!runtime.snapshot().await.active);
+    assert!(runtime.snapshot().await.raid_pending);
+}

@@ -90,6 +90,45 @@ beforeEach(() => {
         return null;
     });
 });
+it("requires a known idle runtime and uses legacy minutes when seconds are unset", async () => {
+    let finish: (value: StreamEndSnapshot) => void = () => {};
+    const waiting = new Promise<StreamEndSnapshot>((resolve) => {
+        finish = resolve;
+    });
+    invoke.mockImplementation(async (command: string, args: any) => {
+        if (command === "stream_end_status") return waiting;
+        if (command === "stream_end_snapshot") {
+            const value = config();
+            value.draft.plannedSeconds = 0;
+            return value;
+        }
+        if (command === "save_stream_end_preferences")
+            return { ...config(), draft: args.draft };
+        if (command === "start_stream_end")
+            return { ...idle, active: true, phase: "scheduled" };
+        return null;
+    });
+    show();
+    expect(
+        await screen.findByLabelText("Geplantes Streamende in Sekunden"),
+    ).toHaveValue(1800);
+    expect(
+        screen.getByRole("button", { name: "Streamende starten" }),
+    ).toBeDisabled();
+    await act(async () => finish(idle));
+    await waitFor(() =>
+        expect(
+            screen.getByRole("button", { name: "Streamende planen" }),
+        ).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Streamende planen" }));
+    await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith(
+            "start_stream_end",
+            expect.objectContaining({ planned: true, seconds: 1800 }),
+        ),
+    );
+});
 it("saves the concrete draft and starts the chosen native mode with the reviewed snapshot", async () => {
     show();
     await screen.findByLabelText("Streamende-Modus");

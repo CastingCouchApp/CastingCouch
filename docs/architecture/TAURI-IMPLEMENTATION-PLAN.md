@@ -1,6 +1,6 @@
 # Tauri: Arbeitsziel und verbleibende Umsetzung
 
-Stand: 3. Oktober 2026, geprüft gegen Commit `cc06bbc` und die aktuelle Feature-Matrix. Dieser Plan ersetzt die bisherige unspezifische Arbeitsanweisung „Stelle die App umschreibung fertig!!“. Er priorisiert die Arbeit, ohne den ausgewählten Funktionsumfang zu verkleinern.
+Stand: 3. Oktober 2026, einschließlich der geprüften M1-Integration auf Basis von `d6a26ba`. Dieser Plan ersetzt die bisherige unspezifische Arbeitsanweisung „Stelle die App umschreibung fertig!!“. Er priorisiert die Arbeit, ohne den ausgewählten Funktionsumfang zu verkleinern.
 
 ## Verbindliches Gesamtziel
 
@@ -14,15 +14,15 @@ Die [Feature-Matrix](TAURI-FEATURE-PARITY.md) enthält 53 ausgewählte Pakete: 3
 
 - B1–B7 sind implementiert und automatisiert geprüft. Die Basis erneut allgemein umzubauen ist kein nächster Meilenstein. Konkrete Regressionen werden weiterhin behoben; installierte Betriebsabnahme bleibt offen.
 - Canvas-Verwaltung, Assets, Extension Packs, Chat, Countdown, große Teile von OBS/Twitch/Musik, Alert-Runtime, Profile, Dashboard und Sessionanalyse sind vorhanden.
-- `cc06bbc` ergänzt native Streamende-Commands, Dienstanbindung, ausgehende Raid-Subscriptions und eine getestete React-Komponente. `StreamEndPanel` wird noch von keiner produktiven Seite montiert. Der OBS-Stoppbutton sendet weiterhin unmittelbar `stop_stream`.
-- Die zuletzt ausgeführten lokalen Rust- und Frontend-Prüfungen, Typprüfung und Produktionsbuild sind erfolgreich; 172 Frontend-Tests. Diese Prüfung ersetzt weder echte Konten und Dienste noch die Installation auf beiden Zielplattformen.
+- M1 bindet die native Streamende-/Raid-Steuerung als Dashboard-Karte und OBS-Stoppdialog ein. Manuelle Raid-Wege teilen Sperren und Kanalprüfung; App-Beenden wartet auf tatsächliche Mutationen und Cleanup und bleibt bei unaufgelöstem Raid geöffnet.
+- Die zuletzt ausgeführten lokalen Rust- und Frontend-Prüfungen, Typprüfung und Produktionsbuild sind erfolgreich; 176 Frontend-Tests. Der native Raid-Test verbindet Tauri-IPC, Helix-HTTP, EventSub- und OBS-WebSocket einschließlich Wiederverbindung. Diese Prüfung ersetzt weder echte Konten und Dienste noch die Installation auf beiden Zielplattformen.
 - CI für `cc06bbc` ist ebenfalls erfolgreich: [Build mit Windows/macOS-Tauri, WPF und Qualitätsprüfungen](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37120030451) sowie [CodeQL](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37120030423). Daraus folgt kein Nachweis eines installierten Streamablaufs.
 
 ## Verbleibende Arbeit nach Art der Lücke
 
 | Bereich / IDs | Tatsächlich verbleibende Arbeit |
 |---|---|
-| Bedienpult DA2 | Streamende-/Raid-Komponente erreichbar machen; sämtliche manuellen Raid-Wege und Kanalwechsel absichern; App-Beenden während eines Ablaufs behandeln. Danach C#-Streamstart, Vorprüfung, gespeicherte Benachrichtigungen und verbliebene Schnellzugriffe abgleichen und portieren. Twitch-Ereignisfeed ersetzt keine allgemeinen App-Benachrichtigungen. |
+| Bedienpult DA2 | M1 ist implementiert und automatisiert geprüft. C#-Streamstart, Vorprüfung, gespeicherte Benachrichtigungen und verbliebene Schnellzugriffe abgleichen und portieren. Twitch-Ereignisfeed ersetzt keine allgemeinen App-Benachrichtigungen. Live-/Installationsabnahme des Streamende-Assistenten bleibt offen. |
 | OBS4 / OBS6 | Fehlende quellentypspezifische Einstellungen und Filterparameter; Monitoring um die tatsächlich vorhandenen C#-Werte und Fehlerabläufe vervollständigen. Zuerst konkrete C#-Restliste erstellen, keine zusätzliche OBS-Vollverwaltung erfinden. |
 | AL1 / AL2 | Tatsächlichen Audioausgang auswählen, separaten Sound abspielen, OBS-Animationen und räumliche/animierte Vorschau portieren; Abbruch und Cleanup gemeinsam mit Musik prüfen. |
 | SYS1 / SYS2 / SYS4 | Ersteinrichtung, Dokumentanzeige/versionierte Zustimmung, Migration mit Vorschau/Backup sowie vollständige Wiederherstellung. Settings-Roundtrip und App-Profile ersetzen kein Datenbackup. |
@@ -30,7 +30,7 @@ Die [Feature-Matrix](TAURI-FEATURE-PARITY.md) enthält 53 ausgewählte Pakete: 3
 | O2 / O5 / OBS3 / OBS5 / TW3 | Canvas-/Widget-Verhalten, OBS-Browserquellen, Organisations-/Audiofunktionen und dauerhaftes Webchat-Login mit den tatsächlichen C#-Abläufen vergleichen und praktisch prüfen. Diese Einträge dürfen nicht pauschal als fehlende Backend-Implementierung behandelt werden. |
 | Sämtliche übernommenen Pakete | Installierte Windows-/macOS-Abnahme einschließlich echter Verbindungen, Fehler/Wiederanlauf, Persistenz und Gesamtablauf. Erfolgreiches CI-Packaging allein ist kein Installationsnachweis. |
 
-## Nächster Meilenstein M1: Streamende und Raid vollständig bedienbar
+## Meilenstein M1: Streamende und Raid vollständig bedienbar
 
 **Arbeitsziel:** Den bereits begonnenen Streamende-/Raid-Ablauf vom Dashboard und vom OBS-Stoppbutton bis zum tatsächlichen Abschluss oder Abbruch verbinden und über die nativen Grenzen absichern. In diesem Meilenstein werden keine anderen Feature-Pakete begonnen.
 
@@ -43,6 +43,10 @@ Die [Feature-Matrix](TAURI-FEATURE-PARITY.md) enthält 53 ausgewählte Pakete: 3
 | M1.5 Abschluss | Dokumentierte Bedienung und verbleibende praktische Abnahme; getesteter Commit auf `main`. | Betroffene Contract-/Integration-/UI-Tests, vollständige passende Regression und Produktionsbuild erfolgreich; Browserprüfung des eingebundenen Dialogs. Live-/Installationsnachweis separat offen lassen, wenn kein geeigneter Dienst oder Zielrechner verfügbar ist. |
 
 M1 gilt als **Implementierung abgeschlossen**, wenn M1.1–M1.5 erfüllt sind. DA2 und das Gesamtziel bleiben offen, solange weitere Bedienpultfunktionen oder die geforderte Betriebsabnahme fehlen. Ein isoliert grüner Komponenten- oder Actor-Test genügt nicht.
+
+**Ergebnis:** M1.1–M1.5 sind implementiert und lokal geprüft. Dashboard-Einbindung, OBS-Stoppdialog, Legacy-Planungsdauer und fehlender Runtime-Status sind durch UI-Tests abgesichert. Native IPC prüft gemeinsame Raid-Sperren und Kanalwechsel einschließlich HTTP-Fehler und erfolgreicher Auflösung. Der durchgehende native Raid-Test prüft abgelehnte/erneuerte Subscriptions, verworfene falsche/eingehende/alte Bestätigungen und genau einen OBS-Stopp nach Wiederverbindung. Musiktests sichern verspätete Szenenereignisse und externen Stopp nach fehlgeschlagener verwalteter Operation ab; Shutdown wartet auf einen laufenden Raid-POST und tatsächlichen Abbruch. Der Dialog wurde zusätzlich im Browser mit einer ausdrücklich getrennten UI-Testfixture geprüft: Öffnen ohne Stoppbefehl, Moduswahl, scrollbare Bedienung, Start und Schließen nach Abbruchabschluss. Diese Fixture belegt Darstellung und UI-Verhalten, keine Dienstverbindung. Details: [Streamende-Vertrag](TAURI-STREAM-END.md).
+
+**Nächste Arbeit:** M2 beginnt mit dem konkreten C#-Streamstart-/Vorprüfungsablauf; M1-Live-/Installationsabnahme bleibt als eigener Nachweis offen.
 
 ## Folgende Meilensteine
 

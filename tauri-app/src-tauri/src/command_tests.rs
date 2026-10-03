@@ -1,5 +1,94 @@
 use super::*;
 
+struct PendingRaidTestIo;
+impl ccs_modules::stream_end::StreamEndIo for PendingRaidTestIo {
+    fn execute(
+        &self,
+        operation: ccs_modules::stream_end::StreamEndOperation,
+    ) -> ccs_modules::stream_end::IoFuture<'_> {
+        Box::pin(async move {
+            use ccs_modules::stream_end::*;
+            match operation {
+                StreamEndOperation::ProbeRaid { .. } => {
+                    Ok(StreamEndReply::Target(Some(RaidIdentity {
+                        id: "target-id".into(),
+                        login: "target".into(),
+                        display_name: "Target".into(),
+                        online: true,
+                    })))
+                }
+                StreamEndOperation::CancelRaid => Err("Twitch API 403".into()),
+                _ => Ok(StreamEndReply::Done),
+            }
+        })
+    }
+}
+async fn seed_unresolved_stream_end(state: &AppState) {
+    use ccs_modules::stream_end::*;
+    state
+        .stream_end
+        .start(
+            StreamEndPlan {
+                preferences: StreamEndPreferences {
+                    mode: "EndSceneRaidThenStop".into(),
+                    selected_raid_channel: "target".into(),
+                    ..Default::default()
+                },
+                end_scene: String::new(),
+                start_scene: String::new(),
+                broadcaster_id: "owner".into(),
+                broadcaster_login: "owner".into(),
+                play_end_music: false,
+                pause_music_on_stream_end: false,
+            },
+            0,
+            Arc::new(PendingRaidTestIo),
+        )
+        .await
+        .unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        while state.stream_end.snapshot().await.phase != "raid_countdown" {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    state.stream_end.control("abort").await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        while state.stream_end.snapshot().await.active {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(state.stream_end.snapshot().await.raid_pending);
+}
+
+#[test]
+fn unresolved_assistant_raid_blocks_both_native_start_paths_before_authorization() {
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        seed_unresolved_stream_end(&app.state::<AppState>()).await;
+        for (cmd, args) in [
+            ("start_twitch_raid", json!({"login":"target"})),
+            (
+                "twitch_action",
+                json!({"action":{"action":"raid","id":"target-id"}}),
+            ),
+        ] {
+            let error = call(&window, cmd, args).unwrap_err();
+            assert!(
+                error.as_str().unwrap().contains("Vorherigen Raid"),
+                "{error}"
+            );
+        }
+    });
+}
+
 #[test]
 fn stream_end_preferences_cross_native_ipc_preserve_parallel_settings_and_restart_idle() {
     tauri::async_runtime::block_on(async {
@@ -825,6 +914,89 @@ fn raid_native_commands_preflight_start_cancel_emit_and_share_cached_suggestions
         assert!(
             call(&window, "twitch_raid_state", json!({})).unwrap()["requestedTarget"].is_null()
         );
+        // An assistant's unresolved raid belongs to its original broadcaster,
+        // even when the independent community state was reset by a channel edit.
+        Mock::given(path("/users"))
+            .and(query_param("login", "other"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({"data":[{"id":"other-id","login":"other","display_name":"Other"}]}),
+            ))
+            .with_priority(1)
+            .mount(&server)
+            .await;
+        seed_unresolved_stream_end(&state).await;
+        settings.twitch.channel_name = "other".into();
+        state.settings.save(&settings).await.unwrap();
+        let before = server
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .filter(|r| r.method == "DELETE")
+            .count();
+        for (command, args) in [
+            ("cancel_twitch_raid", json!({})),
+            ("twitch_action", json!({"action":{"action":"cancel_raid"}})),
+            ("acknowledge_twitch_raid", json!({})),
+        ] {
+            let error = call(&window, command, args).unwrap_err();
+            assert!(
+                error.as_str().unwrap().contains("gehört zu owner"),
+                "{error}"
+            );
+            assert!(state.stream_end.snapshot().await.raid_pending);
+        }
+        assert_eq!(
+            server
+                .received_requests()
+                .await
+                .unwrap()
+                .iter()
+                .filter(|r| r.method == "DELETE")
+                .count(),
+            before
+        );
+        settings.twitch.channel_name = String::new();
+        state.settings.save(&settings).await.unwrap();
+        let cancelled_attempts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let attempts = cancelled_attempts.clone();
+        Mock::given(method("DELETE"))
+            .and(path("/raids"))
+            .and(query_param("broadcaster_id", "owner"))
+            .respond_with(move |_request: &wiremock::Request| {
+                ResponseTemplate::new(
+                    if attempts.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                        403
+                    } else {
+                        204
+                    },
+                )
+            })
+            .with_priority(1)
+            .expect(2)
+            .mount(&server)
+            .await;
+        assert!(call(
+            &window,
+            "twitch_action",
+            json!({"action":{"action":"cancel_raid"}})
+        )
+        .is_err());
+        assert!(state.stream_end.snapshot().await.raid_pending);
+        call(
+            &window,
+            "twitch_action",
+            json!({"action":{"action":"cancel_raid"}}),
+        )
+        .unwrap();
+        assert!(!state.stream_end.snapshot().await.raid_pending);
+        assert_eq!(
+            cancelled_attempts.load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
+        seed_unresolved_stream_end(&state).await;
+        call(&window, "acknowledge_twitch_raid", json!({})).unwrap();
+        assert!(!state.stream_end.snapshot().await.raid_pending);
     });
 }
 
@@ -2415,7 +2587,7 @@ fn test_app_with_spotify(
 ) -> tauri::App<MockRuntime> {
     test_app_with_clients(root, spotify, None)
 }
-fn test_app_with_clients(
+pub(super) fn test_app_with_clients(
     root: PathBuf,
     spotify: Option<Arc<SpotifyClient>>,
     twitch: Option<Arc<TwitchClient>>,
@@ -2910,7 +3082,7 @@ fn playlist_favorites_and_successful_playback_persist_through_native_ipc() {
         result.unwrap();
     });
 }
-fn call(
+pub(super) fn call(
     window: &tauri::WebviewWindow<MockRuntime>,
     cmd: &str,
     body: Value,

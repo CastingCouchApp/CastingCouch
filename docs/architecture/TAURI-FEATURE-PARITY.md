@@ -2,7 +2,7 @@
 
 Stand: 3. Oktober 2026. Referenz ist der vom Nutzer ausgewählte C#-Funktionsumfang. **Die Umsetzung ist noch nicht abgeschlossen. Kein Cutover und keine vollständige Feature-Parität.**
 
-Verbindliches Arbeitsziel, priorisierte Restliste und Abschlusskriterien: [Umsetzungsplan](TAURI-IMPLEMENTATION-PLAN.md). Nächster Meilenstein ist die vollständige native/UI-Integration von Streamende und Raid. Die späteren „Fortsetzung“-Abschnitte dokumentieren historische Zwischenstände.
+Verbindliches Arbeitsziel, priorisierte Restliste und Abschlusskriterien: [Umsetzungsplan](TAURI-IMPLEMENTATION-PLAN.md). M1 ist implementiert und automatisiert geprüft; nächster Meilenstein sind die verbleibenden Bedienpult-/OBS-/Alert-Funktionen in M2. Die späteren „Fortsetzung“-Abschnitte dokumentieren historische Zwischenstände.
 
 ## Verbindlicher Umfang
 
@@ -91,7 +91,7 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | Abnahme | ID | Stand | Verbleibende Arbeit |
 |---|---|---|---|
 | [ ] | DA1 | Implementiert | Kompatible Karten-/Gruppenfilter, Reihenfolge/Spalten/Größen, Presets/Fokusmodus und Szenenbuttons mit Namen, Farben, Emoji/Glyph/Bildern. Konfliktfähige Persistenz, native IPC-/Neustarttests. Installierte Windows-/macOS-Abnahme offen. Siehe [Dashboard-Vertrag](TAURI-DASHBOARD.md). |
-| [ ] | DA2 | Teilweise | OBS-Ausgänge, Countdown, Status, Szenen/Vorschau, gemeinsamer Chat, Ereignisfeed, tatsächliche Kennzahlen und Musikplayer sind eingebunden. Streamende-/Raid-Fachsteuerung, Settings-Adapter, native Dienst-/Command-Anbindung und separat getestete React-Komponente vorhanden. Einbindung in Dashboard/Stoppdialog, vollständige Raid-/Kanalwechsel-/Shutdown-Verträge und Betriebsabnahme bleiben offen; außerdem C#-Streamstart, Vorprüfung, App-Benachrichtigungen und Schnellzugriffe. Siehe [Streamende-Vertrag](TAURI-STREAM-END.md). Workflow entfällt. |
+| [ ] | DA2 | Teilweise | OBS-Ausgänge, Countdown, Status, Szenen/Vorschau, gemeinsamer Chat, Ereignisfeed, tatsächliche Kennzahlen und Musikplayer sind eingebunden. Streamende-/Raid-Assistent im Dashboard und OBS-Stoppdialog mit gemeinsamen Raid-/Kanalwechsel-/Shutdown-Verträgen; nativer Helix/EventSub/OBS-Ablauf und Wiederverbindung geprüft. C#-Streamstart, Vorprüfung, App-Benachrichtigungen, Schnellzugriffe und installierte Betriebsabnahme bleiben offen. Siehe [Streamende-Vertrag](TAURI-STREAM-END.md). Workflow entfällt. |
 | [ ] | DA3 | Implementiert | OBS-Ereignisse erfassen Start/Stopp unmittelbar; Polling übernimmt Status und Zuschauer-Samples. Zähler, Wiederherstellung, Kategorien, Entwicklung und C#-Reportauswertungen vorhanden. Live-/Installationsabnahme offen. |
 | [ ] | DA4 | Implementiert | C#-Sessionanalyse, Creator Score/Trends/Indizes, Szenen-/Musikauswertung, Ereigniskorrelation/Raid-Bindung, Maßnahmen/Wirkung, Experimente, Notizen und HTML-Wochenberichte. Vollständiges Journal und kompatible Persistenz; C#-Referenz-, IPC- und UI-Tests. Installierte Live-Abnahme offen. |
 | [ ] | SYS1 | Offen | Ersteinrichtung mit Schritten, Prüfungen und Abschluss. |
@@ -112,7 +112,7 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 
 ## Nächste Umsetzungsschritte
 
-1. M1: Begonnenen Streamende-/Raid-Ablauf vollständig in Dashboard und OBS-Stoppdialog einbinden; native Grenzen, gemeinsame Raid-Sperren und Lebenszyklus absichern.
+1. M1 ist implementiert und automatisiert geprüft; Live-/Installationsabnahme bleibt offen.
 2. M2: Verbleibende DA2-, OBS4/OBS6- und AL1/AL2-Funktionen anhand konkreter C#-Abläufe abschließen.
 3. M3: Ersteinrichtung, Rechtstexte/Zustimmungen, Migration/Backup/Wiederherstellung und benötigte Diagnostik herstellen.
 4. M4: Verbleibende Diagnose-/Anpassungsfunktionen sowie konkrete Canvas-/OBS-/Webchat-Unterschiede schließen.

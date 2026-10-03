@@ -24,6 +24,12 @@
       "zone": "Center",
       "size": "Standard"
     },
+    {
+      "key": "StreamEnd",
+      "visible": true,
+      "zone": "Center",
+      "size": "Standard"
+    },
     { "key": "Countdown", "visible": true, "zone": "Left", "size": "Standard" },
     {
       "key": "SpotifyPlayer",

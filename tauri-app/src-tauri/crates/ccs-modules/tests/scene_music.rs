@@ -389,9 +389,89 @@ async fn actual_obs_scene_events_run_rules_once_despite_snapshot_refresh_and_dup
             .count(),
         1
     );
+    // A manually managed scene policy must survive a delayed OBS event, even
+    // after its stream-end lease was released. A later distinct scene resumes
+    // normal rules; a failed scene request releases its ownership marker.
+    obs.set_current_program_scene("Idle").await.unwrap();
+    engine.manage_scene("Game");
+    engine
+        .run(MusicAction::Scene {
+            scene: "Game".into(),
+            force: false,
+        })
+        .await
+        .unwrap();
+    obs.set_current_program_scene("Game").await.unwrap();
+    obs.get_scene_list().await.unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(
+        writes(&server)
+            .await
+            .iter()
+            .filter(|r| r.url.path() == "/me/player/play")
+            .count(),
+        2
+    );
+    obs.set_current_program_scene("Idle").await.unwrap();
+    obs.set_current_program_scene("Game").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while writes(&server)
+            .await
+            .iter()
+            .filter(|r| r.url.path() == "/me/player/play")
+            .count()
+            < 3
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    obs.set_current_program_scene("Idle").await.unwrap();
+    engine.manage_scene("Game");
+    engine.release_managed_scene("Game");
+    obs.set_current_program_scene("Game").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while writes(&server)
+            .await
+            .iter()
+            .filter(|r| r.url.path() == "/me/player/play")
+            .count()
+            < 4
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
     obs.disconnect().await.unwrap();
     peer.await.unwrap();
     binding.abort();
+}
+
+#[tokio::test]
+async fn failed_managed_stop_releases_ownership_and_external_stop_still_pauses_music() {
+    let (engine, _, server, _root) =
+        engine(json!({"StartOnStreamStart":false,"FadeOutEnabled":false})).await;
+    assert!(engine.observe_stream(Some(true)).await.is_none());
+    let lease = engine.claim_stream_end();
+    lease.mark_stop_started();
+    drop(lease);
+    engine
+        .observe_stream(Some(false))
+        .await
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        writes(&server)
+            .await
+            .iter()
+            .filter(|r| r.url.path() == "/me/player/pause")
+            .count(),
+        1
+    );
 }
 
 #[tokio::test]

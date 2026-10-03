@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     listenStreamEnd,
@@ -48,10 +48,12 @@ export function StreamEndPanel({
     onClose?: () => void;
 }) {
     const client = useQueryClient();
+    const channelsId = useId();
     const [expanded, setExpanded] = useState(defaultExpanded);
     const [editor, setEditor] = useState<Configuration>();
     const [dirty, setDirty] = useState(false);
     const [closing, setClosing] = useState(false);
+    useEffect(() => setExpanded(defaultExpanded), [defaultExpanded]);
     const status = useQuery({
         queryKey: streamEndStatusKey,
         queryFn: () => tauriInvoke<StreamEndSnapshot>("stream_end_status"),
@@ -64,7 +66,18 @@ export function StreamEndPanel({
         refetchInterval: 3000,
     });
     useEffect(() => {
-        if (configuration.data?.draft && !dirty) setEditor(configuration.data);
+        if (configuration.data?.draft && !dirty) {
+            const value = configuration.data;
+            setEditor({
+                ...value,
+                draft: {
+                    ...value.draft,
+                    plannedSeconds:
+                        value.draft.plannedSeconds ||
+                        value.draft.plannedMinutes * 60,
+                },
+            });
+        }
     }, [configuration.data, dirty]);
     useEffect(() => {
         let disposed = false;
@@ -184,6 +197,7 @@ export function StreamEndPanel({
     const plannedRaid = draft?.raidOnStreamEnd === true && raidConfigured;
     const canStart =
         enabled &&
+        runtime?.active === false &&
         live === true &&
         valid &&
         !active &&
@@ -386,7 +400,7 @@ export function StreamEndPanel({
                             <label className="block space-y-1">
                                 Raid-Ziel
                                 <Input
-                                    list="stream-end-raid-channels"
+                                    list={channelsId}
                                     value={draft.selectedRaidChannel}
                                     onChange={(event) =>
                                         change(
@@ -396,7 +410,7 @@ export function StreamEndPanel({
                                     }
                                 />
                             </label>
-                            <datalist id="stream-end-raid-channels">
+                            <datalist id={channelsId}>
                                 {(configuration.data?.raidChannels ?? [])
                                     .filter(
                                         (value) => typeof value === "string",

@@ -522,6 +522,38 @@ impl StreamEndRuntime {
         let _ = self.changes.send(state.snapshot.clone());
         Ok(())
     }
+    /// Waits for actual mutations and raid cleanup; the host must keep the app
+    /// open on error/timeout, allowing the user to resolve a pending raid.
+    pub async fn shutdown(&self) -> Result<(), String> {
+        let mut changes = self.subscribe_changes();
+        let commands = {
+            let state = self.state.lock().await;
+            if state.snapshot.active
+                && !matches!(state.snapshot.phase.as_str(), "stopping" | "finalizing")
+            {
+                state.commands.clone()
+            } else {
+                None
+            }
+        };
+        if let Some(commands) = commands {
+            // Await space instead of losing the abort on a full command queue.
+            let _ = commands.send(Message::Control("abort".into())).await;
+        }
+        loop {
+            let snapshot = self.snapshot().await;
+            if !snapshot.active {
+                return if snapshot.raid_pending {
+                    Err(format!("Raid zu {} ist noch unaufgelöst. In Twitch prüfen oder im Assistenten abbrechen, bevor die App beendet wird.",snapshot.target_login))
+                } else {
+                    Ok(())
+                };
+            }
+            if let Err(broadcast::error::RecvError::Closed) = changes.recv().await {
+                return Err("Streamende-Steuerung nicht erreichbar".into());
+            }
+        }
+    }
     async fn publish(&self, snapshot: &StreamEndSnapshot, expected: Option<RaidProof>) {
         let mut state = self.state.lock().await;
         if state.snapshot.run_id != snapshot.run_id {

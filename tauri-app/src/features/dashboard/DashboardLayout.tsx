@@ -104,7 +104,7 @@ function preset(draft: DashboardDraft, name: string): DashboardDraft {
         const priority =
             name === "Twitch Fokus"
                 ? ["Community", "TwitchChat", "TwitchEvents", "SpotifyPlayer"]
-                : ["ObsSceneControl", "StreamControl", "Countdown"];
+                : ["ObsSceneControl", "StreamControl", "StreamEnd", "Countdown"];
         next.cards.sort(
             (a, b) =>
                 (priority.includes(a.key)

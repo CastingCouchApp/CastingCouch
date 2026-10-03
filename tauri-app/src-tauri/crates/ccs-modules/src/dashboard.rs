@@ -59,6 +59,7 @@ pub const CARD_KEYS: &[&str] = &[
     "Community",
     "ObsSceneControl",
     "StreamControl",
+    "StreamEnd",
     "Countdown",
     "SpotifyPlayer",
     "TwitchChat",
@@ -531,6 +532,24 @@ pub async fn obs_preview(obs: &crate::obs::ObsClient) -> Result<Value, String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn stream_end_card_preserves_existing_hidden_order_and_expansion_preferences() {
+        let original = json!({"Dashboard":{"ModuleOrder":["StreamEnd","Workflow","StreamControl"],"HiddenModules":["StreamEnd"],"StreamEndExpanded":true,"Future":7}});
+        let mut draft = snapshot(&original).unwrap().draft;
+        assert_eq!(draft.cards[0].key, "StreamEnd");
+        assert!(!draft.cards[0].visible);
+        assert!(draft.preferences.stream_end_expanded);
+        assert_eq!(apply(&original, &draft).unwrap(), original);
+        draft.cards[0].visible = true;
+        let edited = apply(&original, &draft).unwrap();
+        assert_eq!(
+            edited["Dashboard"]["ModuleOrder"],
+            original["Dashboard"]["ModuleOrder"]
+        );
+        assert_eq!(edited["Dashboard"]["Future"], 7);
+        assert!(snapshot(&edited).unwrap().draft.cards[0].visible);
+    }
 
     #[test]
     fn frontend_demo_fixture_matches_the_native_default_contract() {

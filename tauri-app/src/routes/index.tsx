@@ -1,5 +1,6 @@
 import { Countdown } from "../features/dashboard/Countdown";
 import { StreamHistory } from "../features/dashboard/StreamHistory";
+import { StreamEndPanel } from "../features/dashboard/StreamEndPanel";
 import { CreatorIntelligence } from "../features/dashboard/CreatorIntelligence";
 import {
     DashboardLayout,
@@ -162,6 +163,15 @@ function DashboardPage() {
                                 />
                             ),
                             Countdown: <Countdown />,
+                            StreamEnd: (
+                                <StreamEndPanel
+                                    enabled={obs.state === "connected"}
+                                    live={live}
+                                    defaultExpanded={
+                                        draft.preferences.streamEndExpanded
+                                    }
+                                />
+                            ),
                             SpotifyPlayer: (
                                 <CommonMusicPlayer
                                     provider={musicProvider(

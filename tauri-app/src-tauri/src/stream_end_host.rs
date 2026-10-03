@@ -145,6 +145,10 @@ fn music_preference(original: &Value, native: &str, legacy: &str, default: bool)
         .or_else(|| original["Workflow"].get(legacy).and_then(Value::as_bool))
         .unwrap_or(default)
 }
+pub(super) async fn prepare_shutdown(state: &AppState) -> Result<(), String> {
+    tokio::time::timeout(std::time::Duration::from_secs(15),state.stream_end.shutdown()).await
+        .map_err(|_|"Streamende-Abbruch läuft noch. Die App bleibt geöffnet; Ergebnis im Assistenten prüfen und anschließend erneut schließen.".to_string())?
+}
 pub(super) async fn reject_active(state: &AppState) -> Result<(), String> {
     if state.stream_end.snapshot().await.active {
         Err(

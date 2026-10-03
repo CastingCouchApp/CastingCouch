@@ -20,6 +20,7 @@ import { cn } from "../../lib/cn";
 import { applyThemeId, type AppSettings } from "../../lib/app-settings";
 
 import { queryKeys, tauriInvoke } from "../../lib/api";
+import { AppCloseNotice } from "./AppCloseNotice";
 
 const nav = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -87,6 +88,7 @@ export function AppShell() {
             </aside>
 
             <main className="flex-1 overflow-auto p-6">
+                <AppCloseNotice />
                 {!("__TAURI_INTERNALS__" in window) && (
                     <div
                         role="status"

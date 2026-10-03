@@ -200,6 +200,10 @@ export async function tauriInvoke<T>(
 
 function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
     switch (cmd) {
+        case "stream_end_status":
+            return {runId:0,active:false,phase:"idle",status:"Demo · Kein Streamende geplant",remainingSeconds:0,totalSeconds:0,attempt:0,targetLogin:"",targetDisplayName:"",canRaidNow:false,raidPending:false,pendingAction:null,broadcasterId:"",broadcasterLogin:"",error:null,warnings:[]} as T;
+        case "stream_end_snapshot":
+            return {original:cloneSettings(mockSettings),draft:{mode:"EndSceneThenStop",endSceneSeconds:60,raidOnStreamEnd:false,selectedRaidChannel:"",raidCountdownSeconds:90,raidStartTimeoutSeconds:120,stopStreamAfterRaid:true,stopMusicAfterRaid:true,plannedSeconds:0,plannedMinutes:30},endScene:mockSettings.Obs.EndScene ?? "",raidChannels:[],outgoingRaid:{available:false,broadcasterId:"",error:"Demo · Twitch EventSub nicht verbunden"},warnings:["Demo-Modus; Speichern und Streamende benötigen die Desktop-App."]} as T;
         case "dashboard_snapshot":
             return {original:cloneSettings(mockSettings),draft:structuredClone(dashboardDemoDraft),sceneChoices:[],warnings:["Dashboard im Demo-Modus; Speichern und Dienste erfordern die Desktop-App."]} as T;
         case "startup_error":
