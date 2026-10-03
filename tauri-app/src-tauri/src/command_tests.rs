@@ -2,6 +2,26 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 #[test]
+fn chat_catalog_status_and_refresh_cross_native_ipc_without_faking_a_connection() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let initial = call(&window, "chat_catalog_status", json!({})).unwrap();
+    assert_eq!(initial["emotes"], 0);
+    assert_eq!(initial["badges"], 0);
+    assert!(initial["updatedAt"].is_null());
+    let refreshed = call(&window, "refresh_chat_catalogs", json!({})).unwrap();
+    assert_eq!(refreshed["emotes"], 0);
+    assert!(!refreshed["errors"].as_array().unwrap().is_empty());
+    assert_eq!(
+        call(&window, "chat_catalog_status", json!({})).unwrap(),
+        refreshed
+    );
+}
+
+#[test]
 fn extension_commands_use_the_same_persistent_library_as_canvas_http() {
     use std::io::{Cursor, Write};
     use tauri::Listener;
@@ -814,6 +834,8 @@ fn test_app_with_spotify(
             chat_history,
             twitch_action,
             twitch_query,
+            chat_catalog_status,
+            refresh_chat_catalogs,
             activate_spotify_device,
             spotify_query,
             spotify_action,

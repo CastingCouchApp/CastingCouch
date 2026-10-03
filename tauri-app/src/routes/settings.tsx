@@ -458,8 +458,7 @@ function SettingsForm({
                 <form.Field name="Overlay.Chat.EnableBttv">
                     {(field) => (
                         <Checkbox
-                            disabled
-                            label="BTTV-Emotes (noch nicht verfügbar)"
+                            label="BTTV-Emotes"
                             checked={field.state.value}
                             onChange={field.handleChange}
                         />
@@ -468,8 +467,7 @@ function SettingsForm({
                 <form.Field name="Overlay.Chat.EnableFfz">
                     {(field) => (
                         <Checkbox
-                            disabled
-                            label="FrankerFaceZ-Emotes (noch nicht verfügbar)"
+                            label="FrankerFaceZ-Emotes"
                             checked={field.state.value}
                             onChange={field.handleChange}
                         />
@@ -478,8 +476,7 @@ function SettingsForm({
                 <form.Field name="Overlay.Chat.EnableSevenTv">
                     {(field) => (
                         <Checkbox
-                            disabled
-                            label="7TV-Emotes (noch nicht verfügbar)"
+                            label="7TV-Emotes"
                             checked={field.state.value}
                             onChange={field.handleChange}
                         />

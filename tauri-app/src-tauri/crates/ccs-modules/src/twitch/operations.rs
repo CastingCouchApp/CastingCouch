@@ -298,7 +298,7 @@ impl TwitchHelixClient {
     }
 }
 impl TwitchClient {
-    async fn operation_client(
+    pub(super) async fn operation_client(
         &self,
         client_id: &str,
         channel: &str,

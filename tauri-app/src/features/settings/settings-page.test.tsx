@@ -74,6 +74,20 @@ describe("Settings route", () => {
     });
   });
 
+  it("enables and persists each native third-party chat emote provider", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    for (const label of ["BTTV-Emotes", "FrankerFaceZ-Emotes", "7TV-Emotes"]) {
+      const checkbox = await screen.findByLabelText(label);
+      expect(checkbox).toBeEnabled();
+      await user.click(checkbox);
+    }
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(stored.Overlay.Chat.EnableBttv).toBe(false));
+    expect(stored.Overlay.Chat.EnableFfz).toBe(false);
+    expect(stored.Overlay.Chat.EnableSevenTv).toBe(false);
+  });
+
   it("refreshes settings form and theme after applying a profile", async () => {
     const baseImplementation = invokeMock.getMockImplementation()!;
     invokeMock.mockImplementation(async (cmd: string, args?: Record<string, unknown>) => {

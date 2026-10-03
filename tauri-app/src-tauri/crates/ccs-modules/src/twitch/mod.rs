@@ -1,8 +1,10 @@
+mod chat_catalog;
 mod eventsub;
 mod helix;
 mod oauth;
 mod operations;
 mod tokens;
+pub use chat_catalog::ChatCatalogStatus;
 pub use operations::{TwitchAction, TwitchQuery};
 
 pub use eventsub::{alert_type_for_event, EventSubClient, TwitchEvent};
@@ -88,6 +90,8 @@ pub struct TwitchClient {
     want_connected: AtomicBool,
     expect_eventsub: AtomicBool,
     token_refresh: Mutex<()>,
+    chat_catalogs: chat_catalog::ChatCatalogs,
+    chat_refresh: Mutex<(String, Option<std::time::Instant>)>,
 }
 
 impl TwitchClient {
@@ -114,6 +118,8 @@ impl TwitchClient {
             want_connected: AtomicBool::new(false),
             expect_eventsub: AtomicBool::new(false),
             token_refresh: Mutex::new(()),
+            chat_catalogs: chat_catalog::ChatCatalogs::new(),
+            chat_refresh: Mutex::new((String::new(), None)),
         }
     }
 
@@ -172,6 +178,69 @@ impl TwitchClient {
 
     pub async fn current_user(&self) -> Option<TwitchHelixUser> {
         self.current_user.read().await.clone()
+    }
+
+    pub fn chat_catalog_status(&self) -> ChatCatalogStatus {
+        self.chat_catalogs.status()
+    }
+    pub fn enrich_chat_event(
+        &self,
+        event: &mut TwitchEvent,
+        settings: &ccs_core::settings::OverlayChatSettings,
+    ) {
+        self.chat_catalogs.enrich(event, settings);
+    }
+    pub async fn refresh_chat_catalogs(
+        &self,
+        client_id: &str,
+        channel: &str,
+        settings: &ccs_core::settings::OverlayChatSettings,
+        force: bool,
+    ) -> ChatCatalogStatus {
+        let key = serde_json::json!([
+            client_id,
+            channel,
+            settings.enable_bttv,
+            settings.enable_ffz,
+            settings.enable_seven_tv
+        ])
+        .to_string();
+        let mut previous = self.chat_refresh.lock().await;
+        let ttl = if self.chat_catalogs.status().errors.is_empty() {
+            600
+        } else {
+            30
+        };
+        if !force
+            && previous.0 == key
+            && previous
+                .1
+                .is_some_and(|at| at.elapsed() < std::time::Duration::from_secs(ttl))
+        {
+            return self.chat_catalogs.status();
+        }
+        let old: serde_json::Value = serde_json::from_str(&previous.0).unwrap_or_default();
+        if old[0] != client_id || old[1] != channel {
+            self.chat_catalogs.clear();
+        }
+        let result = tokio::time::timeout(std::time::Duration::from_secs(15), async {
+            let (helix, broadcaster, _) = self.operation_client(client_id, channel).await?;
+            Ok::<_, ModuleError>(
+                self.chat_catalogs
+                    .refresh(&helix, &broadcaster, settings)
+                    .await,
+            )
+        })
+        .await;
+        let status = match result {
+            Ok(Ok(status)) => status,
+            Ok(Err(error)) => self.chat_catalogs.error(error.to_string()),
+            Err(_) => self
+                .chat_catalogs
+                .error("Chat-Kataloge: Zeitüberschreitung".into()),
+        };
+        *previous = (key, Some(std::time::Instant::now()));
+        status
     }
 
     pub async fn needs_eventsub_reconnect(&self) -> bool {
@@ -331,6 +400,10 @@ impl TwitchClient {
         let _guard = self.token_refresh.lock().await;
         self.tokens.delete()?;
         *self.current_user.write().await = None;
+        drop(_guard);
+        let mut refresh = self.chat_refresh.lock().await;
+        self.chat_catalogs.clear();
+        *refresh = (String::new(), None);
         self.set_status(ConnectionState::Disconnected, "").await;
         Ok(self.status().await)
     }

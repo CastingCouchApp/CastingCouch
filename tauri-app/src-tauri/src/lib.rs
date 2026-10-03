@@ -255,6 +255,25 @@ async fn chat_history(state: State<'_, AppState>) -> Result<Value, String> {
     })
 }
 #[tauri::command]
+fn chat_catalog_status(state: State<'_, AppState>) -> ccs_modules::twitch::ChatCatalogStatus {
+    state.twitch.chat_catalog_status()
+}
+#[tauri::command]
+async fn refresh_chat_catalogs(
+    state: State<'_, AppState>,
+) -> Result<ccs_modules::twitch::ChatCatalogStatus, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    Ok(state
+        .twitch
+        .refresh_chat_catalogs(
+            &settings.twitch.client_id,
+            &settings.twitch.channel_name,
+            &settings.overlay.chat,
+            true,
+        )
+        .await)
+}
+#[tauri::command]
 fn countdown_status(state: State<'_, AppState>) -> Value {
     state.hub.countdown()
 }
@@ -1500,6 +1519,8 @@ pub fn run() {
             open_twitch_chat,
             twitch_action,
             twitch_query,
+            chat_catalog_status,
+            refresh_chat_catalogs,
             chat_history,
             countdown_status,
             set_countdown,
@@ -1887,19 +1908,18 @@ fn spawn_live_event_bridges(
     let app_twitch_evt = app.clone();
     let bridge_twitch = bridge.clone();
     let alerts_twitch = alerts.clone();
+    let twitch_chats = twitch.clone();
     tauri::async_runtime::spawn(async move {
         loop {
             match twitch_events.recv().await {
-                Ok(evt) => {
+                Ok(mut evt) => {
                     if evt.event_type == "channel.chat.message" {
                         if let Some(state) = app_twitch_evt.try_state::<AppState>() {
-                            if state
-                                .settings
-                                .load()
-                                .await
-                                .is_ok_and(|s| !s.twitch.enable_chat)
-                            {
-                                continue;
+                            if let Ok(settings) = state.settings.load().await {
+                                if !settings.twitch.enable_chat {
+                                    continue;
+                                }
+                                twitch_chats.enrich_chat_event(&mut evt, &settings.overlay.chat);
                             }
                         }
                     }

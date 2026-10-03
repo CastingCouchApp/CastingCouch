@@ -3,6 +3,7 @@ pub(super) fn spawn_runtime(app: AppHandle) {
     spawn_extension_pack_events(app.clone(), app.state::<AppState>().hub.clone());
     spawn_obs_data(app.clone());
     spawn_twitch_data(app.clone());
+    spawn_chat_catalogs(app.clone());
     spawn_watchdog(app.clone());
     spawn_music_state_monitor(app.clone());
     spawn_music_player_monitor(app.clone());
@@ -89,6 +90,38 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                 warn!(%error,"Chat-Verlauf konnte nicht gespeichert werden");
             }
             state.hub.publish(&state.hub.countdown());
+        }
+    });
+}
+
+fn spawn_chat_catalogs(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(3));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tick.tick().await;
+            let Some(state) = app.try_state::<AppState>() else {
+                break;
+            };
+            if state.scene_music.is_closed() {
+                break;
+            }
+            let Ok(settings) = state.settings.load().await else {
+                continue;
+            };
+            if settings.twitch.enable_chat
+                && state.twitch.status().await.state == ccs_modules::ConnectionState::Connected
+            {
+                state
+                    .twitch
+                    .refresh_chat_catalogs(
+                        &settings.twitch.client_id,
+                        &settings.twitch.channel_name,
+                        &settings.overlay.chat,
+                        false,
+                    )
+                    .await;
+            }
         }
     });
 }

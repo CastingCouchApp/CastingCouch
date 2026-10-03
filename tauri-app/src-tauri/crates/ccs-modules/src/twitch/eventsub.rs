@@ -129,6 +129,7 @@ fn enrich_chat(event: &Value, data: &mut BTreeMap<String, String>) {
         serde_json::json!({"type":"text","text":text})
     }).collect()).unwrap_or_else(||vec![serde_json::json!({"type":"text","text":data["text"]})]);
     data.insert("parts".into(), serde_json::to_string(&parts).unwrap());
+    data.insert("badgeIds".into(), event["badges"].to_string());
     data.insert("badges".into(), "[]".into());
 }
 

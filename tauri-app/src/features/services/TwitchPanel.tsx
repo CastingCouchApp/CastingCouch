@@ -7,6 +7,8 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { TwitchRewards } from "./TwitchRewards";
 import { TwitchVotes } from "./TwitchVotes";
+import { ChatCatalogStatusPanel } from "./ChatCatalogStatus";
+import { TwitchChatMessage } from "./TwitchChatMessage";
 type Event = { type: string; summary?: string; data: Record<string, string> };
 type Item = {
     id: string;
@@ -86,18 +88,20 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
         <div className="grid gap-4 xl:grid-cols-2">
             <Card className="space-y-3">
                 <h2 className="text-lg font-semibold">Twitch-Chat</h2>
+                <ChatCatalogStatusPanel enabled={enabled} />
                 <div className="max-h-80 overflow-auto space-y-2">
                     {history.data?.events?.map((event, index) => (
                         <div
                             key={event.data.messageId ?? index}
                             className="flex gap-2 text-sm"
                         >
-                            <strong>
-                                {event.data.userName ?? event.data.userLogin}
-                            </strong>
-                            <span className="flex-1">
-                                {event.data.text ?? event.summary}
-                            </span>
+                            <TwitchChatMessage
+                                data={{
+                                    ...event.data,
+                                    text:
+                                        event.data.text ?? event.summary ?? "",
+                                }}
+                            />
                             <Button
                                 disabled={!enabled || action.isPending}
                                 variant="ghost"

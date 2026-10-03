@@ -38,7 +38,7 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | [ ] | O3 | Implementiert | Import, Auflistung, Anzeige/URL-Auswahl und echte Löschung; WPF-Indexformat und bestehende IDs, 15-MB-Limit; echter HTTP-Test. Bildinhalt wird wie bisher über Dateiendung akzeptiert. |
 | [ ] | O4 | Implementiert | ZIP-Installation, Austausch mit Rücknahme, Katalog und Deinstallation; vollständige C#-Manifestfelder, kompatible Großschreibung/Windows-Pfade und zusätzliche Referenzprüfung. JS/CSS, Widgets/Effekte/Animationen, alle vier Fontformate und Assets angebunden; C#-Fixture über echtes HTTP und ausführenden Canvas-Test geprüft. Installierte OBS-/Fontdarstellungsabnahme offen. |
 | [ ] | O5 | Teilweise | Live-Videoeinstellungen und PNG-Screenshot aus OBS; Browserquellen-Assistent mit Canvas-/Szenen-/Namenswahl ergänzt. Erstellt oder aktualisiert Browserquellen mit Layout-Größe und aktueller URL. Fremde Quellentypen werden abgelehnt; vorhandene Position/Sichtbarkeit bleiben erhalten. WebSocket- und UI-Vertragstests vorhanden; Betriebsabnahme steht aus. |
-| [ ] | O6 | Teilweise | Standalone-Chat-Frontend, Hintergrund und Konfiguration; Twitch-Fragments mit nativen Emotes, History und Moderationsbereinigung. Badge-Kataloge, BTTV/FFZ/7TV, alle Chat-Settings und Solo-/Canvas-Abnahme fehlen. |
+| [ ] | O6 | Teilweise | Standalone-Chat-Frontend, Hintergrund und Konfiguration; Twitch-Fragments, native und BTTV-/FFZ-/7TV-Emotes, globale/Kanal-Badges, History und Moderationsbereinigung. Katalogstatus/Fehler und manuelle Aktualisierung bedienbar; Anbieter-Schalter wirksam. Vollständige Chat-Erscheinungsbild-Einstellungen und Standalone-/Solo-/Canvas-Betriebsabnahme fehlen. |
 | [ ] | O7 | Implementiert | Start/Stopp/Zeitänderung im Dashboard; Snapshot und WebSocket-Zustand für spät verbundene Clients; unabhängig vom Workflow. |
 
 ## OBS
@@ -57,7 +57,7 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | Abnahme | ID | Stand | Implementierung und verbleibende Arbeit |
 |---|---|---|---|
 | [ ] | TW1 | Implementiert | Kanalinformationen, Titel/Kategorie setzen und Kategoriesuche. |
-| [ ] | TW2 | Teilweise | EventSub Chat, Senden, Textanzeige und History; abgelehnte Sendebestätigung als Fehler. Reichhaltige App-Darstellung und vollständiger Ereignisfeed fehlen. |
+| [ ] | TW2 | Teilweise | EventSub Chat, Senden und History; abgelehnte Sendebestätigung als Fehler. App-Chat zeigt native/Drittanbieter-Emotes, Badges und Benutzerfarbe mit lesbarem Text-Fallback. Vollständiger Ereignisfeed und Live-Abnahme fehlen. |
 | [ ] | TW3 | Teilweise | Eigenes Twitch-Popout-WebView; Windows mit eigenem persistenten Profil, macOS Standard-WebView-Speicher. Dauerhafter Login auf beiden Plattformen noch nachzuweisen. |
 | [ ] | TW4 | Teilweise | Ban/Unban/Timeout/Delete-Backend, UI für Timeout/Löschen/Clear; EventSub-Synchronisierung. Vollständige Moderationsoberfläche fehlt. |
 | [ ] | TW5 | Teilweise | Helix-Abfragen und einfache Anzeige für Follower/Subs/Chatter. B7 versorgt Viewer-Daten und vorhandene Zielkonfiguration im Overlay; der vollständige Ziele-Editor fehlt. |
@@ -111,8 +111,8 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 ## Nächste Umsetzungsschritte
 
 1. Installierte Pakete und echte Dienstverbindungen abnehmen; weitere Alert-Playback-Abbruchfälle im Feature-Paket AL2/AL3 prüfen.
-2. O4/O6, vollständige Twitch-Oberflächen und Sessionerfassung für DA3/DA4 fertigstellen.
-3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung, Alert-Sound und Szenenmusik und Musikzustände fertigstellen.
+2. O6, vollständige Twitch-Oberflächen und Sessionerfassung für DA3/DA4 fertigstellen; O4 im installierten Paket abnehmen.
+3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung und Alert-Sound fertigstellen; implementierte Szenenmusik und Musikzustände praktisch abnehmen.
 4. Dashboard, Einrichtung, Rechtstexte, Migration/Backups und Diagnostik umsetzen; Profile im installierten Paket abnehmen.
 5. Windows-/macOS-Installer bauen und jeden gewählten Nutzerablauf dokumentiert abnehmen; erst danach Cutover entscheiden.
 
@@ -331,3 +331,19 @@ Der neue Rust-HTTP-Test installiert dasselbe C#-Fixture-Pack mit Widget, Effekt,
 Lokale Validierung: 290 unterschiedliche Rust-Tests im gesamten Workspace, 107 Frontend-Tests und 102 Canvas-Tests erfolgreich. Generierter Command-Vertrag, TypeScript-Typprüfung, gemeinsame Canvas-Bundles und React-Produktionsbuild ebenfalls erfolgreich. Der zusätzliche native Ereignisvertrag wurde im vollständigen Rust-Lauf geprüft.
 
 Die kanonische Anleitung unter `.agents/skills/overlay-extension-pack/SKILL.md` wurde um die Normalisierung, zusätzlichen Referenzprüfungen und tatsächlichen Testgrenzen ergänzt. O4 ist implementiert; die offene Installations-/Betriebsabnahme und alle übrigen offenen Feature-Pakete bleiben im ursprünglichen Umfang. [Build 37093311951](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37093311951) und [CodeQL 37093312025](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37093312025) für den vorherigen Commit `31b61b7` sind erfolgreich abgeschlossen, einschließlich Tauri-Paketbuild auf Windows und macOS.
+
+## O6/TW2: Chat-Badges und Emote-Kataloge
+
+`ccs-modules::twitch::chat_catalog` portiert die tatsächlich vorhandenen C#-Verträge aus `ChatBadgeCatalog`, `ChatEmoteCatalog` und `ChatEmoteEnricher`. Globale und kanalspezifische Twitch-Badges verwenden Helix mit dem bestehenden OAuth-Token. Kanaldefinitionen überschreiben globale Versionen; 1x-Bilder, eine andere vorhandene Version desselben Sets und die zwölf bisherigen Offline-Fallbacks bleiben unterstützt. Unbekannte Badges ohne Bild werden wie in C# ausgelassen. Die Helix-Endpunkte sind gegen die [Twitch-Referenz](https://dev.twitch.tv/docs/api/reference/#get-global-chat-badges) abgeglichen.
+
+BTTV lädt globale, Kanal- und geteilte Emotes; FFZ globale und Raum-Sets; 7TV globale und Kanal-Sets samt Host-Dateien. Die C#-Priorität BTTV → FFZ → 7TV bleibt erhalten; kanalspezifische Einträge überschreiben globale Einträge desselben Anbieters. Auch die bisherige Bildauswahl bleibt erhalten. Codes werden als vollständige, groß-/kleinschreibungssensitive Tokens ersetzt. Leerzeichen und Unicode bleiben erhalten; native Twitch-Emotes, Mentions und Cheermotes werden nicht als Drittanbieter-Codes interpretiert. Die bisher deaktivierten Anbieter-Schalter sind jetzt bedienbar und werden beim Anreichern jedes neuen Ereignisses berücksichtigt.
+
+Die bestehende EventSub-Bridge veröffentlicht dieselben JSON-Strings für `parts` und `badges` im App-Ereignis und Overlay-WebSocket; die HTTP-Chat-History enthält denselben angereicherten Stand. Der integrierte App-Chat rendert diese Emotes und Badges sowie die Benutzerfarbe als React-Inhalt. Ungültige Parts fallen auf Nachrichtentext zurück; nicht nutzbare Emote-URLs bleiben lesbarer Text. Bild-URLs verwenden ausschließlich HTTP/HTTPS, Namen und Nachrichtentext werden als Text behandelt.
+
+Automatische Katalogaktualisierung läuft unabhängig von Live-Daten und Chat-Empfang. Erfolgreiche Kataloge werden zehn Minuten zwischengespeichert; bei Fehlern wird nach dreißig Sekunden erneut versucht. Anbieter-/Settings-Änderungen lösen eine neue Abfrage aus. Parallele manuelle und automatische Aktualisierungen sind serialisiert und begrenzt. Ein ausgefallener Dienst blockiert die übrigen Anbieter nicht. Frühere nutzbare Einträge bleiben bei Fehlern nur für denselben Kanal erhalten; Kanalwechsel und Logout verwerfen den vorherigen Kanalstand. Anbieterfehler bleiben im Status sichtbar. Die Dienste-Seite zeigt diesen Zustand und bietet eine manuelle Aktualisierung über die typisierten nativen Commands `chat_catalog_status` und `refresh_chat_catalogs`.
+
+Acht neue Rust-Katalogtests prüfen globale/Kanal-HTTP-Verträge und Auth-Header, Provider-Prioritäten, Einzel-/Gesamtausfälle, sofortige Deaktivierung, versionierte Badges/Fallbacks, Tokenisierung, Refresh-Serialisierung/Cache und Logout. Ein zusätzlicher Regressionstest fand einen falschen globalen Badge-Fallback: Bei unbekannter Version muss wie in C# die zuletzt geladene Kanaldefinition greifen, unabhängig von der alphabetischen Reihenfolge der Versions-IDs. Ein tatsächlicher lokaler Overlay-Server liefert den angereicherten Payload über WebSocket und HTTP-History; der Test wartet vor Veröffentlichung auf das Hello. Ein neuer Tauri-IPC-Test prüft Status und fehlgeschlagene Aktualisierung ohne erfundene Verbindung. Frontend-Tests prüfen die drei persistenten Anbieter-Schalter, Status/Aktualisierung/Fehler sowie Chat-Darstellung und ungültige Bild-URLs.
+
+Lokale Validierung: 299 unterschiedliche Rust-Tests im vollständigen Workspace und 112 Frontend-Tests erfolgreich. Generierter Command-Vertrag, TypeScript-Typprüfung, gemeinsamer Canvas-Build und React-Produktionsbuild erfolgreich. Das gemeinsame Canvas-Frontend wurde in diesem Schritt nicht geändert; seine vorherigen 102 Tests werden dadurch nicht als zusätzliche neue Abnahme gezählt.
+
+O6 und TW2 bleiben teilweise: vollständige Chat-Erscheinungsbild-Einstellungen, der App-Ereignisfeed und die praktische Standalone-/Canvas-/Solo-/OBS-Abnahme fehlen weiterhin. Lokale Gegenstellen ersetzen weder tatsächliche Drittanbieter-Erreichbarkeit noch OAuth- und Installationsabnahme auf Windows/macOS. Alle übrigen Pakete des ursprünglichen Umfangs bleiben verbindlich. Für den vorherigen Commit `6bb05db` sind [Build 37095382065](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37095382065) und [CodeQL 37095382049](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37095382049) erfolgreich abgeschlossen, einschließlich Tauri-Build/Packaging auf Windows und macOS.
