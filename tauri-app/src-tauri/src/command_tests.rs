@@ -1,5 +1,163 @@
 use super::*;
 
+#[test]
+fn native_notification_commands_preserve_csharp_data_and_report_failed_edits() {
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("notifications.json");
+        std::fs::write(&file, json!([{"Timestamp":"2026-10-03T12:00:00+02:00","Severity":"Warnung","Message":"Legacy notification","IsRead":false,"Future":42}]).to_string()).unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let journal = || call(&window, "notifications_snapshot", json!({"filter":"Alle"})).unwrap();
+        assert_eq!(journal()["entries"][0]["message"], "Legacy notification");
+        assert!(call(
+            &window,
+            "notifications_snapshot",
+            json!({"filter":"invalid"})
+        )
+        .is_err());
+        call(&window, "notifications_mark_read", json!({})).unwrap();
+        assert_eq!(journal()["unreadCount"], 0);
+        let saved: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        assert_eq!(saved[0]["Future"], 42);
+        std::fs::remove_file(&file).unwrap();
+        std::fs::create_dir(&file).unwrap();
+        assert!(call(&window, "notifications_clear", json!({})).is_err());
+        assert_eq!(journal()["total"], 1);
+        assert!(!journal()["warnings"].as_array().unwrap().is_empty());
+        std::fs::remove_dir(&file).unwrap();
+        call(&window, "notifications_retry", json!({})).unwrap();
+        assert!(journal()["warnings"].as_array().unwrap().is_empty());
+        call(&window, "notifications_clear", json!({})).unwrap();
+        assert_eq!(journal()["total"], 0);
+        assert_eq!(
+            ccs_modules::notifications::NotificationRuntime::new(root.path())
+                .snapshot("Alle")
+                .unwrap()
+                .total,
+            0
+        );
+    });
+}
+
+#[test]
+fn native_notifications_receive_events_and_preflight_failures_without_interrupting_checks() {
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let changes = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let received = changes.clone();
+        let listener = app.listen("notifications-changed", move |_| {
+            received.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        });
+        runtime::spawn_notification_events(app.handle().clone(), state.notifications.clone());
+        stream_end_host::spawn_events(app.handle().clone(), state.stream_end.clone());
+        let (tx, rx) = broadcast::channel(8);
+        spawn_status_forward(app.handle().clone(), rx);
+        tx.send(ServiceStatus {
+            id: "obs".into(),
+            name: "OBS".into(),
+            state: ccs_modules::ConnectionState::Error,
+            detail: "native socket failure".into(),
+        })
+        .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            while state
+                .notifications
+                .snapshot("Fehler")
+                .unwrap()
+                .entries
+                .is_empty()
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            call(
+                &window,
+                "notifications_snapshot",
+                json!({"filter":"Fehler"})
+            )
+            .unwrap()["entries"][0]["message"],
+            "OBS: Verbindungsfehler: native socket failure"
+        );
+        call(&window, "dashboard_preflight", json!({})).unwrap();
+        let journal = call(&window, "notifications_snapshot", json!({"filter":"Alle"})).unwrap();
+        assert!(journal["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["message"] == "Preflight gestartet."));
+        assert!(journal["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["severity"] == "Warnung"));
+        seed_unresolved_stream_end(&state).await;
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            while !state
+                .notifications
+                .snapshot("Warnungen")
+                .unwrap()
+                .entries
+                .iter()
+                .any(|e| e.message.contains("Twitch API 403"))
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            while changes.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let file = root.path().join("notifications.json");
+        std::fs::remove_file(&file).unwrap();
+        std::fs::create_dir(&file).unwrap();
+        assert_eq!(
+            call(&window, "dashboard_preflight", json!({})).unwrap()["checks"]
+                .as_array()
+                .unwrap()
+                .len(),
+            9
+        );
+        assert!(
+            !call(&window, "notifications_snapshot", json!({"filter":"Alle"})).unwrap()["warnings"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        std::fs::write(&state.paths.settings_file, "invalid settings").unwrap();
+        assert!(call(&window, "dashboard_preflight", json!({})).is_err());
+        assert!(call(
+            &window,
+            "notifications_snapshot",
+            json!({"filter":"Fehler"})
+        )
+        .unwrap()["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["message"]
+                .as_str()
+                .unwrap()
+                .starts_with("Preflight fehlgeschlagen:")));
+        app.unlisten(listener);
+    });
+}
+
 struct PendingRaidTestIo;
 impl ccs_modules::stream_end::StreamEndIo for PendingRaidTestIo {
     fn execute(
@@ -2722,7 +2880,15 @@ pub(super) fn test_app_with_clients(
     ));
     bridge.set_stream_history(stream_history.clone());
     let stream_end = Arc::new(ccs_modules::stream_end::StreamEndRuntime::default());
-    runtime::bind_stream_history(&obs, stream_history.clone(), stream_end.clone());
+    let notifications = Arc::new(ccs_modules::notifications::NotificationRuntime::new(
+        &paths.data_root,
+    ));
+    runtime::bind_stream_history(
+        &obs,
+        stream_history.clone(),
+        stream_end.clone(),
+        notifications.clone(),
+    );
     let creator_intelligence = Arc::new(
         ccs_modules::creator_intelligence::CreatorIntelligenceRuntime::new(
             paths.data_root.clone(),
@@ -2748,6 +2914,7 @@ pub(super) fn test_app_with_clients(
             moderation,
             twitch_metrics,
             stream_history,
+            notifications,
             creator_intelligence,
             spotify,
             scene_music,
@@ -2790,6 +2957,10 @@ pub(super) fn test_app_with_clients(
             refresh_twitch_metrics,
             twitch_goals_snapshot,
             stream_history_snapshot,
+            notifications_snapshot,
+            notifications_mark_read,
+            notifications_clear,
+            notifications_retry,
             creator_intelligence_snapshot,
             record_creator_note,
             complete_creator_action,

@@ -3,8 +3,10 @@ pub(super) fn bind_stream_history(
     obs: &ObsClient,
     history: Arc<ccs_modules::stream_history::StreamHistoryRuntime>,
     stream_end: Arc<ccs_modules::stream_end::StreamEndRuntime>,
+    notifications: Arc<ccs_modules::notifications::NotificationRuntime>,
 ) {
     obs.set_stream_observer(Arc::new(move |event| {
+        notifications.observe_stream(event.active, event.at);
         if let Err(error) = history.observe_stream_event(event.active, event.at) {
             warn!(%error,"OBS-Sitzungsereignis konnte nicht gespeichert werden");
         }
@@ -19,6 +21,7 @@ pub(super) fn bind_stream_history(
 pub(super) fn spawn_runtime(app: AppHandle) {
     stream_end_host::spawn_events(app.clone(), app.state::<AppState>().stream_end.clone());
     spawn_stream_history_events(app.clone(), app.state::<AppState>().stream_history.clone());
+    spawn_notification_events(app.clone(), app.state::<AppState>().notifications.clone());
     spawn_extension_pack_events(app.clone(), app.state::<AppState>().hub.clone());
     spawn_obs_data(app.clone());
     spawn_twitch_data(app.clone());
@@ -137,6 +140,22 @@ pub(super) fn spawn_stream_history_events<R: tauri::Runtime>(
     });
 }
 
+pub(super) fn spawn_notification_events<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    journal: Arc<ccs_modules::notifications::NotificationRuntime>,
+) {
+    let mut changes = journal.subscribe_changes();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match changes.recv().await {
+                Ok(()) | Err(broadcast::error::RecvError::Lagged(_)) => {
+                    let _ = app.emit("notifications-changed", json!({"changed":true}));
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
+}
 fn spawn_chat_catalogs(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(3));

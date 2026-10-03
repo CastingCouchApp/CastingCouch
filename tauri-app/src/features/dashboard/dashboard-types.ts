@@ -20,6 +20,7 @@ export const CARD_TITLES: Record<string, string> = {
     SpotifyPlayer: "Musikplayer",
     TwitchChat: "Twitch-Chat",
     TwitchEvents: "Twitch-Ereignisse",
+    Notifications: "Benachrichtigungen",
     StreamHistory: "Streamverlauf",
     CreatorIntelligence: "Creator Intelligence",
 };
@@ -34,6 +35,7 @@ export const CARD_GROUPS: Record<string, keyof DashboardPreferences> = {
     SpotifyPlayer: "showLivePanels",
     TwitchChat: "showLivePanels",
     TwitchEvents: "showNotifications",
+    Notifications: "showNotifications",
     StreamHistory: "showStreamHistory",
     CreatorIntelligence: "showAdvancedTools",
 };

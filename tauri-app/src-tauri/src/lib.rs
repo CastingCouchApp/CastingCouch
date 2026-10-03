@@ -280,6 +280,7 @@ pub struct AppState {
     pub moderation: Arc<ccs_modules::twitch::ModerationRuntime>,
     pub twitch_metrics: Arc<ccs_modules::twitch::TwitchMetricsRuntime>,
     pub stream_history: Arc<ccs_modules::stream_history::StreamHistoryRuntime>,
+    pub notifications: Arc<ccs_modules::notifications::NotificationRuntime>,
     pub creator_intelligence: Arc<ccs_modules::creator_intelligence::CreatorIntelligenceRuntime>,
     pub spotify: Arc<SpotifyClient>,
     pub scene_music: Arc<ccs_modules::scene_music::SceneMusicEngine>,
@@ -447,6 +448,37 @@ async fn stream_history_snapshot(
 ) -> Result<ccs_modules::stream_history::StreamHistorySnapshot, String> {
     let history = state.stream_history.clone();
     tokio::task::spawn_blocking(move || history.snapshot(session_id.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn notifications_snapshot(
+    state: State<'_, AppState>,
+    filter: String,
+) -> Result<ccs_modules::notifications::NotificationSnapshot, String> {
+    let journal = state.notifications.clone();
+    tokio::task::spawn_blocking(move || journal.snapshot(&filter))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn notifications_mark_read(state: State<'_, AppState>) -> Result<(), String> {
+    let journal = state.notifications.clone();
+    tokio::task::spawn_blocking(move || journal.mark_all_read())
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn notifications_clear(state: State<'_, AppState>) -> Result<(), String> {
+    let journal = state.notifications.clone();
+    tokio::task::spawn_blocking(move || journal.clear())
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn notifications_retry(state: State<'_, AppState>) -> Result<(), String> {
+    let journal = state.notifications.clone();
+    tokio::task::spawn_blocking(move || journal.retry())
         .await
         .map_err(|e| e.to_string())?
 }
@@ -1203,19 +1235,28 @@ async fn obs_query(
 #[tauri::command]
 async fn obs_control(state: State<'_, AppState>, control: ObsControl) -> Result<Value, String> {
     if matches!(control, ObsControl::StartStream) {
-        let _stream_gate = state.stream_end_gate.lock().await;
-        let _settings_gate = state.settings_mutation.lock().await;
-        if state.stream_end.snapshot().await.active {
-            return Err("Streamende läuft; zuerst im Assistenten abbrechen".into());
+        let result = start_obs_stream(&state).await;
+        if let Err(error) = &result {
+            state
+                .notifications
+                .record(&format!("Streamstart fehlgeschlagen: {error}"), "Fehler");
         }
-        let settings = state.settings.load().await.map_err(|e| e.to_string())?;
-        return state
-            .obs
-            .start_stream_with_scene(&settings.obs.start_scene)
-            .await
-            .map_err(|e| e.to_string());
+        return result;
     }
     state.obs.control(control).await.map_err(|e| e.to_string())
+}
+async fn start_obs_stream(state: &AppState) -> Result<Value, String> {
+    let _stream_gate = state.stream_end_gate.lock().await;
+    let _settings_gate = state.settings_mutation.lock().await;
+    if state.stream_end.snapshot().await.active {
+        return Err("Streamende läuft; zuerst im Assistenten abbrechen".into());
+    }
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    state
+        .obs
+        .start_stream_with_scene(&settings.obs.start_scene)
+        .await
+        .map_err(|e| e.to_string())
 }
 #[tauri::command]
 async fn obs_output_status(state: State<'_, AppState>) -> Result<Value, String> {
@@ -1756,6 +1797,28 @@ async fn service_statuses(state: State<'_, AppState>) -> Result<Vec<ServiceStatu
 async fn dashboard_preflight(
     state: State<'_, AppState>,
 ) -> Result<ccs_modules::preflight::PreflightSnapshot, String> {
+    state.notifications.record("Preflight gestartet.", "Info");
+    let result = run_preflight(&state).await;
+    match &result {
+        Ok(snapshot) if snapshot.warning_count == 0 => state
+            .notifications
+            .record("Preflight abgeschlossen: Stream ist bereit.", "Info"),
+        Ok(snapshot) => state.notifications.record(
+            &format!(
+                "Preflight abgeschlossen: {} Punkte benötigen Aufmerksamkeit.",
+                snapshot.warning_count
+            ),
+            "Warnung",
+        ),
+        Err(error) => state
+            .notifications
+            .record(&format!("Preflight fehlgeschlagen: {error}"), "Fehler"),
+    }
+    result
+}
+async fn run_preflight(
+    state: &AppState,
+) -> Result<ccs_modules::preflight::PreflightSnapshot, String> {
     let original = state
         .settings
         .read_value()
@@ -2250,6 +2313,10 @@ pub fn run() {
             refresh_twitch_metrics,
             twitch_goals_snapshot,
             stream_history_snapshot,
+            notifications_snapshot,
+            notifications_mark_read,
+            notifications_clear,
+            notifications_retry,
             creator_intelligence_snapshot,
             record_creator_note,
             complete_creator_action,
@@ -2650,7 +2717,15 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     ));
     bridge.set_stream_history(stream_history.clone());
     let stream_end = Arc::new(ccs_modules::stream_end::StreamEndRuntime::default());
-    runtime::bind_stream_history(&obs, stream_history.clone(), stream_end.clone());
+    let notifications = Arc::new(ccs_modules::notifications::NotificationRuntime::new(
+        &paths.data_root,
+    ));
+    runtime::bind_stream_history(
+        &obs,
+        stream_history.clone(),
+        stream_end.clone(),
+        notifications.clone(),
+    );
     let creator_intelligence = Arc::new(
         ccs_modules::creator_intelligence::CreatorIntelligenceRuntime::new(
             paths.data_root.clone(),
@@ -2675,6 +2750,7 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         moderation,
         twitch_metrics,
         stream_history,
+        notifications,
         creator_intelligence,
         spotify,
         scene_music,
@@ -2788,6 +2864,9 @@ fn spawn_status_forward<R: tauri::Runtime>(
         loop {
             match rx.recv().await {
                 Ok(status) => {
+                    if let Some(state) = app.try_state::<AppState>() {
+                        state.notifications.observe_service(&status);
+                    }
                     let _ = app.emit("service-status", &status);
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,

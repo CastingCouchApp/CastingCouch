@@ -435,6 +435,9 @@ export function listenMusicStatesChanged(onChange: () => void) {
 export function listenDashboardChanged(onChange: () => void) {
     return listenIfTauri<{ changed: boolean }>("dashboard-changed", () => onChange());
 }
+export function listenNotificationsChanged(onChange: () => void) {
+    return listenIfTauri<{ changed: boolean }>("notifications-changed", () => onChange());
+}
 export function listenStreamEnd(onChange: (status: StreamEndSnapshot) => void) {
     return listenIfTauri<StreamEndSnapshot>("stream-end-changed", onChange);
 }

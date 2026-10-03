@@ -1,4 +1,8 @@
 import type {AlertDefinition, UpdatePackage} from "./api";
+export type NotificationItem = { timestamp: string; severity: string; message: string; isRead: boolean };
+
+export type NotificationSnapshot = { entries: Array<NotificationItem>; total: number; unreadCount: number; warnings: Array<string>; recoveryBackup: string | null };
+
 export type PreflightCheck = { key: string; label: string; ok: boolean; detail: string };
 
 export type PreflightSnapshot = { checkedAt: string; warningCount: number; checks: Array<PreflightCheck> };
@@ -212,6 +216,10 @@ export type CommandInvocation =
   | [command: "twitch_query", args: { query: TwitchQuery; after?: string | null }]
   | [command: "twitch_metrics_snapshot", args?: Record<string, never>]
   | [command: "stream_history_snapshot", args?: { sessionId?: string | null }]
+  | [command: "notifications_snapshot", args: { filter: string }]
+  | [command: "notifications_mark_read", args?: Record<string, never>]
+  | [command: "notifications_clear", args?: Record<string, never>]
+  | [command: "notifications_retry", args?: Record<string, never>]
   | [command: "creator_intelligence_snapshot", args: { lookbackDays: number }]
   | [command: "record_creator_note", args: { note: string; requestId: string }]
   | [command: "complete_creator_action", args: { actionId: string }]

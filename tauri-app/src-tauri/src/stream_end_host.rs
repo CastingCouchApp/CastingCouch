@@ -368,6 +368,7 @@ pub(super) fn spawn_events<R: tauri::Runtime>(
                 Ok(snapshot) => {
                     let _ = app.emit("stream-end-changed", &snapshot);
                     if let Some(state) = app.try_state::<AppState>() {
+                        state.notifications.observe_stream_end(&snapshot);
                         state
                             .hub
                             .live
@@ -376,7 +377,11 @@ pub(super) fn spawn_events<R: tauri::Runtime>(
                     }
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => {
-                    let _ = app.emit("stream-end-changed", runtime.snapshot().await);
+                    let snapshot = runtime.snapshot().await;
+                    if let Some(state) = app.try_state::<AppState>() {
+                        state.notifications.observe_stream_end(&snapshot);
+                    }
+                    let _ = app.emit("stream-end-changed", snapshot);
                 }
                 Err(broadcast::error::RecvError::Closed) => break,
             }

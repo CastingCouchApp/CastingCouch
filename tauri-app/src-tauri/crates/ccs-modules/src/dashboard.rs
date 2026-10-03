@@ -66,6 +66,7 @@ pub const CARD_KEYS: &[&str] = &[
     "TwitchChat",
     "TwitchEvents",
     "StreamHistory",
+    "Notifications",
     "CreatorIntelligence",
 ];
 fn canonical(key: &str) -> &str {
@@ -112,7 +113,7 @@ fn zone(v: &str) -> &str {
 fn default_zone(key: &str) -> &str {
     match key {
         "ConnectionStatus" | "Countdown" | "Preflight" => "Left",
-        "SpotifyPlayer" | "TwitchEvents" | "CreatorIntelligence" => "Right",
+        "SpotifyPlayer" | "TwitchEvents" | "Notifications" | "CreatorIntelligence" => "Right",
         _ => "Center",
     }
 }
@@ -533,6 +534,27 @@ pub async fn obs_preview(obs: &crate::obs::ObsClient) -> Result<Value, String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn notifications_card_uses_legacy_key_visibility_zone_and_order() {
+        let original = json!({"Dashboard":{"ModuleOrder":["Notifications","Workflow","TwitchEvents"],"HiddenModules":["Notifications"],"ModuleZones":{"Notifications":"Left"},"ShowNotifications":false,"Future":12}});
+        let draft = snapshot(&original).unwrap().draft;
+        assert_eq!(draft.cards[0].key, "Notifications");
+        assert!(!draft.cards[0].visible);
+        assert_eq!(draft.cards[0].zone, "Left");
+        assert!(!draft.preferences.show_notifications);
+        assert_eq!(apply(&original, &draft).unwrap(), original);
+        let default = snapshot(&json!({"Dashboard":{}})).unwrap().draft;
+        assert_eq!(
+            default
+                .cards
+                .iter()
+                .find(|c| c.key == "Notifications")
+                .unwrap()
+                .zone,
+            "Right"
+        );
+    }
 
     #[test]
     fn stream_end_card_preserves_existing_hidden_order_and_expansion_preferences() {

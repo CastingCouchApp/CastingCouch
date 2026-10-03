@@ -116,6 +116,16 @@ fn native_stream_start_sets_scene_first_and_rejects_unknown_active_and_failed_ou
         );
         assert!(call(&window, "stream_history_snapshot", json!({})).unwrap()["active"].is_null());
         mode.store(4, std::sync::atomic::Ordering::SeqCst);
+        let journal = call(&window, "notifications_snapshot", json!({"filter":"Alle"})).unwrap();
+        assert_eq!(
+            journal["total"], 4,
+            "rejected starts are errors, never successful starts"
+        );
+        assert!(journal["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|e| e["severity"] == "Fehler"));
         requests.lock().unwrap().clear();
         start().unwrap();
         let sent = requests.lock().unwrap().clone();
@@ -127,6 +137,9 @@ fn native_stream_start_sets_scene_first_and_rejects_unknown_active_and_failed_ou
         );
         assert_eq!(sent[1]["requestData"]["sceneName"], "Intro");
         assert!(call(&window, "stream_history_snapshot", json!({})).unwrap()["active"].is_object());
+        let journal = call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap();
+        assert_eq!(journal["entries"].as_array().unwrap().len(), 1);
+        assert_eq!(journal["entries"][0]["message"], "OBS-Stream gestartet.");
         requests.lock().unwrap().clear();
         assert!(start().is_err());
         assert_eq!(requests.lock().unwrap().len(), 1);

@@ -29,6 +29,8 @@ const domainFiles = {
     TwitchQuery: ["twitch/operations.rs", "query"],
 };
 const structFiles = {
+    NotificationItem: "notifications.rs",
+    NotificationSnapshot: "notifications.rs",
     PreflightCheck: "preflight.rs",
     PreflightSnapshot: "preflight.rs",
     StreamEndPreferences: "stream_end.rs",

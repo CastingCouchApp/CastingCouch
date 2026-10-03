@@ -2,6 +2,7 @@ import { Countdown } from "../features/dashboard/Countdown";
 import { StreamHistory } from "../features/dashboard/StreamHistory";
 import { StreamEndPanel } from "../features/dashboard/StreamEndPanel";
 import { Preflight } from "../features/dashboard/Preflight";
+import { Notifications } from "../features/dashboard/Notifications";
 import { CreatorIntelligence } from "../features/dashboard/CreatorIntelligence";
 import {
     DashboardLayout,
@@ -165,6 +166,7 @@ function DashboardPage() {
                             ),
                             Countdown: <Countdown />,
                             Preflight: <Preflight />,
+                            Notifications: <Notifications />,
                             StreamEnd: (
                                 <StreamEndPanel
                                     enabled={obs.state === "connected"}
