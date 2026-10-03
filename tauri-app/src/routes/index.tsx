@@ -1,4 +1,5 @@
 import { Countdown } from "../features/dashboard/Countdown";
+import { StreamHistory } from "../features/dashboard/StreamHistory";
 import { ObsControls } from "../features/obs/ObsControls";
 import type { ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -93,6 +94,7 @@ function DashboardPage() {
                 <ObsControls enabled={obs.state === "connected"} />
                 <Countdown />
             </div>
+            <StreamHistory />
         </div>
     );
 }

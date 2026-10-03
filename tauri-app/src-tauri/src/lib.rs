@@ -157,6 +157,7 @@ pub struct AppState {
     pub twitch: Arc<TwitchClient>,
     pub moderation: Arc<ccs_modules::twitch::ModerationRuntime>,
     pub twitch_metrics: Arc<ccs_modules::twitch::TwitchMetricsRuntime>,
+    pub stream_history: Arc<ccs_modules::stream_history::StreamHistoryRuntime>,
     pub spotify: Arc<SpotifyClient>,
     pub scene_music: Arc<ccs_modules::scene_music::SceneMusicEngine>,
     pub music_states: Arc<ccs_modules::spotify_states::SpotifyStateRuntime>,
@@ -290,6 +291,57 @@ async fn twitch_metrics_snapshot(
     state: State<'_, AppState>,
 ) -> Result<ccs_modules::twitch::TwitchMetricsSnapshot, String> {
     Ok(state.twitch_metrics.snapshot().await)
+}
+#[tauri::command]
+async fn stream_history_snapshot(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+) -> Result<ccs_modules::stream_history::StreamHistorySnapshot, String> {
+    let history = state.stream_history.clone();
+    tokio::task::spawn_blocking(move || history.snapshot(session_id.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn retry_stream_history(state: State<'_, AppState>) -> Result<(), String> {
+    let history = state.stream_history.clone();
+    tokio::task::spawn_blocking(move || history.retry())
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn latest_stream_summary(state: State<'_, AppState>) -> Result<String, String> {
+    let history = state.stream_history.clone();
+    tokio::task::spawn_blocking(move || history.latest_summary())
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn export_stream_history(
+    state: State<'_, AppState>,
+    format: String,
+    path: String,
+) -> Result<String, String> {
+    let history = state.stream_history.clone();
+    tokio::task::spawn_blocking(move || {
+        history.export(&format, &PathBuf::from(&path))?;
+        Ok(path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn open_stream_history_folder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let path = state.paths.data_root.join("StreamHistory");
+    tokio::fs::create_dir_all(&path)
+        .await
+        .map_err(|e| e.to_string())?;
+    app.opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 fn raid_settings_value(original: Value) -> Value {
@@ -1889,6 +1941,11 @@ pub fn run() {
             twitch_metrics_snapshot,
             refresh_twitch_metrics,
             twitch_goals_snapshot,
+            stream_history_snapshot,
+            retry_stream_history,
+            latest_stream_summary,
+            export_stream_history,
+            open_stream_history_folder,
             save_twitch_goals,
             twitch_raid_settings,
             save_twitch_raid_settings,
@@ -1990,6 +2047,9 @@ pub fn run() {
                     tauri::async_runtime::spawn(async move {
                         if let Some(state) = app.try_state::<AppState>() {
                             state.music_statistics.close().await;
+                            if let Err(error) = state.stream_history.retry() {
+                                error!(%error, "Sitzungsverlauf konnte beim Beenden nicht gespeichert werden");
+                            }
                             if let Some(bridge)=state.ytm.lock().await.take() { bridge.stop_and_wait().await; }
                             state.scene_music.close().await;
                             match tokio::time::timeout(std::time::Duration::from_secs(12), state.alerts.shutdown()).await {
@@ -2262,6 +2322,11 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         twitch.clone(),
         hub.clone(),
     ));
+    let stream_history = Arc::new(ccs_modules::stream_history::StreamHistoryRuntime::new(
+        paths.data_root.clone(),
+        hub.clone(),
+    ));
+    bridge.set_stream_history(stream_history.clone());
     app.manage(AppState {
         ytm,
         music_player,
@@ -2277,6 +2342,7 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         twitch,
         moderation,
         twitch_metrics,
+        stream_history,
         spotify,
         scene_music,
         music_states,

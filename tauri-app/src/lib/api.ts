@@ -483,6 +483,9 @@ export function listenTwitchGoals(onChange:()=>void) {
 export function listenTwitchRaids(onChange:()=>void) {
     return listenIfTauri<{changed:boolean}>("twitch-raids-changed",()=>onChange());
 }
+export function listenStreamHistory(onChange:()=>void) {
+    return listenIfTauri<{changed:boolean}>("stream-history-changed",()=>onChange());
+}
 export type ModerationResult = {
     applied: boolean;
     message: string;

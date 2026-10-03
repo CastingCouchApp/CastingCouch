@@ -1,6 +1,103 @@
 use super::*;
 
 #[test]
+fn stream_history_commands_read_capture_export_and_restore_across_native_ipc() {
+    use chrono::TimeZone;
+    use std::collections::BTreeMap;
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let at = chrono::Utc.with_ymd_and_hms(2026, 10, 3, 10, 0, 0).unwrap();
+        let data = json!({"stream":{"available":true,"isLive":true,"elapsedSeconds":0},"obs":{"currentScene":"Live"}});
+        let metrics = json!({"connected":true,"viewerCount":{"value":7,"at":at.to_rfc3339(),"error":null},"followers":{"value":0,"error":null},"title":"A <script>","category":"Game","channelError":null});
+        state.hub.live.merge_snapshot(&data);
+        state
+            .stream_history
+            .observe(&data, &metrics, &json!({}), at)
+            .unwrap();
+        state.bridge.from_twitch(
+            "channel.chat.message",
+            "Hallo",
+            at,
+            BTreeMap::from([
+                ("messageId".into(), "m".into()),
+                ("userName".into(), "Alice".into()),
+            ]),
+        );
+        let active = call(&window, "stream_history_snapshot", json!({})).unwrap();
+        assert_eq!(active["active"]["ChatMessages"], 1);
+        state
+            .stream_history
+            .observe(
+                &json!({"stream":{"available":true,"isLive":false}}),
+                &metrics,
+                &json!({}),
+                at + chrono::Duration::seconds(60),
+            )
+            .unwrap();
+        let saved = call(&window, "stream_history_snapshot", json!({})).unwrap();
+        assert_eq!(saved["sessions"][0]["DurationSeconds"], 60);
+        assert_eq!(saved["statistics"]["totalStreams"], 1);
+        let session = saved["sessions"][0]["SessionId"].as_str().unwrap();
+        let events = call(
+            &window,
+            "stream_history_snapshot",
+            json!({"sessionId":session}),
+        )
+        .unwrap();
+        assert!(events["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["Type"] == "twitch.chat.message" && e["Payload"]["user"] == "Alice"));
+        let csv = root.path().join("export.csv");
+        call(
+            &window,
+            "export_stream_history",
+            json!({"format":"csv","path":csv}),
+        )
+        .unwrap();
+        assert!(std::fs::read_to_string(csv)
+            .unwrap()
+            .contains("StartedAt;EndedAt"));
+        let html = root.path().join("report.html");
+        call(
+            &window,
+            "export_stream_history",
+            json!({"format":"html","path":html}),
+        )
+        .unwrap();
+        let report = std::fs::read_to_string(html).unwrap();
+        assert!(report.contains("A &lt;script&gt;"));
+        assert!(!report.contains("A <script>"));
+        assert!(call(&window, "latest_stream_summary", json!({}))
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .contains("Chatnachrichten: 1"));
+        call(&window, "retry_stream_history", json!({})).unwrap();
+        let restarted = test_app(root.path().into());
+        let second = WebviewWindowBuilder::new(&restarted, "main", Default::default())
+            .build()
+            .unwrap();
+        assert_eq!(
+            call(&second, "stream_history_snapshot", json!({})).unwrap()["sessions"],
+            saved["sessions"]
+        );
+        assert!(call(
+            &second,
+            "export_stream_history",
+            json!({"format":"csv","path":root.path().join("StreamHistory/history.jsonl")})
+        )
+        .is_err());
+    });
+}
+
+#[test]
 fn raid_native_commands_preflight_start_cancel_emit_and_share_cached_suggestions() {
     use ccs_modules::twitch::{
         TwitchConnectOptions, TwitchOAuthClient, TwitchTokenRepository, TwitchTokenSet,
@@ -1857,6 +1954,11 @@ fn test_app_with_clients(
         twitch.clone(),
         hub.clone(),
     ));
+    let stream_history = Arc::new(ccs_modules::stream_history::StreamHistoryRuntime::new(
+        paths.data_root.clone(),
+        hub.clone(),
+    ));
+    bridge.set_stream_history(stream_history.clone());
     let music_overlay = Arc::new(ccs_modules::music_overlay::MusicOverlayRuntime::new(
         settings.clone(),
         obs.clone(),
@@ -1873,6 +1975,7 @@ fn test_app_with_clients(
             twitch,
             moderation,
             twitch_metrics,
+            stream_history,
             spotify,
             scene_music,
             music_states,
@@ -1902,6 +2005,10 @@ fn test_app_with_clients(
             twitch_metrics_snapshot,
             refresh_twitch_metrics,
             twitch_goals_snapshot,
+            stream_history_snapshot,
+            retry_stream_history,
+            latest_stream_summary,
+            export_stream_history,
             save_twitch_goals,
             twitch_raid_settings,
             save_twitch_raid_settings,

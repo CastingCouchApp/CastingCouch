@@ -64,7 +64,7 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | [ ] | TW6 | Implementiert | Gespeicherte Raid-Ziele, zusammengeführte Vorschläge, paginierte Followed-/Live-Kanäle, Suche, frische Zielprüfung, Start und Abbruch samt Fehlermeldungen. Live-/Installationsabnahme offen; der vollständige Streamende-Assistent bleibt DA2. |
 | [ ] | TW7 | Implementiert | Rewards erstellen/bearbeiten/pausieren/fortsetzen/löschen; Titel, Kosten, Beschreibung, Farbe, Aktivierung und Eingabepflicht. Teiländerungen erhalten übrige Twitch-Felder. Einlösungen mit Zuschauereingabe, Statusfilter, Paging und Erfüllen/Erstatten; externe Änderungen über EventSub und periodische Abfrage. Twitch-Ownership-/Berechtigungsfehler bleiben sichtbar. Live-Abnahme offen. |
 | [ ] | TW8 | Implementiert | Getrennte Umfragen-/Vorhersagenverwaltung mit Ergebnissen, Paging, C#-Normalisierung und Zeitgrenzen. Umfragen beenden/archivieren; Vorhersagen sperren/auflösen/abbrechen, Gewinner bestätigen. EventSub-Beginn/Fortschritt/Ende aktualisiert die UI; periodische Abfragen decken verlorene Events ab. Live-Abnahme offen. |
-| [ ] | TW9 | Offen | Chat-History ist vorhanden; Ereignis- und Streamhistorien sind noch nicht portiert. |
+| [ ] | TW9 | Teilweise | Dauerhaftes Sitzungs- und Ereignisjournal mit C#-Dateiformaten, Verlaufsansicht und Export vorhanden. Vollständiger Abgleich der Journal-Payloads und Musikerfassung bleibt offen. |
 
 ## Musik und Alerts
 
@@ -90,7 +90,7 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 |---|---|---|---|
 | [ ] | DA1 | Offen | Karten-/Szenenbutton-Konfiguration. |
 | [ ] | DA2 | Teilweise | OBS-Ausgänge, Countdown und bisherige Statuskarten. Chat, Ereignisse, Kennzahlen, Musikbedienung und der C#-Streamende-Assistent mit Raid-Countdown, Retry/Timeout sowie optionalem Stream-/Musikstopp fehlen im Bedienpult. Workflow entfällt. |
-| [ ] | DA3 | Offen | Sessionerfassung, Persistenz und Auswertung. |
+| [ ] | DA3 | Teilweise | OBS-basierte Sessionerfassung, Zuschauer-Samples, Zähler, Persistenz, Kategorien, Entwicklung und Export vorhanden. Erfassung unmittelbar beim Streamstart und vollständiger C#-Reportabgleich bleiben offen. |
 | [ ] | DA4 | Offen | Sessionanalyse, Creator Score und Wochenberichte. |
 | [ ] | SYS1 | Offen | Ersteinrichtung mit Schritten, Prüfungen und Abschluss. |
 | [ ] | SYS2 | Offen | Dokumentanzeige und versionierte Zustimmungen; getrennt von gestrichener kommerzieller Lizenzierung. |
@@ -446,3 +446,17 @@ Neue Tests prüfen C#-Normalisierung/Reihenfolge, lokale HTTP-Pagination, Live-P
 Der vorherige Commit `9992313` ist in [Build 37103643419](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37103643419) und [CodeQL 37103643423](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37103643423) erfolgreich geprüft. CI-Build und Packaging ersetzen keine Live-/Installationsabnahme.
 
 Lokale Validierung: 340 unterschiedliche Rust-Tests im vollständigen Workspace, 142 React-Tests, Command-Verträge, TypeScript-Typprüfung und Produktionsbuild einschließlich Canvas-Bundles erfolgreich. Der erste Frontend-Gesamtlauf überschritt bei einem bestehenden Settings-Test das Ladezeitlimit; die vollständige Wiederholung mit zwei Workern war ohne Änderung dieses Tests erfolgreich. Das gemeinsame Canvas-TypeScript blieb unverändert; dessen frühere 115 Tests wurden hier nicht erneut ausgeführt.
+
+## Fortsetzung: Sitzungsverlauf und Sessionstatistik (TW9/DA3, teilweise)
+
+Die neue Rust-Runtime erfasst Sitzungen anhand bestätigter OBS-Streamzustände. Sie speichert Zuschauer-Samples, Durchschnitt/Peak, bestätigten Followergewinn, Chat, Alerts, Subs einschließlich ReSubs, Geschenk-Abos, Bits und Raids. Ein fehlender OBS-Status beendet keine Sitzung und erhöht deren bestätigte Laufzeit nicht. Nach einem Neustart wird eine passende laufende Sitzung fortgesetzt; eine unterbrochene Sitzung endet am letzten bestätigten Beobachtungszeitpunkt. Chatnachrichten mit gleicher Nachrichten-ID werden nicht doppelt gezählt.
+
+Die bestehenden Dateien `StreamHistory/history.jsonl` und `CreatorIntelligence/YYYY-MM/events.jsonl` bleiben lesbar. Zusatzfelder geladener Datensätze werden erhalten; beschädigte Zeilen erzeugen Warnungen und werden nicht umgeschrieben. Der neue versionierte Checkpoint `StreamHistory/active-session.json` hält aktive Sitzungen und noch ausstehende Schreiboperationen. Journal- und Sitzungskennungen verhindern erneutes Anhängen nach Wiederholung. Beschädigte Checkpoints bleiben unverändert und blockieren die Erfassung mit einer sichtbaren Warnung. Schreibfehler können ausdrücklich erneut versucht werden.
+
+Das Dashboard zeigt gespeicherte Sitzungen, sämtliche Zähler, Kategorien, Entwicklung und bis zu 500 neueste Journal-Einträge, optional pro Sitzung. Native Commands liefern den Verlauf, Zusammenfassung für die Zwischenablage und CSV-/HTML-Export. Dateidialog-Abbruch schreibt nichts; HTML-Inhalte werden escaped. Native Änderungsereignisse und Polling aktualisieren die Ansicht. Die gemeinsame Ereignisbrücke versorgt zugleich Journal und Overlay-Zähler; lokale HTTP-/WebSocket-Tests prüfen diesen Weg. Ein nativer IPC-Test prüft Erfassung, Export, Zusammenfassung und Neustart. React-Tests prüfen Filter, Fehler, Retry, Export, Zwischenablage und Listener-Abmeldung.
+
+TW9 und DA3 sind damit **teilweise umgesetzt**, nicht vollständig abgenommen. Noch offen sind der genaue C#-Abgleich einzelner Journal-Payloads, Musikerfassung unabhängig von der Overlay-Ausgabe, die Erfassung bereits vor dem ersten OBS-Poll sowie Details der Exportreihenfolge und HTML-Auswertung. Creator Intelligence aus DA4 wird dadurch nicht als implementiert gewertet. Tatsächliche Live-Dienste und installierte Windows-/macOS-Pakete bleiben separat abzunehmen.
+
+Der vorherige Commit `0f3c8c8` ist in [Build 37105331606](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37105331606) und [CodeQL 37105331598](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37105331598) erfolgreich geprüft. Diese Prüfungen gelten für den vorherigen Commit und ersetzen keine Live-/Installationsabnahme dieses Zwischenstands.
+
+Lokale Validierung: vollständiger Rust-Workspace mit 346 unterschiedlichen Tests erfolgreich, einschließlich fünf neuer History-Integrationstests und eines neuen nativen IPC-Tests. Alle 146 React-Tests sowie Command-Verträge, TypeScript-Typprüfung und Produktionsbuild einschließlich Canvas-Bundles erfolgreich. Das gemeinsame Canvas-TypeScript wurde nicht geändert; dessen eigene Tests wurden in diesem Schritt nicht erneut ausgeführt.

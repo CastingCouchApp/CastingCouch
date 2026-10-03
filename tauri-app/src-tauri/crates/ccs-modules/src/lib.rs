@@ -11,6 +11,7 @@ pub mod scene_music;
 pub mod spotify;
 pub mod spotify_states;
 pub mod twitch;
+pub mod stream_history;
 
 use serde::{Deserialize, Serialize};
 

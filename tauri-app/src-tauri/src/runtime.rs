@@ -1,5 +1,6 @@
 use super::*;
 pub(super) fn spawn_runtime(app: AppHandle) {
+    spawn_stream_history_events(app.clone(), app.state::<AppState>().stream_history.clone());
     spawn_extension_pack_events(app.clone(), app.state::<AppState>().hub.clone());
     spawn_obs_data(app.clone());
     spawn_twitch_data(app.clone());
@@ -77,6 +78,15 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                 "alerts":runtime.map(|r|json!({"isRunning":r.current_type.is_some(),"currentType":r.current_type.unwrap_or_default(),"queueLength":r.pending_count})).unwrap_or_else(||json!({"isRunning":false,"currentType":"","queueLength":0})),
                 "countdown":state.hub.live.countdown_state()
             }));
+            let metrics =
+                serde_json::to_value(state.twitch_metrics.snapshot().await).unwrap_or(Value::Null);
+            if let Err(error) =
+                state
+                    .stream_history
+                    .observe_now(&snapshot, &metrics, &settings.twitch.extra)
+            {
+                warn!(%error,"Sitzungsverlauf fehlgeschlagen");
+            }
 
             let path = ccs_core::paths::overlay_data_path(&state.paths, &settings);
             match state
@@ -99,6 +109,22 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                 warn!(%error,"Chat-Verlauf konnte nicht gespeichert werden");
             }
             state.hub.publish(&state.hub.countdown());
+        }
+    });
+}
+pub(super) fn spawn_stream_history_events<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    history: Arc<ccs_modules::stream_history::StreamHistoryRuntime>,
+) {
+    let mut changes = history.subscribe_changes();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match changes.recv().await {
+                Ok(()) | Err(broadcast::error::RecvError::Lagged(_)) => {
+                    let _ = app.emit("stream-history-changed", json!({"changed":true}));
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
         }
     });
 }

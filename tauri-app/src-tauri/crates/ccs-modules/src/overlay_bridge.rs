@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, VecDeque};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 /// Overlay `/ws` envelope matching WPF `OverlayRealtimeEvent` (camelCase).
 #[derive(Debug, Clone, Serialize)]
@@ -44,6 +44,7 @@ pub struct OverlayEventBridge {
     hub: Arc<RealtimeHub>,
     twitch_feed: Arc<Mutex<VecDeque<OverlayRealtimeEvent>>>,
     twitch_chat: Arc<ccs_overlay_server::ChatHistoryBuffer>,
+    stream_history: Arc<RwLock<Option<Arc<crate::stream_history::StreamHistoryRuntime>>>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -57,6 +58,7 @@ impl OverlayEventBridge {
             hub,
             twitch_feed: Arc::new(Mutex::new(VecDeque::new())),
             twitch_chat: Arc::new(ccs_overlay_server::ChatHistoryBuffer::with_capacity(500)),
+            stream_history: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -69,6 +71,9 @@ impl OverlayEventBridge {
 
     pub fn twitch_chat_feed(&self) -> Value {
         self.twitch_chat.history()
+    }
+    pub fn set_stream_history(&self, history: Arc<crate::stream_history::StreamHistoryRuntime>) {
+        *self.stream_history.write().unwrap() = Some(history);
     }
 
     pub fn publish(&self, event: &OverlayRealtimeEvent) -> Value {
@@ -83,6 +88,9 @@ impl OverlayEventBridge {
         let value = event.to_value();
         self.twitch_chat.record(&value);
         self.hub.publish(&value);
+        if let Some(history) = self.stream_history.read().unwrap().as_ref() {
+            history.record(&value);
+        }
         value
     }
 
