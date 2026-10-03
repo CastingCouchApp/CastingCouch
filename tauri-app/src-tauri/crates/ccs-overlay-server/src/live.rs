@@ -48,38 +48,37 @@ impl LiveState {
             .cloned()
             .unwrap_or_else(|| json!(""));
         data["twitch"]["available"] = json!(!channel.is_null());
-        data["twitch"]["title"] = channel
-            .pointer("/data/0/title")
-            .cloned()
-            .unwrap_or_else(|| json!(""));
-        data["twitch"]["category"] = channel
-            .pointer("/data/0/game_name")
-            .cloned()
-            .unwrap_or_else(|| json!(""));
-        data["twitch"]["followers"] = followers.get("total").cloned().unwrap_or_else(|| json!(0));
-        data["twitch"]["subscriptions"] = subs.get("total").cloned().unwrap_or_else(|| json!(0));
-        data["stream"]["viewerCount"] = stream
-            .pointer("/data/0/viewer_count")
-            .cloned()
-            .unwrap_or_else(|| json!(0));
-        data["twitch"]["viewerCountAvailable"] = json!(!stream.is_null());
-        for (key, target, title) in [
-            ("FollowerGoal", 200, "Follower-Ziel"),
-            ("SubGoal", 25, "Sub-Ziel"),
-            ("DonationGoal", 100, "Donation-Ziel"),
-        ] {
-            let goal = &settings[key];
-            let output = format!("{}{}State", key[..1].to_lowercase(), &key[1..]);
-            data["twitch"][&output] = json!({"title":goal.get("Title").cloned().unwrap_or_else(||json!(title)),"reason":goal.get("Reason").cloned().unwrap_or_else(||json!("")),"current":goal.get("Current").cloned().unwrap_or_else(||json!(0)),"target":goal.get("Target").cloned().unwrap_or_else(||json!(target)),"fontFace":goal.get("FontFace").cloned().unwrap_or_else(||json!("Segoe UI")),"fontSize":goal.get("FontSize").cloned().unwrap_or_else(||json!(36)),"currency":goal.get("Currency").cloned().unwrap_or_else(||json!("")),"enabled":goal.get("Enabled").cloned().unwrap_or_else(||json!(true))});
+        if !channel.is_null() {
+            data["twitch"]["title"] = channel
+                .pointer("/data/0/title")
+                .cloned()
+                .unwrap_or_else(|| json!(""));
+            data["twitch"]["category"] = channel
+                .pointer("/data/0/game_name")
+                .cloned()
+                .unwrap_or_else(|| json!(""));
         }
-        if let Some(total) = followers.get("total") {
-            data["twitch"]["followerGoalState"]["current"] = total.clone();
+        for (key, response) in [("followers", followers), ("subscriptions", subs)] {
+            let valid = response.get("total").and_then(Value::as_u64);
+            data["twitch"][format!("{key}Available")] = json!(valid.is_some());
+            if let Some(total) = valid {
+                data["twitch"][key] = json!(total);
+                data["twitch"][format!("{key}Known")] = json!(true);
+            }
         }
-        if let Some(total) = subs.get("total") {
-            data["twitch"]["subGoalState"]["current"] = total.clone();
+        let viewers = stream["data"].as_array().and_then(|items| {
+            if items.is_empty() {
+                Some(0)
+            } else {
+                items[0]["viewer_count"].as_u64()
+            }
+        });
+        if let Some(viewers) = viewers {
+            data["stream"]["viewerCount"] = json!(viewers);
         }
-        data["twitch"]["followerGoal"] = data["twitch"]["followerGoalState"]["target"].clone();
-        if data["stream"]["isLive"] == true && !stream.is_null() {
+        data["twitch"]["viewerCountAvailable"] = json!(viewers.is_some());
+        goal_settings(&mut data, settings);
+        if data["stream"]["isLive"] == true && viewers.is_some() {
             let viewers = data["stream"]["viewerCount"].as_u64().unwrap_or(0);
             let mut samples = self.viewer_samples.lock().unwrap();
             samples.0 += 1;
@@ -88,6 +87,10 @@ impl LiveState {
             data["stats"]["peakViewers"] =
                 json!(viewers.max(data["stats"]["peakViewers"].as_u64().unwrap_or(0)));
         }
+    }
+
+    pub fn update_goal_settings(&self, settings: &Value) {
+        goal_settings(&mut self.data.write().unwrap(), settings);
     }
 
     pub fn merge_snapshot(&self, patch: &Value) -> Value {
@@ -254,4 +257,25 @@ impl LiveState {
             .max(0);
         json!({"source":"app","type":"app.countdown","at":Utc::now().to_rfc3339(),"summary":countdown.2,"data":{"isRunning":(remaining>0).to_string(),"remainingSeconds":remaining.to_string(),"totalSeconds":countdown.1.to_string(),"label":countdown.2,"endsAt":countdown.0.map(|t|t.to_rfc3339()).unwrap_or_default()}})
     }
+}
+
+fn goal_settings(data: &mut Value, settings: &Value) {
+    for (key, target, title) in [
+        ("FollowerGoal", 200, "Follower-Ziel"),
+        ("SubGoal", 25, "Sub-Ziel"),
+        ("DonationGoal", 100, "Donation-Ziel"),
+    ] {
+        let goal = &settings[key];
+        let output = format!("{}{}State", key[..1].to_lowercase(), &key[1..]);
+        data["twitch"][&output] = json!({"title":goal.get("Title").cloned().unwrap_or_else(||json!(title)),"reason":goal.get("Reason").cloned().unwrap_or_else(||json!("")),"current":goal.get("Current").cloned().unwrap_or_else(||json!(0)),"target":goal.get("Target").cloned().unwrap_or_else(||json!(target)),"fontFace":goal.get("FontFace").cloned().unwrap_or_else(||json!("Segoe UI")),"fontSize":goal.get("FontSize").cloned().unwrap_or_else(||json!(36)),"currency":goal.get("Currency").cloned().unwrap_or_else(||json!("")),"enabled":goal.get("Enabled").cloned().unwrap_or_else(||json!(true))});
+    }
+    if data["twitch"]["followersKnown"] == true {
+        let total = data["twitch"]["followers"].clone();
+        data["twitch"]["followerGoalState"]["current"] = total.clone();
+    }
+    if data["twitch"]["subscriptionsKnown"] == true {
+        let total = data["twitch"]["subscriptions"].clone();
+        data["twitch"]["subGoalState"]["current"] = total.clone();
+    }
+    data["twitch"]["followerGoal"] = data["twitch"]["followerGoalState"]["target"].clone();
 }

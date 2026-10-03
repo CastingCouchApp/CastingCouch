@@ -93,3 +93,23 @@ fn twitch_snapshot_uses_helix_totals_and_configured_goals() {
     assert_eq!(data["stream"]["viewerCount"], 12);
     assert_eq!(data["stats"]["peakViewers"], 12);
 }
+
+#[test]
+fn goal_settings_change_keeps_live_counts_without_adding_viewer_samples() {
+    let hub = RealtimeHub::new();
+    hub.live.merge_snapshot(&json!({"stream":{"isLive":true}}));
+    hub.live.update_twitch(
+        &json!({}),
+        &json!({"data":[{}]}),
+        &json!({"data":[{"viewer_count":12}]}),
+        &json!({"total":30}),
+        &json!({"total":0}),
+    );
+    let stats = hub.live.data.read().unwrap()["stats"].clone();
+    hub.live.update_goal_settings(&json!({"FollowerGoal":{"Title":"New","Target":500,"Current":99},"SubGoal":{"Target":25,"Current":99}}));
+    let data = hub.live.data.read().unwrap();
+    assert_eq!(data["twitch"]["followerGoalState"]["current"], 30);
+    assert_eq!(data["twitch"]["subGoalState"]["current"], 0);
+    assert_eq!(data["twitch"]["followerGoalState"]["target"], 500);
+    assert_eq!(data["stats"], stats);
+}

@@ -156,6 +156,7 @@ pub struct AppState {
     pub obs: Arc<ObsClient>,
     pub twitch: Arc<TwitchClient>,
     pub moderation: Arc<ccs_modules::twitch::ModerationRuntime>,
+    pub twitch_metrics: Arc<ccs_modules::twitch::TwitchMetricsRuntime>,
     pub spotify: Arc<SpotifyClient>,
     pub scene_music: Arc<ccs_modules::scene_music::SceneMusicEngine>,
     pub music_states: Arc<ccs_modules::spotify_states::SpotifyStateRuntime>,
@@ -282,6 +283,96 @@ async fn twitch_query(
         )
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn twitch_metrics_snapshot(
+    state: State<'_, AppState>,
+) -> Result<ccs_modules::twitch::TwitchMetricsSnapshot, String> {
+    Ok(state.twitch_metrics.snapshot().await)
+}
+#[tauri::command]
+async fn refresh_twitch_metrics<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<ccs_modules::twitch::TwitchMetricsSnapshot, String> {
+    state.twitch_metrics.refresh(true).await?;
+    let snapshot = state.twitch_metrics.snapshot().await;
+    app.emit("twitch-metrics-changed", &snapshot)
+        .map_err(|e| e.to_string())?;
+    Ok(snapshot)
+}
+#[tauri::command]
+async fn twitch_goals_snapshot(state: State<'_, AppState>) -> Result<Value, String> {
+    let original = state
+        .settings
+        .read_value()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(
+        json!({"draft":ccs_modules::twitch::goal_draft(&original),"original":original,"warnings":[]}),
+    )
+}
+#[tauri::command]
+async fn save_twitch_goals<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    draft: ccs_modules::twitch::GoalsDraft,
+    original: Value,
+) -> Result<Value, String> {
+    let _guard = state.settings_mutation.lock().await;
+    let counts = state.twitch_metrics.snapshot().await;
+    let available = |count: &ccs_modules::twitch::TwitchCount| {
+        if counts.connected && count.error.is_none() {
+            count.value
+        } else {
+            None
+        }
+    };
+    let edited = ccs_modules::twitch::edit_goals(
+        &original,
+        &draft,
+        available(&counts.followers),
+        available(&counts.subscriptions),
+    )?;
+    let saved = state
+        .settings
+        .save_edit(&original, &edited)
+        .await
+        .map_err(|e| e.to_string())?;
+    state.twitch_metrics.apply_goals(&saved["Twitch"]).await;
+    let mut warnings =
+        OverlayLayoutStore::with_hub(&state.paths.overlay_layouts, state.hub.clone())
+            .synchronize_goals(&saved["Twitch"])
+            .await;
+    let settings: AppSettings = serde_json::from_value(saved.clone()).map_err(|e| e.to_string())?;
+    if let Err(error) = state
+        .hub
+        .live
+        .write_snapshot_with_music(
+            &ccs_core::paths::overlay_data_path(&state.paths, &settings),
+            settings.spotify.extra["OverlayEnabled"]
+                .as_bool()
+                .unwrap_or(true),
+        )
+        .await
+    {
+        warnings.push(format!(
+            "Ziele gespeichert; Overlay-Datendatei konnte nicht aktualisiert werden: {error}"
+        ));
+    }
+    let data = state.hub.live.data.read().unwrap().clone();
+    state.hub.publish(
+        &json!({"source":"app","type":"app.overlay.data","at":data["updatedAt"],"data":data}),
+    );
+    if let Err(error) = app.emit("twitch-goals-changed", json!({"changed":true})) {
+        warnings.push(format!(
+            "Ziele gespeichert; App-Benachrichtigung fehlgeschlagen: {error}"
+        ));
+    }
+    Ok(
+        json!({"draft":ccs_modules::twitch::goal_draft(&saved),"original":saved,"warnings":warnings}),
+    )
 }
 #[tauri::command]
 fn twitch_event_feed(
@@ -1594,6 +1685,10 @@ pub fn run() {
             clear_twitch_moderation_view,
             export_twitch_moderation_log,
             twitch_query,
+            twitch_metrics_snapshot,
+            refresh_twitch_metrics,
+            twitch_goals_snapshot,
+            save_twitch_goals,
             chat_catalog_status,
             refresh_chat_catalogs,
             chat_history,
@@ -1952,6 +2047,11 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         bridge.clone(),
         &paths.logs,
     ));
+    let twitch_metrics = Arc::new(ccs_modules::twitch::TwitchMetricsRuntime::new(
+        settings.clone(),
+        twitch.clone(),
+        hub.clone(),
+    ));
     app.manage(AppState {
         ytm,
         music_player,
@@ -1966,6 +2066,7 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         obs,
         twitch,
         moderation,
+        twitch_metrics,
         spotify,
         scene_music,
         music_states,
@@ -2002,6 +2103,9 @@ fn spawn_live_event_bridges(
         loop {
             match twitch_events.recv().await {
                 Ok(mut evt) => {
+                    if let Some(state) = app_twitch_evt.try_state::<AppState>() {
+                        state.twitch_metrics.notify_event(&evt.event_type);
+                    }
                     if evt.event_type == "channel.chat.message" {
                         if let Some(state) = app_twitch_evt.try_state::<AppState>() {
                             if let Ok(settings) = state.settings.load().await {

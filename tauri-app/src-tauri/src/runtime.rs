@@ -148,7 +148,7 @@ fn spawn_music_state_monitor(app: AppHandle) {
             }
             match state.music_states.tick(startup).await {
                 Ok(()) => startup = false,
-                Err(error) => warn!(%error, "Spotify-Zustandsüberwachung fehlgeschlagen"),
+                Err(error) => warn!(%error, "Spotify-ZustandsÃ¼berwachung fehlgeschlagen"),
             }
         }
     });
@@ -196,52 +196,23 @@ fn spawn_obs_data(app: AppHandle) {
 
 fn spawn_twitch_data(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let mut tick = tokio::time::interval(std::time::Duration::from_secs(30));
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        let mut counter = 0u64;
         loop {
             tick.tick().await;
             let state = app.state::<AppState>();
-            let Ok(settings) = state.settings.load().await else {
-                continue;
-            };
-
-            use ccs_modules::twitch::TwitchQuery;
-            let query = |q| {
-                state.twitch.query(
-                    &settings.twitch.client_id,
-                    &settings.twitch.channel_name,
-                    q,
-                    None,
-                )
-            };
-            let values =
-                if state.twitch.status().await.state == ccs_modules::ConnectionState::Connected {
-                    tokio::time::timeout(std::time::Duration::from_secs(8), async {
-                        tokio::join!(
-                            query(TwitchQuery::Channel),
-                            query(TwitchQuery::Stream),
-                            query(TwitchQuery::Followers),
-                            query(TwitchQuery::Subscriptions)
-                        )
-                    })
-                    .await
-                    .ok()
-                    .map(|(a, b, c, d)| (a.ok(), b.ok(), c.ok(), d.ok()))
-                    .unwrap_or_default()
-                } else {
-                    Default::default()
-                };
-            state.hub.live.update_twitch(
-                &serde_json::to_value(&settings.twitch).unwrap_or_default(),
-                &values.0.unwrap_or(Value::Null),
-                &values.1.unwrap_or(Value::Null),
-                &values.2.unwrap_or(Value::Null),
-                &values.3.unwrap_or(Value::Null),
-            );
-
-            counter = counter.wrapping_add(1);
-            let _ = counter;
+            match state.twitch_metrics.refresh(false).await {
+                Ok(true) => {
+                    let _ = app.emit(
+                        "twitch-metrics-changed",
+                        state.twitch_metrics.snapshot().await,
+                    );
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    warn!(%error,"Twitch-Zahlen konnten nicht aktualisiert werden");
+                }
+            }
         }
     });
 }
@@ -265,7 +236,7 @@ fn spawn_watchdog(app: AppHandle) {
                     )
                     .await
                     {
-                        warn!(%error, "Musiklautstärke konnte noch nicht wiederhergestellt werden");
+                        warn!(%error, "MusiklautstÃ¤rke konnte noch nicht wiederhergestellt werden");
                     }
                 }
             }

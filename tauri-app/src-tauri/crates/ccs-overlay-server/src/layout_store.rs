@@ -168,6 +168,73 @@ impl OverlayLayoutStore {
         Ok(())
     }
 
+    /// Update the current files under the same lock as editor saves and canvas changes.
+    pub async fn synchronize_goals(&self, settings: &Value) -> Vec<String> {
+        let _guard = if let Some(hub) = &self.hub {
+            Some(hub.chat_layout_lock.lock().await)
+        } else {
+            None
+        };
+        let mut warnings = vec![];
+        let mut files = match fs::read_dir(&self.root).await {
+            Ok(files) => files,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return warnings,
+            Err(error) => return vec![format!("Goal-Layouts nicht lesbar: {error}")],
+        };
+        loop {
+            let file = match files.next_entry().await {
+                Ok(Some(file)) => file,
+                Ok(None) => break,
+                Err(error) => {
+                    warnings.push(format!("Goal-Layouts nicht lesbar: {error}"));
+                    break;
+                }
+            };
+            let path = file.path();
+            if !path
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+            {
+                continue;
+            }
+            let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let result:Result<(),String>=async {
+                if !file.file_type().await.map_err(|e|e.to_string())?.is_file(){return Ok(());}
+                let mut layout:Value=serde_json::from_slice(&fs::read(&path).await.map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+                if !layout.is_object(){return Err("Layout muss ein Objekt sein.".into());}
+                let old=layout.clone();
+                for item in layout["items"].as_array_mut().into_iter().flatten() {
+                    if !item["type"].as_str().is_some_and(|s|s.eq_ignore_ascii_case("goal-bar")){continue;}
+                    if !item["props"].is_object(){item["props"]=json!({});}
+                    let props=item["props"].as_object_mut().unwrap();
+                    let kind=props.iter().find(|(k,_)|k.eq_ignore_ascii_case("kind")).and_then(|(_,v)|v.as_str()).unwrap_or("followers").to_lowercase();
+                    let (key,title,target)=match kind.as_str(){"subs"=>("SubGoal","Sub-Ziel",25),"bits"|"custom"=>("DonationGoal","Donation-Ziel",100),_=>("FollowerGoal","Follower-Ziel",200)};
+                    let goal=&settings[key];
+                    let title=goal["Title"].as_str().unwrap_or(title);
+                    let reason=goal["Reason"].as_str().unwrap_or("");
+                    let label=if key=="DonationGoal"&&!reason.trim().is_empty(){format!("{title} · {reason}")}else{title.into()};
+                    props.retain(|key,_|!key.eq_ignore_ascii_case("current")&&!key.eq_ignore_ascii_case("label")&&!key.eq_ignore_ascii_case("target"));
+                    props.insert("label".into(),json!(label));
+                    props.insert("target".into(),json!(goal["Target"].as_f64().unwrap_or(target as f64).max(1.0)));
+                }
+                if old!=layout {
+                    fs::write(&path,serde_json::to_vec_pretty(&layout).map_err(|e|e.to_string())?).await.map_err(|e|e.to_string())?;
+                    if let Some(hub)=&self.hub {hub.publish(&json!({"source":"app","type":"app.overlay.layout","at":chrono::Utc::now().to_rfc3339(),"summary":"Ziele aktualisiert","data":{"instanceId":id,"layout":layout.to_string()}}));}
+                }
+                Ok(())
+            }.await;
+            if let Err(error) = result {
+                warnings.push(format!(
+                    "Goal-Layout {id} konnte nicht aktualisiert werden: {error}"
+                ));
+            }
+        }
+        warnings
+    }
+
     pub async fn duplicate(&self, source_id: &str, target_id: &str) -> Result<(), LayoutError> {
         let layout = self.load(source_id).await?;
         self.save(target_id, &layout).await

@@ -1,4 +1,8 @@
 import type {AlertDefinition, UpdatePackage} from "./api";
+export type GoalDraft = { title: string; current: string; target: string; fontFace: string; fontSize: string; currency: string; reason: string };
+
+export type GoalsDraft = { overlayScene: string; follower: GoalDraft; subscriptions: GoalDraft; donation: GoalDraft };
+
 export type ObsControl =
   | { action: "start_stream" }
   | { action: "stop_stream" }
@@ -170,6 +174,10 @@ export type CommandInvocation =
   | [command: "export_twitch_moderation_log", args: { path: string }]
   | [command: "twitch_action", args: { action: TwitchAction }]
   | [command: "twitch_query", args: { query: TwitchQuery; after?: string | null }]
+  | [command: "twitch_metrics_snapshot", args?: Record<string, never>]
+  | [command: "refresh_twitch_metrics", args?: Record<string, never>]
+  | [command: "twitch_goals_snapshot", args?: Record<string, never>]
+  | [command: "save_twitch_goals", args: { draft: GoalsDraft; original: unknown }]
   | [command: "twitch_event_feed", args?: Record<string, never>]
   | [command: "twitch_chat_feed", args?: Record<string, never>]
   | [command: "chat_history", args?: Record<string, never>]

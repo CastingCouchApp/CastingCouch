@@ -1,6 +1,10 @@
 mod chat_catalog;
 mod eventsub;
+mod goals;
 mod helix;
+pub use goals::{edit_goals, goal_draft, GoalDraft, GoalsDraft};
+mod metrics;
+pub use metrics::{chatter_interval, TwitchCount, TwitchMetricsRuntime, TwitchMetricsSnapshot};
 mod moderation;
 mod oauth;
 mod operations;

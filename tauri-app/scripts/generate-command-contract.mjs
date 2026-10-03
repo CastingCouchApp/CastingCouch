@@ -28,10 +28,14 @@ const domainFiles = {
     ModerationAction: ["twitch/moderation.rs", "action"],
     TwitchQuery: ["twitch/operations.rs", "query"],
 };
+const structFiles = {
+    GoalDraft: "twitch/goals.rs",
+    GoalsDraft: "twitch/goals.rs",
+};
 function type(rust) {
     rust = rust.trim();
     const name = rust.split("::").at(-1);
-    if (domainFiles[name]) return name;
+    if (domainFiles[name] || structFiles[name]) return name;
     if (name === "AlertDefinition" || name === "UpdatePackage") return name;
     if (rust === "String") return "string";
     if (rust === "bool") return "boolean";
@@ -65,6 +69,22 @@ const count = (source.match(/#\[tauri::command\]/g) || []).length;
 if (count !== commands.length)
     throw Error(`Parsed ${commands.length}/${count} commands`);
 const domains = [];
+for (const [name, file] of Object.entries(structFiles)) {
+    const rust = readFileSync(
+        new URL("src-tauri/crates/ccs-modules/src/" + file, root),
+        "utf8",
+    );
+    const body = rust.match(
+        new RegExp(`pub struct ${name} \\{([\\s\\S]*?)\\}`),
+    )?.[1];
+    if (!body) throw Error("Missing struct " + name);
+    const fields = split(body).map((field) => {
+        const match = field.match(/^pub (\w+)\s*:\s*([\s\S]+)$/);
+        if (!match) throw Error("Unsupported struct field " + field);
+        return `${match[1].replace(/_([a-z])/g, (_, c) => c.toUpperCase())}: ${type(match[2])}`;
+    });
+    domains.push(`export type ${name} = { ${fields.join("; ")} };\n`);
+}
 for (const [name, [file, tag]] of Object.entries(domainFiles)) {
     const rust = readFileSync(
         new URL("src-tauri/crates/ccs-modules/src/" + file, root),

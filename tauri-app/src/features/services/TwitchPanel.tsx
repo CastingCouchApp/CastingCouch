@@ -11,6 +11,7 @@ import { ChatCatalogStatusPanel } from "./ChatCatalogStatus";
 import { TwitchChatMessage } from "./TwitchChatMessage";
 import { TwitchEventFeed, TwitchEventTime } from "./TwitchEventFeed";
 import { TwitchModeration, useModerationAction } from "./TwitchModeration";
+import { TwitchGoals } from "./TwitchGoals";
 type Event = {
     type: string;
     at: string;
@@ -425,6 +426,7 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                 )}
             </Card>
             <TwitchRewards enabled={enabled} />
+            <TwitchGoals enabled={enabled} />
             <TwitchModeration
                 enabled={enabled}
                 selectedUser={moderationUser.login}

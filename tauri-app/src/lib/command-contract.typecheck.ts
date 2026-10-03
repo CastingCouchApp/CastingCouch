@@ -1,6 +1,11 @@
 import { tauriInvoke } from "./api";
 // Compiled by tsc; these calls are never executed. Stale argument names must fail compilation.
 export function commandContractTypeAssertions() {
+    // @ts-expect-error Goal drafts must include all typed nested fields.
+    void tauriInvoke("save_twitch_goals", {
+        draft: { overlayScene: "Goals" },
+        original: {},
+    });
     void tauriInvoke("music_state_action", {
         action: { action: "restore", group: "Intro", fadeSeconds: 3 },
     });

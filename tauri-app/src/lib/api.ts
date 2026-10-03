@@ -472,6 +472,14 @@ export type TwitchRealtimeEvent = {
     data: Record<string, string>;
 };
 export type TwitchEventFeedSnapshot = { events: TwitchRealtimeEvent[] };
+export type TwitchCount = {value:number|null;at:string|null;error:string|null};
+export type TwitchMetricsSnapshot = {connected:boolean;viewerCount:TwitchCount;followers:TwitchCount;subscriptions:TwitchCount;chatters:TwitchCount;title:string;category:string;channelError:string|null};
+export function listenTwitchMetrics(onChange:(snapshot:TwitchMetricsSnapshot)=>void) {
+    return listenIfTauri<TwitchMetricsSnapshot>("twitch-metrics-changed",onChange);
+}
+export function listenTwitchGoals(onChange:()=>void) {
+    return listenIfTauri<{changed:boolean}>("twitch-goals-changed",()=>onChange());
+}
 export type ModerationResult = {
     applied: boolean;
     message: string;

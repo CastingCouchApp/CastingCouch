@@ -3,6 +3,262 @@ use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 use tauri::Listener;
 
 #[test]
+fn native_metric_refresh_uses_helix_and_saving_goals_uses_confirmed_zeroes() {
+    use ccs_modules::twitch::{TwitchOAuthClient, TwitchTokenRepository, TwitchTokenSet};
+    use ccs_secrets::MemorySecretStore;
+    use wiremock::{matchers::path, Mock, MockServer, ResponseTemplate};
+    tauri::async_runtime::block_on(async {
+        let server = MockServer::start().await;
+        let client_id = "abcdefghijabcdefghijabcdefghij";
+        Mock::given(path("/validate")).respond_with(ResponseTemplate::new(200).set_body_json(json!({"client_id":client_id,"login":"owner","user_id":"10","scopes":[],"expires_in":3600}))).mount(&server).await;
+        Mock::given(path("/users"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({"data":[{"id":"10","login":"owner","display_name":"Owner"}]}),
+            ))
+            .mount(&server)
+            .await;
+        for (endpoint, body) in [
+            (
+                "/channels",
+                json!({"data":[{"title":"Title","game_name":"Game"}]}),
+            ),
+            ("/streams", json!({"data":[{"viewer_count":8}]})),
+            ("/channels/followers", json!({"total":0})),
+            ("/subscriptions", json!({"total":0})),
+            ("/chat/chatters", json!({"total":3})),
+        ] {
+            Mock::given(path(endpoint))
+                .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                .expect(1)
+                .mount(&server)
+                .await;
+        }
+        let secrets = Arc::new(MemorySecretStore::new());
+        TwitchTokenRepository::new(secrets.clone())
+            .save(&TwitchTokenSet::from_oauth(
+                "token".into(),
+                "refresh".into(),
+                3600,
+                vec![],
+            ))
+            .unwrap();
+        let twitch = Arc::new(TwitchClient::with_http(
+            secrets,
+            TwitchOAuthClient::with_base_urls(
+                format!("{}/device", server.uri()),
+                format!("{}/token", server.uri()),
+                format!("{}/validate", server.uri()),
+            ),
+            format!("{}/", server.uri()),
+        ));
+        twitch
+            .connect(&TwitchConnectOptions {
+                client_id: client_id.into(),
+                channel_name: String::new(),
+                scopes: vec![],
+                enable_event_sub: false,
+            })
+            .await
+            .unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app_with_clients(root.path().into(), None, Some(twitch));
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let mut settings = state.settings.load().await.unwrap();
+        settings.twitch.client_id = client_id.into();
+        settings.twitch.extra = json!({"FollowerGoal":{"Current":99,"Target":200},"SubGoal":{"Current":99,"Target":25}});
+        settings.spotify.extra["OverlayEnabled"] = json!(false);
+        state.settings.save(&settings).await.unwrap();
+        let file = ccs_core::paths::overlay_data_path(&state.paths, &settings);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(
+            &file,
+            json!({"music":{"title":"External"},"custom":{"keep":true}}).to_string(),
+        )
+        .unwrap();
+        let updates = Arc::new(std::sync::Mutex::new(Vec::<Value>::new()));
+        let received = updates.clone();
+        app.listen("twitch-metrics-changed", move |event| {
+            received
+                .lock()
+                .unwrap()
+                .push(serde_json::from_str(event.payload()).unwrap())
+        });
+        let metrics = call(&window, "refresh_twitch_metrics", json!({})).unwrap();
+        assert_eq!(metrics["viewerCount"]["value"], 8);
+        assert_eq!(metrics["followers"]["value"], 0);
+        assert_eq!(
+            call(&window, "twitch_metrics_snapshot", json!({})).unwrap(),
+            metrics
+        );
+        assert_eq!(updates.lock().unwrap().as_slice(), &[metrics]);
+        let initial = call(&window, "twitch_goals_snapshot", json!({})).unwrap();
+        let result = call(
+            &window,
+            "save_twitch_goals",
+            json!({"draft":initial["draft"],"original":initial["original"]}),
+        )
+        .unwrap();
+        assert_eq!(
+            result["original"]["Twitch"]["FollowerGoal"]["Current"].as_f64(),
+            Some(0.0)
+        );
+        assert_eq!(
+            result["original"]["Twitch"]["SubGoal"]["Current"].as_f64(),
+            Some(0.0)
+        );
+        let output: Value = serde_json::from_slice(&std::fs::read(file).unwrap()).unwrap();
+        assert_eq!(output["music"]["title"], "External");
+        assert_eq!(output["custom"]["keep"], true);
+    });
+}
+
+#[test]
+fn goal_commands_preserve_parallel_settings_and_update_http_layouts_and_websocket() {
+    use futures_util::StreamExt;
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let store = OverlayLayoutStore::with_hub(&state.paths.overlay_layouts, state.hub.clone());
+        store.save("one",&json!({"items":[{"id":"goal","type":"goal-bar","props":{"kind":"followers","current":999}}]})).await.unwrap();
+        let original = call(&window, "twitch_goals_snapshot", json!({})).unwrap();
+        let mut draft = original["draft"].clone();
+        draft["follower"]["target"] = json!("250,5");
+        draft["follower"]["title"] = json!(" Community ");
+        let mut concurrent = state.settings.load().await.unwrap();
+        concurrent.branding.display_name = "Parallel".into();
+        state.settings.save(&concurrent).await.unwrap();
+        let server = OverlayServer::start(
+            state.settings.clone(),
+            state.paths.clone(),
+            state.hub.clone(),
+            0,
+        )
+        .await
+        .unwrap();
+        let (mut ws, _) =
+            tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{}/ws", server.port))
+                .await
+                .unwrap();
+        ws.next().await.unwrap().unwrap();
+        ws.next().await.unwrap().unwrap();
+        let saved = call(
+            &window,
+            "save_twitch_goals",
+            json!({"draft":draft,"original":original["original"]}),
+        )
+        .unwrap();
+        assert_eq!(saved["original"]["Branding"]["DisplayName"], "Parallel");
+        assert_eq!(saved["original"]["Twitch"]["FollowerGoal"]["Target"], 250.5);
+        let event = tokio::time::timeout(std::time::Duration::from_secs(2), ws.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let event: Value = serde_json::from_str(event.to_text().unwrap()).unwrap();
+        assert_eq!(event["type"], "app.overlay.layout");
+        let http = reqwest::Client::new();
+        let live: Value = http
+            .get(format!(
+                "http://127.0.0.1:{}/data/overlay-data.json",
+                server.port
+            ))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(live["twitch"]["followerGoalState"]["target"], 250.5);
+        assert_eq!(live["twitch"]["followerGoalState"]["title"], "Community");
+        assert_eq!(
+            store.load("one").await.unwrap()["items"][0]["props"]["target"],
+            250.5
+        );
+        let conflict = call(
+            &window,
+            "save_twitch_goals",
+            json!({"draft":original["draft"],"original":original["original"]}),
+        );
+        assert!(conflict.is_err());
+        assert_eq!(
+            state.settings.read_value().await.unwrap()["Twitch"]["FollowerGoal"]["Target"],
+            250.5
+        );
+        ws.close(None).await.unwrap();
+        server.stop();
+        drop(app);
+        let restart = test_app(root.path().into());
+        let second = WebviewWindowBuilder::new(&restart, "main", Default::default())
+            .build()
+            .unwrap();
+        assert_eq!(
+            call(&second, "twitch_goals_snapshot", json!({})).unwrap()["draft"]["follower"]
+                ["target"],
+            "250.5"
+        );
+    });
+}
+
+#[test]
+fn goal_save_reports_followup_failures_and_can_retry_without_losing_saved_settings() {
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let settings = state.settings.load().await.unwrap();
+        let file = ccs_core::paths::overlay_data_path(&state.paths, &settings);
+        std::fs::create_dir_all(&file).unwrap();
+        std::fs::create_dir_all(&state.paths.overlay_layouts).unwrap();
+        let layout = state.paths.overlay_layouts.join("broken.json");
+        std::fs::write(&layout, b"{broken").unwrap();
+        let initial = call(&window, "twitch_goals_snapshot", json!({})).unwrap();
+        let mut draft = initial["draft"].clone();
+        draft["donation"]["reason"] = json!("Mikrofon");
+        let saved = call(
+            &window,
+            "save_twitch_goals",
+            json!({"original":initial["original"],"draft":draft}),
+        )
+        .unwrap();
+        assert_eq!(saved["warnings"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            state.settings.read_value().await.unwrap()["Twitch"]["DonationGoal"]["Reason"],
+            "Mikrofon"
+        );
+        assert_eq!(std::fs::read(&layout).unwrap(), b"{broken");
+        std::fs::remove_dir(&file).unwrap();
+        std::fs::write(
+            &layout,
+            json!({"items":[{"type":"goal-bar","props":{"kind":"custom"}}]}).to_string(),
+        )
+        .unwrap();
+        let retried = call(
+            &window,
+            "save_twitch_goals",
+            json!({"original":saved["original"],"draft":saved["draft"]}),
+        )
+        .unwrap();
+        assert_eq!(retried["warnings"], json!([]));
+        assert_eq!(
+            serde_json::from_slice::<Value>(&std::fs::read(layout).unwrap()).unwrap()["items"][0]
+                ["props"]["label"],
+            "Donation-Ziel · Mikrofon"
+        );
+        assert!(file.is_file());
+    });
+}
+
+#[test]
 fn moderation_commands_cross_native_ipc_http_events_and_preserve_the_log() {
     use ccs_modules::twitch::{TwitchOAuthClient, TwitchTokenRepository, TwitchTokenSet};
     use ccs_secrets::MemorySecretStore;
@@ -1324,6 +1580,11 @@ fn test_app_with_clients(
         bridge.clone(),
         &paths.logs,
     ));
+    let twitch_metrics = Arc::new(ccs_modules::twitch::TwitchMetricsRuntime::new(
+        settings.clone(),
+        twitch.clone(),
+        hub.clone(),
+    ));
     let music_overlay = Arc::new(ccs_modules::music_overlay::MusicOverlayRuntime::new(
         settings.clone(),
         obs.clone(),
@@ -1339,6 +1600,7 @@ fn test_app_with_clients(
             obs,
             twitch,
             moderation,
+            twitch_metrics,
             spotify,
             scene_music,
             music_states,
@@ -1365,6 +1627,10 @@ fn test_app_with_clients(
             clear_twitch_moderation_view,
             export_twitch_moderation_log,
             twitch_query,
+            twitch_metrics_snapshot,
+            refresh_twitch_metrics,
+            twitch_goals_snapshot,
+            save_twitch_goals,
             chat_catalog_status,
             refresh_chat_catalogs,
             activate_spotify_device,

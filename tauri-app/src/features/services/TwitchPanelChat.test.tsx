@@ -24,6 +24,7 @@ vi.mock("../../lib/api", () => ({
 vi.mock("./ChatCatalogStatus", () => ({ ChatCatalogStatusPanel: () => null }));
 vi.mock("./TwitchRewards", () => ({ TwitchRewards: () => null }));
 vi.mock("./TwitchVotes", () => ({ TwitchVotes: () => null }));
+vi.mock("./TwitchGoals", () => ({ TwitchGoals: () => null }));
 function event(text: string, id = "message") {
     return {
         source: "twitch",
