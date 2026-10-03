@@ -353,10 +353,17 @@ impl SpotifyClient {
     }
 
     pub async fn logout(&self) -> ModuleResult<ServiceStatus> {
+        self.disconnect().await?;
+        let _guard = self.token_refresh.lock().await;
+        self.tokens.delete()?;
+        Ok(self.status().await)
+    }
+
+    /// Stop the provider without deleting the stored OAuth session.
+    pub async fn disconnect(&self) -> ModuleResult<ServiceStatus> {
         self.cancel_pending_login().await;
         self.stop_poll().await;
         let _guard = self.token_refresh.lock().await;
-        self.tokens.delete()?;
         self.store_now_playing(NowPlaying::default()).await;
         *self.display_name.write().await = String::new();
         self.set_status(ConnectionState::Disconnected, "").await;
@@ -482,6 +489,7 @@ impl SpotifyClient {
         self.poll_enabled.store(false, Ordering::SeqCst);
         if let Some(handle) = self.poll_task.lock().await.take() {
             handle.abort();
+            let _ = handle.await;
         }
     }
 
@@ -489,6 +497,7 @@ impl SpotifyClient {
         self.cancel_login.store(true, Ordering::SeqCst);
         if let Some(handle) = self.login_task.lock().await.take() {
             handle.abort();
+            let _ = handle.await;
         }
     }
 }

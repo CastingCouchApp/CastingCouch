@@ -10,6 +10,7 @@ import { routeTree } from "../../routeTree.gen";
 import { defaultAppSettings } from "../../lib/app-settings";
 const invokeMock = vi.fn();
 let ytmRunning = false;
+let musicSettings = defaultAppSettings();
 vi.mock("../../lib/api", async (original) => ({
     ...(await original<typeof import("../../lib/api")>()),
     tauriInvoke: (cmd: string, args: unknown) =>
@@ -36,41 +37,68 @@ function renderMusic() {
 describe("Native music", () => {
     beforeEach(() => {
         ytmRunning = false;
-        invokeMock.mockReset().mockImplementation(async (cmd: string) => {
-            if (cmd === "get_settings") return defaultAppSettings();
-            if (cmd === "now_playing")
-                return {
-                    title: "Contract Song",
-                    artist: "Artist",
-                    album: "Album",
-                    is_playing: true,
-                };
-            if (cmd === "ytm_now_playing")
-                return { connected: false, statusText: "Bridge gestoppt" };
-            if (cmd === "spotify_query") return { devices: [], items: [] };
-            if (cmd === "ytm_runtime_status")
-                return {
-                    running: ytmRunning,
-                    port: ytmRunning ? 43831 : null,
-                    configuredPort: 43831,
-                    installUrl: ytmRunning
-                        ? "http://127.0.0.1:43831/ytmusic/install"
-                        : null,
-                    bookmarklet: ytmRunning ? "javascript:%28example%29" : null,
-                    error: null,
-                    snapshot: {
-                        connected: false,
-                        statusText: ytmRunning
-                            ? "Bookmarklet inaktiv"
-                            : "Bridge gestoppt",
-                    },
-                };
-            if (cmd === "ytm_connect") {
-                ytmRunning = true;
-                return "http://127.0.0.1:43831/ytmusic/install";
-            }
-            return null;
-        });
+        musicSettings = defaultAppSettings();
+        invokeMock
+            .mockReset()
+            .mockImplementation(async (cmd: string, args: any) => {
+                if (cmd === "get_settings") return musicSettings;
+                if (cmd === "save_settings") {
+                    musicSettings = args.settings;
+                    return { warnings: [] };
+                }
+                if (cmd === "music_player_snapshot")
+                    return {
+                        provider:
+                            musicSettings.MusicPlayer.ProviderId ?? "spotify",
+                        providerDisplayName: "Spotify",
+                        connected: true,
+                        isPlaying: true,
+                        title: "Contract Song",
+                        artist: "Artist",
+                        album: "Album",
+                        progressMs: 0,
+                        durationMs: 5000,
+                        volumePercent: null,
+                        supportsSeek: true,
+                        supportsVolume: true,
+                        statusText: "Spielt",
+                        error: null,
+                    };
+                if (cmd === "now_playing")
+                    return {
+                        title: "Contract Song",
+                        artist: "Artist",
+                        album: "Album",
+                        is_playing: true,
+                    };
+                if (cmd === "ytm_now_playing")
+                    return { connected: false, statusText: "Bridge gestoppt" };
+                if (cmd === "spotify_query") return { devices: [], items: [] };
+                if (cmd === "ytm_runtime_status")
+                    return {
+                        running: ytmRunning,
+                        port: ytmRunning ? 43831 : null,
+                        configuredPort: 43831,
+                        installUrl: ytmRunning
+                            ? "http://127.0.0.1:43831/ytmusic/install"
+                            : null,
+                        bookmarklet: ytmRunning
+                            ? "javascript:%28example%29"
+                            : null,
+                        error: null,
+                        snapshot: {
+                            connected: false,
+                            statusText: ytmRunning
+                                ? "Bookmarklet inaktiv"
+                                : "Bridge gestoppt",
+                        },
+                    };
+                if (cmd === "ytm_connect") {
+                    ytmRunning = true;
+                    return "http://127.0.0.1:43831/ytmusic/install";
+                }
+                return null;
+            });
     });
     it("uses native playback commands and removes workflow navigation", async () => {
         renderMusic();
@@ -80,16 +108,19 @@ describe("Native music", () => {
         ).not.toBeInTheDocument();
         expect(screen.queryByText(/Sidecar/)).not.toBeInTheDocument();
         fireEvent.click(
-            screen.getByRole("button", { name: "Spotify pausieren" }),
+            screen.getByRole("button", { name: "Musik pausieren" }),
         );
         await waitFor(() =>
-            expect(invokeMock).toHaveBeenCalledWith("spotify_action", {
-                action: { action: "pause" },
+            expect(invokeMock).toHaveBeenCalledWith("music_player_action", {
+                action: { action: "play_pause" },
             }),
         );
     });
     it("connects the native YouTube Music bridge", async () => {
         renderMusic();
+        const select = await screen.findByLabelText("Musikprovider");
+        await waitFor(() => expect(select).not.toBeDisabled());
+        fireEvent.change(select, { target: { value: "ytmusic" } });
         fireEvent.click(
             await screen.findByRole("button", {
                 name: "YouTube Music verbinden",
@@ -103,7 +134,7 @@ describe("Native music", () => {
     it("persists provider choice without replacing unrelated settings", async () => {
         renderMusic();
         const select = await screen.findByLabelText(
-            "Musikprovider für das Overlay",
+            "Musikprovider",
         );
         await waitFor(() => expect(select).not.toBeDisabled());
         fireEvent.change(select, { target: { value: "ytmusic" } });
@@ -131,7 +162,7 @@ describe("Native music", () => {
         );
         renderMusic();
         const select = await screen.findByLabelText(
-            "Musikprovider für das Overlay",
+            "Musikprovider",
         );
         await waitFor(() => expect(select).toHaveValue("ytmusic"));
     });

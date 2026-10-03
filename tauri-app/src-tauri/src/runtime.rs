@@ -4,6 +4,7 @@ pub(super) fn spawn_runtime(app: AppHandle) {
     spawn_twitch_data(app.clone());
     spawn_watchdog(app.clone());
     spawn_music_state_monitor(app.clone());
+    spawn_music_player_monitor(app.clone());
     tauri::async_runtime::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -19,43 +20,21 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                 }
             };
             state.spotify.set_reconnect_enabled(
-                settings.general.connection_watchdog_enabled && settings.general.reconnect_spotify,
+                settings.music_player.provider_id() == "spotify"
+                    && settings.general.connection_watchdog_enabled
+                    && settings.general.reconnect_spotify,
             );
 
             let outputs = state.hub.live.data.read().unwrap()["obs"]["outputs"].clone();
-            let spotify = state.spotify.now_playing().await;
-            let ytm = state.ytm.lock().await.as_ref().map(|bridge| {
-                bridge.set_timeout_seconds(settings.you_tube_music.timeout_seconds());
-                bridge.snapshot()
-            });
-            let mut music = if settings.music_player.provider_id() == "ytmusic" {
-                serde_json::to_value(ytm.unwrap_or_else(|| ccs_overlay_server::MusicSnapshot {
-                    provider: "ytmusic".into(),
-                    status_text: "Bridge gestoppt".into(),
-                    ..Default::default()
-                }))
-                .unwrap_or(Value::Null)
-            } else {
-                json!({"provider":"spotify","connected":state.spotify.status().await.state==ccs_modules::ConnectionState::Connected,"isPlaying":spotify.is_playing,"title":spotify.title,"artist":spotify.artist,"album":spotify.album,"coverUrl":spotify.cover_url,"cover":spotify.cover_url,"progressMs":spotify.progress_ms,"durationMs":spotify.duration_ms})
+            let mut music = match music_player_snapshot(app.state::<AppState>()).await {
+                Ok(snapshot) => serde_json::to_value(snapshot).unwrap_or(Value::Null),
+                Err(error) => {
+                    warn!(%error,"Musikdaten nicht lesbar");
+                    continue;
+                }
             };
+            let _ = app.emit("music-player-changed", &music);
             music["cover"] = music["coverUrl"].clone();
-            if music["statusText"]
-                .as_str()
-                .is_none_or(|text| text.is_empty())
-            {
-                music["statusText"] = json!(if music["connected"] != true {
-                    "Nicht verbunden"
-                } else if music["isPlaying"] == true {
-                    "Wiedergabe"
-                } else {
-                    "Pausiert"
-                });
-            }
-            music["providerDisplayName"] = json!(if music["provider"] == "ytmusic" {
-                "YouTube Music"
-            } else {
-                "Spotify"
-            });
             for (key, fallback) in [
                 ("showInOverlay", true),
                 ("showTitle", true),
@@ -74,8 +53,8 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                     .unwrap_or(fallback));
             }
             let signature = format!(
-                "{}|{}|{}",
-                music["provider"], music["title"], music["artist"]
+                "{}|{}|{}|{}",
+                music["provider"], music["title"], music["artist"], music["coverUrl"]
             );
             if signature != previous_music {
                 state.bridge.app_music_track(
@@ -312,6 +291,21 @@ fn spawn_watchdog(app: AppHandle) {
             }
             counter = counter.wrapping_add(1);
             let _ = counter;
+        }
+    });
+}
+
+fn spawn_music_player_monitor(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(5));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tick.tick().await;
+            let state = app.state::<AppState>();
+            if state.scene_music.is_closed() {
+                break;
+            }
+            state.music_player.refresh_details().await;
         }
     });
 }

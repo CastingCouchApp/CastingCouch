@@ -2,6 +2,157 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 #[test]
+fn shared_player_commands_cross_native_ipc_and_provider_switch_releases_the_bridge() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let snapshot = call(&window, "music_player_snapshot", json!({})).unwrap();
+    assert_eq!(snapshot["provider"], "spotify");
+    assert_eq!(snapshot["connected"], false);
+    assert_eq!(snapshot["volumePercent"], Value::Null);
+    assert!(call(
+        &window,
+        "music_player_action",
+        json!({"action":{"action":"play"}})
+    )
+    .is_err());
+    assert!(
+        call(&window, "ytm_connect", json!({})).is_err(),
+        "inactive providers cannot connect"
+    );
+    let socket = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = socket.local_addr().unwrap().port();
+    drop(socket);
+    let original = call(&window, "get_settings", json!({})).unwrap();
+    let mut next = original.clone();
+    next["MusicPlayer"]["ProviderId"] = json!("ytmusic");
+    next["YouTubeMusic"]["BridgePort"] = json!(port);
+    call(
+        &window,
+        "save_settings",
+        json!({"original":original,"settings":next}),
+    )
+    .unwrap();
+    let connected = call(&window, "music_player_connect", json!({})).unwrap();
+    assert!(connected["installUrl"]
+        .as_str()
+        .unwrap()
+        .contains(&port.to_string()));
+    tauri::async_runtime::block_on(async {
+        let http = reqwest::Client::new();
+        http.post(format!("http://127.0.0.1:{port}/ytmusic/state")).json(&json!({"title":"Shared title","coverUrl":"https://example.com/image","isPlaying":true})).send().await.unwrap().error_for_status().unwrap();
+        let snapshot = call(&window, "music_player_snapshot", json!({})).unwrap();
+        assert_eq!(snapshot["title"], "Shared title");
+        assert_eq!(snapshot["supportsVolume"], false);
+        call(
+            &window,
+            "music_player_action",
+            json!({"action":{"action":"play_pause"}}),
+        )
+        .unwrap();
+        let commands: Value = http
+            .get(format!("http://127.0.0.1:{port}/ytmusic/commands"))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(commands["commands"], json!(["playpause"]));
+    });
+    let mut spotify = next.clone();
+    spotify["MusicPlayer"]["ProviderId"] = json!("spotify");
+    call(
+        &window,
+        "save_settings",
+        json!({"original":next,"settings":spotify}),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&window, "ytm_runtime_status", json!({})).unwrap()["running"],
+        false
+    );
+    std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).unwrap();
+    call(&window, "music_player_disconnect", json!({})).unwrap();
+}
+
+#[test]
+fn common_connect_reuses_saved_spotify_oauth_after_disconnect_through_native_ipc() {
+    use ccs_modules::spotify::{SpotifyOAuthClient, SpotifyTokenRepository, SpotifyTokenSet};
+    use ccs_secrets::MemorySecretStore;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let (spotify, _server) = tauri::async_runtime::block_on(async {
+        let server = MockServer::start().await;
+        let secrets = Arc::new(MemorySecretStore::new());
+        SpotifyTokenRepository::new(secrets.clone())
+            .save(&SpotifyTokenSet::from_oauth(
+                "saved-access".into(),
+                "saved-refresh".into(),
+                3600,
+                "Bearer".into(),
+                vec![],
+            ))
+            .unwrap();
+        Mock::given(method("GET"))
+            .and(path("/me"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"id":"user","display_name":"Saved User"})),
+            )
+            .expect(2)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/me/player/currently-playing"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+        (
+            Arc::new(SpotifyClient::with_http(
+                secrets,
+                SpotifyOAuthClient::new(),
+                server.uri(),
+            )),
+            server,
+        )
+    });
+    let app = test_app_with_spotify(root.path().into(), Some(spotify.clone()));
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let original = call(&window, "get_settings", json!({})).unwrap();
+    let mut next = original.clone();
+    next["Spotify"]["ClientId"] = json!("contract-client-id-12345");
+    call(
+        &window,
+        "save_settings",
+        json!({"original":original,"settings":next}),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&window, "music_player_connect", json!({})).unwrap()["state"],
+        "connected"
+    );
+    call(&window, "music_player_disconnect", json!({})).unwrap();
+    assert!(spotify.has_token());
+    assert_eq!(
+        call(&window, "music_player_snapshot", json!({})).unwrap()["connected"],
+        false
+    );
+    assert_eq!(
+        call(&window, "music_player_connect", json!({})).unwrap()["state"],
+        "connected"
+    );
+    call(&window, "music_player_disconnect", json!({})).unwrap();
+}
+
+#[test]
 fn youtube_autostart_respects_selected_provider_and_reports_busy_port_without_aborting_app() {
     tauri::async_runtime::block_on(async {
         let mut settings = AppSettings::default();
@@ -37,6 +188,7 @@ fn youtube_bridge_port_changes_are_transactional_and_setup_crosses_native_ipc() 
     drop(first);
     let original = call(&window, "get_settings", json!({})).unwrap();
     let mut next = original.clone();
+    next["MusicPlayer"]["ProviderId"] = json!("ytmusic");
     next["YouTubeMusic"] =
         json!({"BridgePort":first_port,"StateTimeoutSeconds":30,"AutoConnect":true,"Custom":42});
     call(
@@ -254,7 +406,7 @@ fn test_app_with_spotify(
         settings.clone(),
         spotify.clone(),
         scene_music.clone(),
-        ducking,
+        ducking.clone(),
     ));
     let music_statistics = Arc::new(ccs_modules::music_statistics::MusicStatisticsRuntime::new(
         Arc::new(ccs_core::music_statistics::MusicStatisticsStore::new(
@@ -262,10 +414,19 @@ fn test_app_with_spotify(
         )),
         settings.clone(),
     ));
+    let ytm = Arc::new(Mutex::new(None));
+    let music_player = Arc::new(ccs_modules::music_player::MusicPlayerRuntime::new(
+        settings.clone(),
+        spotify.clone(),
+        scene_music.clone(),
+        ducking,
+        ytm.clone(),
+    ));
     mock_builder()
         .manage(StartupState::default())
         .manage(AppState {
-            ytm: Mutex::new(None),
+            ytm,
+            music_player,
             ytm_error: Mutex::new(None),
             settings_mutation: Mutex::new(()),
             obs: ObsClient::new_shared("127.0.0.1", 4455),
@@ -296,6 +457,10 @@ fn test_app_with_spotify(
             music_state_action,
             music_state_snapshot,
             music_statistics_snapshot,
+            music_player_snapshot,
+            music_player_action,
+            music_player_disconnect,
+            music_player_connect,
             ytm_connect,
             ytm_disconnect,
             ytm_command,

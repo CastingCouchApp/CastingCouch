@@ -36,6 +36,7 @@ export const queryKeys = {
     alerts: ["alerts"] as const,
     alertRuntime: ["alert-runtime"] as const,
     nowPlaying: ["now-playing"] as const,
+    musicPlayer: ["music-player"] as const,
     ytmNowPlaying: ["ytm-now-playing"] as const,
     paths: ["paths"] as const,
     overlayHealthUrl: ["overlay-health-url"] as const,
@@ -64,6 +65,26 @@ export type NowPlaying = {
     artist: string;
     album: string;
     is_playing: boolean;
+};
+
+export type MusicPlayerSnapshot = {
+    provider: string;
+    providerDisplayName: string;
+    connected: boolean;
+    connecting: boolean;
+    bridgeRunning: boolean;
+    isPlaying: boolean;
+    title: string;
+    artist: string;
+    album: string;
+    coverUrl: string;
+    progressMs: number;
+    durationMs: number;
+    volumePercent: number | null;
+    supportsSeek: boolean;
+    supportsVolume: boolean;
+    statusText: string;
+    error: string | null;
 };
 
 export const EMPTY_NOW_PLAYING: NowPlaying = {
@@ -264,6 +285,10 @@ function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
                 state: "disconnected",
                 detail: "",
             } as T;
+        case "music_player_snapshot": {
+            const provider = mockSettings.MusicPlayer.ProviderId ?? mockSettings.MusicPlayer.Source ?? "spotify";
+            return { provider, providerDisplayName:provider === "ytmusic" ? "YouTube Music" : "Spotify",connected:false,connecting:false,bridgeRunning:false,isPlaying:false,title:"",artist:"",album:"",coverUrl:"",progressMs:0,durationMs:0,volumePercent:null,supportsSeek:provider === "spotify",supportsVolume:provider === "spotify",statusText:"Demo · Nicht verbunden",error:null } as T;
+        }
         case "now_playing":
             return { title: "", artist: "", album: "", is_playing: false } as T;
         case "obs_current_scene":
@@ -422,6 +447,10 @@ export async function listenNowPlaying(
     onPlaying: (playing: NowPlaying) => void,
 ): Promise<() => void> {
     return listenIfTauri<NowPlaying>("now-playing", onPlaying);
+}
+
+export function listenMusicPlayer(onSnapshot: (snapshot: MusicPlayerSnapshot) => void) {
+    return listenIfTauri<MusicPlayerSnapshot>("music-player-changed", onSnapshot);
 }
 
 export async function listenTwitchEvents(

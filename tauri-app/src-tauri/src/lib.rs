@@ -124,7 +124,8 @@ async fn apply_profile(
 }
 
 pub struct AppState {
-    pub ytm: Mutex<Option<Arc<ccs_overlay_server::YouTubeMusicBridge>>>,
+    pub ytm: Arc<Mutex<Option<Arc<ccs_overlay_server::YouTubeMusicBridge>>>>,
+    pub music_player: Arc<ccs_modules::music_player::MusicPlayerRuntime>,
     pub ytm_error: Mutex<Option<String>>,
     pub paths: AppPaths,
     pub settings_mutation: Mutex<()>,
@@ -247,6 +248,11 @@ async fn spotify_action(
     state: State<'_, AppState>,
     action: ccs_modules::spotify::SpotifyAction,
 ) -> Result<Value, String> {
+    let _provider = state
+        .music_player
+        .provider_guard("spotify")
+        .await
+        .map_err(|e| e.to_string())?;
     let _player_guard = if !matches!(
         &action,
         ccs_modules::spotify::SpotifyAction::SaveTrack { .. }
@@ -281,6 +287,7 @@ async fn spotify_action(
         .map_err(|e| e.to_string())?;
     // Settings changes also wait for the player: release it before persisting playlist history.
     drop(_player_guard);
+    drop(_provider);
     if let Some(uri) = playlist {
         let _guard = state.settings_mutation.lock().await;
         let original = state
@@ -449,6 +456,11 @@ async fn set_spotify_playlist_favorite(
 }
 #[tauri::command]
 async fn activate_spotify_device(state: State<'_, AppState>, play: bool) -> Result<Value, String> {
+    let _provider = state
+        .music_player
+        .provider_guard("spotify")
+        .await
+        .map_err(|e| e.to_string())?;
     let _player_guard = state.scene_music.manual_player_guard().await;
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     state
@@ -525,6 +537,11 @@ async fn obs_output_status(state: State<'_, AppState>) -> Result<Value, String> 
 #[tauri::command]
 async fn ytm_connect(state: State<'_, AppState>) -> Result<String, String> {
     let _mutation = state.settings_mutation.lock().await;
+    let _provider = state
+        .music_player
+        .provider_guard("ytmusic")
+        .await
+        .map_err(|e| e.to_string())?;
     let mut current = state.ytm.lock().await;
     if current.as_ref().is_none_or(|bridge| !bridge.is_running()) {
         if let Some(previous) = current.take() {
@@ -558,6 +575,62 @@ async fn ytm_disconnect(state: State<'_, AppState>) -> Result<(), String> {
     }
     *state.ytm_error.lock().await = None;
     Ok(())
+}
+
+#[tauri::command]
+async fn music_player_snapshot(
+    state: State<'_, AppState>,
+) -> Result<ccs_modules::music_player::MusicPlayerSnapshot, String> {
+    let mut snapshot = state
+        .music_player
+        .snapshot()
+        .await
+        .map_err(|e| e.to_string())?;
+    if snapshot.provider == "ytmusic" && snapshot.error.is_none() {
+        snapshot.error = state.ytm_error.lock().await.clone();
+    }
+    Ok(snapshot)
+}
+
+#[tauri::command]
+async fn music_player_action(
+    state: State<'_, AppState>,
+    action: ccs_modules::music_player::MusicPlayerAction,
+) -> Result<Value, String> {
+    state
+        .music_player
+        .action(action)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn music_player_disconnect(state: State<'_, AppState>) -> Result<(), String> {
+    let _mutation = state.settings_mutation.lock().await;
+    state
+        .music_player
+        .disconnect()
+        .await
+        .map_err(|e| e.to_string())?;
+    *state.ytm_error.lock().await = None;
+    Ok(())
+}
+
+#[tauri::command]
+async fn music_player_connect<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    if settings.music_player.provider_id() == "ytmusic" {
+        ytm_connect(state)
+            .await
+            .map(|url| json!({"installUrl":url}))
+    } else {
+        connect_spotify(app, state, false)
+            .await
+            .map(|status| json!(status))
+    }
 }
 #[tauri::command]
 async fn ytm_runtime_status(state: State<'_, AppState>) -> Result<Value, String> {
@@ -752,6 +825,9 @@ async fn save_settings_impl(
         state.alerts.clear_queue().await;
     }
     let mut warnings = Vec::<String>::new();
+    if let Err(error) = state.music_player.apply_provider().await {
+        warnings.push(format!("Einstellungen gespeichert; Musikprovider konnte nicht vollständig gewechselt werden: {error}"));
+    }
     let mut password_updated = false;
     if let Some(password) = obs_password.filter(|p| !p.is_empty()) {
         match state.secrets.set(OBS_PASSWORD_SECRET_KEY, &password) {
@@ -1063,6 +1139,20 @@ async fn spotify_login(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<ServiceStatus, String> {
+    connect_spotify(app, state, true).await
+}
+
+async fn connect_spotify<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    reauthenticate: bool,
+) -> Result<ServiceStatus, String> {
+    let _mutation = state.settings_mutation.lock().await;
+    let _provider = state
+        .music_player
+        .provider_guard("spotify")
+        .await
+        .map_err(|e| e.to_string())?;
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     let redirect_uri = if settings.spotify.redirect_uri.trim().is_empty() {
         "http://127.0.0.1:43821/callback/".into()
@@ -1074,6 +1164,15 @@ async fn spotify_login(
         redirect_uri,
         scopes: settings.spotify.scopes.clone(),
     };
+    if !reauthenticate && state.spotify.has_token() {
+        let status = state
+            .spotify
+            .connect(&options)
+            .await
+            .map_err(|e| e.to_string())?;
+        state.spotify.spawn_poll(options.client_id);
+        return Ok(status);
+    }
     let (status, authorize_url) = state
         .spotify
         .begin_login(options)
@@ -1382,6 +1481,10 @@ pub fn run() {
             setup_overlay_source,
             obs_output_status,
             ytm_connect,
+            music_player_snapshot,
+            music_player_action,
+            music_player_connect,
+            music_player_disconnect,
             ytm_disconnect,
             ytm_now_playing,
             ytm_runtime_status,
@@ -1530,7 +1633,7 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         settings.clone(),
         spotify.clone(),
         scene_music.clone(),
-        ducking,
+        ducking.clone(),
     ));
     let mut state_changes = music_states.subscribe();
     let music_statistics = Arc::new(ccs_modules::music_statistics::MusicStatisticsRuntime::new(
@@ -1641,16 +1744,29 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    if loaded.spotify.auto_connect
+    let ytm = Arc::new(Mutex::new(None));
+    let music_player = Arc::new(ccs_modules::music_player::MusicPlayerRuntime::new(
+        settings.clone(),
+        spotify.clone(),
+        scene_music.clone(),
+        ducking,
+        ytm.clone(),
+    ));
+    if loaded.music_player.provider_id() == "spotify"
+        && loaded.spotify.auto_connect
         && !loaded.spotify.client_id.trim().is_empty()
         && spotify.has_token()
     {
         let spotify_auto = Arc::clone(&spotify);
         let settings_auto = Arc::clone(&settings);
+        let player_auto = music_player.clone();
         let client_id = loaded.spotify.client_id.clone();
         let redirect_uri = loaded.spotify.redirect_uri.clone();
         let scopes = loaded.spotify.scopes.clone();
         tauri::async_runtime::spawn(async move {
+            let Ok(_provider) = player_auto.provider_guard("spotify").await else {
+                return;
+            };
             let options = match settings_auto.load().await {
                 Ok(s) => SpotifyConnectOptions {
                     client_id: s.spotify.client_id,
@@ -1678,8 +1794,12 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(error) = &ytm_error {
         warn!(%error,"YouTube-Music-Autostart fehlgeschlagen");
     }
+    tauri::async_runtime::block_on(async {
+        *ytm.lock().await = ytm_bridge;
+    });
     app.manage(AppState {
-        ytm: Mutex::new(ytm_bridge),
+        ytm,
+        music_player,
         ytm_error: Mutex::new(ytm_error),
         paths,
         settings_mutation: Mutex::new(()),

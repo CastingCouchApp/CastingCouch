@@ -2,6 +2,7 @@ pub mod alert_preview;
 mod alert_renderer;
 pub mod alerts;
 pub mod music_automation;
+pub mod music_player;
 pub mod music_statistics;
 pub mod obs;
 pub mod overlay_bridge;

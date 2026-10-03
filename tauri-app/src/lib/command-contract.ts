@@ -83,6 +83,15 @@ export type MusicAction =
   | { action: "stop" }
   | { action: "restore_state"; state: unknown; fadeSeconds: number };
 
+export type MusicPlayerAction =
+  | { action: "play" }
+  | { action: "pause" }
+  | { action: "play_pause" }
+  | { action: "next" }
+  | { action: "previous" }
+  | { action: "seek"; positionMs: number }
+  | { action: "volume"; percent: number };
+
 export type MusicStateAction =
   | { action: "capture"; group: string }
   | { action: "restore"; group: string; fadeSeconds: number }
@@ -167,6 +176,10 @@ export type CommandInvocation =
   | [command: "obs_output_status", args?: Record<string, never>]
   | [command: "ytm_connect", args?: Record<string, never>]
   | [command: "ytm_disconnect", args?: Record<string, never>]
+  | [command: "music_player_snapshot", args?: Record<string, never>]
+  | [command: "music_player_action", args: { action: MusicPlayerAction }]
+  | [command: "music_player_disconnect", args?: Record<string, never>]
+  | [command: "music_player_connect", args?: Record<string, never>]
   | [command: "ytm_runtime_status", args?: Record<string, never>]
   | [command: "ytm_now_playing", args?: Record<string, never>]
   | [command: "ytm_command", args: { command: string }]

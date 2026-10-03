@@ -1,3 +1,4 @@
+import { CommonMusicPlayer } from "../features/music/CommonMusicPlayer";
 import { YouTubeMusicSetup } from "../features/music/YouTubeMusicSetup";
 import { SpotifyLibrary } from "../features/music/SpotifyLibrary";
 import { SceneMusic } from "../features/music/SceneMusic";
@@ -14,14 +15,7 @@ import {
     type AppSettings,
 } from "../lib/app-settings";
 import { Card } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import {
-    FALLBACK_POLL_MS,
-    queryKeys,
-    tauriInvoke,
-    type NowPlaying,
-} from "../lib/api";
+import { queryKeys, tauriInvoke } from "../lib/api";
 export const Route = createFileRoute("/music")({ component: MusicPage });
 function MusicPage() {
     const client = useQueryClient();
@@ -38,7 +32,7 @@ function MusicPage() {
                 Source: source,
                 ProviderId: source,
             };
-            await tauriInvoke("save_settings", {
+            return tauriInvoke<{ warnings: string[] }>("save_settings", {
                 original: settings.data,
                 settings: next,
             });
@@ -55,11 +49,7 @@ function MusicPage() {
                 device?: { volume_percent: number };
             }>("spotify_query", { query: { query: "playback" } }),
         refetchInterval: 5000,
-    });
-    const now = useQuery({
-        queryKey: queryKeys.nowPlaying,
-        queryFn: () => tauriInvoke<NowPlaying>("now_playing"),
-        refetchInterval: FALLBACK_POLL_MS,
+        enabled: musicProvider(settings.data?.MusicPlayer) === "spotify",
     });
     const act = useMutation({
         mutationFn: (action: SpotifyAction) =>
@@ -75,19 +65,15 @@ function MusicPage() {
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-semibold">Musik</h1>
-            <MusicAutomation />
-            <SceneMusic />
-            <SavedMusicStates />
-            <MusicStatistics />
             {error && (
                 <p role="alert" className="text-red-400">
                     {String(error)}
                 </p>
             )}
             <label className="block">
-                Musikprovider für das Overlay{" "}
+                Musikprovider{" "}
                 <select
-                    aria-label="Musikprovider für das Overlay"
+                    aria-label="Musikprovider"
                     className="bg-panel p-2"
                     disabled={!settings.data || provider.isPending}
                     value={musicProvider(settings.data?.MusicPlayer)}
@@ -97,120 +83,62 @@ function MusicPage() {
                     <option value="ytmusic">YouTube Music</option>
                 </select>
             </label>
-            <div className="grid gap-4 xl:grid-cols-2">
-                <Card className="space-y-4">
-                    <h2 className="text-lg font-semibold">Spotify</h2>
-                    <p>{now.data?.title || "Keine Wiedergabe"}</p>
-                    <p className="text-text-secondary">{now.data?.artist}</p>
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            disabled={act.isPending}
-                            onClick={() => act.mutate({ action: "previous" })}
-                        >
-                            Vorheriger Titel
-                        </Button>
-                        <Button
-                            disabled={act.isPending}
-                            onClick={() =>
-                                act.mutate({
-                                    action: now.data?.is_playing
-                                        ? "pause"
-                                        : "play",
-                                })
-                            }
-                        >
-                            {now.data?.is_playing
-                                ? "Spotify pausieren"
-                                : "Spotify abspielen"}
-                        </Button>
-                        <Button
-                            disabled={act.isPending}
-                            onClick={() => act.mutate({ action: "next" })}
-                        >
-                            Nächster Titel
-                        </Button>
-                    </div>
-                    <label className="block">
-                        Lautstärke{" "}
-                        <input
-                            aria-label="Spotify Lautstärke"
-                            type="range"
-                            min="0"
-                            max="100"
-                            key={playback.data?.device?.volume_percent}
-                            defaultValue={
-                                playback.data?.device?.volume_percent ?? 0
-                            }
-                            disabled={!playback.data?.device}
-                            onPointerUp={(e) =>
-                                act.mutate({
-                                    action: "volume",
-                                    percent: Number(e.currentTarget.value),
-                                })
-                            }
-                            onKeyUp={(e) => {
-                                if (e.key.startsWith("Arrow"))
+            {provider.data?.warnings?.map((warning) => (
+                <p role="alert" key={warning}>
+                    {warning}
+                </p>
+            ))}
+            <CommonMusicPlayer
+                provider={musicProvider(settings.data?.MusicPlayer)}
+                changingProvider={provider.isPending}
+            />
+            {musicProvider(settings.data?.MusicPlayer) === "spotify" ? (
+                <>
+                    <Card className="space-y-4">
+                        <h2 className="text-lg font-semibold">
+                            Spotify-Einstellungen
+                        </h2>
+                        <label className="flex gap-2">
+                            <input
+                                type="checkbox"
+                                checked={playback.data?.shuffle_state ?? false}
+                                onChange={(e) =>
                                     act.mutate({
-                                        action: "volume",
-                                        percent: Number(e.currentTarget.value),
-                                    });
-                            }}
-                        />
-                    </label>
-                    <label className="block">
-                        Position (Sekunden, Enter bestätigt)
-                        <Input
-                            type="number"
-                            min="0"
-                            defaultValue="0"
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter")
+                                        action: "shuffle",
+                                        enabled: e.target.checked,
+                                    })
+                                }
+                            />
+                            Zufallswiedergabe
+                        </label>
+                        <label className="block">
+                            Wiederholung{" "}
+                            <select
+                                className="bg-panel p-2"
+                                value={playback.data?.repeat_state ?? "off"}
+                                onChange={(e) =>
                                     act.mutate({
-                                        action: "seek",
-                                        positionMs: Math.max(
-                                            0,
-                                            Number(e.currentTarget.value) *
-                                                1000,
-                                        ),
-                                    });
-                            }}
-                        />
-                    </label>
-                    <label className="flex gap-2">
-                        <input
-                            type="checkbox"
-                            checked={playback.data?.shuffle_state ?? false}
-                            onChange={(e) =>
-                                act.mutate({
-                                    action: "shuffle",
-                                    enabled: e.target.checked,
-                                })
-                            }
-                        />
-                        Zufallswiedergabe
-                    </label>
-                    <label className="block">
-                        Wiederholung{" "}
-                        <select
-                            className="bg-panel p-2"
-                            value={playback.data?.repeat_state ?? "off"}
-                            onChange={(e) =>
-                                act.mutate({
-                                    action: "repeat",
-                                    mode: e.target.value,
-                                })
-                            }
-                        >
-                            <option value="off">Aus</option>
-                            <option value="context">Playlist</option>
-                            <option value="track">Titel</option>
-                        </select>
-                    </label>
-                    <SpotifyDevices />
-                </Card>
+                                        action: "repeat",
+                                        mode: e.target.value,
+                                    })
+                                }
+                            >
+                                <option value="off">Aus</option>
+                                <option value="context">Playlist</option>
+                                <option value="track">Titel</option>
+                            </select>
+                        </label>
+                        <SpotifyDevices />
+                    </Card>
+                    <SpotifyLibrary />
+                    <MusicAutomation />
+                    <SceneMusic />
+                    <SavedMusicStates />
+                    <MusicStatistics />
+                </>
+            ) : (
                 <YouTubeMusicSetup />
-            </div>
-            <SpotifyLibrary />
+            )}
         </div>
     );
 }

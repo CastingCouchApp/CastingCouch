@@ -22,6 +22,7 @@ const domainFiles = {
     SpotifyAction: ["spotify/playback.rs", "action"],
     SpotifyQuery: ["spotify/playback.rs", "query"],
     MusicAction: ["scene_music.rs", "action"],
+    MusicPlayerAction: ["music_player.rs", "action"],
     MusicStateAction: ["spotify_states.rs", "action"],
     TwitchAction: ["twitch/operations.rs", "action"],
     TwitchQuery: ["twitch/operations.rs", "query"],
