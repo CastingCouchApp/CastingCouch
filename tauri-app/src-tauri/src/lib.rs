@@ -25,6 +25,75 @@ use tracing::{error, info, warn};
 
 const OBS_PASSWORD_SECRET_KEY: &str = "obs.password";
 
+#[tauri::command]
+async fn dashboard_snapshot(
+    state: State<'_, AppState>,
+) -> Result<ccs_modules::dashboard::DashboardSnapshot, String> {
+    let original = state
+        .settings
+        .read_value()
+        .await
+        .map_err(|e| e.to_string())?;
+    ccs_modules::dashboard::snapshot(&original)
+}
+#[tauri::command]
+async fn save_dashboard<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    original: Value,
+    draft: ccs_modules::dashboard::DashboardDraft,
+) -> Result<ccs_modules::dashboard::DashboardSnapshot, String> {
+    let validation_original = original.clone();
+    let edited = tauri::async_runtime::spawn_blocking(move || {
+        ccs_modules::dashboard::apply(&validation_original, &draft)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    let _guard = state.settings_mutation.lock().await;
+    let saved = state
+        .settings
+        .save_edit(&original, &edited)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut result = ccs_modules::dashboard::snapshot(&saved)?;
+    if let Err(error) = app.emit("dashboard-changed", json!({"changed":true})) {
+        result.warnings.push(format!(
+            "Dashboard gespeichert; App-Benachrichtigung fehlgeschlagen: {error}"
+        ));
+    }
+    Ok(result)
+}
+#[tauri::command]
+async fn dashboard_image_preview(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || ccs_modules::dashboard::image_preview(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn dashboard_asset_choices(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
+    let root = state.paths.overlay_root.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let library = ccs_overlay_server::MediaLibrary::new(root);
+        let mut choices = Vec::new();
+        for mut asset in library.assets()? {
+            if asset["contentType"] == "image/svg+xml" {
+                continue;
+            }
+            let id = asset["id"].as_str().ok_or("Asset besitzt keine ID")?;
+            let path = library.asset_path(id)?;
+            asset["path"] = json!(path.to_str().ok_or("Ungültiger Asset-Pfad")?);
+            choices.push(asset);
+        }
+        Ok(choices)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn dashboard_obs_preview(state: State<'_, AppState>) -> Result<Value, String> {
+    ccs_modules::dashboard::obs_preview(&state.obs).await
+}
+
 fn extension_pack_service(state: &AppState) -> ccs_overlay_server::ExtensionPackService {
     ccs_overlay_server::ExtensionPackService::new(&state.paths.overlay_root, state.hub.clone())
 }
@@ -1991,6 +2060,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            dashboard_snapshot,
+            save_dashboard,
+            dashboard_image_preview,
+            dashboard_asset_choices,
+            dashboard_obs_preview,
             startup_error,
             overlay_runtime_status,
             open_twitch_chat,
@@ -2398,7 +2472,8 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     runtime::bind_stream_history(&obs, stream_history.clone());
     let creator_intelligence = Arc::new(
         ccs_modules::creator_intelligence::CreatorIntelligenceRuntime::new(
-            paths.data_root.clone(), stream_history.clone(),
+            paths.data_root.clone(),
+            stream_history.clone(),
         ),
     );
     app.manage(AppState {

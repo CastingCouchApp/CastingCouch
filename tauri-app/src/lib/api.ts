@@ -1,6 +1,7 @@
 import type { CommandInvocation } from "./command-contract";
 import { QueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
+import dashboardDemoDraft from "../features/dashboard/dashboard-default.json";
 import {
     cloneSettings,
     defaultAppSettings,
@@ -199,6 +200,8 @@ export async function tauriInvoke<T>(
 
 function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): T {
     switch (cmd) {
+        case "dashboard_snapshot":
+            return {original:cloneSettings(mockSettings),draft:structuredClone(dashboardDemoDraft),sceneChoices:[],warnings:["Dashboard im Demo-Modus; Speichern und Dienste erfordern die Desktop-App."]} as T;
         case "startup_error":
             return null as T;
         case "overlay_runtime_status":
@@ -424,6 +427,9 @@ export function listenMusicAutomation(onStatus: (status: MusicAutomationStatus) 
 }
 export function listenMusicStatesChanged(onChange: () => void) {
     return listenIfTauri<{ changed: boolean }>("music-states-changed", () => onChange());
+}
+export function listenDashboardChanged(onChange: () => void) {
+    return listenIfTauri<{ changed: boolean }>("dashboard-changed", () => onChange());
 }
 export function listenMusicStatisticsChanged(onChange: () => void) {
     return listenIfTauri<{ changed: boolean }>("music-statistics-changed", () => onChange());

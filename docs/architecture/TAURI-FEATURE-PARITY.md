@@ -88,8 +88,8 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 
 | Abnahme | ID | Stand | Verbleibende Arbeit |
 |---|---|---|---|
-| [ ] | DA1 | Offen | Karten-/Szenenbutton-Konfiguration. |
-| [ ] | DA2 | Teilweise | OBS-Ausgänge, Countdown und bisherige Statuskarten. Chat, Ereignisse, Kennzahlen, Musikbedienung und der C#-Streamende-Assistent mit Raid-Countdown, Retry/Timeout sowie optionalem Stream-/Musikstopp fehlen im Bedienpult. Workflow entfällt. |
+| [ ] | DA1 | Implementiert | Kompatible Karten-/Gruppenfilter, Reihenfolge/Spalten/Größen, Presets/Fokusmodus und Szenenbuttons mit Namen, Farben, Emoji/Glyph/Bildern. Konfliktfähige Persistenz, native IPC-/Neustarttests. Installierte Windows-/macOS-Abnahme offen. Siehe [Dashboard-Vertrag](TAURI-DASHBOARD.md). |
+| [ ] | DA2 | Teilweise | OBS-Ausgänge, Countdown, Status, Szenen/Vorschau, gemeinsamer Chat, Ereignisfeed, tatsächliche Kennzahlen und Musikplayer sind eingebunden. C#-Streamende-Assistent mit Raid-Countdown, Retry/Timeout und optionalem Stream-/Musikstopp sowie verbleibende Vorprüfungs-/Benachrichtigungs-/Schnellzugriffsabläufe offen. Workflow entfällt. |
 | [ ] | DA3 | Implementiert | OBS-Ereignisse erfassen Start/Stopp unmittelbar; Polling übernimmt Status und Zuschauer-Samples. Zähler, Wiederherstellung, Kategorien, Entwicklung und C#-Reportauswertungen vorhanden. Live-/Installationsabnahme offen. |
 | [ ] | DA4 | Implementiert | C#-Sessionanalyse, Creator Score/Trends/Indizes, Szenen-/Musikauswertung, Ereigniskorrelation/Raid-Bindung, Maßnahmen/Wirkung, Experimente, Notizen und HTML-Wochenberichte. Vollständiges Journal und kompatible Persistenz; C#-Referenz-, IPC- und UI-Tests. Installierte Live-Abnahme offen. |
 | [ ] | SYS1 | Offen | Ersteinrichtung mit Schritten, Prüfungen und Abschluss. |
@@ -111,7 +111,7 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 ## Nächste Umsetzungsschritte
 
 1. Installierte Pakete und echte Dienstverbindungen abnehmen; weitere Alert-Playback-Abbruchfälle im Feature-Paket AL2/AL3 prüfen.
-2. Verbleibende OBS-/Alert-Funktionen sowie DA1/DA2 fertigstellen; O2/O4/O6, Twitch, Musik und Sitzungsanalyse im installierten Paket abnehmen.
+2. Verbleibende OBS-/Alert-Funktionen und DA2 fertigstellen; DA1, O2/O4/O6, Twitch, Musik und Sitzungsanalyse im installierten Paket abnehmen.
 3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung und Alert-Sound fertigstellen; implementierte Szenenmusik und Musikzustände praktisch abnehmen.
 4. Dashboard, Einrichtung, Rechtstexte, Migration/Backups und Diagnostik umsetzen; Profile im installierten Paket abnehmen.
 5. Windows-/macOS-Installer bauen und jeden gewählten Nutzerablauf dokumentiert abnehmen; erst danach Cutover entscheiden.

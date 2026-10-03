@@ -13,6 +13,7 @@ pub mod spotify_states;
 pub mod twitch;
 pub mod stream_history;
 pub mod creator_intelligence;
+pub mod dashboard;
 
 use serde::{Deserialize, Serialize};
 

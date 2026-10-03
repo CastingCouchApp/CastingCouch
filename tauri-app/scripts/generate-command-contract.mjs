@@ -29,6 +29,10 @@ const domainFiles = {
     TwitchQuery: ["twitch/operations.rs", "query"],
 };
 const structFiles = {
+    DashboardDraft: "dashboard.rs",
+    DashboardPreferences: "dashboard.rs",
+    DashboardCardDraft: "dashboard.rs",
+    SceneButtonDraft: "dashboard.rs",
     GoalDraft: "twitch/goals.rs",
     GoalsDraft: "twitch/goals.rs",
     RaidSuggestion: "twitch/community.rs",

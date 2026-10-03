@@ -1,4 +1,12 @@
 import type {AlertDefinition, UpdatePackage} from "./api";
+export type DashboardDraft = { cards: Array<DashboardCardDraft>; sceneButtons: Array<SceneButtonDraft>; preferences: DashboardPreferences };
+
+export type DashboardPreferences = { showServiceStatus: boolean; showStreamControls: boolean; showLivePanels: boolean; showQuickServices: boolean; showAdvancedTools: boolean; showNotifications: boolean; showStreamHistory: boolean; autoFocusModeOnStreamStart: boolean; autoExitFocusModeOnStreamEnd: boolean; obsScenePreviewSize: string; dashboardStatistic: string; streamEndExpanded: boolean };
+
+export type DashboardCardDraft = { key: string; visible: boolean; zone: string; size: string };
+
+export type SceneButtonDraft = { id: string; title: string; sceneName: string; iconKind: string; iconValue: string; color: string };
+
 export type GoalDraft = { title: string; current: string; target: string; fontFace: string; fontSize: string; currency: string; reason: string };
 
 export type GoalsDraft = { overlayScene: string; follower: GoalDraft; subscriptions: GoalDraft; donation: GoalDraft };
@@ -167,6 +175,11 @@ export type TwitchQuery =
   | { query: "redemptions"; rewardId: string; status?: string | null };
 // Generated from src-tauri/src/lib.rs. Run npm run contracts:generate.
 export type CommandInvocation =
+  | [command: "dashboard_snapshot", args?: Record<string, never>]
+  | [command: "save_dashboard", args: { original: unknown; draft: DashboardDraft }]
+  | [command: "dashboard_image_preview", args: { path: string }]
+  | [command: "dashboard_asset_choices", args?: Record<string, never>]
+  | [command: "dashboard_obs_preview", args?: Record<string, never>]
   | [command: "list_extension_packs", args?: Record<string, never>]
   | [command: "import_extension_pack", args: { path: string }]
   | [command: "uninstall_extension_pack", args: { id: string }]

@@ -19,6 +19,8 @@ Tauri-Migration: [`architecture/TAURI-MIGRATION.md`](architecture/TAURI-MIGRATIO
 
 Creator Intelligence in Tauri: [`architecture/TAURI-CREATOR-INTELLIGENCE.md`](architecture/TAURI-CREATOR-INTELLIGENCE.md)
 
+Tauri-Dashboard und Bedienpult: [`architecture/TAURI-DASHBOARD.md`](architecture/TAURI-DASHBOARD.md)
+
 Verkaufsrisiken: [`architecture/RISK-REGISTER.md`](architecture/RISK-REGISTER.md)
 
 Betriebsfreigabe: [`operations/SALES-READINESS-RUNBOOK.md`](operations/SALES-READINESS-RUNBOOK.md)

@@ -1,6 +1,106 @@
 use super::*;
 
 #[test]
+fn dashboard_commands_persist_layout_keep_parallel_settings_and_report_conflicts() {
+    use tauri::Listener;
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let settings = call(&window, "get_settings", json!({})).unwrap();
+        let mut seed = settings.clone();
+        seed["Dashboard"] = json!({"ModuleOrder":["Workflow","StreamControl"],"Future":{"keep":1},"SceneButtons":[{"Id":"stable","Title":"Live","SceneName":"Live","IconKind":"Emoji","IconValue":"🎮","Future":2}]});
+        call(
+            &window,
+            "save_settings",
+            json!({"original":settings,"settings":seed}),
+        )
+        .unwrap();
+        let snapshot = call(&window, "dashboard_snapshot", json!({})).unwrap();
+        let mut draft = snapshot["draft"].clone();
+        draft["sceneButtons"][0]["title"] = json!("Gaming");
+        draft["cards"][0]["size"] = json!("Groß");
+        let mut parallel = seed.clone();
+        parallel["Branding"]["DisplayName"] = json!("Parallel");
+        call(
+            &window,
+            "save_settings",
+            json!({"original":seed,"settings":parallel}),
+        )
+        .unwrap();
+        let (changed, mut received) = tokio::sync::mpsc::unbounded_channel();
+        app.listen("dashboard-changed", move |e| {
+            let _ = changed.send(e.payload().to_string());
+        });
+        let saved = call(
+            &window,
+            "save_dashboard",
+            json!({"original":snapshot["original"],"draft":draft}),
+        )
+        .unwrap();
+        assert_eq!(saved["original"]["Branding"]["DisplayName"], "Parallel");
+        assert_eq!(
+            saved["original"]["Dashboard"]["SceneButtons"][0]["Future"],
+            2
+        );
+        assert_eq!(saved["original"]["Dashboard"]["Future"]["keep"], 1);
+        tokio::time::timeout(std::time::Duration::from_secs(1), received.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let mut conflicting = snapshot["draft"].clone();
+        conflicting["sceneButtons"][0]["title"] = json!("Different");
+        assert!(call(
+            &window,
+            "save_dashboard",
+            json!({"original":snapshot["original"],"draft":conflicting})
+        )
+        .is_err());
+        let disk = call(&window, "get_settings", json!({})).unwrap();
+        assert_eq!(disk["Dashboard"]["SceneButtons"][0]["Title"], "Gaming");
+        let mut invalid = saved["draft"].clone();
+        invalid["cards"][0]["key"] = json!("Workflow");
+        assert!(call(
+            &window,
+            "save_dashboard",
+            json!({"original":saved["original"],"draft":invalid})
+        )
+        .is_err());
+        let image = root.path().join("icon.png");
+        std::fs::write(&image, b"\x89PNG\r\n\x1a\nbody").unwrap();
+        assert!(
+            call(&window, "dashboard_image_preview", json!({"path":image}))
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .starts_with("data:image/png")
+        );
+        let library =
+            ccs_overlay_server::MediaLibrary::new(&app.state::<AppState>().paths.overlay_root);
+        let asset = library
+            .import_image("scene.png", b"\x89PNG\r\n\x1a\nbody")
+            .unwrap();
+        library.import_image("shape.svg", b"<svg/>").unwrap();
+        let choices = call(&window, "dashboard_asset_choices", json!({})).unwrap();
+        assert_eq!(choices.as_array().unwrap().len(), 1);
+        assert_eq!(choices[0]["id"], asset["id"]);
+        assert!(std::path::Path::new(choices[0]["path"].as_str().unwrap()).is_file());
+        drop(window);
+        drop(app);
+        let second = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&second, "main", Default::default())
+            .build()
+            .unwrap();
+        let restored = call(&window, "dashboard_snapshot", json!({})).unwrap();
+        assert_eq!(restored["draft"]["sceneButtons"][0]["id"], "stable");
+        assert_eq!(restored["draft"]["sceneButtons"][0]["title"], "Gaming");
+        assert_eq!(restored["draft"]["cards"][0]["size"], "Groß");
+    });
+}
+
+#[test]
 fn creator_intelligence_commands_cross_native_ipc_journal_and_persistent_mutations() {
     tauri::async_runtime::block_on(async {
         let root = tempfile::tempdir().unwrap();
@@ -154,6 +254,12 @@ fn native_obs_commands_capture_immediate_session_events_and_forward_history_chan
                 }
                 let data = if kind == "GetSceneList" {
                     json!({"currentProgramSceneName":"Live","scenes":[]})
+                } else if kind == "GetVideoSettings" {
+                    json!({"baseWidth":1920,"baseHeight":1080})
+                } else if kind == "GetSourceScreenshot" {
+                    assert_eq!(request["d"]["requestData"]["sourceName"], "Live");
+                    assert_eq!(request["d"]["requestData"]["imageWidth"], 960);
+                    json!({"imageData":"data:image/png;base64,iVBORw0KGgo="})
                 } else {
                     json!({})
                 };
@@ -165,6 +271,10 @@ fn native_obs_commands_capture_immediate_session_events_and_forward_history_chan
             .connect_simple("127.0.0.1", port, None, false)
             .await
             .unwrap();
+        let preview = call(&window, "dashboard_obs_preview", json!({})).unwrap();
+        assert_eq!(preview["width"], 1920);
+        assert_eq!(preview["height"], 1080);
+        assert_eq!(preview["url"], "data:image/png;base64,iVBORw0KGgo=");
         call(
             &window,
             "obs_control",
@@ -196,6 +306,7 @@ fn native_obs_commands_capture_immediate_session_events_and_forward_history_chan
             json!({"changed":true})
         );
         state.obs.disconnect().await.unwrap();
+        assert!(call(&window, "dashboard_obs_preview", json!({})).is_err());
         task.await.unwrap();
         app.unlisten(listener);
     });
@@ -2232,7 +2343,8 @@ fn test_app_with_clients(
     runtime::bind_stream_history(&obs, stream_history.clone());
     let creator_intelligence = Arc::new(
         ccs_modules::creator_intelligence::CreatorIntelligenceRuntime::new(
-            paths.data_root.clone(), stream_history.clone(),
+            paths.data_root.clone(),
+            stream_history.clone(),
         ),
     );
     let music_overlay = Arc::new(ccs_modules::music_overlay::MusicOverlayRuntime::new(
@@ -2268,6 +2380,11 @@ fn test_app_with_clients(
             _lock: None,
         })
         .invoke_handler(tauri::generate_handler![
+            dashboard_snapshot,
+            save_dashboard,
+            dashboard_image_preview,
+            dashboard_asset_choices,
+            dashboard_obs_preview,
             duplicate_canvas,
             delete_canvas,
             chat_history,

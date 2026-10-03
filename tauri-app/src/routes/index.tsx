@@ -1,6 +1,19 @@
 import { Countdown } from "../features/dashboard/Countdown";
 import { StreamHistory } from "../features/dashboard/StreamHistory";
 import { CreatorIntelligence } from "../features/dashboard/CreatorIntelligence";
+import {
+    DashboardLayout,
+    DashboardCards,
+} from "../features/dashboard/DashboardLayout";
+import { DashboardSceneButtons } from "../features/dashboard/DashboardSceneButtons";
+import {
+    DashboardCommunity,
+    DashboardObsPreview,
+} from "../features/dashboard/DashboardLivePanels";
+import { CommonMusicPlayer } from "../features/music/CommonMusicPlayer";
+import { TwitchChat } from "../features/services/TwitchChat";
+import { TwitchEventFeed } from "../features/services/TwitchEventFeed";
+import { musicProvider, type AppSettings } from "../lib/app-settings";
 import { ObsControls } from "../features/obs/ObsControls";
 import type { ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -71,32 +84,103 @@ function DashboardPage() {
         queryFn: () => tauriInvoke<NowPlaying>("now_playing"),
         refetchInterval: FALLBACK_POLL_MS,
     });
+    const outputs = useQuery({
+        queryKey: ["obs-outputs"],
+        queryFn: () =>
+            tauriInvoke<{ stream: { outputActive: boolean } | null }>(
+                "obs_output_status",
+            ),
+        enabled: obs.state === "connected",
+        refetchInterval: 3000,
+    });
+    const live =
+        obs.state === "connected" && !outputs.isError && outputs.data?.stream
+            ? outputs.data.stream.outputActive
+            : undefined;
 
     return (
         <div className="space-y-6">
             <header>
                 <h1 className="text-2xl font-semibold">Dashboard</h1>
-                <p className="text-sm text-zinc-400">
-                    Live-Status von OBS, Twitch und Spotify.
+                <p className="text-sm text-muted">
+                    Verbindungen, Szenen, Chat, Musik und Sitzungen.
                 </p>
             </header>
-            <div className="grid gap-4 md:grid-cols-3">
-                <ServiceCard status={obs}>
-                    <ObsBody status={obs} scene={scene.data} />
-                </ServiceCard>
-                <ServiceCard status={twitch}>
-                    <TwitchBody status={twitch} />
-                </ServiceCard>
-                <ServiceCard status={spotify}>
-                    <SpotifyBody status={spotify} playing={nowPlaying.data} />
-                </ServiceCard>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-                <ObsControls enabled={obs.state === "connected"} />
-                <Countdown />
-            </div>
-            <StreamHistory />
-            <CreatorIntelligence />
+            <DashboardLayout live={live}>
+                {(draft, focus, original) => (
+                    <DashboardCards
+                        draft={draft}
+                        focus={focus}
+                        nodes={{
+                            ConnectionStatus: (
+                                <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-1">
+                                    <ServiceCard status={obs}>
+                                        <ObsBody
+                                            status={obs}
+                                            scene={scene.data}
+                                        />
+                                    </ServiceCard>
+                                    <ServiceCard status={twitch}>
+                                        <TwitchBody status={twitch} />
+                                    </ServiceCard>
+                                    <ServiceCard status={spotify}>
+                                        <SpotifyBody
+                                            status={spotify}
+                                            playing={nowPlaying.data}
+                                        />
+                                    </ServiceCard>
+                                </div>
+                            ),
+                            Community: (
+                                <DashboardCommunity
+                                    statistic={
+                                        draft.preferences.dashboardStatistic
+                                    }
+                                />
+                            ),
+                            ObsSceneControl: (
+                                <div className="space-y-3">
+                                    <DashboardSceneButtons
+                                        buttons={draft.sceneButtons}
+                                        enabled={obs.state === "connected"}
+                                        currentScene={scene.data}
+                                    />
+                                    <Card>
+                                        <DashboardObsPreview
+                                            enabled={obs.state === "connected"}
+                                            size={
+                                                draft.preferences
+                                                    .obsScenePreviewSize
+                                            }
+                                        />
+                                    </Card>
+                                </div>
+                            ),
+                            StreamControl: (
+                                <ObsControls
+                                    enabled={obs.state === "connected"}
+                                />
+                            ),
+                            Countdown: <Countdown />,
+                            SpotifyPlayer: (
+                                <CommonMusicPlayer
+                                    provider={musicProvider(
+                                        (original as AppSettings)?.MusicPlayer,
+                                    )}
+                                />
+                            ),
+                            TwitchChat: (
+                                <TwitchChat
+                                    enabled={twitch.state === "connected"}
+                                />
+                            ),
+                            TwitchEvents: <TwitchEventFeed />,
+                            StreamHistory: <StreamHistory />,
+                            CreatorIntelligence: <CreatorIntelligence />,
+                        }}
+                    />
+                )}
+            </DashboardLayout>
         </div>
     );
 }

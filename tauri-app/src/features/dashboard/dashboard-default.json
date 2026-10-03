@@ -1,0 +1,74 @@
+{
+  "cards": [
+    {
+      "key": "ConnectionStatus",
+      "visible": true,
+      "zone": "Left",
+      "size": "Standard"
+    },
+    {
+      "key": "Community",
+      "visible": true,
+      "zone": "Center",
+      "size": "Standard"
+    },
+    {
+      "key": "ObsSceneControl",
+      "visible": true,
+      "zone": "Center",
+      "size": "Standard"
+    },
+    {
+      "key": "StreamControl",
+      "visible": true,
+      "zone": "Center",
+      "size": "Standard"
+    },
+    { "key": "Countdown", "visible": true, "zone": "Left", "size": "Standard" },
+    {
+      "key": "SpotifyPlayer",
+      "visible": true,
+      "zone": "Right",
+      "size": "Standard"
+    },
+    {
+      "key": "TwitchChat",
+      "visible": true,
+      "zone": "Center",
+      "size": "Standard"
+    },
+    {
+      "key": "TwitchEvents",
+      "visible": true,
+      "zone": "Right",
+      "size": "Standard"
+    },
+    {
+      "key": "StreamHistory",
+      "visible": true,
+      "zone": "Center",
+      "size": "Standard"
+    },
+    {
+      "key": "CreatorIntelligence",
+      "visible": true,
+      "zone": "Right",
+      "size": "Standard"
+    }
+  ],
+  "sceneButtons": [],
+  "preferences": {
+    "showServiceStatus": true,
+    "showStreamControls": true,
+    "showLivePanels": true,
+    "showQuickServices": true,
+    "showAdvancedTools": true,
+    "showNotifications": true,
+    "showStreamHistory": true,
+    "autoFocusModeOnStreamStart": false,
+    "autoExitFocusModeOnStreamEnd": true,
+    "obsScenePreviewSize": "Standard",
+    "dashboardStatistic": "ViewerCount",
+    "streamEndExpanded": false
+  }
+}
