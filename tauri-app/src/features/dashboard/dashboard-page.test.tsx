@@ -136,6 +136,9 @@ describe("Dashboard live service status", () => {
         expect(screen.getByRole("heading", {name:"Streamende und Raid"})).toBeInTheDocument();
         expect(screen.getByRole("heading", {name:"Vorprüfung"})).toBeInTheDocument();
         expect(screen.getByRole("heading", {name:"Benachrichtigungen"})).toBeInTheDocument();
+        expect(screen.getByRole("heading", {name:"Szenen-Schnellwahl"})).toBeInTheDocument();
+        expect(screen.getByRole("heading", {name:"OBS-Audiomixer"})).toBeInTheDocument();
+        expect(screen.getByRole("heading", {name:"Raid-Assistent und Profile"})).toBeInTheDocument();
         expect(screen.getAllByText("Getrennt")).toHaveLength(3);
     });
 

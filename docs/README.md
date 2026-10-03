@@ -27,6 +27,8 @@ Tauri-Streamstart und konkrete M2-Restabläufe: [`architecture/TAURI-STREAM-STAR
 
 Tauri-App-Benachrichtigungen: [`architecture/TAURI-NOTIFICATIONS.md`](architecture/TAURI-NOTIFICATIONS.md)
 
+Tauri-Dashboard-Schnellzugriffe: [`architecture/TAURI-DASHBOARD-SHORTCUTS.md`](architecture/TAURI-DASHBOARD-SHORTCUTS.md)
+
 Tauri-Arbeitsziel und nächste Meilensteine: [`architecture/TAURI-IMPLEMENTATION-PLAN.md`](architecture/TAURI-IMPLEMENTATION-PLAN.md)
 
 Verkaufsrisiken: [`architecture/RISK-REGISTER.md`](architecture/RISK-REGISTER.md)

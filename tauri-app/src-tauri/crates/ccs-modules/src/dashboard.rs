@@ -62,6 +62,9 @@ pub const CARD_KEYS: &[&str] = &[
     "StreamEnd",
     "Countdown",
     "Preflight",
+    "Scenes",
+    "AudioMixer",
+    "RaidAssistant",
     "SpotifyPlayer",
     "TwitchChat",
     "TwitchEvents",
@@ -112,8 +115,12 @@ fn zone(v: &str) -> &str {
 }
 fn default_zone(key: &str) -> &str {
     match key {
-        "ConnectionStatus" | "Countdown" | "Preflight" => "Left",
-        "SpotifyPlayer" | "TwitchEvents" | "Notifications" | "CreatorIntelligence" => "Right",
+        "ConnectionStatus" | "Countdown" | "Preflight" | "Scenes" | "AudioMixer" => "Left",
+        "SpotifyPlayer"
+        | "TwitchEvents"
+        | "Notifications"
+        | "CreatorIntelligence"
+        | "RaidAssistant" => "Right",
         _ => "Center",
     }
 }
@@ -534,6 +541,25 @@ pub async fn obs_preview(obs: &crate::obs::ObsClient) -> Result<Value, String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn shortcut_cards_preserve_legacy_order_hidden_states_and_zones() {
+        let original = json!({"Dashboard":{"ModuleOrder":["Scenes","AudioMixer","Workflow","RaidAssistant"],"HiddenModules":["AudioMixer"],"ModuleZones":{"Scenes":"Right","RaidAssistant":"Left"},"ShowAdvancedTools":false}});
+        let draft = snapshot(&original).unwrap().draft;
+        assert_eq!(
+            draft
+                .cards
+                .iter()
+                .take(3)
+                .map(|c| c.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Scenes", "AudioMixer", "RaidAssistant"]
+        );
+        assert!(!draft.cards[1].visible);
+        assert_eq!(draft.cards[0].zone, "Right");
+        assert_eq!(draft.cards[2].zone, "Left");
+        assert_eq!(apply(&original, &draft).unwrap(), original);
+    }
 
     #[test]
     fn notifications_card_uses_legacy_key_visibility_zone_and_order() {

@@ -3005,6 +3005,7 @@ pub(super) fn test_app_with_clients(
             overlay_runtime_status,
             setup_overlay_source,
             obs_query,
+            obs_set_scene,
             obs_control,
             open_overlay_editor,
             test_alert,
@@ -3766,8 +3767,25 @@ fn profiles_cross_native_ipc_and_failed_apply_preserves_current_settings() {
         call(&window, "get_settings", json!({})).unwrap()["Branding"]["DisplayName"],
         "Changed"
     );
+    assert_eq!(
+        call(
+            &window,
+            "notifications_snapshot",
+            json!({"filter":"Fehler"})
+        )
+        .unwrap()["entries"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
     let result = call(&window, "apply_profile", json!({"id":id,"original":next})).unwrap();
     assert_eq!(result["saved"], true);
+    assert_eq!(
+        call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap()["entries"][0]
+            ["message"],
+        "Profil „Studio“ wurde angewendet."
+    );
     assert_eq!(
         call(&window, "get_settings", json!({})).unwrap()["Branding"]["DisplayName"],
         original["Branding"]["DisplayName"]

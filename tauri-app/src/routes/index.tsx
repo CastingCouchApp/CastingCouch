@@ -3,6 +3,7 @@ import { StreamHistory } from "../features/dashboard/StreamHistory";
 import { StreamEndPanel } from "../features/dashboard/StreamEndPanel";
 import { Preflight } from "../features/dashboard/Preflight";
 import { Notifications } from "../features/dashboard/Notifications";
+import { DashboardConfiguredScenes, DashboardAudioMixer, DashboardRaidAssistant } from "../features/dashboard/DashboardShortcuts";
 import { CreatorIntelligence } from "../features/dashboard/CreatorIntelligence";
 import {
     DashboardLayout,
@@ -166,6 +167,9 @@ function DashboardPage() {
                             ),
                             Countdown: <Countdown />,
                             Preflight: <Preflight />,
+                            Scenes: <DashboardConfiguredScenes settings={original as AppSettings} enabled={obs.state === "connected"} currentScene={scene.data}/>,
+                            AudioMixer: <DashboardAudioMixer enabled={obs.state === "connected"}/>,
+                            RaidAssistant: <DashboardRaidAssistant enabled={twitch.state === "connected"}/>,
                             Notifications: <Notifications />,
                             StreamEnd: (
                                 <StreamEndPanel

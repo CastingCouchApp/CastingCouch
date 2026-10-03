@@ -204,11 +204,17 @@ impl ProfileStore {
         }
     }
     pub async fn prepare_apply(&self, id: &str, current: &Value) -> Result<Value> {
-        let mut settings = normalize_settings(self.load(id).await?.settings)?;
+        self.prepare_named_apply(id, current)
+            .await
+            .map(|(_, settings)| settings)
+    }
+    pub async fn prepare_named_apply(&self, id: &str, current: &Value) -> Result<(String, Value)> {
+        let profile = self.load(id).await?;
+        let mut settings = normalize_settings(profile.settings)?;
         if let Some(password) = current.pointer("/StreamerBot/Password") {
             settings["StreamerBot"]["Password"] = password.clone();
         }
-        Ok(settings)
+        Ok((profile.name, settings))
     }
 }
 fn strip_password(settings: &mut Value) {

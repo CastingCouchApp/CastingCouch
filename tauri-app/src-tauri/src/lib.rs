@@ -249,17 +249,38 @@ async fn apply_profile(
     id: String,
     original: Value,
 ) -> Result<Value, String> {
-    let current = state
-        .settings
-        .read_value()
-        .await
-        .map_err(|e| e.to_string())?;
-    let settings = profile_store(&state)
-        .prepare_apply(&id, &current)
-        .await
-        .map_err(|e| e.to_string())?;
-    // Use the same validation, conflict handling, server restart and reconnection as manual edits.
-    save_settings_impl(state, settings, original, None, true).await
+    let notifications = state.notifications.clone();
+    let mut name = id.clone();
+    let result = async {
+        let current = state
+            .settings
+            .read_value()
+            .await
+            .map_err(|e| e.to_string())?;
+        let (profile_name, settings) = profile_store(&state)
+            .prepare_named_apply(&id, &current)
+            .await
+            .map_err(|e| e.to_string())?;
+        name = profile_name;
+        // Use the same validation, conflict handling, server restart and reconnection as manual edits.
+        save_settings_impl(state, settings, original, None, true).await
+    }
+    .await;
+    match &result {
+        Ok(saved) => {
+            notifications.record(&format!("Profil „{name}“ wurde angewendet."), "Info");
+            if let Some(warnings) = saved["warnings"].as_array() {
+                for warning in warnings.iter().filter_map(Value::as_str) {
+                    notifications.record(warning, "Warnung");
+                }
+            }
+        }
+        Err(error) => notifications.record(
+            &format!("Profil konnte nicht angewendet werden: {error}"),
+            "Fehler",
+        ),
+    }
+    result
 }
 
 pub struct AppState {
@@ -1243,7 +1264,32 @@ async fn obs_control(state: State<'_, AppState>, control: ObsControl) -> Result<
         }
         return result;
     }
-    state.obs.control(control).await.map_err(|e| e.to_string())
+    let notice = match &control {
+        ObsControl::SetMute {
+            input_name,
+            input_muted,
+        } => Some(format!(
+            "{input_name} wurde {}.",
+            if *input_muted { "gemutet" } else { "aktiviert" }
+        )),
+        ObsControl::SetVolume {
+            input_name,
+            input_volume_db,
+        } => Some(format!(
+            "{input_name}: Lautstärke auf {input_volume_db:.1} dB gesetzt."
+        )),
+        _ => None,
+    };
+    let result = state.obs.control(control).await.map_err(|e| e.to_string());
+    if let Some(notice) = notice {
+        match &result {
+            Ok(_) => state.notifications.record(&notice, "Info"),
+            Err(error) => state
+                .notifications
+                .record(&format!("OBS-Audiofehler: {error}"), "Fehler"),
+        }
+    }
+    result
 }
 async fn start_obs_stream(state: &AppState) -> Result<Value, String> {
     let _stream_gate = state.stream_end_gate.lock().await;
@@ -1906,11 +1952,21 @@ async fn obs_scenes(state: State<'_, AppState>) -> Result<Vec<ObsSceneInfo>, Str
 
 #[tauri::command]
 async fn obs_set_scene(state: State<'_, AppState>, scene: String) -> Result<(), String> {
-    state
+    let result = state
         .obs
         .set_current_program_scene(&scene)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    match &result {
+        Ok(()) => state
+            .notifications
+            .record(&format!("OBS-Szene gewechselt: {scene}"), "Info"),
+        Err(error) => state.notifications.record(
+            &format!("OBS-Szenenwechsel fehlgeschlagen: {error}"),
+            "Fehler",
+        ),
+    }
+    result
 }
 
 #[tauri::command]
@@ -2902,6 +2958,8 @@ fn spawn_extension_pack_events<R: tauri::Runtime>(
 
 #[cfg(test)]
 mod command_tests;
+#[cfg(test)]
+mod dashboard_shortcuts_tests;
 #[cfg(test)]
 mod stream_end_boundary_tests;
 #[cfg(test)]

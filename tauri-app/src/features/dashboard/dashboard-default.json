@@ -32,6 +32,9 @@
     },
     { "key": "Countdown", "visible": true, "zone": "Left", "size": "Standard" },
     { "key": "Preflight", "visible": true, "zone": "Left", "size": "Standard" },
+    { "key": "Scenes", "visible": true, "zone": "Left", "size": "Standard" },
+    { "key": "AudioMixer", "visible": true, "zone": "Left", "size": "Standard" },
+    { "key": "RaidAssistant", "visible": true, "zone": "Right", "size": "Standard" },
     {
       "key": "SpotifyPlayer",
       "visible": true,
