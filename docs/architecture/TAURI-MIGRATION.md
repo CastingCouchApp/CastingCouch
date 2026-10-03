@@ -3,9 +3,10 @@
 Stand: 6. September 2026
 
 Aktueller Umsetzungs- und Abnahmestand: [`TAURI-FEATURE-PARITY.md`](TAURI-FEATURE-PARITY.md).
+Verbindliches Arbeitsziel und nächste Meilensteine: [`TAURI-IMPLEMENTATION-PLAN.md`](TAURI-IMPLEMENTATION-PLAN.md).
 Die folgende Bestandsaufnahme vom August beschreibt den Ausgangspunkt; ihre Stub- und Sidecar-Angaben sind historisch. Tauri startet inzwischen keinen .NET-Sidecar mehr.
 
-Agent-Prompts für die nächsten Slices: [`TAURI-PHASE-PROMPTS.md`](TAURI-PHASE-PROMPTS.md).
+Historische Agent-Prompts: [`TAURI-PHASE-PROMPTS.md`](TAURI-PHASE-PROMPTS.md). Für die aktuelle Fortsetzung gelten Umsetzungsplan und Feature-Matrix.
 
 CastingCouch wird strangler-artig von WPF/.NET 10 nach **Tauri 2** (Windows + macOS) portiert.
 Die WPF-App bleibt bis zur Feature-Parität das produktive Release; `tauri-app/` ist der neue Stack.

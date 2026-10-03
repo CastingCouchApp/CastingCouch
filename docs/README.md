@@ -23,6 +23,8 @@ Tauri-Dashboard und Bedienpult: [`architecture/TAURI-DASHBOARD.md`](architecture
 
 Tauri-Streamende und Raid: [`architecture/TAURI-STREAM-END.md`](architecture/TAURI-STREAM-END.md)
 
+Tauri-Arbeitsziel und nächste Meilensteine: [`architecture/TAURI-IMPLEMENTATION-PLAN.md`](architecture/TAURI-IMPLEMENTATION-PLAN.md)
+
 Verkaufsrisiken: [`architecture/RISK-REGISTER.md`](architecture/RISK-REGISTER.md)
 
 Betriebsfreigabe: [`operations/SALES-READINESS-RUNBOOK.md`](operations/SALES-READINESS-RUNBOOK.md)
