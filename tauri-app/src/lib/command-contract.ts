@@ -58,7 +58,10 @@ export type ObsControl =
   | { action: "set_index"; sceneName: string; sceneItemId: number; sceneItemIndex: number }
   | { action: "set_transform"; sceneName: string; sceneItemId: number; sceneItemTransform: unknown }
   | { action: "set_filter"; sourceName: string; filterName: string; filterEnabled: boolean }
-  | { action: "set_input_settings"; inputName: string; inputSettings: unknown };
+  | { action: "set_input_settings"; inputName: string; inputSettings: unknown }
+  | { action: "restart_media"; inputName: string }
+  | { action: "stop_media"; inputName: string }
+  | { action: "refresh_browser"; inputName: string };
 
 export type ObsQuery =
   | { query: "transform"; sceneName: string; sceneItemId: number }

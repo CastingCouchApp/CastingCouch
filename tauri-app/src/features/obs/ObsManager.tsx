@@ -42,7 +42,13 @@ function ConnectedManager() {
             tauriInvoke<{ name: string; index: number }[]>("obs_scenes"),
         retry: false,
     });
-    const inputs = useObsQuery<{ inputs: { inputName: string }[] }>({
+    const inputs = useObsQuery<{
+        inputs: {
+            inputName: string;
+            inputKind?: string;
+            unversionedInputKind?: string;
+        }[];
+    }>({
         query: "inputs",
     });
     const target = group[group.length - 1] ?? scene;
@@ -78,7 +84,11 @@ function ConnectedManager() {
         scenes.error,
         inputs.error,
         items.error,
-        mutation.error,
+        ["restart_media", "stop_media", "refresh_browser"].includes(
+            mutation.variables?.action ?? "",
+        )
+            ? null
+            : mutation.error,
     ].filter(Boolean);
     return (
         <>
@@ -272,6 +282,16 @@ function ConnectedManager() {
                     <SourceControls
                         key={`${target}:${selected}:${input}`}
                         input={input}
+                        inputKind={
+                            !inputs.isError && !items.isError
+                                ? inputs.data?.inputs?.find(
+                                      (entry) => entry.inputName === input,
+                                  )?.unversionedInputKind ||
+                                  inputs.data?.inputs?.find(
+                                      (entry) => entry.inputName === input,
+                                  )?.inputKind
+                                : undefined
+                        }
                         scene={target}
                         item={item}
                         itemCount={items.data?.sceneItems?.length ?? 0}

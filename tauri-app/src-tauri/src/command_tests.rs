@@ -3197,6 +3197,7 @@ pub(super) fn test_app_with_clients(
             overlay_runtime_status,
             setup_overlay_source,
             obs_query,
+            obs_output_status,
             obs_set_scene,
             obs_control,
             open_overlay_editor,
@@ -3814,6 +3815,220 @@ fn obs_queries_use_typed_camel_case_arguments_through_ipc() {
     )
     .unwrap_err();
     assert!(error.as_str().unwrap().contains("inputName"));
+}
+
+#[test]
+fn native_obs_media_actions_check_current_source_kind_report_errors_and_reconnect() {
+    use futures_util::{SinkExt, StreamExt};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use tokio_tungstenite::tungstenite::Message;
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let requests = Arc::new(std::sync::Mutex::new(Vec::<Value>::new()));
+        let recorded = requests.clone();
+        let changed_kind = Arc::new(AtomicBool::new(false));
+        let kind_flag = changed_kind.clone();
+        let stream_failed = Arc::new(AtomicBool::new(false));
+        let stream_flag = stream_failed.clone();
+        let job = tokio::spawn(async move {
+            let mut stop_failed = false;
+            for _ in 0..2 {
+                let (socket, _) = listener.accept().await.unwrap();
+                let mut ws = tokio_tungstenite::accept_async(socket).await.unwrap();
+                ws.send(Message::Text(
+                    json!({"op":0,"d":{"obsWebSocketVersion":"5.6.0","rpcVersion":1}})
+                        .to_string()
+                        .into(),
+                ))
+                .await
+                .unwrap();
+                ws.next().await.unwrap().unwrap();
+                ws.send(Message::Text(
+                    json!({"op":2,"d":{"negotiatedRpcVersion":1}})
+                        .to_string()
+                        .into(),
+                ))
+                .await
+                .unwrap();
+                while let Some(Ok(Message::Text(text))) = ws.next().await {
+                    let request: Value = serde_json::from_str(&text).unwrap();
+                    let d = &request["d"];
+                    let kind = d["requestType"].as_str().unwrap();
+                    recorded.lock().unwrap().push(d.clone());
+                    let fail_stop = kind == "TriggerMediaInputAction"
+                        && d["requestData"]["mediaAction"]
+                            == "OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP"
+                        && !stop_failed;
+                    if fail_stop {
+                        stop_failed = true;
+                    }
+                    let failed = fail_stop
+                        || (kind == "GetStreamStatus" && stream_flag.load(Ordering::SeqCst));
+                    let data = match kind {
+                        "GetSceneList" => json!({"scenes":[],"currentProgramSceneName":"Live"}),
+                        "GetInputList" => {
+                            json!({"inputs":[{"inputName":"Clip ü","inputKind":"ffmpeg_source_v2","unversionedInputKind":"ffmpeg_source"},{"inputName":"Browser","inputKind":if kind_flag.load(Ordering::SeqCst) {"image_source"} else {"browser_source"}}]})
+                        }
+                        "GetStreamStatus" => {
+                            json!({"outputActive":true,"outputTimecode":"01:02:03.004","outputDuration":3723004})
+                        }
+                        "GetRecordStatus" => {
+                            json!({"outputActive":true,"outputPaused":true,"outputTimecode":"00:01:30.000"})
+                        }
+                        "GetReplayBufferStatus" | "GetVirtualCamStatus" => {
+                            json!({"outputActive":false})
+                        }
+                        "GetStats" => {
+                            json!({"activeFps":59.94,"cpuUsage":12.5,"memoryUsage":1024,"renderSkippedFrames":3,"renderTotalFrames":2000,"outputSkippedFrames":4,"outputTotalFrames":1800})
+                        }
+                        _ => json!({}),
+                    };
+                    ws.send(Message::Text(json!({"op":7,"d":{"requestType":kind,"requestId":d["requestId"],"requestStatus":{"result":!failed,"code":if failed {500}else{100},"comment":if failed {"native OBS failure"}else{""}},"responseData":data}}).to_string().into())).await.unwrap();
+                }
+            }
+        });
+        state
+            .obs
+            .connect_simple("127.0.0.1", port, None, false)
+            .await
+            .unwrap();
+        call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"restart_media","inputName":"Clip ü"}}),
+        )
+        .unwrap();
+        let rejected = call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"stop_media","inputName":"Clip ü"}}),
+        )
+        .unwrap_err();
+        assert!(rejected.to_string().contains("native OBS failure"));
+        call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"stop_media","inputName":"Clip ü"}}),
+        )
+        .unwrap();
+        call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"refresh_browser","inputName":"Browser"}}),
+        )
+        .unwrap();
+        changed_kind.store(true, Ordering::SeqCst);
+        assert!(
+            call(
+                &window,
+                "obs_control",
+                json!({"control":{"action":"refresh_browser","inputName":"Browser"}})
+            )
+            .is_err(),
+            "source kind must be checked again before the mutation"
+        );
+        assert!(call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"restart_media","inputName":"Missing"}})
+        )
+        .is_err());
+        assert!(call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"restart_media","input_name":"Clip ü"}})
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("inputName"));
+        let status = call(&window, "obs_output_status", json!({})).unwrap();
+        assert_eq!(status["stream"]["outputTimecode"], "01:02:03.004");
+        assert_eq!(status["stats"]["renderSkippedFrames"], 3);
+        stream_failed.store(true, Ordering::SeqCst);
+        let partial = call(&window, "obs_output_status", json!({})).unwrap();
+        assert!(partial["stream"].is_null());
+        assert_eq!(partial["record"]["outputPaused"], true);
+        assert_eq!(partial["stats"]["memoryUsage"], 1024);
+        assert!(partial["errors"]["stream"]
+            .as_str()
+            .unwrap()
+            .contains("native OBS failure"));
+        state.obs.disconnect().await.unwrap();
+        assert!(call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"restart_media","inputName":"Clip ü"}})
+        )
+        .is_err());
+        state
+            .obs
+            .connect_simple("127.0.0.1", port, None, false)
+            .await
+            .unwrap();
+        call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"restart_media","inputName":"Clip ü"}}),
+        )
+        .unwrap();
+        let journal = call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap();
+        assert_eq!(journal["entries"].as_array().unwrap().len(), 4);
+        assert!(journal["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |entry| entry["message"].as_str().unwrap().contains("Browser")
+                    && entry["message"].as_str().unwrap().contains("Cache")
+            ));
+        assert_eq!(
+            call(
+                &window,
+                "notifications_snapshot",
+                json!({"filter":"Fehler"})
+            )
+            .unwrap()["entries"]
+                .as_array()
+                .unwrap()
+                .len(),
+            4
+        );
+        let calls = requests.lock().unwrap().clone();
+        let media = calls
+            .iter()
+            .filter(|req| req["requestType"] == "TriggerMediaInputAction")
+            .collect::<Vec<_>>();
+        assert_eq!(media.len(), 4);
+        assert_eq!(
+            media[0]["requestData"],
+            json!({"inputName":"Clip ü","mediaAction":"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART"})
+        );
+        assert_eq!(
+            media[1]["requestData"],
+            json!({"inputName":"Clip ü","mediaAction":"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP"})
+        );
+        let browser = calls
+            .iter()
+            .filter(|req| req["requestType"] == "PressInputPropertiesButton")
+            .collect::<Vec<_>>();
+        assert_eq!(browser.len(), 1);
+        assert_eq!(
+            browser[0]["requestData"],
+            json!({"inputName":"Browser","propertyName":"refreshnocache"})
+        );
+        state.obs.disconnect().await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(5), job)
+            .await
+            .unwrap()
+            .unwrap();
+    });
 }
 
 #[test]

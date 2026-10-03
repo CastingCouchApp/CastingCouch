@@ -1345,15 +1345,38 @@ async fn obs_control(state: State<'_, AppState>, control: ObsControl) -> Result<
         } => Some(format!(
             "{input_name}: Lautstärke auf {input_volume_db:.1} dB gesetzt."
         )),
+        ObsControl::RestartMedia { input_name } => Some(format!(
+            "OBS-Medienquelle „{input_name}“: Neustart angefordert."
+        )),
+        ObsControl::StopMedia { input_name } => Some(format!(
+            "OBS-Medienquelle „{input_name}“: Stopp angefordert."
+        )),
+        ObsControl::RefreshBrowser { input_name } => Some(format!(
+            "OBS-Browserquelle „{input_name}“: Neuladen ohne Cache angefordert."
+        )),
         _ => None,
     };
+    let media_action = matches!(
+        &control,
+        ObsControl::RestartMedia { .. }
+            | ObsControl::StopMedia { .. }
+            | ObsControl::RefreshBrowser { .. }
+    );
     let result = state.obs.control(control).await.map_err(|e| e.to_string());
     if let Some(notice) = notice {
         match &result {
             Ok(_) => state.notifications.record(&notice, "Info"),
-            Err(error) => state
-                .notifications
-                .record(&format!("OBS-Audiofehler: {error}"), "Fehler"),
+            Err(error) => state.notifications.record(
+                &format!(
+                    "{}: {error}",
+                    if media_action {
+                        "OBS-Medien-/Browseraktion fehlgeschlagen"
+                    } else {
+                        "OBS-Audiofehler"
+                    }
+                ),
+                "Fehler",
+            ),
         }
     }
     result

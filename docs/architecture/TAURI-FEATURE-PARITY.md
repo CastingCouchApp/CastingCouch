@@ -50,9 +50,9 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | [ ] | OBS1 | Implementiert | Stream und Aufnahme starten/stoppen, Aufnahme pausieren/fortsetzen, Status in Dienste/Dashboard. |
 | [ ] | OBS2 | Implementiert | Replay Buffer starten/stoppen/speichern und virtuelle Kamera. |
 | [ ] | OBS3 | Teilweise | Typisierte Abfragen und Bedienoberfläche für Profile, Szenensammlungen, Übergänge und Dauer vorhanden. Betriebsabnahme mit OBS steht aus. |
-| [ ] | OBS4 | Teilweise | Quellen-/Gruppenauswahl, Sichtbarkeit, Sperre, Reihenfolge, Transformation und Filter-Schalter bedienbar. Häufige Quellenparameter können geändert werden; andere Einstellungen bleiben erhalten. Vollständige Filterparameter- und quellentypspezifische Editoren fehlen. |
+| [ ] | OBS4 | Teilweise | Quellen-/Gruppenauswahl, Sichtbarkeit, Sperre, Reihenfolge, Transformation und Filter-Schalter bedienbar. Häufige Quellenparameter können geändert werden; andere Einstellungen bleiben erhalten. [Medien-Neustart/-Stopp und Browser-Neuladen ohne Cache](TAURI-OBS-MEDIA-MONITORING.md) mit aktueller Quellenartprüfung, Journal und nativem IPC-/WebSocket-Test ergänzt. C#-Suchfilter für Szenen, Scene Items und Eingänge noch übernehmen; allgemeine Filterparameter-/Quellentypeditoren sind in der geprüften C#-Bedienung nicht belegt. Betriebsabnahme offen. |
 | [ ] | OBS5 | Teilweise | Quellenauswahl mit tatsächlichem Mute-, Lautstärke-, Monitoring- und Sync-Offset-Zustand sowie Bedienung vorhanden. Nicht unterstützte Audioabfragen bleiben als Fehler sichtbar. Betriebsabnahme steht aus. |
-| [ ] | OBS6 | Teilweise | Regelmäßige Ausgangsstatus-/FPS-/CPU-Abfrage und Fehleranzeige. Optionale Ausgangsfehler werden einzeln angezeigt; Streamstatus bleibt erhalten. Bei fehlendem Status bleiben Schaltflächen deaktiviert. Umfassendes Monitoring fehlt. |
+| [ ] | OBS6 | Implementiert | [Gemeinsames Livemonitoring](TAURI-OBS-MEDIA-MONITORING.md) für Stream-/Aufnahmezeitcode, Pause, Replay/Kamera, CPU/FPS/RAM und Render-/Encoding-Lag. Ausgangsabfragen unabhängig, einschließlich Streamfehler; fehlende Werte bleiben unbekannt. Fehler/Trennung sperren veraltete Anzeigen und Mutationen, Statusrefresh und Wiederherstellung geprüft. Installierte OBS-/Windows-/macOS-Abnahme offen. |
 
 ## Twitch
 

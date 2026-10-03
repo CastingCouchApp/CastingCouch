@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { useObsQuery, type Item, type Apply } from "./management-api";
+import { SourceMediaControls } from "./SourceMediaControls";
 export function NumberSetting({
     label,
     value,
@@ -83,12 +84,14 @@ export function NumberSetting({
 }
 export function SourceControls({
     input,
+    inputKind,
     scene,
     item,
     itemCount,
     apply,
 }: {
     input: string;
+    inputKind?: string;
     scene: string;
     item?: Item;
     itemCount: number;
@@ -148,6 +151,7 @@ export function SourceControls({
     return (
         <section className="space-y-4 rounded border border-border p-3">
             <h3 className="font-semibold">{input}</h3>
+            <SourceMediaControls input={input} kind={inputKind} apply={apply} />
             {item && (
                 <>
                     <div className="flex flex-wrap gap-4">

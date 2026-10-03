@@ -41,6 +41,7 @@ Die konfigurierbare Karte `Notifications` verwendet `ShowNotifications`, vorhand
 - [Szenen-/Audio-Schnellzugriffe und Profilanwendung](TAURI-DASHBOARD-SHORTCUTS.md): gemeinsame native Commands protokollieren tatsächliche Ergebnisse und Fehler; Profilwarnungen bleiben sichtbar.
 - [Dienst-Programmstart](TAURI-DASHBOARD-SERVICES.md): gespeicherte OBS-/Spotify-Pfade, bereits laufendes Programm, angenommener Start oder ursprünglicher Fehler. Ein Programmstart wird nicht als Dienstverbindung protokolliert.
 - [Gemeinsame Musikaktionen und Spotify-Schnellzugriffe](TAURI-DASHBOARD-MUSIC.md): API-Annahme beziehungsweise Bridge-Queue als „angefordert“, ursprüngliche Ablehnung und expliziter Teilerfolg bei Playliststart mit fehlgeschlagener Verlaufsspeicherung. Kein Erfolgseintrag für einen abgelehnten Command.
+- [OBS-Medien-/Browseraktionen](TAURI-OBS-MEDIA-MONITORING.md): angenommener Neustart/Stopp beziehungsweise Neuladen ohne Cache mit Quellenname; Fehler einschließlich geänderter Quellenart, fehlender Quelle und Trennung. Keine tatsächliche sichtbare Wiedergabe aus der Command-Annahme ableiten.
 
 Weitere C#-Meldestellen in Musikautomationen, Moderation und Diagnostik werden beim Abschluss dieser Abläufe abgeglichen. Eine vollständige Übernahme aller C#-Meldestellen wird mit diesem Abschnitt nicht behauptet. Gestrichene Workflow-/externe Funktionen werden nicht als Meldungsquellen wieder eingeführt.
 

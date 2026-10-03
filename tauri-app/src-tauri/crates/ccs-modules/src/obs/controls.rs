@@ -78,6 +78,15 @@ pub enum ObsControl {
         input_name: String,
         input_settings: Value,
     },
+    RestartMedia {
+        input_name: String,
+    },
+    StopMedia {
+        input_name: String,
+    },
+    RefreshBrowser {
+        input_name: String,
+    },
 }
 
 impl ObsControl {
@@ -108,11 +117,23 @@ impl ObsControl {
             Self::SetTransform { .. } => "SetSceneItemTransform",
             Self::SetFilter { .. } => "SetSourceFilterEnabled",
             Self::SetInputSettings { .. } => "SetInputSettings",
+            Self::RestartMedia { .. } | Self::StopMedia { .. } => "TriggerMediaInputAction",
+            Self::RefreshBrowser { .. } => "PressInputPropertiesButton",
         };
         let mut data = serde_json::to_value(self).expect("serializable OBS control");
         data.as_object_mut().unwrap().remove("action");
         if matches!(self, Self::SetInputSettings { .. }) {
             data["overlay"] = json!(true);
+        }
+        match self {
+            Self::RestartMedia { .. } => {
+                data["mediaAction"] = json!("OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART")
+            }
+            Self::StopMedia { .. } => {
+                data["mediaAction"] = json!("OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP")
+            }
+            Self::RefreshBrowser { .. } => data["propertyName"] = json!("refreshnocache"),
+            _ => {}
         }
         (name, data)
     }
@@ -142,6 +163,46 @@ impl ObsClient {
         self.control(ObsControl::StartStream).await
     }
     pub async fn control(&self, control: ObsControl) -> ModuleResult<Value> {
+        if let ObsControl::RestartMedia { input_name }
+        | ObsControl::StopMedia { input_name }
+        | ObsControl::RefreshBrowser { input_name } = &control
+        {
+            if input_name.trim().is_empty() {
+                return Err(crate::ModuleError::Message("OBS-Quellenname fehlt".into()));
+            }
+            // UI snapshots may be stale after collection/source changes. Validate
+            // the current OBS input kind before sending the irreversible request.
+            let inputs = self.send_request("GetInputList", None).await?;
+            let entries = inputs["inputs"]
+                .as_array()
+                .ok_or_else(|| crate::ModuleError::Message("Ungültige OBS-Quellenliste".into()))?;
+            let input = entries
+                .iter()
+                .find(|input| input["inputName"] == input_name.as_str())
+                .ok_or_else(|| {
+                    crate::ModuleError::Message(format!(
+                        "OBS-Quelle „{input_name}“ existiert nicht mehr"
+                    ))
+                })?;
+            let kind = input["unversionedInputKind"]
+                .as_str()
+                .filter(|kind| !kind.is_empty())
+                .or_else(|| input["inputKind"].as_str())
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            let supported = if matches!(control, ObsControl::RefreshBrowser { .. }) {
+                kind.contains("browser")
+            } else {
+                ["ffmpeg", "vlc", "media"]
+                    .iter()
+                    .any(|part| kind.contains(part))
+            };
+            if !supported {
+                return Err(crate::ModuleError::Message(
+                    "Diese Aktion ist für die aktuelle OBS-Quellenart nicht verfügbar".into(),
+                ));
+            }
+        }
         let (name, data) = control.request();
         self.send_request(name, Some(data)).await
     }
@@ -230,9 +291,9 @@ impl ObsClient {
             self.send_request("GetVirtualCamStatus", None),
             self.send_request("GetStats", None),
         );
-        let stream = stream?;
-        let mut result = json!({"stream":stream,"errors":{}});
+        let mut result = json!({"errors":{}});
         for (key, response) in [
+            ("stream", stream),
             ("record", record),
             ("replay", replay),
             ("camera", camera),

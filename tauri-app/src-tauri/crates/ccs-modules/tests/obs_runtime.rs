@@ -165,6 +165,20 @@ async fn optional_output_failure_keeps_stream_status_and_exposes_error() {
     task.await.unwrap();
 }
 #[tokio::test]
+async fn stream_failure_keeps_other_outputs_and_stats_available() {
+    let (obs, _, task) = server("GetStreamStatus").await;
+    let status = obs.output_status().await.unwrap();
+    assert!(status["stream"].is_null());
+    assert_eq!(status["record"]["outputActive"], false);
+    assert_eq!(status["stats"]["activeFps"], 60);
+    assert!(status["errors"]["stream"]
+        .as_str()
+        .unwrap()
+        .contains("contract failure"));
+    obs.disconnect().await.unwrap();
+    task.await.unwrap();
+}
+#[tokio::test]
 async fn alert_stop_hides_existing_sources_without_creating_them() {
     let (obs, requests, task) = server("").await;
     let mut settings = AppSettings::default();

@@ -1,30 +1,31 @@
 import type { ObsControl } from "../../lib/command-contract";
-type OutputAction = Exclude<ObsControl["action"], `set_${string}`>;
+type OutputAction = Extract<
+    ObsControl["action"],
+    | "start_stream"
+    | "stop_stream"
+    | "start_record"
+    | "stop_record"
+    | "pause_record"
+    | "resume_record"
+    | "start_replay_buffer"
+    | "stop_replay_buffer"
+    | "save_replay_buffer"
+    | "start_virtual_cam"
+    | "stop_virtual_cam"
+>;
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tauriInvoke } from "../../lib/api";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { useState } from "react";
 import { StreamEndPanel } from "../dashboard/StreamEndPanel";
-type Output = {
-    outputActive?: boolean;
-    outputPaused?: boolean;
-    outputDuration?: number;
-};
-type Outputs = {
-    stream: Output;
-    record: Output | null;
-    replay: Output | null;
-    camera: Output | null;
-    stats: { activeFps?: number; cpuUsage?: number } | null;
-    errors?: Record<string, string>;
-};
+import { ObsMonitoring, type ObsOutputs } from "./ObsMonitoring";
 export function ObsControls({ enabled }: { enabled: boolean }) {
     const [ending, setEnding] = useState(false);
     const client = useQueryClient();
     const status = useQuery({
         queryKey: ["obs-outputs"],
-        queryFn: () => tauriInvoke<Outputs>("obs_output_status"),
+        queryFn: () => tauriInvoke<ObsOutputs>("obs_output_status"),
         enabled,
         refetchInterval: 3000,
     });
@@ -34,6 +35,7 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
         onSuccess: () =>
             void client.invalidateQueries({ queryKey: ["obs-outputs"] }),
     });
+    const data = enabled && !status.isError ? status.data : undefined;
     const available = (action: OutputAction) => {
         const key = action.includes("replay")
             ? "replay"
@@ -43,8 +45,9 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
                 ? "record"
                 : "stream";
         return (
-            typeof status.data?.[key]?.outputActive === "boolean" &&
-            !status.isError
+            typeof data?.[key]?.outputActive === "boolean" &&
+            (!(action === "pause_record" || action === "resume_record") ||
+                typeof data?.record?.outputPaused === "boolean")
         );
     };
     const button = (action: OutputAction, label: string) => (
@@ -73,73 +76,74 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
                     {!enabled
                         ? "OBS nicht verbunden"
                         : status.isError ||
-                            typeof status.data?.stream?.outputActive !==
-                                "boolean"
+                            typeof data?.stream?.outputActive !== "boolean"
                           ? "Streamstatus unbekannt"
-                          : status.data.stream.outputActive
+                          : data.stream.outputActive
                             ? "Stream läuft"
                             : "Stream gestoppt"}
                 </p>
                 <div className="flex flex-wrap gap-2">
                     {button(
-                        status.data?.stream?.outputActive
+                        data?.stream?.outputActive
                             ? "stop_stream"
                             : "start_stream",
-                        status.data?.stream?.outputActive
+                        data?.stream?.outputActive
                             ? "Stream stoppen"
                             : "Stream starten",
                     )}
                     {button(
-                        status.data?.record?.outputActive
+                        data?.record?.outputActive
                             ? "stop_record"
                             : "start_record",
-                        status.data?.record?.outputActive
+                        data?.record?.outputActive
                             ? "Aufnahme stoppen"
                             : "Aufnahme starten",
                     )}
-                    {status.data?.record?.outputActive &&
+                    {data?.record?.outputActive &&
                         button(
-                            status.data.record.outputPaused
+                            data.record.outputPaused
                                 ? "resume_record"
                                 : "pause_record",
-                            status.data.record.outputPaused
+                            data.record.outputPaused
                                 ? "Aufnahme fortsetzen"
                                 : "Aufnahme pausieren",
                         )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {button(
-                        status.data?.replay?.outputActive
+                        data?.replay?.outputActive
                             ? "stop_replay_buffer"
                             : "start_replay_buffer",
-                        status.data?.replay?.outputActive
+                        data?.replay?.outputActive
                             ? "Replay Buffer stoppen"
                             : "Replay Buffer starten",
                     )}
-                    {status.data?.replay?.outputActive &&
+                    {data?.replay?.outputActive &&
                         button("save_replay_buffer", "Replay speichern")}
                     {button(
-                        status.data?.camera?.outputActive
+                        data?.camera?.outputActive
                             ? "stop_virtual_cam"
                             : "start_virtual_cam",
-                        status.data?.camera?.outputActive
+                        data?.camera?.outputActive
                             ? "Virtuelle Kamera stoppen"
                             : "Virtuelle Kamera starten",
                     )}
                 </div>
-                {status.data?.stats && (
-                    <p className="text-sm text-text-secondary">
-                        FPS {status.data.stats.activeFps?.toFixed(1)} · CPU{" "}
-                        {status.data.stats.cpuUsage?.toFixed(1)} %
+                <ObsMonitoring outputs={data} />
+                <Button
+                    variant="ghost"
+                    disabled={
+                        !enabled || status.isFetching || control.isPending
+                    }
+                    onClick={() => void status.refetch()}
+                >
+                    OBS-Status aktualisieren
+                </Button>
+                {Object.entries(data?.errors ?? {}).map(([key, error]) => (
+                    <p key={key} role="status">
+                        {key}: {error}
                     </p>
-                )}
-                {Object.entries(status.data?.errors ?? {}).map(
-                    ([key, error]) => (
-                        <p key={key} role="status">
-                            {key}: {error}
-                        </p>
-                    ),
-                )}
+                ))}
                 {(status.error || control.error) && (
                     <p role="alert">{String(control.error ?? status.error)}</p>
                 )}
@@ -156,7 +160,7 @@ export function ObsControls({ enabled }: { enabled: boolean }) {
                             enabled={enabled}
                             live={
                                 !status.isError
-                                    ? status.data?.stream?.outputActive
+                                    ? data?.stream?.outputActive
                                     : undefined
                             }
                             defaultExpanded

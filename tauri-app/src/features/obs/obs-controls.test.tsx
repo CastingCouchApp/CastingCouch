@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+    act,
     fireEvent,
     render,
     screen,
@@ -15,18 +16,127 @@ vi.mock("../../lib/api", () => ({
     listenStreamEndSettings: async () => () => {},
 }));
 function show() {
-    render(
-        <QueryClientProvider
-            client={
-                new QueryClient({
-                    defaultOptions: { queries: { retry: false } },
-                })
-            }
-        >
+    const client = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+    });
+    const view = render(
+        <QueryClientProvider client={client}>
             <ObsControls enabled />
         </QueryClientProvider>,
     );
+    return { client, ...view };
 }
+it("shows actual output timecodes, recording/replay/camera state and full C# statistics", async () => {
+    invoke.mockReset().mockResolvedValue({
+        stream: { outputActive: true, outputTimecode: "01:02:03.004" },
+        record: {
+            outputActive: true,
+            outputPaused: true,
+            outputDuration: 90000,
+        },
+        replay: { outputActive: true },
+        camera: { outputActive: false },
+        stats: {
+            activeFps: 59.94,
+            cpuUsage: 12.5,
+            memoryUsage: 1024,
+            renderSkippedFrames: 3,
+            renderTotalFrames: 2000,
+            outputSkippedFrames: 4,
+            outputTotalFrames: 1800,
+        },
+    });
+    show();
+    expect(
+        await screen.findByText("Streamlaufzeit: 01:02:03.004"),
+    ).toBeInTheDocument();
+    expect(
+        screen.getByText("Aufnahme: Pausiert · 00:01:30"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Replay Buffer: Aktiv")).toBeInTheDocument();
+    expect(screen.getByText("Virtuelle Kamera: Gestoppt")).toBeInTheDocument();
+    for (const text of [
+        "CPU: 12.5 %",
+        "FPS: 59.9",
+        "RAM: 1024 MB",
+        "Render-Lag: 3/2000",
+        "Encoding-Lag: 4/1800",
+    ])
+        expect(screen.getByText(text)).toBeInTheDocument();
+});
+it("keeps missing statistics unknown and does not allow pausing with unknown pause status", async () => {
+    invoke.mockReset().mockResolvedValue({
+        stream: null,
+        record: { outputActive: true },
+        stats: { activeFps: -1 },
+        errors: { stream: "Streamstatus fehlgeschlagen" },
+    });
+    show();
+    await waitFor(() =>
+        expect(
+            screen.getByRole("button", { name: "Aufnahme stoppen" }),
+        ).toBeEnabled(),
+    );
+    expect(screen.getByText("Aufnahme: Status unbekannt")).toBeInTheDocument();
+    expect(
+        screen.getByRole("button", { name: "Aufnahme pausieren" }),
+    ).toBeDisabled();
+    expect(
+        screen.getByRole("button", { name: "Aufnahme stoppen" }),
+    ).toBeEnabled();
+    for (const text of [
+        "CPU: Unbekannt",
+        "FPS: Unbekannt",
+        "RAM: Unbekannt",
+        "Render-Lag: Unbekannt",
+        "Encoding-Lag: Unbekannt",
+    ])
+        expect(screen.getByText(text)).toBeInTheDocument();
+});
+it("hides cached live statistics after query failure and recovers with an explicit refresh", async () => {
+    let offline = false;
+    const connected = {
+        stream: { outputActive: true, outputDuration: 60000 },
+        record: { outputActive: false },
+        stats: { cpuUsage: 12.5, activeFps: 60 },
+    };
+    invoke.mockReset().mockImplementation(async () => {
+        if (offline) throw Error("OBS-Verbindung unterbrochen");
+        return connected;
+    });
+    const { client, rerender } = show();
+    expect(await screen.findByText("CPU: 12.5 %")).toBeInTheDocument();
+    offline = true;
+    await act(() => client.invalidateQueries({ queryKey: ["obs-outputs"] }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+        "OBS-Verbindung unterbrochen",
+    );
+    expect(screen.queryByText("CPU: 12.5 %")).not.toBeInTheDocument();
+    expect(screen.getByText("CPU: Unbekannt")).toBeInTheDocument();
+    expect(
+        screen.getByRole("button", { name: "Stream starten" }),
+    ).toBeDisabled();
+    offline = false;
+    fireEvent.click(
+        screen.getByRole("button", { name: "OBS-Status aktualisieren" }),
+    );
+    expect(
+        await screen.findByText("Streamlaufzeit: 00:01:00"),
+    ).toBeInTheDocument();
+    expect(
+        screen.getByRole("button", { name: "Stream stoppen" }),
+    ).toBeEnabled();
+    rerender(
+        <QueryClientProvider client={client}>
+            <ObsControls enabled={false} />
+        </QueryClientProvider>,
+    );
+    expect(screen.queryByText("CPU: 12.5 %")).not.toBeInTheDocument();
+    expect(screen.getByText("OBS nicht verbunden")).toBeInTheDocument();
+    expect(
+        screen.getByRole("button", { name: "OBS-Status aktualisieren" }),
+    ).toBeDisabled();
+});
 describe("OBS output availability", () => {
     it("keeps an incomplete stream-status response unknown and disables stream mutations", async () => {
         invoke.mockReset();
