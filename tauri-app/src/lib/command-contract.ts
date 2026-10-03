@@ -70,6 +70,7 @@ export type ObsQuery =
   | { query: "transitions" }
   | { query: "current_transition" }
   | { query: "inputs" }
+  | { query: "input_catalog" }
   | { query: "scene_items"; sceneName: string }
   | { query: "group_items"; sceneName: string }
   | { query: "input_settings"; inputName: string }

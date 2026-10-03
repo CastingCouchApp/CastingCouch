@@ -3870,11 +3870,17 @@ fn native_obs_media_actions_check_current_source_kind_report_errors_and_reconnec
                         stop_failed = true;
                     }
                     let failed = fail_stop
-                        || (kind == "GetStreamStatus" && stream_flag.load(Ordering::SeqCst));
+                        || (kind == "GetStreamStatus" && stream_flag.load(Ordering::SeqCst))
+                        || (kind == "GetInputMute"
+                            && d["requestData"]["inputName"] == "Browser"
+                            && kind_flag.load(Ordering::SeqCst));
                     let data = match kind {
                         "GetSceneList" => json!({"scenes":[],"currentProgramSceneName":"Live"}),
                         "GetInputList" => {
                             json!({"inputs":[{"inputName":"Clip ü","inputKind":"ffmpeg_source_v2","unversionedInputKind":"ffmpeg_source"},{"inputName":"Browser","inputKind":if kind_flag.load(Ordering::SeqCst) {"image_source"} else {"browser_source"}}]})
+                        }
+                        "GetInputMute" => {
+                            json!({"inputMuted":d["requestData"]["inputName"] == "Browser"})
                         }
                         "GetStreamStatus" => {
                             json!({"outputActive":true,"outputTimecode":"01:02:03.004","outputDuration":3723004})
@@ -3899,6 +3905,21 @@ fn native_obs_media_actions_check_current_source_kind_report_errors_and_reconnec
             .connect_simple("127.0.0.1", port, None, false)
             .await
             .unwrap();
+        let catalog = call(
+            &window,
+            "obs_query",
+            json!({"query":{"query":"input_catalog"}}),
+        )
+        .unwrap();
+        assert_eq!(catalog["inputs"][0]["inputName"], "Clip ü");
+        assert_eq!(
+            catalog["inputs"][0]["unversionedInputKind"],
+            "ffmpeg_source"
+        );
+        assert_eq!(catalog["inputs"][0]["category"], "game");
+        assert_eq!(catalog["inputs"][0]["inputMuted"], false);
+        assert_eq!(catalog["inputs"][1]["category"], "browser");
+        assert_eq!(catalog["inputs"][1]["inputMuted"], true);
         call(
             &window,
             "obs_control",
@@ -3925,6 +3946,18 @@ fn native_obs_media_actions_check_current_source_kind_report_errors_and_reconnec
         )
         .unwrap();
         changed_kind.store(true, Ordering::SeqCst);
+        let catalog = call(
+            &window,
+            "obs_query",
+            json!({"query":{"query":"input_catalog"}}),
+        )
+        .unwrap();
+        assert_eq!(catalog["inputs"][1]["inputKind"], "image_source");
+        assert!(catalog["inputs"][1]["inputMuted"].is_null());
+        assert!(catalog["inputs"][1]["muteError"]
+            .as_str()
+            .unwrap()
+            .contains("native OBS failure"));
         assert!(
             call(
                 &window,
@@ -3961,6 +3994,12 @@ fn native_obs_media_actions_check_current_source_kind_report_errors_and_reconnec
             .unwrap()
             .contains("native OBS failure"));
         state.obs.disconnect().await.unwrap();
+        assert!(call(
+            &window,
+            "obs_query",
+            json!({"query":{"query":"input_catalog"}})
+        )
+        .is_err());
         assert!(call(
             &window,
             "obs_control",

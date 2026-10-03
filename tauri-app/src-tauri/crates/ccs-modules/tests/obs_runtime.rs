@@ -164,6 +164,41 @@ async fn optional_output_failure_keeps_stream_status_and_exposes_error() {
     obs.disconnect().await.unwrap();
     task.await.unwrap();
 }
+
+#[tokio::test]
+async fn input_catalog_uses_current_obs_names_kinds_and_reports_partial_mute_failure() {
+    let (obs, requests, task) = server("GetInputMute").await;
+    let query: ObsQuery = serde_json::from_value(json!({"query":"input_catalog"})).unwrap();
+    let catalog = obs.query(query.clone()).await.unwrap();
+    assert_eq!(catalog["inputs"][0]["inputName"], "Existing");
+    assert_eq!(catalog["inputs"][0]["category"], "browser");
+    assert_eq!(catalog["inputs"][1]["category"], "game");
+    assert!(catalog["inputs"][0]["inputMuted"].is_null());
+    assert!(catalog["inputs"][0]["muteError"]
+        .as_str()
+        .unwrap()
+        .contains("contract failure"));
+    let names = requests
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|r| r["requestType"] == "GetInputMute")
+        .map(|r| r["requestData"]["inputName"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(names, vec![json!("Existing"), json!("Wrong kind")]);
+    obs.disconnect().await.unwrap();
+    assert!(obs.query(query).await.is_err());
+    task.await.unwrap();
+    let (obs, _, task) = server("").await;
+    let catalog = obs
+        .query(serde_json::from_value(json!({"query":"input_catalog"})).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(catalog["inputs"][0]["inputMuted"], false);
+    assert!(catalog["inputs"][0]["muteError"].is_null());
+    obs.disconnect().await.unwrap();
+    task.await.unwrap();
+}
 #[tokio::test]
 async fn stream_failure_keeps_other_outputs_and_stats_available() {
     let (obs, _, task) = server("GetStreamStatus").await;

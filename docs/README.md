@@ -32,6 +32,7 @@ Tauri-Dashboard-Schnellzugriffe: [`architecture/TAURI-DASHBOARD-SHORTCUTS.md`](a
 Tauri-Dashboard-Dienste: [`architecture/TAURI-DASHBOARD-SERVICES.md`](architecture/TAURI-DASHBOARD-SERVICES.md)
 Tauri-Dashboard-Musik: [`architecture/TAURI-DASHBOARD-MUSIC.md`](architecture/TAURI-DASHBOARD-MUSIC.md)
 Tauri-OBS-Medien/Monitoring: [`architecture/TAURI-OBS-MEDIA-MONITORING.md`](architecture/TAURI-OBS-MEDIA-MONITORING.md)
+Tauri-OBS-Suchfilter: [`architecture/TAURI-OBS-SEARCH-FILTERS.md`](architecture/TAURI-OBS-SEARCH-FILTERS.md)
 
 Tauri-Arbeitsziel und nächste Meilensteine: [`architecture/TAURI-IMPLEMENTATION-PLAN.md`](architecture/TAURI-IMPLEMENTATION-PLAN.md)
 

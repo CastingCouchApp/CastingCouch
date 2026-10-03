@@ -9,16 +9,23 @@ export type {
     ObsControl as Control,
 } from "../../lib/command-contract";
 export type Apply = (control: Control) => Promise<unknown>;
-export function useObsQuery<T>(query: ObsQuery, enabled = true) {
+export function useObsQuery<T>(
+    query: ObsQuery,
+    enabled = true,
+    refetchInterval?: number,
+) {
     return useQuery({
         queryKey: ["obs-management", query],
         queryFn: () => tauriInvoke<T>("obs_query", { query }),
         enabled,
+        refetchInterval,
         retry: false,
     });
 }
 export type Item = {
     sourceName: string;
+    sourceType?: string;
+    inputKind?: string;
     sceneItemId: number;
     sceneItemIndex: number;
     sceneItemEnabled: boolean;
