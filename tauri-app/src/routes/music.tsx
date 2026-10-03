@@ -1,6 +1,7 @@
 import { SpotifyLibrary } from "../features/music/SpotifyLibrary";
 import { SceneMusic } from "../features/music/SceneMusic";
 import { SavedMusicStates } from "../features/music/SavedMusicStates";
+import { MusicStatistics } from "../features/music/MusicStatistics";
 import type { SpotifyAction } from "../lib/command-contract";
 import { MusicAutomation } from "../features/music/MusicAutomation";
 import { SpotifyDevices } from "../features/music/SpotifyDevices";
@@ -106,6 +107,7 @@ function MusicPage() {
             <MusicAutomation />
             <SceneMusic />
             <SavedMusicStates />
+            <MusicStatistics />
             {error && (
                 <p role="alert" className="text-red-400">
                     {String(error)}

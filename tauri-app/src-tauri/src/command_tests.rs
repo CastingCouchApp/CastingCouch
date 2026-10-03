@@ -1,6 +1,83 @@
 use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
+#[test]
+fn statistics_http_samples_emit_native_changes_and_reset_survives_restart() {
+    use tauri::Listener;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let server = tauri::async_runtime::block_on(MockServer::start());
+    tauri::async_runtime::block_on(Mock::given(method("GET"))
+        .and(path("/me/player/currently-playing"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"is_playing":true,"item":{"id":"native-song","type":"track","name":"Native Song","artists":[{"name":"Artist"}],"album":{"name":"Album"}}})))
+        .mount(&server));
+    let secrets = Arc::new(ccs_secrets::MemorySecretStore::new());
+    ccs_modules::spotify::SpotifyTokenRepository::new(secrets.clone())
+        .save(&ccs_modules::spotify::SpotifyTokenSet {
+            access_token: "test-token".into(),
+            refresh_token: "refresh".into(),
+            obtained_at: std::time::SystemTime::now().into(),
+            expires_in_seconds: 3600,
+            token_type: "Bearer".into(),
+            scopes: vec![],
+        })
+        .unwrap();
+    let player = Arc::new(SpotifyClient::with_http(
+        secrets,
+        ccs_modules::spotify::SpotifyOAuthClient::new(),
+        server.uri(),
+    ));
+    let app = test_app_with_spotify(root.path().into(), Some(player.clone()));
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let (sent, mut received) = tokio::sync::mpsc::unbounded_channel();
+    let listener = app.listen("music-statistics-changed", move |event| {
+        sent.send(event.payload().to_string()).unwrap();
+    });
+    let runtime = app.state::<AppState>().music_statistics.clone();
+    let job = spawn_music_statistics(app.handle().clone(), runtime.clone(), &player);
+    tauri::async_runtime::block_on(async {
+        player.refresh_now_playing("client").await.unwrap();
+        let event = tokio::time::timeout(std::time::Duration::from_secs(2), received.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&event).unwrap(),
+            json!({"changed":true})
+        );
+    });
+    let snapshot = call(&window, "music_statistics_snapshot", json!({})).unwrap();
+    assert_eq!(snapshot["totalPlays"], 1);
+    assert_eq!(snapshot["topTracks"][0]["TrackId"], "native-song");
+    assert_eq!(snapshot["topArtists"][0]["artist"], "Artist");
+    call(&window, "reset_music_statistics", json!({})).unwrap();
+    tauri::async_runtime::block_on(async {
+        runtime.close().await;
+        job.await.unwrap();
+    });
+    app.unlisten(listener);
+    let restarted = test_app(root.path().into());
+    let second = WebviewWindowBuilder::new(&restarted, "main", Default::default())
+        .build()
+        .unwrap();
+    assert_eq!(
+        call(&second, "music_statistics_snapshot", json!({})).unwrap()["totalPlays"],
+        0
+    );
+    let file = root
+        .path()
+        .join("Statistics/spotify-listening-statistics.json");
+    std::fs::write(&file, "corrupt").unwrap();
+    assert!(call(&second, "music_statistics_snapshot", json!({})).is_err());
+    assert!(call(&second, "reset_music_statistics", json!({})).is_err());
+    assert_eq!(std::fs::read_to_string(file).unwrap(), "corrupt");
+}
+
 fn test_app(root: PathBuf) -> tauri::App<MockRuntime> {
     test_app_with_spotify(root, None)
 }
@@ -33,6 +110,12 @@ fn test_app_with_spotify(
         scene_music.clone(),
         ducking,
     ));
+    let music_statistics = Arc::new(ccs_modules::music_statistics::MusicStatisticsRuntime::new(
+        Arc::new(ccs_core::music_statistics::MusicStatisticsStore::new(
+            &paths.data_root,
+        )),
+        settings.clone(),
+    ));
     mock_builder()
         .manage(StartupState::default())
         .manage(AppState {
@@ -43,6 +126,7 @@ fn test_app_with_spotify(
             spotify,
             scene_music,
             music_states,
+            music_statistics,
             paths,
             settings,
             secrets,
@@ -64,6 +148,8 @@ fn test_app_with_spotify(
             music_automation_status,
             music_state_action,
             music_state_snapshot,
+            music_statistics_snapshot,
+            reset_music_statistics,
             set_spotify_playlist_favorite,
             startup_error,
             overlay_runtime_status,

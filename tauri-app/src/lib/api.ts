@@ -59,6 +59,7 @@ export type ServiceStatus = {
 };
 
 export type NowPlaying = {
+    track_id?: string;
     title: string;
     artist: string;
     album: string;
@@ -394,6 +395,9 @@ export function listenMusicAutomation(onStatus: (status: MusicAutomationStatus) 
 }
 export function listenMusicStatesChanged(onChange: () => void) {
     return listenIfTauri<{ changed: boolean }>("music-states-changed", () => onChange());
+}
+export function listenMusicStatisticsChanged(onChange: () => void) {
+    return listenIfTauri<{ changed: boolean }>("music-statistics-changed", () => onChange());
 }
 
 export async function listenServiceStatus(
