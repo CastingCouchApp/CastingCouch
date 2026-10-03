@@ -71,6 +71,16 @@ export type SpotifyQuery =
   | { query: "playlist_tracks"; id: string }
   | { query: "search"; text: string };
 
+export type MusicAction =
+  | { action: "scene"; scene: string; force: boolean }
+  | { action: "stream_started" }
+  | { action: "stream_stopped" }
+  | { action: "start_playlist" }
+  | { action: "fade_in" }
+  | { action: "fade_out" }
+  | { action: "fade_to"; percent: number; milliseconds: number; pauseAtEnd: boolean }
+  | { action: "stop" };
+
 export type TwitchAction =
   | { action: "channel"; title: string; categoryId: string }
   | { action: "send_chat"; message: string }
@@ -118,6 +128,8 @@ export type CommandInvocation =
   | [command: "countdown_status", args?: Record<string, never>]
   | [command: "set_countdown", args: { seconds: number; label: string }]
   | [command: "spotify_action", args: { action: SpotifyAction }]
+  | [command: "music_automation_action", args: { action: MusicAction }]
+  | [command: "music_automation_status", args?: Record<string, never>]
   | [command: "set_spotify_playlist_favorite", args: { uri: string; favorite: boolean }]
   | [command: "activate_spotify_device", args: { play: boolean }]
   | [command: "spotify_query", args: { query: SpotifyQuery; offset?: number | null }]

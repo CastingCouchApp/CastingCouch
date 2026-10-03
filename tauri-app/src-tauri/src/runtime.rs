@@ -129,6 +129,14 @@ fn spawn_obs_data(app: AppHandle) {
             };
 
             let outputs = state.obs.output_status().await.unwrap_or(Value::Null);
+            state
+                .scene_music
+                .observe_stream(
+                    outputs
+                        .pointer("/stream/outputActive")
+                        .and_then(Value::as_bool),
+                )
+                .await;
             use ccs_modules::obs::ObsQuery;
             let (mic, desktop) = tokio::join!(
                 state.obs.query(ObsQuery::Mute {

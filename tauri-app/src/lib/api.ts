@@ -384,6 +384,15 @@ async function listenIfTauri<T>(
     return () => {};
 }
 
+export type MusicAutomationStatus = {
+    running: boolean;
+    action: string;
+    history: Array<{ at: string; rule: string; success: boolean; message: string }>;
+};
+export function listenMusicAutomation(onStatus: (status: MusicAutomationStatus) => void) {
+    return listenIfTauri<MusicAutomationStatus>("music-automation-status",onStatus);
+}
+
 export async function listenServiceStatus(
     onStatus: (status: ServiceStatus) => void,
 ): Promise<() => void> {

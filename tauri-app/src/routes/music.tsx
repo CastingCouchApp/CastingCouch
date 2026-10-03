@@ -1,4 +1,5 @@
 import { SpotifyLibrary } from "../features/music/SpotifyLibrary";
+import { SceneMusic } from "../features/music/SceneMusic";
 import type { SpotifyAction } from "../lib/command-contract";
 import { MusicAutomation } from "../features/music/MusicAutomation";
 import { SpotifyDevices } from "../features/music/SpotifyDevices";
@@ -102,6 +103,7 @@ function MusicPage() {
         <div className="space-y-6">
             <h1 className="text-2xl font-semibold">Musik</h1>
             <MusicAutomation />
+            <SceneMusic />
             {error && (
                 <p role="alert" className="text-red-400">
                     {String(error)}

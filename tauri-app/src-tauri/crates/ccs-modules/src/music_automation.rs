@@ -27,6 +27,15 @@ pub struct AlertDucking {
     state: Mutex<DuckingState>,
 }
 impl AlertDucking {
+    /// Fades use the desired volume, rather than the temporarily reduced volume.
+    pub async fn desired_volume(&self) -> Option<(String, u8)> {
+        self.state
+            .lock()
+            .await
+            .restore
+            .as_ref()
+            .map(|r| (r.device_id.clone(), r.original))
+    }
     pub fn new(player: Arc<SpotifyClient>) -> Self {
         Self {
             player,

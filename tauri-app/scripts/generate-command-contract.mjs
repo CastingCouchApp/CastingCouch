@@ -21,6 +21,7 @@ const domainFiles = {
     ObsQuery: ["obs/queries.rs", "query"],
     SpotifyAction: ["spotify/playback.rs", "action"],
     SpotifyQuery: ["spotify/playback.rs", "query"],
+    MusicAction: ["scene_music.rs", "action"],
     TwitchAction: ["twitch/operations.rs", "action"],
     TwitchQuery: ["twitch/operations.rs", "query"],
 };

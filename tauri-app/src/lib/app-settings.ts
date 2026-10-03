@@ -69,6 +69,20 @@ export type TwitchSettings = {
 };
 
 export type SpotifySettings = {
+  SmartAutomationEnabled?: boolean;
+  StartOnStreamStart?: boolean;
+  PlayEndMusic?: boolean;
+  PauseOnStreamEnd?: boolean;
+  StartVolumePercent?: number;
+  FadeInEnabled?: boolean;
+  FadeInSeconds?: number;
+  FadeOutEnabled?: boolean;
+  FadeOutSeconds?: number;
+  PauseAfterFadeOut?: boolean;
+  SetVolumeOnLiveTransition?: boolean;
+  MuteOnLiveTransition?: boolean;
+  LiveVolumePercent?: number;
+  AutomationRules?: Array<Record<string, unknown>>;
   PreferredDeviceId?: string;
   AutoTransferToPreferredDevice?: boolean;
   UseActiveDeviceWhenPreferredUnavailable?: boolean;

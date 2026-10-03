@@ -14,6 +14,16 @@ fn test_app_with_spotify(
     let hub = Arc::new(RealtimeHub::new());
     let bridge = OverlayEventBridge::new(hub.clone());
     let alerts = Arc::new(AlertEngine::from_store(settings.clone(), bridge.clone()));
+    let spotify = spotify.unwrap_or_else(|| SpotifyClient::new_shared(secrets.clone()));
+    let ducking = Arc::new(ccs_modules::music_automation::AlertDucking::new(
+        spotify.clone(),
+    ));
+    alerts.attach_music(ducking.clone());
+    let scene_music = Arc::new(ccs_modules::scene_music::SceneMusicEngine::new(
+        settings.clone(),
+        spotify.clone(),
+        ducking,
+    ));
     mock_builder()
         .manage(StartupState::default())
         .manage(AppState {
@@ -21,7 +31,8 @@ fn test_app_with_spotify(
             settings_mutation: Mutex::new(()),
             obs: ObsClient::new_shared("127.0.0.1", 4455),
             twitch: TwitchClient::new_shared(secrets.clone()),
-            spotify: spotify.unwrap_or_else(|| SpotifyClient::new_shared(secrets.clone())),
+            spotify,
+            scene_music,
             paths,
             settings,
             secrets,
@@ -39,6 +50,8 @@ fn test_app_with_spotify(
             activate_spotify_device,
             spotify_query,
             spotify_action,
+            music_automation_action,
+            music_automation_status,
             set_spotify_playlist_favorite,
             startup_error,
             overlay_runtime_status,
@@ -65,6 +78,84 @@ fn test_app_with_spotify(
         ])
         .build(mock_context(noop_assets()))
         .unwrap()
+}
+
+#[test]
+fn music_scene_commands_decode_native_arguments_and_preserve_imported_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let player = Arc::new(SpotifyClient::with_http(
+        Arc::new(ccs_secrets::MemorySecretStore::new()),
+        ccs_modules::spotify::SpotifyOAuthClient::new(),
+        "http://127.0.0.1:1",
+    ));
+    let app = test_app_with_spotify(dir.path().into(), Some(player));
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let original = call(&window, "get_settings", json!({})).unwrap();
+    let mut settings = original.clone();
+    settings["Spotify"]["SmartAutomationEnabled"] = json!(false);
+    settings["Spotify"]["AutomationRules"] = json!([{"Id":"imported","TriggerType":"ObsSceneChanged","TriggerValue":"Game","ActionType":"Pause","DelaySeconds":2,"Custom":{"keep":42}}]);
+    call(
+        &window,
+        "save_settings",
+        json!({"original":original,"settings":settings}),
+    )
+    .unwrap();
+    assert!(call(
+        &window,
+        "music_automation_action",
+        json!({"action":{"action":"scene","scene":"Game","force":false}})
+    )
+    .is_ok());
+    assert!(call(
+        &window,
+        "music_automation_action",
+        json!({"action":{"action":"fade_to","percent":101,"milliseconds":0,"pauseAtEnd":true}})
+    )
+    .is_err());
+    assert!(call(
+        &window,
+        "music_automation_action",
+        json!({"action":{"action":"stop"}})
+    )
+    .is_ok());
+    let status = call(&window, "music_automation_status", json!({})).unwrap();
+    assert_eq!(status["running"], false);
+    assert!(status["history"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r["success"] == false));
+    let pending = tauri::async_runtime::block_on(async {
+        let job = app.state::<AppState>().scene_music.dispatch(
+            ccs_modules::scene_music::MusicAction::Scene {
+                scene: "Game".into(),
+                force: true,
+            },
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        job
+    });
+    assert!(call(
+        &window,
+        "spotify_action",
+        json!({"action":{"action":"next"}})
+    )
+    .is_err());
+    let cancelled = tauri::async_runtime::block_on(pending)
+        .unwrap()
+        .unwrap_err()
+        .to_string();
+    assert_eq!(cancelled, "Musikaktion abgebrochen");
+    let restarted = test_app(dir.path().into());
+    let second = WebviewWindowBuilder::new(&restarted, "main", Default::default())
+        .build()
+        .unwrap();
+    assert_eq!(
+        call(&second, "get_settings", json!({})).unwrap()["Spotify"]["AutomationRules"],
+        settings["Spotify"]["AutomationRules"]
+    );
 }
 
 #[test]

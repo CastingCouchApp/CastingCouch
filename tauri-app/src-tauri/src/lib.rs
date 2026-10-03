@@ -134,6 +134,7 @@ pub struct AppState {
     pub obs: Arc<ObsClient>,
     pub twitch: Arc<TwitchClient>,
     pub spotify: Arc<SpotifyClient>,
+    pub scene_music: Arc<ccs_modules::scene_music::SceneMusicEngine>,
     pub alerts: Arc<AlertEngine>,
     pub bridge: OverlayEventBridge,
     pub verified_update: Mutex<Option<PathBuf>>,
@@ -243,6 +244,14 @@ async fn spotify_action(
     state: State<'_, AppState>,
     action: ccs_modules::spotify::SpotifyAction,
 ) -> Result<Value, String> {
+    if !matches!(
+        &action,
+        ccs_modules::spotify::SpotifyAction::SaveTrack { .. }
+            | ccs_modules::spotify::SpotifyAction::RemoveSavedTrack { .. }
+            | ccs_modules::spotify::SpotifyAction::Queue { .. }
+    ) {
+        state.scene_music.shutdown().await;
+    }
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     if let ccs_modules::spotify::SpotifyAction::Volume { percent } = &action {
         if let Some(music) = state.alerts.music_ducking() {
@@ -298,6 +307,22 @@ fn string_list(value: &Value) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn music_automation_action(
+    state: State<'_, AppState>,
+    action: ccs_modules::scene_music::MusicAction,
+) -> Result<Value, String> {
+    state
+        .scene_music
+        .run(action)
+        .await
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn music_automation_status(state: State<'_, AppState>) -> Result<Value, String> {
+    Ok(state.scene_music.status().await)
 }
 
 #[tauri::command]
@@ -538,6 +563,15 @@ async fn save_settings_impl(
         state.hub.live.data.write().unwrap()["serverError"] = Value::Null;
     }
     let next: AppSettings = serde_json::from_value(saved).map_err(|e| e.to_string())?;
+    if old.spotify.extra != next.spotify.extra
+        || old.spotify.client_id != next.spotify.client_id
+        || old.music_player.provider_id() != next.music_player.provider_id()
+        || old.obs.start_scene != next.obs.start_scene
+        || old.obs.live_scene != next.obs.live_scene
+        || old.obs.end_scene != next.obs.end_scene
+    {
+        state.scene_music.shutdown().await;
+    }
     if old.alerts.enabled && !next.alerts.enabled {
         state.alerts.stop_current();
         state.alerts.clear_queue().await;
@@ -1158,6 +1192,8 @@ pub fn run() {
             countdown_status,
             set_countdown,
             spotify_action,
+            music_automation_action,
+            music_automation_status,
             set_spotify_playlist_favorite,
             activate_spotify_device,
             spotify_query,
@@ -1224,6 +1260,7 @@ pub fn run() {
                     let app = app.clone();
                     tauri::async_runtime::spawn(async move {
                         if let Some(state) = app.try_state::<AppState>() {
+                            state.scene_music.close().await;
                             match tokio::time::timeout(std::time::Duration::from_secs(12), state.alerts.shutdown()).await {
                                 Ok(Ok(())) => {},
                                 Ok(Err(error)) => error!(%error, "Alerts konnten beim Beenden nicht aufgeräumt werden"),
@@ -1294,9 +1331,29 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let spotify = SpotifyClient::new_shared(secrets_dyn);
     let alerts = Arc::new(AlertEngine::from_store(settings.clone(), bridge.clone()));
     alerts.attach_obs(obs.clone());
-    alerts.attach_music(Arc::new(ccs_modules::music_automation::AlertDucking::new(
+    let ducking = Arc::new(ccs_modules::music_automation::AlertDucking::new(
         spotify.clone(),
-    )));
+    ));
+    alerts.attach_music(ducking.clone());
+    let scene_music = Arc::new(ccs_modules::scene_music::SceneMusicEngine::new(
+        settings.clone(),
+        spotify.clone(),
+        ducking,
+    ));
+    tauri::async_runtime::spawn(scene_music.bind_obs(&obs));
+    let mut music_status = scene_music.subscribe_status();
+    let music_app = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match music_status.recv().await {
+                Ok(status) => {
+                    let _ = music_app.emit("music-automation-status", status);
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
 
     spawn_live_event_bridges(
         app.handle().clone(),
@@ -1416,6 +1473,7 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         obs,
         twitch,
         spotify,
+        scene_music,
         alerts,
         bridge,
         verified_update: Mutex::new(None),
