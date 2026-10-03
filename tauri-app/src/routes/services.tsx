@@ -307,7 +307,7 @@ function ServicesPage() {
             </div>
             <ObsControls enabled={connected} />
             <ObsManager enabled={connected} />
-            <TwitchPanel enabled={twitchConnected} />
+            <section id="twitch"><TwitchPanel enabled={twitchConnected} /></section>
         </div>
     );
 }

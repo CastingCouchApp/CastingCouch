@@ -39,8 +39,9 @@ Die konfigurierbare Karte `Notifications` verwendet `ShowNotifications`, vorhand
 - OBS/Twitch/Spotify-Verbindungsstatus: Verbindungen, Trennung und Fehler aus den nativen Statuskanälen; wiederholte identische Meldungen und Connecting-Polls werden unterdrückt.
 - Streamende-Assistent: Phasenwechsel, Fehler und einzelne Warnungen aus derselben Runtime wie Dashboard und Stoppdialog. Countdown-Ticks erzeugen keinen Meldungsspam. Nach überlaufener Event-Queue wird der aktuelle Runtime-Zustand übernommen.
 - [Szenen-/Audio-Schnellzugriffe und Profilanwendung](TAURI-DASHBOARD-SHORTCUTS.md): gemeinsame native Commands protokollieren tatsächliche Ergebnisse und Fehler; Profilwarnungen bleiben sichtbar.
+- [Dienst-Programmstart](TAURI-DASHBOARD-SERVICES.md): gespeicherte OBS-/Spotify-Pfade, bereits laufendes Programm, angenommener Start oder ursprünglicher Fehler. Ein Programmstart wird nicht als Dienstverbindung protokolliert.
 
-Weitere C#-Meldestellen in Dienst-Schnellstarts, Musikaktionen, Moderation und Diagnostik werden beim Abschluss dieser Abläufe abgeglichen. Eine vollständige Übernahme aller C#-Meldestellen wird mit diesem Abschnitt nicht behauptet. Gestrichene Workflow-/externe Funktionen werden nicht als Meldungsquellen wieder eingeführt.
+Weitere C#-Meldestellen in Musikaktionen, Moderation und Diagnostik werden beim Abschluss dieser Abläufe abgeglichen. Eine vollständige Übernahme aller C#-Meldestellen wird mit diesem Abschnitt nicht behauptet. Gestrichene Workflow-/externe Funktionen werden nicht als Meldungsquellen wieder eingeführt.
 
 ## Nachweise und verbleibende Abnahme
 

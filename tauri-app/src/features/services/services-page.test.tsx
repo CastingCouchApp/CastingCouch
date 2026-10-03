@@ -26,12 +26,13 @@ vi.mock("../../lib/api", async (importOriginal) => {
   };
 });
 
-function renderServices() {
+async function renderServices() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: ["/services"] }),
   });
+  await router.load();
   return render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
@@ -83,10 +84,11 @@ describe("Services route Twitch", () => {
   });
 
   it("shows Anmelden when Twitch is disconnected", async () => {
-    renderServices();
+    await renderServices();
     expect(await screen.findByRole("heading", { name: "Dienste" })).toBeInTheDocument();
     await screen.findByText("Twitch");
     const twitchCard = serviceCard("Twitch");
+    expect(document.getElementById("twitch")).toBeInTheDocument();
     expect(within(twitchCard).getByRole("button", { name: "Anmelden" })).toBeInTheDocument();
     expect(within(twitchCard).queryByText("OAuth folgt in Phase 3.")).not.toBeInTheDocument();
   });
@@ -98,7 +100,7 @@ describe("Services route Twitch", () => {
       }
       return undefined;
     });
-    renderServices();
+    await renderServices();
     await screen.findByText("TwitchDev (twitchdev)");
     const twitchCard = serviceCard("Twitch");
     expect(within(twitchCard).getByRole("button", { name: "Abmelden" })).toBeInTheDocument();
@@ -107,7 +109,7 @@ describe("Services route Twitch", () => {
 
   it("invokes twitch_login on Anmelden click", async () => {
     const user = userEvent.setup();
-    renderServices();
+    await renderServices();
     await screen.findByText("Twitch");
     const twitchCard = serviceCard("Twitch");
     await user.click(within(twitchCard).getByRole("button", { name: "Anmelden" }));
@@ -115,7 +117,7 @@ describe("Services route Twitch", () => {
   });
 
   it("updates Twitch card from service-status event without polling", async () => {
-    renderServices();
+    await renderServices();
     await screen.findByText("Twitch");
     const twitchCard = serviceCard("Twitch");
     expect(within(twitchCard).getByText("disconnected")).toBeInTheDocument();
@@ -162,7 +164,7 @@ describe("Services route Spotify", () => {
   });
 
   it("shows Anmelden when Spotify is disconnected", async () => {
-    renderServices();
+    await renderServices();
     await screen.findByText("Spotify");
     const spotifyCard = serviceCard("Spotify");
     expect(within(spotifyCard).getByRole("button", { name: "Anmelden" })).toBeInTheDocument();
@@ -181,7 +183,7 @@ describe("Services route Spotify", () => {
       }
       return undefined;
     });
-    renderServices();
+    await renderServices();
     await screen.findByText("Contract User · Contract Song – Contract Artist, Guest Artist");
     const spotifyCard = serviceCard("Spotify");
     expect(within(spotifyCard).getByRole("button", { name: "Abmelden" })).toBeInTheDocument();
@@ -190,7 +192,7 @@ describe("Services route Spotify", () => {
 
   it("invokes spotify_login on Anmelden click", async () => {
     const user = userEvent.setup();
-    renderServices();
+    await renderServices();
     await screen.findByText("Spotify");
     const spotifyCard = serviceCard("Spotify");
     await user.click(within(spotifyCard).getByRole("button", { name: "Anmelden" }));
@@ -220,7 +222,7 @@ describe("Services route errors and AutoConnect", () => {
       }
       return undefined;
     });
-    renderServices();
+    await renderServices();
     const obsCard = await waitFor(() => serviceCard("OBS"));
     expect(within(obsCard).getByText("error")).toBeInTheDocument();
     expect(within(obsCard).getByText(/Identify failed/)).toBeInTheDocument();
@@ -241,7 +243,7 @@ describe("Services route errors and AutoConnect", () => {
       return undefined;
     });
     const user = userEvent.setup();
-    renderServices();
+    await renderServices();
     await screen.findByText("OBS");
     await user.click(within(serviceCard("OBS")).getByRole("button", { name: "Verbinden" }));
     expect(await within(serviceCard("OBS")).findByText("WebSocket connection failed")).toBeInTheDocument();
@@ -261,7 +263,7 @@ describe("Services route errors and AutoConnect", () => {
       }
       return undefined;
     });
-    renderServices();
+    await renderServices();
     await screen.findByText("OBS");
     expect(
       await within(serviceCard("OBS")).findByText(

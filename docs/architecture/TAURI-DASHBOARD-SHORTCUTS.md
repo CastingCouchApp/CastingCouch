@@ -44,4 +44,4 @@ Die zuerst fehlgeschlagenen Tests belegen die fehlenden Komponenten/Katalogeintr
 
 Vollständiger Rust-Workspace, 189 Frontend-Tests in 47 Dateien, Command-Vertrag, TypeScript und Produktionsbuild sind erfolgreich. Eine erste vollständige UI-Prüfung scheiterte beim Laden einer lokalen Testabhängigkeit; Einzelwiederholung und anschließende vollständige Wiederholung bestanden ohne Dependency- oder Produktänderung.
 
-Nächster DA2-Abgleich: Dienst-Schnellstarts/-öffnen, Musikaktionen und weitere Meldestellen. OBS4/OBS6 und AL1/AL2 bleiben eigene M2-Arbeiten. Reale Konten, Quellen und installierte Windows-/macOS-Nutzerabläufe sind gesondert nachzuweisen; WPF bleibt verfügbar.
+[Dienst-Schnellstarts/-öffnen](TAURI-DASHBOARD-SERVICES.md) sind inzwischen ebenfalls implementiert. Nächster DA2-Abgleich: Musikaktionen und weitere Meldestellen. OBS4/OBS6 und AL1/AL2 bleiben eigene M2-Arbeiten. Reale Konten, Quellen und installierte Windows-/macOS-Nutzerabläufe sind gesondert nachzuweisen; WPF bleibt verfügbar.

@@ -69,6 +69,7 @@ export type TwitchSettings = {
 };
 
 export type SpotifySettings = {
+  ExecutablePath?: string;
   SmartAutomationEnabled?: boolean;
   StartOnStreamStart?: boolean;
   PlayEndMusic?: boolean;
@@ -454,6 +455,7 @@ export function applyEditedSettings(base: AppSettings, form: AppSettings): AppSe
   next.Spotify.ClientId = form.Spotify.ClientId;
   next.Spotify.RedirectUri = form.Spotify.RedirectUri;
   next.Spotify.AutoConnect = form.Spotify.AutoConnect;
+  if (Object.prototype.hasOwnProperty.call(form.Spotify, "ExecutablePath")) next.Spotify.ExecutablePath = form.Spotify.ExecutablePath;
 
   next.Overlay.WebServerPort = form.Overlay.WebServerPort;
   next.Overlay.SelectedCanvasId = form.Overlay.SelectedCanvasId;

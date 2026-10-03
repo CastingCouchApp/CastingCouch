@@ -27,6 +27,29 @@ use tracing::{error, info, warn};
 const OBS_PASSWORD_SECRET_KEY: &str = "obs.password";
 
 #[tauri::command]
+async fn launch_service(
+    state: State<'_, AppState>,
+    service: String,
+) -> Result<ccs_core::service_launcher::LaunchResult, String> {
+    let result = async {
+        let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+        tauri::async_runtime::spawn_blocking(move || {
+            ccs_core::service_launcher::launch_configured_service(&settings, &service)
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+    .await;
+    match &result {
+        Ok(launched) => state.notifications.record(&launched.message, "Info"),
+        Err(error) => state
+            .notifications
+            .record(&format!("Programmstart fehlgeschlagen: {error}"), "Fehler"),
+    }
+    result
+}
+
+#[tauri::command]
 async fn stream_end_snapshot(state: State<'_, AppState>) -> Result<Value, String> {
     stream_end_host::snapshot(&state).await
 }
@@ -2346,6 +2369,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            launch_service,
             stream_end_snapshot,
             stream_end_status,
             save_stream_end_preferences,

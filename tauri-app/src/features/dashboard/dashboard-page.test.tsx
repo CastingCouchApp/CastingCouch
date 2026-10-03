@@ -139,6 +139,8 @@ describe("Dashboard live service status", () => {
         expect(screen.getByRole("heading", {name:"Szenen-Schnellwahl"})).toBeInTheDocument();
         expect(screen.getByRole("heading", {name:"OBS-Audiomixer"})).toBeInTheDocument();
         expect(screen.getByRole("heading", {name:"Raid-Assistent und Profile"})).toBeInTheDocument();
+        expect(screen.getByRole("heading", {name:"Dienste-Schnellzugriff"})).toBeInTheDocument();
+        expect(screen.getByRole("link",{name:"Twitch öffnen"})).toHaveAttribute("href","/services#twitch");
         expect(screen.getAllByText("Getrennt")).toHaveLength(3);
     });
 

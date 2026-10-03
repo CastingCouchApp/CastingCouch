@@ -29,6 +29,8 @@ Tauri-App-Benachrichtigungen: [`architecture/TAURI-NOTIFICATIONS.md`](architectu
 
 Tauri-Dashboard-Schnellzugriffe: [`architecture/TAURI-DASHBOARD-SHORTCUTS.md`](architecture/TAURI-DASHBOARD-SHORTCUTS.md)
 
+Tauri-Dashboard-Dienste: [`architecture/TAURI-DASHBOARD-SERVICES.md`](architecture/TAURI-DASHBOARD-SERVICES.md)
+
 Tauri-Arbeitsziel und nächste Meilensteine: [`architecture/TAURI-IMPLEMENTATION-PLAN.md`](architecture/TAURI-IMPLEMENTATION-PLAN.md)
 
 Verkaufsrisiken: [`architecture/RISK-REGISTER.md`](architecture/RISK-REGISTER.md)

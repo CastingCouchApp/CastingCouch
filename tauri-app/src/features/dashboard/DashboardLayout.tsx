@@ -29,6 +29,7 @@ const groups: [keyof DashboardPreferences, string][] = [
     ["showServiceStatus", "Verbindungsstatus"],
     ["showStreamControls", "Streamsteuerung"],
     ["showLivePanels", "Live-Panels"],
+    ["showQuickServices", "Dienste-Schnellzugriff"],
     ["showAdvancedTools", "Auswertungen"],
     ["showNotifications", "Ereignisse"],
     ["showStreamHistory", "Verlauf"],

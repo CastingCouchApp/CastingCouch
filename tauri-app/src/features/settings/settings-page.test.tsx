@@ -77,6 +77,16 @@ describe("Settings route", () => {
     });
   });
 
+  it("edits the Spotify program path without losing historical music settings", async () => {
+    Object.assign(stored.Spotify, {ExecutablePath:"C:\\Old Spotify\\Spotify.exe",FutureMusic:{keep:true}});
+    const user = userEvent.setup(); renderSettings();
+    const path = await screen.findByLabelText("Programmpfad zu Spotify");
+    expect(path).toHaveValue("C:\\Old Spotify\\Spotify.exe");
+    await user.clear(path); await user.type(path,"/Applications/Spotify.app");
+    await user.click(screen.getByRole("button",{name:"Speichern"}));
+    await waitFor(()=>expect(stored.Spotify).toMatchObject({ExecutablePath:"/Applications/Spotify.app",FutureMusic:{keep:true},PreferredDeviceId:"device-x"}));
+  });
+
   it("edits chat appearance and retains unedited legacy fields in the save contract", async () => {
     Object.assign(stored.Overlay.Chat, { FontFamily: "Arial", FutureStyle: { keep: true } });
     const user = userEvent.setup();

@@ -3,6 +3,7 @@ pub mod logging;
 pub mod music_statistics;
 pub mod paths;
 pub mod profiles;
+pub mod service_launcher;
 pub mod settings;
 pub mod spotify_states;
 pub mod store;

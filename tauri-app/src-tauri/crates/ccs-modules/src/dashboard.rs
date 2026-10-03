@@ -65,6 +65,7 @@ pub const CARD_KEYS: &[&str] = &[
     "Scenes",
     "AudioMixer",
     "RaidAssistant",
+    "QuickServices",
     "SpotifyPlayer",
     "TwitchChat",
     "TwitchEvents",
@@ -541,6 +542,17 @@ pub async fn obs_preview(obs: &crate::obs::ObsClient) -> Result<Value, String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn quick_services_preserves_hidden_order_and_its_own_visibility_group() {
+        let original = json!({"Dashboard":{"ModuleOrder":["QuickServices","StreamControl"],"ModuleZones":{"QuickServices":"Right"},"HiddenModules":["QuickServices"],"ShowQuickServices":false}});
+        let snapshot = snapshot(&original).unwrap();
+        assert_eq!(snapshot.draft.cards[0].key, "QuickServices");
+        assert_eq!(snapshot.draft.cards[0].zone, "Right");
+        assert!(!snapshot.draft.cards[0].visible);
+        assert!(!snapshot.draft.preferences.show_quick_services);
+        assert_eq!(apply(&original, &snapshot.draft).unwrap(), original);
+    }
 
     #[test]
     fn shortcut_cards_preserve_legacy_order_hidden_states_and_zones() {

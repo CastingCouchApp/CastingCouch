@@ -18,6 +18,7 @@ fs4 = "0.13"
 sha2 = "0.10"
 rsa = { version = "0.9", features = ["pem", "sha2"] }
 base64 = "0.22"
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 
 [dev-dependencies]
 tempfile = "3"

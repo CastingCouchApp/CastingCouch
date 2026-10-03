@@ -1,6 +1,98 @@
 use super::*;
 
 #[test]
+fn native_service_launch_uses_saved_path_reports_errors_and_does_not_connect() {
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let missing = call(&window, "launch_service", json!({"service":"obs"})).unwrap_err();
+        assert!(missing.to_string().contains("Programmpfad"));
+        assert!(call(&window, "launch_service", json!({"service":"streamerbot"})).is_err());
+        assert_eq!(
+            call(
+                &window,
+                "notifications_snapshot",
+                json!({"filter":"Fehler"})
+            )
+            .unwrap()["total"],
+            2
+        );
+
+        let folder = root.path().join("Programme mit Leerzeichen ä");
+        std::fs::create_dir(&folder).unwrap();
+        let source = folder.join("helper.rs");
+        let exe = folder.join(if cfg!(windows) {
+            "ccslaunchfixture.exe"
+        } else {
+            "ccslaunchfixture"
+        });
+        std::fs::write(&source, r#"fn main() {
+            let root = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
+            let mut out = std::fs::OpenOptions::new().create(true).append(true).open(root.join("starts.txt")).unwrap();
+            use std::io::Write;
+            writeln!(out, "{}|{}", std::env::current_dir().unwrap().display(), std::env::args().count()).unwrap();
+            let deadline=std::time::Instant::now()+std::time::Duration::from_secs(10);
+            while !root.join("stop").exists() && std::time::Instant::now()<deadline { std::thread::sleep(std::time::Duration::from_millis(20)); }
+        }"#).unwrap();
+        let compiled = std::process::Command::new("rustc")
+            .arg(&source)
+            .arg("-o")
+            .arg(&exe)
+            .output()
+            .unwrap();
+        assert!(
+            compiled.status.success(),
+            "{}",
+            String::from_utf8_lossy(&compiled.stderr)
+        );
+        let state = app.state::<AppState>();
+        let mut settings = state.settings.read_value().await.unwrap();
+        settings["Obs"]["ExecutablePath"] = json!(exe);
+        let original = state.settings.read_value().await.unwrap();
+        state
+            .settings
+            .save_edit(&original, &settings)
+            .await
+            .unwrap();
+        let first = call(&window, "launch_service", json!({"service":"obs"})).unwrap();
+        assert_eq!(first["status"], "started");
+        let started = folder.join("starts.txt");
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while !started.exists() {
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .unwrap();
+        let again = call(&window, "launch_service", json!({"service":"obs"})).unwrap();
+        let starts = std::fs::read_to_string(&started).unwrap();
+        std::fs::write(folder.join("stop"), "stop").unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert_eq!(again["status"], "already_running");
+        assert_eq!(starts.lines().count(), 1);
+        assert!(starts.trim_end().ends_with("|1"));
+        assert_eq!(
+            std::fs::canonicalize(starts.trim_end().trim_end_matches("|1")).unwrap(),
+            std::fs::canonicalize(&folder).unwrap()
+        );
+        assert_eq!(
+            state.obs.status().await.state,
+            ccs_modules::ConnectionState::Disconnected
+        );
+        assert_eq!(
+            call(&window, "notifications_snapshot", json!({"filter":"Info"})).unwrap()["entries"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+    });
+}
+
+#[test]
 fn native_notification_commands_preserve_csharp_data_and_report_failed_edits() {
     tauri::async_runtime::block_on(async {
         let root = tempfile::tempdir().unwrap();
@@ -2931,6 +3023,7 @@ pub(super) fn test_app_with_clients(
             _lock: None,
         })
         .invoke_handler(tauri::generate_handler![
+            launch_service,
             stream_end_snapshot,
             stream_end_status,
             save_stream_end_preferences,

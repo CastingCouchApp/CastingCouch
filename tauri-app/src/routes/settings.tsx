@@ -378,6 +378,9 @@ function SettingsForm({
 
             <Card className="space-y-3">
                 <h2 className="text-lg font-medium">Spotify</h2>
+                <form.Field name="Spotify.ExecutablePath">
+                    {(field) => <TextField label="Programmpfad zu Spotify" value={field.state.value ?? ""} onChange={field.handleChange}/>}
+                </form.Field>
                 <form.Field name="Spotify.ClientId">
                     {(field) => (
                         <TextField

@@ -187,6 +187,7 @@ export type TwitchQuery =
   | { query: "redemptions"; rewardId: string; status?: string | null };
 // Generated from src-tauri/src/lib.rs. Run npm run contracts:generate.
 export type CommandInvocation =
+  | [command: "launch_service", args: { service: string }]
   | [command: "stream_end_snapshot", args?: Record<string, never>]
   | [command: "stream_end_status", args?: Record<string, never>]
   | [command: "save_stream_end_preferences", args: { original: unknown; draft: StreamEndPreferences }]
