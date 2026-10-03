@@ -1,0 +1,5051 @@
+{
+  "now": "2026-10-03T08:44:37.7993306+00:00",
+  "offsetSeconds": 7200,
+  "events": [
+    {
+      "TimestampUtc": "2026-09-06T16:00:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C0\u003E",
+        "category": "Gaming"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:00:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:00:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:00:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 10,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:05:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 15,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:10:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 20,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:15:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 25,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:20:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 30,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:25:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 35,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:30:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 25,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:35:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 20,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:40:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 15,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:45:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 10,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:50:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 5,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:55:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 0,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T17:00:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": -5,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:00:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:01:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:02:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:20:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:25:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:30:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T16:35:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-06T17:05:00+00:00",
+      "SessionId": "reference-0",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-06T17:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:00:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C1\u003E",
+        "category": "Talk"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:00:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:00:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:00:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 13,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:05:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 18,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:10:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 23,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:15:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 28,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:20:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 33,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:25:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 38,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:30:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 28,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:35:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 23,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:40:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 18,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:45:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 13,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:50:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 8,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:55:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 3,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T18:00:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": -2,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:00:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:01:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:02:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:03:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:04:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:05:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:10:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:20:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:25:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:30:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T17:35:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-08T18:05:00+00:00",
+      "SessionId": "reference-1",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-08T18:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:00:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C2\u003E",
+        "category": "Gaming"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:00:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:00:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:00:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 16,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:05:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 21,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:10:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 26,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:15:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 31,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:20:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 36,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:25:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 41,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:30:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 31,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:35:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 26,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:40:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 21,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:45:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 16,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:50:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 11,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:55:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 6,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T19:00:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 1,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:00:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:01:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:02:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:03:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:04:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:05:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:06:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:07:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:08:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:10:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:11:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:20:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:25:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:30:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T18:35:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-10T19:05:00+00:00",
+      "SessionId": "reference-2",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-10T19:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:00:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C3\u003E",
+        "category": "Talk"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:00:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:00:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:00:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 19,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:05:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 24,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:10:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 29,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:15:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 34,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:20:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 39,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:25:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 44,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:30:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 34,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:35:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 29,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:40:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 24,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:45:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 19,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:50:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 14,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:55:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 9,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T17:00:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 4,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:00:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:01:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:02:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:03:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:04:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:05:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:06:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:07:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:08:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:09:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:10:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:11:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:10:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:11:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:12:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:20:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:25:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:30:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T16:35:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-12T17:05:00+00:00",
+      "SessionId": "reference-3",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-12T17:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:00:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C4\u003E",
+        "category": "Gaming"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:00:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:00:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:00:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 22,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:05:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 27,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:10:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 32,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:15:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 37,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:20:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 42,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:25:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 47,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:30:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 37,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:35:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 32,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:40:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 27,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:45:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 22,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:50:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 17,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:55:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 12,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T18:00:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 7,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:00:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:01:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:02:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:03:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:04:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:05:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:06:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:07:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:08:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:09:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:10:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:11:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:12:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:13:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:14:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:20:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:25:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:30:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T17:35:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-14T18:05:00+00:00",
+      "SessionId": "reference-4",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-14T18:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:00:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C5\u003E",
+        "category": "Talk"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:00:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:00:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:00:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 25,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:05:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 30,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:10:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 35,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:15:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 40,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:20:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 45,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:25:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 50,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:30:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 40,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:35:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 35,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:40:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 30,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:45:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 25,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:50:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 20,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:55:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 15,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T19:00:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 10,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:00:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:01:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:02:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:03:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:04:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:05:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:06:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:07:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:08:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:09:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:10:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:11:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:12:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:13:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:14:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:15:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:16:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:17:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:10:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:20:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:25:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:30:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T18:35:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-16T19:05:00+00:00",
+      "SessionId": "reference-5",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-16T19:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:00:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C6\u003E",
+        "category": "Gaming"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:00:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:00:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:00:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 28,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:05:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 33,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:10:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 38,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:15:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 43,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:20:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 48,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:25:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 53,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:30:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 43,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:35:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 38,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:40:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 33,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:45:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 28,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:50:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 23,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:55:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 18,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T17:00:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 13,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:00:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:01:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:02:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:03:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:04:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:05:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:06:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:07:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:08:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:09:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:10:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:11:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:12:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:13:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:14:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:15:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:16:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:17:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:18:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:19:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:20:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:10:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:11:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:20:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:25:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:30:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T16:35:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-18T17:05:00+00:00",
+      "SessionId": "reference-6",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-18T17:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:00:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C7\u003E",
+        "category": "Talk"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:00:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:00:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:00:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 31,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:05:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 36,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:10:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 41,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:15:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 46,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:20:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 51,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:25:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 56,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:30:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 46,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:35:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 41,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:40:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 36,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:45:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 31,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:50:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 26,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:55:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 21,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T18:00:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 16,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:00:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:01:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:02:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:03:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:04:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:05:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:06:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:07:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:08:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:09:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:10:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:11:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:12:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:13:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:14:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:15:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:16:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:17:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:18:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:19:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:20:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:21:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:22:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:23:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:10:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:11:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:12:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:20:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:25:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:30:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T17:35:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-20T18:05:00+00:00",
+      "SessionId": "reference-7",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-20T18:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:00:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C8\u003E",
+        "category": "Gaming"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:00:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:00:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:00:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 34,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:05:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 39,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:10:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 44,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:15:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 49,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:20:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 54,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:25:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 59,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:30:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 49,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:35:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 44,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:40:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 39,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:45:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 34,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:50:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 29,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:55:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 24,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T19:00:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 19,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:00:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:01:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:02:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:03:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:04:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:05:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:06:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:07:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:08:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:09:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:10:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:11:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:12:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:13:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:14:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:15:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:16:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:17:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:18:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:19:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:20:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:21:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:22:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:23:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:24:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:25:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:26:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:20:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:25:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:30:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T18:35:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-22T19:05:00+00:00",
+      "SessionId": "reference-8",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-22T19:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:00:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C9\u003E",
+        "category": "Talk"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:00:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:00:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:00:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 37,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:05:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 42,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:10:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 47,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:15:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 52,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:20:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 57,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:25:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 62,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:30:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 52,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:35:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 47,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:40:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 42,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:45:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 37,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:50:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 32,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:55:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 27,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T17:00:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 22,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:00:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:01:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:02:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:03:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:04:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:05:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:06:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:07:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:08:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:09:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:10:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:11:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:12:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:13:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:14:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:15:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:16:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:17:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:18:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:19:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:20:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:21:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:22:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:23:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:24:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:25:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:26:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:27:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:28:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:29:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:10:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:20:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:25:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:30:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T16:35:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-24T17:05:00+00:00",
+      "SessionId": "reference-9",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-24T17:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:00:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C10\u003E",
+        "category": "Gaming"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:00:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:00:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:00:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 40,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:05:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 45,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:10:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 50,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:15:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 55,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:20:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 60,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:25:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 65,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:30:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 55,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:35:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 50,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:40:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 45,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:45:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 40,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:50:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 35,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:55:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 30,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T18:00:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 25,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:00:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:01:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:02:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:03:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:04:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:05:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:06:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:07:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:08:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:09:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:10:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:11:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:12:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:13:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:14:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:15:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:16:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:17:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:18:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:19:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:20:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:21:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:22:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:23:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:24:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:25:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:26:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:27:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:28:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:29:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:30:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:31:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:32:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:10:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:11:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:20:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:25:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:30:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T17:35:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-26T18:05:00+00:00",
+      "SessionId": "reference-10",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-26T18:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:00:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Session \u003C11\u003E",
+        "category": "Talk"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:00:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:00:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:00:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 43,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:05:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 48,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:10:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 53,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:15:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 58,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:20:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 63,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:25:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 68,
+        "scene": "Main"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:30:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 58,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:35:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 53,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:40:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 48,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:45:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 43,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:50:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 38,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:55:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 33,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T19:00:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 28,
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:00:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:01:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:02:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:03:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:04:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:05:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:06:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:07:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:08:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:09:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:10:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:11:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:12:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:13:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:14:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:15:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:16:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:17:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:18:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:19:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:20:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:21:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:22:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:23:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:24:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:25:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:26:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:27:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:28:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:29:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:30:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:31:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:32:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:33:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:34:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:35:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.chat.message",
+      "Payload": {
+        "user": "User"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:10:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:11:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:12:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.follow",
+      "Payload": {
+        "Summary": "Follow"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:20:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "twitch.event",
+      "Payload": {
+        "type": "channel.raid",
+        "summary": "Raid \u003Cguest\u003E"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:25:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "session.note",
+      "Payload": {
+        "note": "Interview"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:30:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "obs.scene.changed",
+      "Payload": {
+        "scene": "Break"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T18:35:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "spotify.track.changed",
+      "Payload": {
+        "track": "Song 2",
+        "artist": "Artist"
+      }
+    },
+    {
+      "TimestampUtc": "2026-09-28T19:05:00+00:00",
+      "SessionId": "reference-11",
+      "Type": "session.ended",
+      "Payload": {
+        "endedAt": "2026-09-28T19:05:00\u002B00:00"
+      }
+    },
+    {
+      "TimestampUtc": "2026-10-03T08:24:37.7993306+00:00",
+      "SessionId": "unfinished",
+      "Type": "session.started",
+      "Payload": {
+        "title": "Live",
+        "category": "Talk"
+      }
+    },
+    {
+      "TimestampUtc": "2026-10-03T08:34:37.7993306+00:00",
+      "SessionId": "unfinished",
+      "Type": "twitch.viewer.sample",
+      "Payload": {
+        "viewers": 5
+      }
+    }
+  ],
+  "latest": {
+    "SessionId": "unfinished",
+    "StartedAt": "2026-10-03T10:24:37.7993306+02:00",
+    "EndedAt": "2026-10-03T10:34:37.7993306+02:00",
+    "Title": "Live",
+    "Category": "Talk",
+    "Duration": "00:10:00",
+    "CreatorScore": 36,
+    "PeakViewers": 5,
+    "AverageViewers": 5,
+    "RetentionPercent": 100,
+    "ChatMessagesPerHour": 0,
+    "FollowersPerHour": 0,
+    "ChatMessages": 0,
+    "Followers": 0,
+    "DistinctScenes": 0,
+    "TracksPlayed": 0,
+    "Recommendations": [
+      "Mehr Zuschauer-Messpunkte sammeln; f\u00FCr belastbare Trends werden mindestens drei Live-Samples ben\u00F6tigt.",
+      "Die Chataktivit\u00E4t ist niedrig. Direkte Fragen, Abstimmungen oder Channel-Point-Aktionen k\u00F6nnen das Engagement erh\u00F6hen.",
+      "Es wurde kaum zwischen OBS-Szenen gewechselt. Mehr visuelle Abwechslung kann l\u00E4ngere Streams strukturieren."
+    ]
+  },
+  "dashboard": {
+    "LookbackDays": 30,
+    "SessionCount": 12,
+    "WeeklySessionCount": 2,
+    "WeeklyAverageCreatorScore": 44.5,
+    "AverageCreatorScore": 32.25,
+    "StreamQualityIndex": 37,
+    "EngagementIndex": 15,
+    "GrowthIndex": 19,
+    "AverageRetentionPercent": 50.944266395286796,
+    "AverageChatMessagesPerHour": 18,
+    "AverageFollowersPerHour": 1.3846153846153848,
+    "AverageViewers": 32.26923076923077,
+    "CreatorScoreTrend": 10.8,
+    "ViewerTrendPerStream": 2.999999999999991,
+    "BestStartHour": 20,
+    "BestDay": 1,
+    "BestCategory": "Talk",
+    "PredictedAverageViewers": 45.76923076923076,
+    "PredictedCreatorScore": 45,
+    "RecentSessions": [
+      {
+        "SessionId": "reference-11",
+        "StartedAt": "2026-09-28T20:00:00+02:00",
+        "EndedAt": "2026-09-28T21:05:00+02:00",
+        "Title": "Session \u003C11\u003E",
+        "Category": "Talk",
+        "Duration": "01:05:00",
+        "CreatorScore": 46,
+        "PeakViewers": 68,
+        "AverageViewers": 48.76923076923077,
+        "RetentionPercent": 70.29702970297029,
+        "ChatMessagesPerHour": 33.23076923076923,
+        "FollowersPerHour": 2.7692307692307696,
+        "ChatMessages": 36,
+        "Followers": 3,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel."
+        ]
+      },
+      {
+        "SessionId": "reference-10",
+        "StartedAt": "2026-09-26T19:00:00+02:00",
+        "EndedAt": "2026-09-26T20:05:00+02:00",
+        "Title": "Session \u003C10\u003E",
+        "Category": "Gaming",
+        "Duration": "01:05:00",
+        "CreatorScore": 43,
+        "PeakViewers": 65,
+        "AverageViewers": 45.76923076923077,
+        "RetentionPercent": 68.42105263157895,
+        "ChatMessagesPerHour": 30.461538461538463,
+        "FollowersPerHour": 1.8461538461538463,
+        "ChatMessages": 33,
+        "Followers": 2,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel."
+        ]
+      },
+      {
+        "SessionId": "reference-9",
+        "StartedAt": "2026-09-24T18:00:00+02:00",
+        "EndedAt": "2026-09-24T19:05:00+02:00",
+        "Title": "Session \u003C9\u003E",
+        "Category": "Talk",
+        "Duration": "01:05:00",
+        "CreatorScore": 40,
+        "PeakViewers": 62,
+        "AverageViewers": 42.76923076923077,
+        "RetentionPercent": 66.29213483146067,
+        "ChatMessagesPerHour": 27.692307692307693,
+        "FollowersPerHour": 0.9230769230769231,
+        "ChatMessages": 30,
+        "Followers": 1,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel."
+        ]
+      },
+      {
+        "SessionId": "reference-8",
+        "StartedAt": "2026-09-22T20:00:00+02:00",
+        "EndedAt": "2026-09-22T21:05:00+02:00",
+        "Title": "Session \u003C8\u003E",
+        "Category": "Gaming",
+        "Duration": "01:05:00",
+        "CreatorScore": 36,
+        "PeakViewers": 59,
+        "AverageViewers": 39.76923076923077,
+        "RetentionPercent": 63.85542168674698,
+        "ChatMessagesPerHour": 24.923076923076923,
+        "FollowersPerHour": 0,
+        "ChatMessages": 27,
+        "Followers": 0,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel."
+        ]
+      },
+      {
+        "SessionId": "reference-7",
+        "StartedAt": "2026-09-20T19:00:00+02:00",
+        "EndedAt": "2026-09-20T20:05:00+02:00",
+        "Title": "Session \u003C7\u003E",
+        "Category": "Talk",
+        "Duration": "01:05:00",
+        "CreatorScore": 40,
+        "PeakViewers": 56,
+        "AverageViewers": 36.76923076923077,
+        "RetentionPercent": 61.038961038961034,
+        "ChatMessagesPerHour": 22.153846153846157,
+        "FollowersPerHour": 2.7692307692307696,
+        "ChatMessages": 24,
+        "Followers": 3,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel."
+        ]
+      },
+      {
+        "SessionId": "reference-6",
+        "StartedAt": "2026-09-18T18:00:00+02:00",
+        "EndedAt": "2026-09-18T19:05:00+02:00",
+        "Title": "Session \u003C6\u003E",
+        "Category": "Gaming",
+        "Duration": "01:05:00",
+        "CreatorScore": 36,
+        "PeakViewers": 53,
+        "AverageViewers": 33.76923076923077,
+        "RetentionPercent": 57.74647887323944,
+        "ChatMessagesPerHour": 19.384615384615387,
+        "FollowersPerHour": 1.8461538461538463,
+        "ChatMessages": 21,
+        "Followers": 2,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel."
+        ]
+      },
+      {
+        "SessionId": "reference-5",
+        "StartedAt": "2026-09-16T20:00:00+02:00",
+        "EndedAt": "2026-09-16T21:05:00+02:00",
+        "Title": "Session \u003C5\u003E",
+        "Category": "Talk",
+        "Duration": "01:05:00",
+        "CreatorScore": 32,
+        "PeakViewers": 50,
+        "AverageViewers": 30.76923076923077,
+        "RetentionPercent": 53.84615384615385,
+        "ChatMessagesPerHour": 16.615384615384617,
+        "FollowersPerHour": 0.9230769230769231,
+        "ChatMessages": 18,
+        "Followers": 1,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel."
+        ]
+      },
+      {
+        "SessionId": "reference-4",
+        "StartedAt": "2026-09-14T19:00:00+02:00",
+        "EndedAt": "2026-09-14T20:05:00+02:00",
+        "Title": "Session \u003C4\u003E",
+        "Category": "Gaming",
+        "Duration": "01:05:00",
+        "CreatorScore": 28,
+        "PeakViewers": 47,
+        "AverageViewers": 27.76923076923077,
+        "RetentionPercent": 49.152542372881356,
+        "ChatMessagesPerHour": 13.846153846153847,
+        "FollowersPerHour": 0,
+        "ChatMessages": 15,
+        "Followers": 0,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel."
+        ]
+      },
+      {
+        "SessionId": "reference-3",
+        "StartedAt": "2026-09-12T18:00:00+02:00",
+        "EndedAt": "2026-09-12T19:05:00+02:00",
+        "Title": "Session \u003C3\u003E",
+        "Category": "Talk",
+        "Duration": "01:05:00",
+        "CreatorScore": 30,
+        "PeakViewers": 44,
+        "AverageViewers": 24.76923076923077,
+        "RetentionPercent": 43.39622641509434,
+        "ChatMessagesPerHour": 11.076923076923078,
+        "FollowersPerHour": 2.7692307692307696,
+        "ChatMessages": 12,
+        "Followers": 3,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel."
+        ]
+      },
+      {
+        "SessionId": "reference-2",
+        "StartedAt": "2026-09-10T20:00:00+02:00",
+        "EndedAt": "2026-09-10T21:05:00+02:00",
+        "Title": "Session \u003C2\u003E",
+        "Category": "Gaming",
+        "Duration": "01:05:00",
+        "CreatorScore": 25,
+        "PeakViewers": 41,
+        "AverageViewers": 21.76923076923077,
+        "RetentionPercent": 36.17021276595745,
+        "ChatMessagesPerHour": 8.307692307692308,
+        "FollowersPerHour": 1.8461538461538463,
+        "ChatMessages": 9,
+        "Followers": 2,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel.",
+          "Die Chataktivit\u00E4t ist niedrig. Direkte Fragen, Abstimmungen oder Channel-Point-Aktionen k\u00F6nnen das Engagement erh\u00F6hen."
+        ]
+      },
+      {
+        "SessionId": "reference-1",
+        "StartedAt": "2026-09-08T19:00:00+02:00",
+        "EndedAt": "2026-09-08T20:05:00+02:00",
+        "Title": "Session \u003C1\u003E",
+        "Category": "Talk",
+        "Duration": "01:05:00",
+        "CreatorScore": 19,
+        "PeakViewers": 38,
+        "AverageViewers": 18.76923076923077,
+        "RetentionPercent": 26.82926829268293,
+        "ChatMessagesPerHour": 5.538461538461539,
+        "FollowersPerHour": 0.9230769230769231,
+        "ChatMessages": 6,
+        "Followers": 1,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel.",
+          "Die Chataktivit\u00E4t ist niedrig. Direkte Fragen, Abstimmungen oder Channel-Point-Aktionen k\u00F6nnen das Engagement erh\u00F6hen."
+        ]
+      },
+      {
+        "SessionId": "reference-0",
+        "StartedAt": "2026-09-06T18:00:00+02:00",
+        "EndedAt": "2026-09-06T19:05:00+02:00",
+        "Title": "Session \u003C0\u003E",
+        "Category": "Gaming",
+        "Duration": "01:05:00",
+        "CreatorScore": 12,
+        "PeakViewers": 35,
+        "AverageViewers": 15.76923076923077,
+        "RetentionPercent": 14.285714285714285,
+        "ChatMessagesPerHour": 2.7692307692307696,
+        "FollowersPerHour": 0,
+        "ChatMessages": 3,
+        "Followers": 0,
+        "DistinctScenes": 2,
+        "TracksPlayed": 2,
+        "Recommendations": [
+          "Die Zuschauerbindung f\u00E4llt zum Streamende deutlich ab. Plane vor dem typischen Einbruch einen Szenen-, Kategorie- oder Content-Wechsel.",
+          "Die Chataktivit\u00E4t ist niedrig. Direkte Fragen, Abstimmungen oder Channel-Point-Aktionen k\u00F6nnen das Engagement erh\u00F6hen."
+        ]
+      }
+    ],
+    "Insights": [
+      "Der Creator Score steigt aktuell um 10.8 Punkte gegen\u00FCber dem vorherigen Vergleichszeitraum.",
+      "Die st\u00E4rkste Startzeit liegt aktuell bei etwa 20:00 Uhr (Montag).",
+      "Die Kategorie \u201ETalk\u201C erzielt derzeit die beste Kombination aus Score und Zuschauerzahl.",
+      "Die durchschnittliche Zuschauerbindung ist ausbauf\u00E4hig. Plane den st\u00E4rksten Inhalt vor dem typischen R\u00FCckgang ein."
+    ]
+  },
+  "content": {
+    "LookbackDays": 30,
+    "SessionCount": 12,
+    "Scenes": [
+      {
+        "Kind": "OBS-Szene",
+        "Name": "Main",
+        "Occurrences": 12,
+        "TotalMinutes": 360,
+        "AverageViewers": 39,
+        "ViewerDelta": 25,
+        "ChatMessagesPerMinute": 0.625
+      },
+      {
+        "Kind": "OBS-Szene",
+        "Name": "Break",
+        "Occurrences": 12,
+        "TotalMinutes": 420,
+        "AverageViewers": 26.5,
+        "ViewerDelta": -30,
+        "ChatMessagesPerMinute": 0.021428571428571425
+      }
+    ],
+    "Tracks": [
+      {
+        "Kind": "Spotify-Titel",
+        "Name": "Song \u2013 Artist",
+        "Occurrences": 12,
+        "TotalMinutes": 420,
+        "AverageViewers": 39.35714285714285,
+        "ViewerDelta": 15,
+        "ChatMessagesPerMinute": 0.5547619047619047
+      },
+      {
+        "Kind": "Spotify-Titel",
+        "Name": "Song 2 \u2013 Artist",
+        "Occurrences": 12,
+        "TotalMinutes": 360,
+        "AverageViewers": 24,
+        "ViewerDelta": -25,
+        "ChatMessagesPerMinute": 0.002777777777777778
+      }
+    ],
+    "Heatmap": [
+      {
+        "Day": 1,
+        "Hour": 20,
+        "SampleCount": 13,
+        "AverageViewers": 47.15384615384615
+      },
+      {
+        "Day": 4,
+        "Hour": 18,
+        "SampleCount": 12,
+        "AverageViewers": 44.5
+      },
+      {
+        "Day": 6,
+        "Hour": 19,
+        "SampleCount": 13,
+        "AverageViewers": 44.15384615384615
+      },
+      {
+        "Day": 2,
+        "Hour": 20,
+        "SampleCount": 13,
+        "AverageViewers": 38.15384615384615
+      },
+      {
+        "Day": 5,
+        "Hour": 18,
+        "SampleCount": 12,
+        "AverageViewers": 35.5
+      },
+      {
+        "Day": 0,
+        "Hour": 19,
+        "SampleCount": 13,
+        "AverageViewers": 35.15384615384615
+      },
+      {
+        "Day": 3,
+        "Hour": 20,
+        "SampleCount": 12,
+        "AverageViewers": 32.5
+      },
+      {
+        "Day": 1,
+        "Hour": 19,
+        "SampleCount": 12,
+        "AverageViewers": 29.5
+      },
+      {
+        "Day": 1,
+        "Hour": 21,
+        "SampleCount": 1,
+        "AverageViewers": 28
+      },
+      {
+        "Day": 6,
+        "Hour": 18,
+        "SampleCount": 12,
+        "AverageViewers": 26.5
+      },
+      {
+        "Day": 6,
+        "Hour": 20,
+        "SampleCount": 1,
+        "AverageViewers": 25
+      },
+      {
+        "Day": 4,
+        "Hour": 20,
+        "SampleCount": 12,
+        "AverageViewers": 23.5
+      },
+      {
+        "Day": 4,
+        "Hour": 19,
+        "SampleCount": 1,
+        "AverageViewers": 22
+      },
+      {
+        "Day": 2,
+        "Hour": 19,
+        "SampleCount": 12,
+        "AverageViewers": 20.5
+      },
+      {
+        "Day": 2,
+        "Hour": 21,
+        "SampleCount": 1,
+        "AverageViewers": 19
+      },
+      {
+        "Day": 0,
+        "Hour": 18,
+        "SampleCount": 12,
+        "AverageViewers": 17.5
+      },
+      {
+        "Day": 0,
+        "Hour": 20,
+        "SampleCount": 1,
+        "AverageViewers": 16
+      },
+      {
+        "Day": 5,
+        "Hour": 19,
+        "SampleCount": 1,
+        "AverageViewers": 13
+      }
+    ],
+    "Insights": [
+      "Die Szene \u201EMain\u201C erzielt aktuell die st\u00E4rkste Zuschauerentwicklung (\u002B25.0 Zuschauer je Einsatz).",
+      "Bei \u201EBreak\u201C sinkt die Zuschauerzahl im Mittel um 30.0. Pr\u00FCfe L\u00E4nge, Inhalt und \u00DCbergang.",
+      "Der Titel \u201ESong \u2013 Artist\u201C war bisher mit der besten Zuschauerentwicklung verbunden.",
+      "Das st\u00E4rkste gemessene Zeitfenster ist Montag um 20:00 Uhr mit \u00D8 47.2 Zuschauern."
+    ]
+  },
+  "correlation": {
+    "LookbackDays": 30,
+    "SessionCount": 12,
+    "Correlations": [
+      {
+        "EventName": "OBS-Szene: Main",
+        "EventType": "obs.scene.changed",
+        "Occurrences": 12,
+        "BaselineViewers": 26.5,
+        "ViewerDelta5Minutes": 5,
+        "ViewerDelta10Minutes": 10
+      },
+      {
+        "EventName": "Spotify: Song \u2013 Artist",
+        "EventType": "spotify.track.changed",
+        "Occurrences": 12,
+        "BaselineViewers": 26.5,
+        "ViewerDelta5Minutes": 5,
+        "ViewerDelta10Minutes": 10
+      },
+      {
+        "EventName": "Raid \u003Cguest\u003E",
+        "EventType": "twitch.event",
+        "Occurrences": 12,
+        "BaselineViewers": 46.5,
+        "ViewerDelta5Minutes": 5,
+        "ViewerDelta10Minutes": -5
+      },
+      {
+        "EventName": "OBS-Szene: Break",
+        "EventType": "obs.scene.changed",
+        "Occurrences": 12,
+        "BaselineViewers": 41.5,
+        "ViewerDelta5Minutes": -5,
+        "ViewerDelta10Minutes": -10
+      },
+      {
+        "EventName": "Spotify: Song 2 \u2013 Artist",
+        "EventType": "spotify.track.changed",
+        "Occurrences": 12,
+        "BaselineViewers": 36.5,
+        "ViewerDelta5Minutes": -5,
+        "ViewerDelta10Minutes": -10
+      },
+      {
+        "EventName": "Notiz: Interview",
+        "EventType": "session.note",
+        "Occurrences": 12,
+        "BaselineViewers": 51.5,
+        "ViewerDelta5Minutes": -10,
+        "ViewerDelta10Minutes": -15
+      }
+    ],
+    "Raids": [
+      {
+        "RaidSummary": "Raid \u003Cguest\u003E",
+        "ViewersBefore": 46.5,
+        "ViewersAfter5": 51.5,
+        "ViewersAfter10": 41.5,
+        "ViewersAfter30": 21.5,
+        "Retention30Percent": 41.74757281553398
+      }
+    ],
+    "Actions": [
+      "\u201EOBS-Szene: Main\u201C ist nach zehn Minuten im Mittel mit \u002B10.0 Zuschauern verbunden. Diesen Ablauf gezielt wiederholen.",
+      "Nach \u201ENotiz: Interview\u201C fehlen nach zehn Minuten durchschnittlich 15.0 Zuschauer. \u00DCbergang, L\u00E4nge oder Inhalt pr\u00FCfen.",
+      "Die beste gemessene Raid-Bindung erreicht \u201ERaid \u003Cguest\u003E\u201C mit 42% nach 30 Minuten."
+    ]
+  },
+  "actionsInput": [
+    {
+      "Id": "custom-engagement",
+      "Title": "Chat goal",
+      "Metric": "engagement",
+      "Baseline": 0,
+      "Target": 15,
+      "Priority": 1,
+      "Status": "Offen",
+      "CreatedAt": "2026-09-03T08:44:37.7993306+00:00",
+      "CompletedAt": null,
+      "CurrentValue": null
+    },
+    {
+      "Id": "closed",
+      "Title": "Completed score",
+      "Metric": "score",
+      "Baseline": 10,
+      "Target": 20,
+      "Priority": 2,
+      "Status": "Erledigt",
+      "CreatedAt": "2026-09-03T08:44:37.7993306+00:00",
+      "CompletedAt": "2026-09-13T08:44:37.7993306+00:00",
+      "CurrentValue": 11
+    },
+    {
+      "Id": "declined",
+      "Title": "Retention goal",
+      "Metric": "retention",
+      "Baseline": 100,
+      "Target": 120,
+      "Priority": 2,
+      "Status": "Offen",
+      "CreatedAt": "2026-09-03T08:44:37.7993306+00:00",
+      "CompletedAt": null,
+      "CurrentValue": null
+    }
+  ],
+  "experimentsInput": [
+    {
+      "Id": "test",
+      "ActionId": "custom-engagement",
+      "Title": "Chat test",
+      "Metric": "engagement",
+      "Baseline": 0,
+      "TargetSessions": 3,
+      "Status": "Aktiv",
+      "StartedAt": "2026-09-19T00:00:00+02:00",
+      "CompletedAt": null
+    },
+    {
+      "Id": "future",
+      "ActionId": "custom-engagement",
+      "Title": "Not started yet",
+      "Metric": "score",
+      "Baseline": 20,
+      "TargetSessions": 3,
+      "Status": "Aktiv",
+      "StartedAt": "2026-10-04T08:44:37.7993306+00:00",
+      "CompletedAt": null
+    }
+  ],
+  "actions": {
+    "Items": [
+      {
+        "Id": "8a1915319ba24779bb8c777cff8f3616",
+        "Title": "Zuschauerbindung auf mindestens 90 % erh\u00F6hen",
+        "Metric": "retention",
+        "Baseline": 50.944266395286796,
+        "Target": 90,
+        "Priority": 1,
+        "Status": "Offen",
+        "CreatedAt": "2026-10-03T10:44:37.9466983+02:00",
+        "CompletedAt": null,
+        "CurrentValue": 50.944266395286796
+      },
+      {
+        "Id": "declined",
+        "Title": "Retention goal",
+        "Metric": "retention",
+        "Baseline": 100,
+        "Target": 120,
+        "Priority": 2,
+        "Status": "Offen",
+        "CreatedAt": "2026-09-03T08:44:37.7993306+00:00",
+        "CompletedAt": null,
+        "CurrentValue": 50.944266395286796
+      },
+      {
+        "Id": "07714404451b486b9bf5cdd7bbcc5d59",
+        "Title": "\u201EOBS-Szene: Main\u201C ist nach zehn Minuten im Mittel mit \u002B10.0 Zuschauern verbunden. Diesen Ablauf gezielt wiederholen.",
+        "Metric": "manual",
+        "Baseline": 0,
+        "Target": 1,
+        "Priority": 3,
+        "Status": "Offen",
+        "CreatedAt": "2026-10-03T10:44:37.9466983+02:00",
+        "CompletedAt": null,
+        "CurrentValue": null
+      },
+      {
+        "Id": "9ab724f891f64fc38565234539d4fbb7",
+        "Title": "Nach \u201ENotiz: Interview\u201C fehlen nach zehn Minuten durchschnittlich 15.0 Zuschauer. \u00DCbergang, L\u00E4nge oder Inhalt pr\u00FCfen.",
+        "Metric": "manual",
+        "Baseline": 0,
+        "Target": 1,
+        "Priority": 3,
+        "Status": "Offen",
+        "CreatedAt": "2026-10-03T10:44:37.9466983+02:00",
+        "CompletedAt": null,
+        "CurrentValue": null
+      },
+      {
+        "Id": "de10077c536d44efb28046dd41f5490d",
+        "Title": "Die beste gemessene Raid-Bindung erreicht \u201ERaid \u003Cguest\u003E\u201C mit 42% nach 30 Minuten.",
+        "Metric": "manual",
+        "Baseline": 0,
+        "Target": 1,
+        "Priority": 3,
+        "Status": "Offen",
+        "CreatedAt": "2026-10-03T10:44:37.9466983+02:00",
+        "CompletedAt": null,
+        "CurrentValue": null
+      },
+      {
+        "Id": "custom-engagement",
+        "Title": "Chat goal",
+        "Metric": "engagement",
+        "Baseline": 0,
+        "Target": 15,
+        "Priority": 1,
+        "Status": "Automatisch erreicht",
+        "CreatedAt": "2026-09-03T08:44:37.7993306+00:00",
+        "CompletedAt": "2026-10-03T10:44:37.9466983+02:00",
+        "CurrentValue": 18
+      },
+      {
+        "Id": "closed",
+        "Title": "Completed score",
+        "Metric": "score",
+        "Baseline": 10,
+        "Target": 20,
+        "Priority": 2,
+        "Status": "Erledigt",
+        "CreatedAt": "2026-09-03T08:44:37.7993306+00:00",
+        "CompletedAt": "2026-09-13T08:44:37.7993306+00:00",
+        "CurrentValue": 11
+      }
+    ],
+    "OpenCount": 5,
+    "CompletedCount": 2
+  },
+  "effectiveness": {
+    "Rows": [
+      {
+        "Id": "custom-engagement",
+        "Title": "Chat goal",
+        "Metric": "engagement",
+        "Status": "Automatisch erreicht",
+        "Baseline": 0,
+        "Current": 18,
+        "Target": 15,
+        "Improvement": 18,
+        "ProgressPercent": 120,
+        "Verdict": "Ziel erreicht \u00B7 positive Entwicklung",
+        "CreatedAt": "2026-09-03T08:44:37.7993306+00:00",
+        "CompletedAt": "2026-10-03T10:44:37.9594761+02:00"
+      },
+      {
+        "Id": "closed",
+        "Title": "Completed score",
+        "Metric": "score",
+        "Status": "Erledigt",
+        "Baseline": 10,
+        "Current": 11,
+        "Target": 20,
+        "Improvement": 1,
+        "ProgressPercent": 10,
+        "Verdict": "Ziel erreicht \u00B7 positive Entwicklung",
+        "CreatedAt": "2026-09-03T08:44:37.7993306+00:00",
+        "CompletedAt": "2026-09-13T08:44:37.7993306+00:00"
+      },
+      {
+        "Id": "8a1915319ba24779bb8c777cff8f3616",
+        "Title": "Zuschauerbindung auf mindestens 90 % erh\u00F6hen",
+        "Metric": "retention",
+        "Status": "Offen",
+        "Baseline": 50.944266395286796,
+        "Current": 50.944266395286796,
+        "Target": 90,
+        "Improvement": 0,
+        "ProgressPercent": 0,
+        "Verdict": "Noch keine messbare Ver\u00E4nderung",
+        "CreatedAt": "2026-10-03T10:44:37.9466983+02:00",
+        "CompletedAt": null
+      },
+      {
+        "Id": "declined",
+        "Title": "Retention goal",
+        "Metric": "retention",
+        "Status": "Offen",
+        "Baseline": 100,
+        "Current": 50.944266395286796,
+        "Target": 120,
+        "Improvement": -49.055733604713204,
+        "ProgressPercent": 0,
+        "Verdict": "Wert hat sich verschlechtert",
+        "CreatedAt": "2026-09-03T08:44:37.7993306+00:00",
+        "CompletedAt": null
+      }
+    ],
+    "ImprovedCount": 2,
+    "DeclinedCount": 1,
+    "ReachedCount": 2,
+    "Summary": "St\u00E4rkste beobachtete Entwicklung: Chat goal (\u002B18.0; 120% des Zielwegs)."
+  },
+  "experiments": {
+    "Rows": [
+      {
+        "Id": "future",
+        "ActionId": "custom-engagement",
+        "Title": "Not started yet",
+        "Metric": "score",
+        "Status": "Aktiv",
+        "Baseline": 43,
+        "Current": 43,
+        "Delta": 0,
+        "SessionCount": 0,
+        "TargetSessions": 3,
+        "Confidence": "Zu wenig Daten",
+        "Verdict": "Noch kein vollst\u00E4ndiger Stream seit Teststart.",
+        "StartedAt": "2026-10-04T08:44:37.7993306+00:00",
+        "CompletedAt": null
+      },
+      {
+        "Id": "test",
+        "ActionId": "custom-engagement",
+        "Title": "Chat test",
+        "Metric": "engagement",
+        "Status": "Ausgewertet",
+        "Baseline": 16.615384615384617,
+        "Current": 24.923076923076923,
+        "Delta": 8.307692307692307,
+        "SessionCount": 3,
+        "TargetSessions": 3,
+        "Confidence": "Mittel",
+        "Verdict": "Positive Ver\u00E4nderung beobachtet.",
+        "StartedAt": "2026-09-19T00:00:00+02:00",
+        "CompletedAt": "2026-10-03T10:44:37.9677631+02:00"
+      }
+    ],
+    "ActiveCount": 1,
+    "CompletedCount": 1,
+    "PositiveCount": 1,
+    "Summary": "1 aktiv \u00B7 1 ausgewertet \u00B7 1 mit positiver beobachteter Ver\u00E4nderung."
+  }
+}

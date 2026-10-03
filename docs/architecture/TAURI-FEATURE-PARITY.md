@@ -91,7 +91,7 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | [ ] | DA1 | Offen | Karten-/Szenenbutton-Konfiguration. |
 | [ ] | DA2 | Teilweise | OBS-Ausgänge, Countdown und bisherige Statuskarten. Chat, Ereignisse, Kennzahlen, Musikbedienung und der C#-Streamende-Assistent mit Raid-Countdown, Retry/Timeout sowie optionalem Stream-/Musikstopp fehlen im Bedienpult. Workflow entfällt. |
 | [ ] | DA3 | Implementiert | OBS-Ereignisse erfassen Start/Stopp unmittelbar; Polling übernimmt Status und Zuschauer-Samples. Zähler, Wiederherstellung, Kategorien, Entwicklung und C#-Reportauswertungen vorhanden. Live-/Installationsabnahme offen. |
-| [ ] | DA4 | Offen | Sessionanalyse, Creator Score und Wochenberichte. |
+| [ ] | DA4 | Implementiert | C#-Sessionanalyse, Creator Score/Trends/Indizes, Szenen-/Musikauswertung, Ereigniskorrelation/Raid-Bindung, Maßnahmen/Wirkung, Experimente, Notizen und HTML-Wochenberichte. Vollständiges Journal und kompatible Persistenz; C#-Referenz-, IPC- und UI-Tests. Installierte Live-Abnahme offen. |
 | [ ] | SYS1 | Offen | Ersteinrichtung mit Schritten, Prüfungen und Abschluss. |
 | [ ] | SYS2 | Offen | Dokumentanzeige und versionierte Zustimmungen; getrennt von gestrichener kommerzieller Lizenzierung. |
 | [ ] | SYS3 | Implementiert | Profile aus gespeicherten Einstellungen erstellen, Metadaten bearbeiten, anwenden, löschen und über native Dateidialoge importieren/exportieren. C#-Dateiformat und vorhandener Profilordner bleiben verwendbar; Konflikte und belegte Ports brechen das Anwenden ohne Änderung ab. Installierte Betriebsabnahme steht aus. |
@@ -111,7 +111,7 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 ## Nächste Umsetzungsschritte
 
 1. Installierte Pakete und echte Dienstverbindungen abnehmen; weitere Alert-Playback-Abbruchfälle im Feature-Paket AL2/AL3 prüfen.
-2. Verbleibende Twitch-Oberflächen und Sessionerfassung für DA3/DA4 fertigstellen; O4/O6/TW2 im installierten Paket abnehmen.
+2. Verbleibende OBS-/Alert-Funktionen sowie DA1/DA2 fertigstellen; O2/O4/O6, Twitch, Musik und Sitzungsanalyse im installierten Paket abnehmen.
 3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung und Alert-Sound fertigstellen; implementierte Szenenmusik und Musikzustände praktisch abnehmen.
 4. Dashboard, Einrichtung, Rechtstexte, Migration/Backups und Diagnostik umsetzen; Profile im installierten Paket abnehmen.
 5. Windows-/macOS-Installer bauen und jeden gewählten Nutzerablauf dokumentiert abnehmen; erst danach Cutover entscheiden.
@@ -475,4 +475,12 @@ Der macOS-CI-Fehler des Vorgängercommits `2b1be35` betraf ein Datenverzeichnis,
 
 TW9 und DA3 gelten auf Implementierungsebene als umgesetzt. Installierte Windows-/macOS-Pakete, tatsächliche OBS-/Twitch-/Musikverbindungen und Wiederverbindung im Streambetrieb bleiben separat abzunehmen. DA4 und sämtliche weiteren offenen Pakete bleiben im ausgewählten Gesamtumfang; das Gesamtziel ist weiterhin offen.
 
-Lokale Validierung: 354 unterschiedliche Rust-Tests im vollständigen Workspace und alle 146 React-Tests erfolgreich. Zehn History-Integrationstests prüfen unter anderem Journal-Payloads, EventSub-Duplikate, verzögerte Poll-Antworten, Follower am Sitzungsende, beschädigte Checkpoints und unveränderte Live-Daten trotz geschütztem Verlauf. Tatsächliche lokale OBS-WebSockets prüfen kurze Sitzungen und Live-Phasen; native Tauri-IPC prüft denselben Ablauf samt Änderungsereignissen und Musikerfassung bei abgeschaltetem Overlay. Command-Verträge, TypeScript-Typprüfung und Produktionsbuild mit Canvas-Bundles erfolgreich. Die unveränderten Canvas-Tests wurden hier nicht erneut ausgeführt.
+Lokale Validierung des TW9/DA3-Schritts: 354 unterschiedliche Rust-Tests im vollständigen Workspace und alle 146 React-Tests erfolgreich. Zehn History-Integrationstests prüfen unter anderem Journal-Payloads, EventSub-Duplikate, verzögerte Poll-Antworten, Follower am Sitzungsende, beschädigte Checkpoints und unveränderte Live-Daten trotz geschütztem Verlauf. Tatsächliche lokale OBS-WebSockets prüfen kurze Sitzungen und Live-Phasen; native Tauri-IPC prüft denselben Ablauf samt Änderungsereignissen und Musikerfassung bei abgeschaltetem Overlay. Command-Verträge, TypeScript-Typprüfung und Produktionsbuild mit Canvas-Bundles erfolgreich. Die unveränderten Canvas-Tests wurden hier nicht erneut ausgeführt.
+
+## Fortsetzung: Creator Intelligence (DA4)
+
+DA4 ist auf Implementierungsebene übernommen: Sessionanalyse/Creator Score, Trends/Indizes/Prognosen, Szenen-/Musiksegmente und Zeitfenster, Ereigniskorrelation/Raid-Bindung, Maßnahmen samt Wirkung, Experimente über drei Streams, Sitzungsnotizen und HTML-Wochenbericht. React bedient die gemeinsame native Fachlogik im Dashboard. Die C#-Dateien bleiben kompatibel; beschädigte Maßnahmen-/Experimentdateien werden geschützt und Fehler sichtbar angezeigt.
+
+Die Referenzfixture stammt aus der Ausführung der originalen C#-Analyse mit 506 Ereignissen und zwölf vollständigen Sitzungen. Rust prüft sämtliche übernommenen Berechnungsbereiche gegen diese Ergebnisse; echte Tauri-IPC verbindet Erfassung, Persistenz, Bericht und Neustart. Integration, Fehlerverhalten, gezielte Verbesserungen und noch offene Live-/Installationsabnahme stehen in [Creator Intelligence in Tauri](TAURI-CREATOR-INTELLIGENCE.md). Die übrigen offenen Pakete und die Gesamtabnahme bleiben unverändert verbindlich.
+
+Lokale Validierung: vollständiger Rust-Workspace, vierzehn Creator-Intelligence-Tests, native IPC und alle 152 React-Tests erfolgreich. Command-Verträge, TypeScript-Typprüfung, Produktionsbuild einschließlich Canvas-Bundles sowie PowerShell-Syntaxprüfung erfolgreich. Die unveränderten Canvas-Tests wurden hier nicht erneut ausgeführt. Die CI des Vorgängercommits `754be4c` ist einschließlich Windows-/macOS-Paketbau erfolgreich ([Build 37109411496](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37109411496), [CodeQL 37109411548](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37109411548)); das ersetzt keine CI- oder installierte Abnahme der neuen DA4-Änderung.

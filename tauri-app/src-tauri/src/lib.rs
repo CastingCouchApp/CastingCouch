@@ -158,6 +158,7 @@ pub struct AppState {
     pub moderation: Arc<ccs_modules::twitch::ModerationRuntime>,
     pub twitch_metrics: Arc<ccs_modules::twitch::TwitchMetricsRuntime>,
     pub stream_history: Arc<ccs_modules::stream_history::StreamHistoryRuntime>,
+    pub creator_intelligence: Arc<ccs_modules::creator_intelligence::CreatorIntelligenceRuntime>,
     pub spotify: Arc<SpotifyClient>,
     pub scene_music: Arc<ccs_modules::scene_music::SceneMusicEngine>,
     pub music_states: Arc<ccs_modules::spotify_states::SpotifyStateRuntime>,
@@ -301,6 +302,67 @@ async fn stream_history_snapshot(
     tokio::task::spawn_blocking(move || history.snapshot(session_id.as_deref()))
         .await
         .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn creator_intelligence_snapshot(
+    state: State<'_, AppState>,
+    lookback_days: i32,
+) -> Result<ccs_modules::creator_intelligence::IntelligenceSnapshot, String> {
+    let intelligence = state.creator_intelligence.clone();
+    tokio::task::spawn_blocking(move || intelligence.snapshot(lookback_days))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn record_creator_note(
+    state: State<'_, AppState>,
+    note: String,
+    request_id: String,
+) -> Result<(), String> {
+    let intelligence = state.creator_intelligence.clone();
+    tokio::task::spawn_blocking(move || intelligence.note(&note, &request_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn complete_creator_action(
+    state: State<'_, AppState>,
+    action_id: String,
+) -> Result<(), String> {
+    let intelligence = state.creator_intelligence.clone();
+    tokio::task::spawn_blocking(move || intelligence.complete_action(&action_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn start_creator_experiment(
+    state: State<'_, AppState>,
+    action_id: String,
+) -> Result<(), String> {
+    let intelligence = state.creator_intelligence.clone();
+    tokio::task::spawn_blocking(move || intelligence.start_experiment(&action_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn generate_creator_weekly_report(state: State<'_, AppState>) -> Result<String, String> {
+    let intelligence = state.creator_intelligence.clone();
+    tokio::task::spawn_blocking(move || intelligence.weekly_report())
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn open_creator_intelligence_folder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let path = state.paths.data_root.join("CreatorIntelligence");
+    tokio::fs::create_dir_all(&path)
+        .await
+        .map_err(|e| e.to_string())?;
+    app.opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 #[tauri::command]
 async fn retry_stream_history(state: State<'_, AppState>) -> Result<(), String> {
@@ -1942,6 +2004,12 @@ pub fn run() {
             refresh_twitch_metrics,
             twitch_goals_snapshot,
             stream_history_snapshot,
+            creator_intelligence_snapshot,
+            record_creator_note,
+            complete_creator_action,
+            start_creator_experiment,
+            generate_creator_weekly_report,
+            open_creator_intelligence_folder,
             retry_stream_history,
             latest_stream_summary,
             export_stream_history,
@@ -2328,6 +2396,11 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     ));
     bridge.set_stream_history(stream_history.clone());
     runtime::bind_stream_history(&obs, stream_history.clone());
+    let creator_intelligence = Arc::new(
+        ccs_modules::creator_intelligence::CreatorIntelligenceRuntime::new(
+            paths.data_root.clone(), stream_history.clone(),
+        ),
+    );
     app.manage(AppState {
         ytm,
         music_player,
@@ -2344,6 +2417,7 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         moderation,
         twitch_metrics,
         stream_history,
+        creator_intelligence,
         spotify,
         scene_music,
         music_states,

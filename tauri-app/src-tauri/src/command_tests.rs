@@ -1,6 +1,115 @@
 use super::*;
 
 #[test]
+fn creator_intelligence_commands_cross_native_ipc_journal_and_persistent_mutations() {
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        assert!(call(
+            &window,
+            "record_creator_note",
+            json!({"note":"Not active","requestId":"1"})
+        )
+        .is_err());
+        let at = chrono::Utc::now() - chrono::Duration::hours(1);
+        let state = app.state::<AppState>();
+        state.stream_history.observe(&json!({"stream":{"available":true,"isLive":true,"elapsedSeconds":0},"obs":{"currentScene":"Main"}}),&json!({}),&json!({}),at).unwrap();
+        call(
+            &window,
+            "record_creator_note",
+            json!({"note":"  Interview  ","requestId":"2"}),
+        )
+        .unwrap();
+        call(
+            &window,
+            "record_creator_note",
+            json!({"note":"  Interview  ","requestId":"2"}),
+        )
+        .unwrap();
+        let live = call(
+            &window,
+            "creator_intelligence_snapshot",
+            json!({"lookbackDays":7}),
+        )
+        .unwrap();
+        assert_eq!(live["recording"], true);
+        assert_eq!(live["dashboard"]["SessionCount"], 0);
+        state
+            .stream_history
+            .observe_stream_event(false, chrono::Utc::now())
+            .unwrap();
+        let saved = call(
+            &window,
+            "creator_intelligence_snapshot",
+            json!({"lookbackDays":30}),
+        )
+        .unwrap();
+        assert_eq!(saved["dashboard"]["SessionCount"], 1);
+        assert_eq!(saved["recording"], false);
+        let action = saved["actions"]["Items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["Metric"] == "engagement")
+            .unwrap();
+        let id = action["Id"].as_str().unwrap();
+        call(&window, "start_creator_experiment", json!({"actionId":id})).unwrap();
+        call(&window, "complete_creator_action", json!({"actionId":id})).unwrap();
+        let report = call(&window, "generate_creator_weekly_report", json!({})).unwrap();
+        assert!(std::fs::read_to_string(report.as_str().unwrap())
+            .unwrap()
+            .contains("Creator Intelligence Wochenbericht"));
+        let history = call(&window, "stream_history_snapshot", json!({})).unwrap();
+        assert_eq!(
+            history["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|r| r["Type"] == "session.note")
+                .count(),
+            1
+        );
+        drop(state);
+        drop(window);
+        drop(app);
+        let second = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&second, "main", Default::default())
+            .build()
+            .unwrap();
+        let restored = call(
+            &window,
+            "creator_intelligence_snapshot",
+            json!({"lookbackDays":30}),
+        )
+        .unwrap();
+        assert_eq!(restored["experiments"]["Rows"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            restored["actions"]["Items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r["Id"] == id)
+                .unwrap()["Status"],
+            "Erledigt"
+        );
+        assert!(call(
+            &window,
+            "creator_intelligence_snapshot",
+            json!({"lookbackDays":0})
+        )
+        .is_err());
+        assert!(call(
+            &window,
+            "complete_creator_action",
+            json!({"actionId":"missing"})
+        )
+        .is_err());
+    });
+}
+#[test]
 fn native_obs_commands_capture_immediate_session_events_and_forward_history_changes() {
     use futures_util::{SinkExt, StreamExt};
     use tauri::Listener;
@@ -2121,6 +2230,11 @@ fn test_app_with_clients(
     ));
     bridge.set_stream_history(stream_history.clone());
     runtime::bind_stream_history(&obs, stream_history.clone());
+    let creator_intelligence = Arc::new(
+        ccs_modules::creator_intelligence::CreatorIntelligenceRuntime::new(
+            paths.data_root.clone(), stream_history.clone(),
+        ),
+    );
     let music_overlay = Arc::new(ccs_modules::music_overlay::MusicOverlayRuntime::new(
         settings.clone(),
         obs.clone(),
@@ -2138,6 +2252,7 @@ fn test_app_with_clients(
             moderation,
             twitch_metrics,
             stream_history,
+            creator_intelligence,
             spotify,
             scene_music,
             music_states,
@@ -2168,6 +2283,11 @@ fn test_app_with_clients(
             refresh_twitch_metrics,
             twitch_goals_snapshot,
             stream_history_snapshot,
+            creator_intelligence_snapshot,
+            record_creator_note,
+            complete_creator_action,
+            start_creator_experiment,
+            generate_creator_weekly_report,
             retry_stream_history,
             latest_stream_summary,
             export_stream_history,

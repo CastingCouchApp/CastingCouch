@@ -332,6 +332,92 @@ impl StreamHistoryRuntime {
         }
         self.record_event(event);
     }
+    pub fn record_note(
+        &self,
+        note: &str,
+        request_id: &str,
+        at: DateTime<Utc>,
+    ) -> Result<(), String> {
+        let note = note.trim();
+        if note.is_empty() || request_id.trim().is_empty() {
+            return Err("Notiz und Anfragekennung dürfen nicht leer sein.".into());
+        }
+        let mut state = self.state.lock().unwrap();
+        if let Some(error) = &state.blocked {
+            return Err(error.clone());
+        }
+        let active = state
+            .active
+            .as_mut()
+            .ok_or("Notizen benötigen eine aktive Stream-Sitzung.")?;
+        if active.seen.insert(format!("note:{request_id}")) {
+            let id = active.row["SessionId"].as_str().unwrap().to_string();
+            let payload = json!({"note":note,"scene":active.scene,"viewers":active.row["ViewerSamples"].as_array().and_then(|s|s.last()).and_then(|s|s["ViewerCount"].as_u64()).unwrap_or(0)});
+            queue_event(&mut state, &id, "session.note", payload, at);
+        }
+        let result = self.flush_locked(&mut state);
+        self.notify_change();
+        result
+    }
+    pub(crate) fn notify_change(&self) {
+        let _ = self.changes.send(());
+    }
+    /// Serialized with journal appends: analytics never reads a partially written row.
+    /// All historical events are returned; the UI's 500-entry limit does not apply.
+    pub(crate) fn analysis_journal(&self) -> Result<(Vec<Value>, Vec<String>, bool), String> {
+        let state = self.state.lock().unwrap();
+        let mut warnings: Vec<_> = state
+            .error
+            .iter()
+            .chain(state.blocked.iter())
+            .cloned()
+            .collect();
+        let directory = self.root.join("CreatorIntelligence");
+        let mut paths = vec![];
+        fn visit(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), String> {
+            let entries = match fs::read_dir(directory) {
+                Ok(entries) => entries,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                Err(e) => return Err(format!("{}: {e}", directory.display())),
+            };
+            for entry in entries {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let kind = entry.file_type().map_err(|e| e.to_string())?;
+                if kind.is_dir() {
+                    visit(&entry.path(), paths)?;
+                } else if kind.is_file() && entry.file_name() == "events.jsonl" {
+                    paths.push(entry.path());
+                }
+            }
+            Ok(())
+        }
+        visit(&directory, &mut paths)?;
+        paths.sort();
+        let mut events = vec![];
+        for path in paths {
+            // Read errors must fail analytics rather than silently producing false goals.
+            let bytes =
+                fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let mut damaged = 0;
+            for line in bytes
+                .trim_start_matches('\u{feff}')
+                .lines()
+                .filter(|s| !s.trim().is_empty())
+            {
+                match serde_json::from_str::<Value>(line) {
+                    Ok(row) if row.is_object() => events.push(row),
+                    _ => damaged += 1,
+                }
+            }
+            if damaged > 0 {
+                warnings.push(format!(
+                    "{}: {damaged} beschädigte Zeile(n) übersprungen; Original bleibt erhalten.",
+                    path.display()
+                ));
+            }
+        }
+        Ok((events, warnings, state.active.is_some()))
+    }
     pub fn observe_stream_event(&self, active: bool, at: DateTime<Utc>) -> Result<bool, String> {
         let (metrics, settings) = {
             let state = self.state.lock().unwrap();
@@ -837,7 +923,7 @@ fn append_jsonl(path: &Path, value: &Value) -> Result<(), String> {
     })();
     result.map_err(|e| format!("{}: {e}", path.display()))
 }
-fn checkpoint(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn checkpoint(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let parent = path.parent().ok_or("Ungültiger Dateipfad")?;
     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     let temp = parent.join(format!(".history-{}.tmp", uuid::Uuid::new_v4()));

@@ -1,5 +1,6 @@
 import { Countdown } from "../features/dashboard/Countdown";
 import { StreamHistory } from "../features/dashboard/StreamHistory";
+import { CreatorIntelligence } from "../features/dashboard/CreatorIntelligence";
 import { ObsControls } from "../features/obs/ObsControls";
 import type { ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -95,6 +96,7 @@ function DashboardPage() {
                 <Countdown />
             </div>
             <StreamHistory />
+            <CreatorIntelligence />
         </div>
     );
 }
