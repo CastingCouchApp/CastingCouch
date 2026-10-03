@@ -89,6 +89,7 @@ impl TwitchHelixClient {
         let response = self
             .http
             .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
             .header("Authorization", format!("Bearer {}", self.access_token))
             .header("Client-Id", &self.client_id)
             .send()

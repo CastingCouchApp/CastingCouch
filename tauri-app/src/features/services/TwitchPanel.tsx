@@ -12,6 +12,7 @@ import { TwitchChatMessage } from "./TwitchChatMessage";
 import { TwitchEventFeed, TwitchEventTime } from "./TwitchEventFeed";
 import { TwitchModeration, useModerationAction } from "./TwitchModeration";
 import { TwitchGoals } from "./TwitchGoals";
+import { TwitchRaids } from "./TwitchRaids";
 type Event = {
     type: string;
     at: string;
@@ -26,6 +27,8 @@ type Item = {
     user_name?: string;
     broadcaster_name?: string;
     broadcaster_id?: string;
+    broadcaster_login?: string;
+    user_login?: string;
     user_id?: string;
     game_name?: string;
     status?: string;
@@ -77,6 +80,12 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
     });
     const webChat = useMutation({
         mutationFn: () => tauriInvoke("open_twitch_chat"),
+    });
+    const selectRaid = useMutation({
+        mutationFn: (login: string) =>
+            tauriInvoke("select_twitch_raid_target", { login }),
+        onSuccess: () =>
+            client.invalidateQueries({ queryKey: ["twitch-raid-settings"] }),
     });
     useEffect(() => {
         let cancelled = false;
@@ -392,29 +401,31 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                                 "followed_streams",
                             ].includes(query.query) && (
                                 <Button
-                                    disabled={action.isPending}
-                                    onClick={() => {
-                                        if (
-                                            window.confirm(
-                                                `Raid zu ${item.display_name ?? item.broadcaster_name ?? item.user_name} starten?`,
-                                            )
+                                    disabled={
+                                        selectRaid.isPending ||
+                                        !(
+                                            item.broadcaster_login ??
+                                            item.user_login
                                         )
-                                            mutate({
-                                                action: "raid",
-                                                id:
-                                                    item.broadcaster_id ??
-                                                    item.user_id ??
-                                                    item.id,
-                                            });
+                                    }
+                                    onClick={() => {
+                                        selectRaid.mutate(
+                                            item.broadcaster_login ??
+                                                item.user_login ??
+                                                "",
+                                        );
                                     }}
                                 >
-                                    Raid starten
+                                    Als Raid-Ziel wählen
                                 </Button>
                             )}
                         </li>
                     ))}
                 </ul>
                 {result.error && <p role="alert">{String(result.error)}</p>}
+                {selectRaid.error && (
+                    <p role="alert">{String(selectRaid.error)}</p>
+                )}
                 {result.data?.pagination?.cursor && (
                     <Button
                         onClick={() =>
@@ -427,6 +438,7 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
             </Card>
             <TwitchRewards enabled={enabled} />
             <TwitchGoals enabled={enabled} />
+            <TwitchRaids enabled={enabled} />
             <TwitchModeration
                 enabled={enabled}
                 selectedUser={moderationUser.login}

@@ -1,6 +1,11 @@
 import { tauriInvoke } from "./api";
 // Compiled by tsc; these calls are never executed. Stale argument names must fail compilation.
 export function commandContractTypeAssertions() {
+    void tauriInvoke("start_twitch_raid", {login:"target"});
+    // @ts-expect-error A login is required for fresh raid preflight.
+    void tauriInvoke("start_twitch_raid", {id:"target"});
+    // @ts-expect-error Reviewed original settings are required for raid list edits.
+    void tauriInvoke("save_twitch_raid_settings", {channels:["target"],selected:"target"});
     // @ts-expect-error Goal drafts must include all typed nested fields.
     void tauriInvoke("save_twitch_goals", {
         draft: { overlayScene: "Goals" },

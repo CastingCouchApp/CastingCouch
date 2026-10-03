@@ -31,6 +31,11 @@ const domainFiles = {
 const structFiles = {
     GoalDraft: "twitch/goals.rs",
     GoalsDraft: "twitch/goals.rs",
+    RaidSuggestion: "twitch/community.rs",
+    RaidSuggestions: "twitch/community.rs",
+    RaidTarget: "twitch/community.rs",
+    RaidStarted: "twitch/community.rs",
+    RaidState: "twitch/community.rs",
 };
 function type(rust) {
     rust = rust.trim();

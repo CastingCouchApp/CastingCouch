@@ -1,4 +1,9 @@
 mod chat_catalog;
+mod community;
+pub use community::{
+    build_raid_suggestions, checked_raid_login, normalize_raid_channel, normalize_raid_channels,
+    remember_raid_channel, RaidStarted, RaidState, RaidSuggestion, RaidSuggestions, RaidTarget,
+};
 mod eventsub;
 mod goals;
 mod helix;
@@ -98,6 +103,7 @@ pub struct TwitchClient {
     token_refresh: Mutex<()>,
     chat_catalogs: chat_catalog::ChatCatalogs,
     chat_refresh: Mutex<(String, Option<std::time::Instant>)>,
+    community: community::CommunityState,
 }
 
 impl TwitchClient {
@@ -126,6 +132,7 @@ impl TwitchClient {
             token_refresh: Mutex::new(()),
             chat_catalogs: chat_catalog::ChatCatalogs::new(),
             chat_refresh: Mutex::new((String::new(), None)),
+            community: community::CommunityState::default(),
         }
     }
 

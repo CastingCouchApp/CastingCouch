@@ -3,6 +3,16 @@ export type GoalDraft = { title: string; current: string; target: string; fontFa
 
 export type GoalsDraft = { overlayScene: string; follower: GoalDraft; subscriptions: GoalDraft; donation: GoalDraft };
 
+export type RaidSuggestion = { login: string; displayName: string; isLive: boolean; sourceLabel: string };
+
+export type RaidSuggestions = { suggestions: Array<RaidSuggestion>; warnings: Array<string> };
+
+export type RaidTarget = { id: string; login: string; displayName: string; profileImageUrl: string; channelUrl: string; isOnline: boolean; category: string; title: string; viewerCount: number; startedAt: string | null };
+
+export type RaidStarted = { target: RaidTarget; response: unknown; warnings: Array<string> };
+
+export type RaidState = { requestedTarget: string | null; requestedAt: string | null; lastError: string | null };
+
 export type ObsControl =
   | { action: "start_stream" }
   | { action: "stop_stream" }
@@ -175,6 +185,15 @@ export type CommandInvocation =
   | [command: "twitch_action", args: { action: TwitchAction }]
   | [command: "twitch_query", args: { query: TwitchQuery; after?: string | null }]
   | [command: "twitch_metrics_snapshot", args?: Record<string, never>]
+  | [command: "twitch_raid_settings", args?: Record<string, never>]
+  | [command: "save_twitch_raid_settings", args: { channels: Array<string>; selected: string; original: unknown }]
+  | [command: "select_twitch_raid_target", args: { login: string }]
+  | [command: "twitch_raid_suggestions", args: { query: string; force?: boolean | null }]
+  | [command: "twitch_raid_target", args: { login: string }]
+  | [command: "twitch_raid_state", args?: Record<string, never>]
+  | [command: "start_twitch_raid", args: { login: string }]
+  | [command: "cancel_twitch_raid", args?: Record<string, never>]
+  | [command: "acknowledge_twitch_raid", args?: Record<string, never>]
   | [command: "refresh_twitch_metrics", args?: Record<string, never>]
   | [command: "twitch_goals_snapshot", args?: Record<string, never>]
   | [command: "save_twitch_goals", args: { draft: GoalsDraft; original: unknown }]

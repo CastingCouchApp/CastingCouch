@@ -254,6 +254,31 @@ impl TwitchQuery {
     }
 }
 impl TwitchHelixClient {
+    pub(super) async fn community_get(
+        &self,
+        endpoint: &'static str,
+        params: Vec<(String, String)>,
+        after: Option<String>,
+    ) -> ModuleResult<Value> {
+        self.perform(
+            Request {
+                method: reqwest::Method::GET,
+                path: endpoint,
+                params,
+                body: None,
+            },
+            after,
+        )
+        .await
+    }
+    pub(super) async fn community_action(
+        &self,
+        action: TwitchAction,
+        broadcaster: &str,
+        user: &str,
+    ) -> ModuleResult<Value> {
+        self.perform(action.request(broadcaster, user)?, None).await
+    }
     async fn perform(&self, request: Request, after: Option<String>) -> ModuleResult<Value> {
         let mut call = self
             .http
@@ -261,6 +286,7 @@ impl TwitchHelixClient {
                 request.method,
                 format!("{}{}", self.helix_base, request.path),
             )
+            .timeout(std::time::Duration::from_secs(15))
             .bearer_auth(&self.access_token)
             .header("Client-Id", &self.client_id)
             .query(&request.params);
@@ -366,6 +392,26 @@ impl TwitchClient {
         channel: &str,
         action: TwitchAction,
     ) -> ModuleResult<Value> {
+        // The ID-based command and the community UI share preflight and duplicate protection.
+        if let TwitchAction::Raid { id } = &action {
+            checked_text(id, 200, "Raid-Ziel-ID")?;
+            let (helix, _, _) = self.operation_client(client_id, channel).await?;
+            let value = helix
+                .community_get("users", vec![("id".into(), id.clone())], None)
+                .await?;
+            let login = value
+                .pointer("/data/0/login")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("Raid-Kanal nicht gefunden."))?;
+            let result = self
+                .community_start(client_id, channel, login, false)
+                .await?;
+            return Ok(result.response);
+        }
+        if matches!(action, TwitchAction::CancelRaid) {
+            self.community_cancel(client_id, channel).await?;
+            return Ok(Value::Null);
+        }
         // Reject invalid drafts before token refresh or channel lookup.
         action.request("", "")?;
         let (helix, broadcaster, user) = self.operation_client(client_id, channel).await?;

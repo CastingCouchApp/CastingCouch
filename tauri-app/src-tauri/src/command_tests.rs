@@ -1,4 +1,276 @@
 use super::*;
+
+#[test]
+fn raid_native_commands_preflight_start_cancel_emit_and_share_cached_suggestions() {
+    use ccs_modules::twitch::{
+        TwitchConnectOptions, TwitchOAuthClient, TwitchTokenRepository, TwitchTokenSet,
+    };
+    use ccs_secrets::MemorySecretStore;
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
+    };
+    tauri::async_runtime::block_on(async {
+        let server = MockServer::start().await;
+        let client_id = "abcdefghijabcdefghijabcdefghij";
+        Mock::given(path("/validate")).respond_with(ResponseTemplate::new(200).set_body_json(json!({"client_id":client_id,"login":"owner","user_id":"owner","scopes":[],"expires_in":3600}))).mount(&server).await;
+        Mock::given(path("/users"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({"data":[{"id":"owner","login":"owner","display_name":"Owner"}]}),
+            ))
+            .with_priority(2)
+            .mount(&server)
+            .await;
+        Mock::given(path("/users"))
+            .and(query_param("login", "target"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({"data":[{"id":"target-id","login":"target","display_name":"Target"}]}),
+            ))
+            .with_priority(1)
+            .mount(&server)
+            .await;
+        Mock::given(path("/streams")).respond_with(ResponseTemplate::new(200).set_body_json(json!({"data":[{"user_login":"target","user_name":"Target","title":"Live","viewer_count":7}]}))).mount(&server).await;
+        Mock::given(path("/channels/followed"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({"data":[{"broadcaster_login":"target","broadcaster_name":"Target"}]}),
+            ))
+            .expect(3)
+            .mount(&server)
+            .await;
+        Mock::given(path("/streams/followed"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"data":[]})))
+            .expect(3)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/raids"))
+            .and(query_param("from_broadcaster_id", "owner"))
+            .and(query_param("to_broadcaster_id", "target-id"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({"data":[{"created_at":"now"}]})),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/chat/messages"))
+            .respond_with(
+                ResponseTemplate::new(403).set_body_json(json!({"message":"No chat permission"})),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+        let secrets = Arc::new(MemorySecretStore::new());
+        TwitchTokenRepository::new(secrets.clone())
+            .save(&TwitchTokenSet::from_oauth(
+                "token".into(),
+                "refresh".into(),
+                3600,
+                vec![],
+            ))
+            .unwrap();
+        let twitch = Arc::new(TwitchClient::with_http(
+            secrets,
+            TwitchOAuthClient::with_base_urls(
+                format!("{}/device", server.uri()),
+                format!("{}/token", server.uri()),
+                format!("{}/validate", server.uri()),
+            ),
+            format!("{}/", server.uri()),
+        ));
+        twitch
+            .connect(&TwitchConnectOptions {
+                client_id: client_id.into(),
+                channel_name: String::new(),
+                scopes: vec![],
+                enable_event_sub: false,
+            })
+            .await
+            .unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app_with_clients(root.path().into(), None, Some(twitch));
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let mut settings = state.settings.load().await.unwrap();
+        settings.twitch.client_id = client_id.into();
+        settings.twitch.enable_chat = true;
+        state.settings.save(&settings).await.unwrap();
+        let events = Arc::new(std::sync::Mutex::new(Vec::<Value>::new()));
+        let received = events.clone();
+        app.listen("twitch-raids-changed", move |e| {
+            received
+                .lock()
+                .unwrap()
+                .push(serde_json::from_str(e.payload()).unwrap())
+        });
+        for _ in 0..2 {
+            let suggestions = call(
+                &window,
+                "twitch_raid_suggestions",
+                json!({"query":"","force":false}),
+            )
+            .unwrap();
+            assert_eq!(suggestions["suggestions"][0]["login"], "target");
+        }
+        let target = call(&window, "twitch_raid_target", json!({"login":"@target"})).unwrap();
+        call(
+            &window,
+            "twitch_raid_suggestions",
+            json!({"query":"","force":true}),
+        )
+        .unwrap();
+        settings.twitch.channel_name = "owner".into();
+        state.settings.save(&settings).await.unwrap();
+        call(
+            &window,
+            "twitch_raid_suggestions",
+            json!({"query":"","force":false}),
+        )
+        .unwrap();
+        settings.twitch.channel_name = String::new();
+        state.settings.save(&settings).await.unwrap();
+        assert_eq!(target["viewerCount"], 7);
+        let started = call(&window, "start_twitch_raid", json!({"login":"target"})).unwrap();
+        assert!(started["warnings"][0]
+            .as_str()
+            .unwrap()
+            .contains("No chat permission"));
+        assert_eq!(
+            call(&window, "twitch_raid_state", json!({})).unwrap()["requestedTarget"],
+            "target"
+        );
+        assert!(call(&window, "start_twitch_raid", json!({"login":"target"})).is_err());
+        assert!(call(
+            &window,
+            "twitch_action",
+            json!({"action":{"action":"raid","id":"target-id"}})
+        )
+        .is_err());
+        settings = state.settings.load().await.unwrap();
+        settings.twitch.channel_name = "owner".into();
+        state.settings.save(&settings).await.unwrap();
+        assert!(
+            call(&window, "twitch_raid_state", json!({})).unwrap()["requestedTarget"].is_null()
+        );
+        settings.twitch.channel_name = String::new();
+        state.settings.save(&settings).await.unwrap();
+        assert_eq!(
+            call(&window, "twitch_raid_settings", json!({})).unwrap()["selected"],
+            "target"
+        );
+        let denied = Mock::given(method("DELETE"))
+            .and(path("/raids"))
+            .respond_with(
+                ResponseTemplate::new(403)
+                    .set_body_json(json!({"message":"No cancellation permission"})),
+            )
+            .mount_as_scoped(&server)
+            .await;
+        assert!(call(&window, "cancel_twitch_raid", json!({})).is_err());
+        assert_eq!(
+            call(&window, "twitch_raid_state", json!({})).unwrap()["requestedTarget"],
+            "target"
+        );
+        drop(denied);
+        Mock::given(method("DELETE"))
+            .and(path("/raids"))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        call(&window, "cancel_twitch_raid", json!({})).unwrap();
+        assert!(
+            call(&window, "twitch_raid_state", json!({})).unwrap()["requestedTarget"].is_null()
+        );
+        assert!(events.lock().unwrap().len() >= 3);
+        let ambiguous = Mock::given(method("POST"))
+            .and(path("/raids"))
+            .respond_with(
+                ResponseTemplate::new(503).set_body_json(json!({"message":"Service unavailable"})),
+            )
+            .with_priority(1)
+            .expect(1)
+            .mount_as_scoped(&server)
+            .await;
+        assert!(
+            call(&window, "start_twitch_raid", json!({"login":"target"}))
+                .unwrap_err()
+                .as_str()
+                .unwrap()
+                .contains("Raid-Ausgang unklar")
+        );
+        let uncertain = call(&window, "twitch_raid_state", json!({})).unwrap();
+        assert_eq!(uncertain["requestedTarget"], "target");
+        assert!(uncertain["lastError"].as_str().unwrap().contains("503"));
+        assert!(call(&window, "start_twitch_raid", json!({"login":"target"})).is_err());
+        drop(ambiguous);
+        call(&window, "acknowledge_twitch_raid", json!({})).unwrap();
+        assert!(
+            call(&window, "twitch_raid_state", json!({})).unwrap()["requestedTarget"].is_null()
+        );
+    });
+}
+
+#[test]
+fn raid_settings_commands_merge_concurrent_changes_preserve_unknown_fields_and_survive_restart() {
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        let mut initial = state.settings.read_value().await.unwrap();
+        initial["Twitch"]["FutureRaidOption"] = json!({"keep":true});
+        let settings: AppSettings = serde_json::from_value(initial).unwrap();
+        state.settings.save(&settings).await.unwrap();
+        let snapshot = call(&window, "twitch_raid_settings", json!({})).unwrap();
+        let mut parallel = state.settings.load().await.unwrap();
+        parallel.branding.display_name = "Parallel".into();
+        state.settings.save(&parallel).await.unwrap();
+        let saved=call(&window,"save_twitch_raid_settings",json!({"channels":[" @Alpha ","alpha","@Beta",""],"selected":"@Beta","original":snapshot["original"]})).unwrap();
+        assert_eq!(saved["channels"], json!(["Alpha", "Beta"]));
+        assert_eq!(saved["selected"], "Beta");
+        assert_eq!(saved["original"]["Branding"]["DisplayName"], "Parallel");
+        assert_eq!(
+            saved["original"]["Twitch"]["FutureRaidOption"]["keep"],
+            true
+        );
+        assert!(call(
+            &window,
+            "save_twitch_raid_settings",
+            json!({"channels":["different"],"selected":"different","original":snapshot["original"]})
+        )
+        .is_err());
+        let remembered = call(
+            &window,
+            "select_twitch_raid_target",
+            json!({"login":"@Beta"}),
+        )
+        .unwrap();
+        assert_eq!(remembered["channels"], json!(["Beta", "Alpha"]));
+        assert!(call(
+            &window,
+            "select_twitch_raid_target",
+            json!({"login":"https://twitch.tv/foo"})
+        )
+        .is_err());
+        let restarted = test_app(root.path().into());
+        let second = WebviewWindowBuilder::new(&restarted, "main", Default::default())
+            .build()
+            .unwrap();
+        assert_eq!(
+            call(&second, "twitch_raid_settings", json!({})).unwrap()["selected"],
+            "Beta"
+        );
+        assert_eq!(
+            call(&second, "twitch_raid_state", json!({})).unwrap()["requestedTarget"],
+            Value::Null
+        );
+    });
+}
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 use tauri::Listener;
 
@@ -1631,6 +1903,15 @@ fn test_app_with_clients(
             refresh_twitch_metrics,
             twitch_goals_snapshot,
             save_twitch_goals,
+            twitch_raid_settings,
+            save_twitch_raid_settings,
+            select_twitch_raid_target,
+            twitch_raid_suggestions,
+            twitch_raid_target,
+            twitch_raid_state,
+            start_twitch_raid,
+            cancel_twitch_raid,
+            acknowledge_twitch_raid,
             chat_catalog_status,
             refresh_chat_catalogs,
             activate_spotify_device,

@@ -480,6 +480,9 @@ export function listenTwitchMetrics(onChange:(snapshot:TwitchMetricsSnapshot)=>v
 export function listenTwitchGoals(onChange:()=>void) {
     return listenIfTauri<{changed:boolean}>("twitch-goals-changed",()=>onChange());
 }
+export function listenTwitchRaids(onChange:()=>void) {
+    return listenIfTauri<{changed:boolean}>("twitch-raids-changed",()=>onChange());
+}
 export type ModerationResult = {
     applied: boolean;
     message: string;

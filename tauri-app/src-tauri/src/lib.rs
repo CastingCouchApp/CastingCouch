@@ -291,6 +291,207 @@ async fn twitch_metrics_snapshot(
 ) -> Result<ccs_modules::twitch::TwitchMetricsSnapshot, String> {
     Ok(state.twitch_metrics.snapshot().await)
 }
+
+fn raid_settings_value(original: Value) -> Value {
+    let channels = original["Twitch"]["RaidChannels"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    json!({"channels":ccs_modules::twitch::normalize_raid_channels(&channels),"selected":ccs_modules::twitch::normalize_raid_channel(original["Twitch"]["SelectedRaidChannel"].as_str().unwrap_or("")),"original":original,"warnings":[]})
+}
+#[tauri::command]
+async fn twitch_raid_settings(state: State<'_, AppState>) -> Result<Value, String> {
+    Ok(raid_settings_value(
+        state
+            .settings
+            .read_value()
+            .await
+            .map_err(|e| e.to_string())?,
+    ))
+}
+#[tauri::command]
+async fn save_twitch_raid_settings<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    channels: Vec<String>,
+    selected: String,
+    original: Value,
+) -> Result<Value, String> {
+    let channels = ccs_modules::twitch::normalize_raid_channels(&channels);
+    for channel in &channels {
+        ccs_modules::twitch::checked_raid_login(channel).map_err(|e| e.to_string())?;
+    }
+    let selected = ccs_modules::twitch::normalize_raid_channel(&selected);
+    if !selected.is_empty() {
+        ccs_modules::twitch::checked_raid_login(&selected).map_err(|e| e.to_string())?;
+    }
+    let _guard = state.settings_mutation.lock().await;
+    let mut edited = original.clone();
+    edited["Twitch"]["RaidChannels"] = json!(channels);
+    edited["Twitch"]["SelectedRaidChannel"] = json!(selected);
+    let saved = state
+        .settings
+        .save_edit(&original, &edited)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut result = raid_settings_value(saved);
+    if let Err(error) = app.emit("twitch-raids-changed", json!({"changed":true})) {
+        result["warnings"] = json!([format!(
+            "Raid-Liste gespeichert; App-Benachrichtigung fehlgeschlagen: {error}"
+        )]);
+    }
+    Ok(result)
+}
+async fn remember_raid_target(state: &AppState, login: &str) -> Result<Value, String> {
+    let login = ccs_modules::twitch::checked_raid_login(login).map_err(|e| e.to_string())?;
+    let _guard = state.settings_mutation.lock().await;
+    let original = state
+        .settings
+        .read_value()
+        .await
+        .map_err(|e| e.to_string())?;
+    let channels = original["Twitch"]["RaidChannels"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let mut edited = original.clone();
+    edited["Twitch"]["RaidChannels"] = json!(ccs_modules::twitch::remember_raid_channel(
+        &channels, &login
+    ));
+    edited["Twitch"]["SelectedRaidChannel"] = json!(login);
+    Ok(raid_settings_value(
+        state
+            .settings
+            .save_edit(&original, &edited)
+            .await
+            .map_err(|e| e.to_string())?,
+    ))
+}
+#[tauri::command]
+async fn select_twitch_raid_target<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    login: String,
+) -> Result<Value, String> {
+    let mut result = remember_raid_target(&state, &login).await?;
+    if let Err(error) = app.emit("twitch-raids-changed", json!({"changed":true})) {
+        result["warnings"] = json!([format!(
+            "Raid-Ziel gespeichert; App-Benachrichtigung fehlgeschlagen: {error}"
+        )]);
+    }
+    Ok(result)
+}
+#[tauri::command]
+async fn twitch_raid_suggestions(
+    state: State<'_, AppState>,
+    query: String,
+    force: Option<bool>,
+) -> Result<ccs_modules::twitch::RaidSuggestions, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    let recent = settings.twitch.extra["RaidChannels"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    state
+        .twitch
+        .community_suggestions(
+            &settings.twitch.client_id,
+            &settings.twitch.channel_name,
+            &recent,
+            &query,
+            force.unwrap_or(false),
+        )
+        .await
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn twitch_raid_target(
+    state: State<'_, AppState>,
+    login: String,
+) -> Result<Option<ccs_modules::twitch::RaidTarget>, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    state
+        .twitch
+        .community_target(
+            &settings.twitch.client_id,
+            &settings.twitch.channel_name,
+            &login,
+        )
+        .await
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn twitch_raid_state(
+    state: State<'_, AppState>,
+) -> Result<ccs_modules::twitch::RaidState, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    Ok(state
+        .twitch
+        .community_raid_state(&settings.twitch.client_id, &settings.twitch.channel_name)
+        .await)
+}
+#[tauri::command]
+async fn start_twitch_raid<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    login: String,
+) -> Result<ccs_modules::twitch::RaidStarted, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    let result = state
+        .twitch
+        .community_start(
+            &settings.twitch.client_id,
+            &settings.twitch.channel_name,
+            &login,
+            settings.twitch.enable_chat,
+        )
+        .await;
+    let _ = app.emit("twitch-raids-changed", json!({"changed":true}));
+    let mut result = result.map_err(|e| e.to_string())?;
+    if let Err(error) = remember_raid_target(&state, &result.target.login).await {
+        result.warnings.push(format!(
+            "Raid gestartet; Ziel konnte nicht gespeichert werden: {error}"
+        ));
+    }
+    if let Err(error) = app.emit("twitch-raids-changed", json!({"changed":true})) {
+        result.warnings.push(format!(
+            "Raid gestartet; App-Benachrichtigung fehlgeschlagen: {error}"
+        ));
+    }
+    Ok(result)
+}
+#[tauri::command]
+async fn cancel_twitch_raid<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    let result = state
+        .twitch
+        .community_cancel(&settings.twitch.client_id, &settings.twitch.channel_name)
+        .await
+        .map_err(|e| e.to_string());
+    let _ = app.emit("twitch-raids-changed", json!({"changed":true}));
+    result
+}
+#[tauri::command]
+async fn acknowledge_twitch_raid<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state.twitch.acknowledge_raid().await;
+    app.emit("twitch-raids-changed", json!({"changed":true}))
+        .map_err(|e| e.to_string())
+}
 #[tauri::command]
 async fn refresh_twitch_metrics<R: tauri::Runtime>(
     app: AppHandle<R>,
@@ -1689,6 +1890,15 @@ pub fn run() {
             refresh_twitch_metrics,
             twitch_goals_snapshot,
             save_twitch_goals,
+            twitch_raid_settings,
+            save_twitch_raid_settings,
+            select_twitch_raid_target,
+            twitch_raid_suggestions,
+            twitch_raid_target,
+            twitch_raid_state,
+            start_twitch_raid,
+            cancel_twitch_raid,
+            acknowledge_twitch_raid,
             chat_catalog_status,
             refresh_chat_catalogs,
             chat_history,
