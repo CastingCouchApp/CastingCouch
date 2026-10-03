@@ -116,6 +116,11 @@ pub fn map_currently_playing(body: &str) -> ModuleResult<NowPlaying> {
         .collect::<Vec<_>>()
         .join(", ");
     Ok(NowPlaying {
+        track_id: item
+            .id
+            .filter(|id| !id.is_empty())
+            .or(item.uri)
+            .unwrap_or_default(),
         title: item.name,
         artist,
         cover_url: item
@@ -205,6 +210,10 @@ struct CurrentlyPlayingResponse {
 
 #[derive(Deserialize)]
 struct ItemResponse {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    uri: Option<String>,
     #[serde(default)]
     duration_ms: i64,
     #[serde(default)]

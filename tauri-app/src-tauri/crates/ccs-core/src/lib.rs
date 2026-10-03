@@ -1,5 +1,6 @@
 pub mod instance;
 pub mod logging;
+pub mod music_statistics;
 pub mod paths;
 pub mod profiles;
 pub mod settings;

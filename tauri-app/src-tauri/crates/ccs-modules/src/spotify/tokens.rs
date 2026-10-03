@@ -22,6 +22,8 @@ fn default_token_type() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct NowPlaying {
     #[serde(default)]
+    pub track_id: String,
+    #[serde(default)]
     pub cover_url: String,
     #[serde(default)]
     pub progress_ms: i64,
@@ -31,6 +33,13 @@ pub struct NowPlaying {
     pub artist: String,
     pub album: String,
     pub is_playing: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct PlaybackSample {
+    pub playing: Option<NowPlaying>,
+    pub sampled_at: DateTime<Utc>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]

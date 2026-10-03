@@ -6,7 +6,7 @@ mod tokens;
 
 pub use api::{SpotifyApiClient, API_BASE_URL};
 pub use oauth::{SpotifyOAuthClient, AUTHORIZE_URL, DEFAULT_REDIRECT_URI, TOKEN_URL};
-pub use tokens::{NowPlaying, SpotifyTokenSet, SpotifyUser};
+pub use tokens::{NowPlaying, PlaybackSample, SpotifyTokenSet, SpotifyUser};
 
 use crate::{ConnectionState, ModuleError, ModuleResult, ServiceStatus};
 use ccs_secrets::{SecretStore, SPOTIFY_TOKEN_SET_KEY};
@@ -78,6 +78,7 @@ pub struct SpotifyClient {
     reconnect_enabled: AtomicBool,
     status_tx: broadcast::Sender<ServiceStatus>,
     now_playing_tx: broadcast::Sender<NowPlaying>,
+    playback_tx: broadcast::Sender<PlaybackSample>,
 }
 
 impl SpotifyClient {
@@ -107,6 +108,7 @@ impl SpotifyClient {
             reconnect_enabled: AtomicBool::new(true),
             status_tx,
             now_playing_tx,
+            playback_tx: broadcast::channel(32).0,
         }
     }
 
@@ -135,6 +137,7 @@ impl SpotifyClient {
             reconnect_enabled: AtomicBool::new(true),
             status_tx,
             now_playing_tx,
+            playback_tx: broadcast::channel(32).0,
         }
     }
 
@@ -161,22 +164,47 @@ impl SpotifyClient {
     pub fn subscribe_now_playing(&self) -> broadcast::Receiver<NowPlaying> {
         self.now_playing_tx.subscribe()
     }
+    pub fn subscribe_playback_samples(&self) -> broadcast::Receiver<PlaybackSample> {
+        self.playback_tx.subscribe()
+    }
+    fn playback_sample(&self, playing: Option<NowPlaying>, error: Option<String>) {
+        let _ = self.playback_tx.send(PlaybackSample {
+            playing,
+            error,
+            sampled_at: chrono::Utc::now(),
+        });
+    }
 
     pub fn has_token(&self) -> bool {
         matches!(self.tokens.load(), Ok(Some(_)))
     }
 
     async fn set_status(&self, state: ConnectionState, detail: impl Into<String>) {
+        let detail = detail.into();
+        if matches!(
+            state,
+            ConnectionState::Error | ConnectionState::Disconnected | ConnectionState::Connecting
+        ) {
+            self.playback_sample(
+                None,
+                if state == ConnectionState::Error {
+                    Some(detail.clone())
+                } else {
+                    None
+                },
+            );
+        }
         let snapshot = {
             let mut s = self.status.write().await;
             s.state = state;
-            s.detail = detail.into();
+            s.detail = detail;
             s.clone()
         };
         let _ = self.status_tx.send(snapshot);
     }
 
     async fn store_now_playing(&self, playing: NowPlaying) {
+        self.playback_sample(Some(playing.clone()), None);
         let changed = {
             let mut np = self.now_playing.write().await;
             let changed = *np != playing;
@@ -337,6 +365,7 @@ impl SpotifyClient {
 
     pub async fn refresh_now_playing(&self, client_id: &str) -> ModuleResult<NowPlaying> {
         if !self.has_token() {
+            self.playback_sample(None, None);
             return Ok(NowPlaying::default());
         }
         match self.fetch_now_playing(client_id).await {
