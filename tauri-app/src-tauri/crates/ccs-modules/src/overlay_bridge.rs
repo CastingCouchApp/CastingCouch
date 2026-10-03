@@ -2,8 +2,8 @@ use ccs_overlay_server::RealtimeHub;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::collections::{BTreeMap, VecDeque};
+use std::sync::{Arc, Mutex};
 
 /// Overlay `/ws` envelope matching WPF `OverlayRealtimeEvent` (camelCase).
 #[derive(Debug, Clone, Serialize)]
@@ -42,15 +42,46 @@ impl OverlayRealtimeEvent {
 #[derive(Clone)]
 pub struct OverlayEventBridge {
     hub: Arc<RealtimeHub>,
+    twitch_feed: Arc<Mutex<VecDeque<OverlayRealtimeEvent>>>,
+    twitch_chat: Arc<ccs_overlay_server::ChatHistoryBuffer>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TwitchEventFeedSnapshot {
+    pub events: Vec<OverlayRealtimeEvent>,
 }
 
 impl OverlayEventBridge {
     pub fn new(hub: Arc<RealtimeHub>) -> Self {
-        Self { hub }
+        Self {
+            hub,
+            twitch_feed: Arc::new(Mutex::new(VecDeque::new())),
+            twitch_chat: Arc::new(ccs_overlay_server::ChatHistoryBuffer::with_capacity(500)),
+        }
+    }
+
+    /// C# keeps the last 200 EventReceived entries in app memory, separate from chat.
+    pub fn twitch_event_feed(&self) -> TwitchEventFeedSnapshot {
+        TwitchEventFeedSnapshot {
+            events: self.twitch_feed.lock().unwrap().iter().cloned().collect(),
+        }
+    }
+
+    pub fn twitch_chat_feed(&self) -> Value {
+        self.twitch_chat.history()
     }
 
     pub fn publish(&self, event: &OverlayRealtimeEvent) -> Value {
+        if event.source.eq_ignore_ascii_case("twitch") && event.event_type != "channel.chat.message"
+        {
+            let mut feed = self.twitch_feed.lock().unwrap();
+            feed.push_back(event.clone());
+            while feed.len() > 200 {
+                feed.pop_front();
+            }
+        }
         let value = event.to_value();
+        self.twitch_chat.record(&value);
         self.hub.publish(&value);
         value
     }
@@ -218,6 +249,164 @@ mod tests {
 
     fn at() -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 7, 27, 18, 0, 0).unwrap()
+    }
+
+    #[test]
+    fn twitch_feed_keeps_the_last_200_non_chat_events_in_receipt_order() {
+        let hub = Arc::new(RealtimeHub::new());
+        let bridge = OverlayEventBridge::new(hub.clone());
+        for index in 0..205 {
+            bridge.from_twitch(
+                "channel.follow",
+                &format!("Follower {index}"),
+                at(),
+                map_of([("index", index.to_string().as_str())]),
+            );
+            bridge.from_twitch(
+                "channel.chat.message",
+                "Chat",
+                at(),
+                map_of([("messageId", index.to_string().as_str())]),
+            );
+            bridge.app_alert("Follow", "Alice");
+        }
+        let snapshot = serde_json::to_value(bridge.twitch_event_feed()).unwrap();
+        let events = snapshot["events"].as_array().unwrap();
+        assert_eq!(events.len(), 200);
+        assert_eq!(events[0]["summary"], "Follower 5");
+        assert_eq!(events[199]["data"]["index"], "204");
+        assert!(events
+            .iter()
+            .all(|e| e["source"] == "twitch" && e["type"] == "channel.follow"));
+        assert_eq!(hub.history()["events"].as_array().unwrap().len(), 160);
+        assert_eq!(
+            serde_json::to_value(bridge.clone().twitch_event_feed()).unwrap(),
+            snapshot
+        );
+        assert!(
+            serde_json::to_value(OverlayEventBridge::new(hub).twitch_event_feed()).unwrap()
+                ["events"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn twitch_feed_retains_warnings_moderation_and_future_event_types_without_rewriting_payloads() {
+        let bridge = OverlayEventBridge::new(Arc::new(RealtimeHub::new()));
+        let mut expected = Vec::new();
+        for ty in [
+            "subscription.warning",
+            "revocation",
+            "channel.chat.clear",
+            "channel.chat.message_delete",
+            "channel.chat.clear_user_messages",
+            "channel.future.event",
+        ] {
+            expected.push(bridge.from_twitch(
+                ty,
+                "<b>keine HTML-Ausführung</b>",
+                at(),
+                map_of([("custom", "äö🎉"), ("nested", "{\"field\":42}")]),
+            ));
+        }
+        assert_eq!(
+            serde_json::to_value(bridge.twitch_event_feed()).unwrap()["events"],
+            serde_json::json!(expected)
+        );
+    }
+
+    #[test]
+    fn app_chat_keeps_500_messages_independently_of_overlay_capacity_and_applies_moderation() {
+        let hub = Arc::new(RealtimeHub::new());
+        let bridge = OverlayEventBridge::new(hub.clone());
+        for index in 0..600 {
+            bridge.from_twitch(
+                "channel.chat.message",
+                "Hallo",
+                at(),
+                map_of([
+                    ("messageId", index.to_string().as_str()),
+                    ("userLogin", if index % 2 == 0 { "Alice" } else { "Bob" }),
+                    ("userId", if index % 2 == 0 { "a" } else { "b" }),
+                    ("parts", "[{\"type\":\"text\",\"text\":\"Hallo\"}]"),
+                ]),
+            );
+        }
+        assert_eq!(
+            bridge.twitch_chat_feed()["events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            500
+        );
+        assert_eq!(
+            bridge.twitch_chat_feed()["events"][0]["data"]["messageId"],
+            "100"
+        );
+        assert_eq!(
+            bridge.twitch_chat_feed()["events"][0]["data"]["parts"],
+            "[{\"type\":\"text\",\"text\":\"Hallo\"}]"
+        );
+        assert_eq!(hub.history()["events"].as_array().unwrap().len(), 160);
+        hub.configure_chat_buffer(2000);
+        assert_eq!(
+            bridge.twitch_chat_feed()["events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            500
+        );
+        bridge.from_twitch(
+            "channel.chat.message_delete",
+            "Gelöscht",
+            at(),
+            map_of([("message_id", " 599 ")]),
+        );
+        assert_eq!(
+            bridge.twitch_chat_feed()["events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            499
+        );
+        bridge.from_twitch(
+            "channel.chat.clear_user_messages",
+            "Timeout",
+            at(),
+            map_of([("target_user_login", " alice ")]),
+        );
+        assert_eq!(
+            bridge.twitch_chat_feed()["events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            249
+        );
+        assert!(bridge.twitch_chat_feed()["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|e| e["data"]["userLogin"] == "Bob"));
+        bridge.from_twitch(
+            "channel.chat.message",
+            "Doppeltes Ereignis",
+            at(),
+            map_of([("messageId", "101")]),
+        );
+        assert_eq!(
+            bridge.twitch_chat_feed()["events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            249
+        );
+        bridge.from_twitch("channel.chat.clear", "Chat geleert", at(), map_of([]));
+        assert_eq!(
+            bridge.clone().twitch_chat_feed()["events"],
+            serde_json::json!([])
+        );
     }
 
     #[tokio::test]

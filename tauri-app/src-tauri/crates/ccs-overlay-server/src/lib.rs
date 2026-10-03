@@ -1,6 +1,8 @@
 mod assets;
 mod canvas;
 mod chat_config;
+mod chat_history;
+pub use chat_history::ChatHistoryBuffer;
 mod hub;
 mod layout_store;
 mod live;

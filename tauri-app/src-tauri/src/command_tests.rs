@@ -2,6 +2,160 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 #[test]
+fn native_app_chat_has_500_entries_independent_of_overlay_and_keeps_moderation_in_sync() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let state = app.state::<AppState>();
+    for index in 0..600 {
+        state.bridge.from_twitch(
+            "channel.chat.message",
+            "Hallo",
+            "2026-10-03T12:00:00Z".parse().unwrap(),
+            std::collections::BTreeMap::from([
+                ("messageId".into(), index.to_string()),
+                ("userId".into(), "user".into()),
+                (
+                    "parts".into(),
+                    "[{\"type\":\"text\",\"text\":\"Hallo\"}]".into(),
+                ),
+            ]),
+        );
+    }
+    let chat = call(&window, "twitch_chat_feed", json!({})).unwrap();
+    assert_eq!(chat["events"].as_array().unwrap().len(), 500);
+    assert_eq!(chat["events"][0]["data"]["messageId"], "100");
+    assert_eq!(
+        call(&window, "chat_history", json!({})).unwrap()["events"]
+            .as_array()
+            .unwrap()
+            .len(),
+        160
+    );
+    assert_eq!(
+        call(&window, "twitch_event_feed", json!({})).unwrap()["events"],
+        json!([])
+    );
+    state.bridge.from_twitch(
+        "channel.chat.message_delete",
+        "Gelöscht",
+        "2026-10-03T12:00:01Z".parse().unwrap(),
+        std::collections::BTreeMap::from([("message_id".into(), "599".into())]),
+    );
+    assert_eq!(
+        call(&window, "twitch_chat_feed", json!({})).unwrap()["events"]
+            .as_array()
+            .unwrap()
+            .len(),
+        499
+    );
+    assert_eq!(state.hub.history()["events"].as_array().unwrap().len(), 159);
+    tauri::async_runtime::block_on(async {
+        let mut settings = state.settings.load().await.unwrap();
+        settings.twitch.enable_chat = false;
+        state.settings.save(&settings).await.unwrap();
+        assert_eq!(
+            call(&window, "twitch_chat_feed", json!({})).unwrap()["events"],
+            json!([])
+        );
+        settings.twitch.enable_chat = true;
+        state.settings.save(&settings).await.unwrap();
+        assert_eq!(
+            call(&window, "twitch_chat_feed", json!({})).unwrap()["events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            499
+        );
+    });
+    state.bridge.from_twitch(
+        "channel.chat.clear_user_messages",
+        "Timeout",
+        "2026-10-03T12:00:02Z".parse().unwrap(),
+        std::collections::BTreeMap::from([("target_user_id".into(), "user".into())]),
+    );
+    assert_eq!(
+        call(&window, "twitch_chat_feed", json!({})).unwrap()["events"],
+        json!([])
+    );
+    assert_eq!(state.hub.history()["events"], json!([]));
+}
+
+#[test]
+fn native_twitch_feed_reads_the_shared_bridge_after_page_changes_even_when_chat_is_disabled() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    tauri::async_runtime::block_on(async {
+        let state = app.state::<AppState>();
+        let server = OverlayServer::start(
+            state.settings.clone(),
+            state.paths.clone(),
+            state.hub.clone(),
+            0,
+        )
+        .await
+        .unwrap();
+        let (mut ws, _) =
+            tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{}/ws", server.port))
+                .await
+                .unwrap();
+        use futures_util::StreamExt;
+        for _ in 0..2 {
+            tokio::time::timeout(std::time::Duration::from_secs(3), ws.next())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+        }
+        let expected = state.bridge.from_twitch(
+            "channel.follow",
+            "Alice folgt dem Kanal.",
+            "2026-10-03T12:00:00Z".parse().unwrap(),
+            std::collections::BTreeMap::from([("user_name".into(), "Alice".into())]),
+        );
+        let frame = tokio::time::timeout(std::time::Duration::from_secs(3), ws.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(frame.to_text().unwrap()).unwrap(),
+            expected
+        );
+        state.bridge.from_twitch(
+            "channel.chat.message",
+            "Chat",
+            "2026-10-03T12:00:01Z".parse().unwrap(),
+            std::collections::BTreeMap::new(),
+        );
+        let mut settings = state.settings.load().await.unwrap();
+        settings.twitch.enable_chat = false;
+        state.settings.save(&settings).await.unwrap();
+        assert_eq!(
+            call(&window, "chat_history", json!({})).unwrap()["events"],
+            json!([])
+        );
+        assert_eq!(
+            call(&window, "twitch_event_feed", json!({})).unwrap()["events"],
+            json!([expected.clone()])
+        );
+        let second = WebviewWindowBuilder::new(&app, "other-page", Default::default())
+            .build()
+            .unwrap();
+        assert_eq!(
+            call(&second, "twitch_event_feed", json!({})).unwrap()["events"],
+            json!([expected])
+        );
+        server.stop();
+    });
+}
+
+#[test]
 fn native_canvas_deletion_updates_the_same_chat_capacity_and_history_as_http() {
     let root = tempfile::tempdir().unwrap();
     let app = test_app(root.path().into());
@@ -1046,6 +1200,8 @@ fn test_app_with_spotify(
             duplicate_canvas,
             delete_canvas,
             chat_history,
+            twitch_event_feed,
+            twitch_chat_feed,
             twitch_action,
             twitch_query,
             chat_catalog_status,

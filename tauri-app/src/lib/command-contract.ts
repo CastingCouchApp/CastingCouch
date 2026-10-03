@@ -159,6 +159,8 @@ export type CommandInvocation =
   | [command: "open_twitch_chat", args?: Record<string, never>]
   | [command: "twitch_action", args: { action: TwitchAction }]
   | [command: "twitch_query", args: { query: TwitchQuery; after?: string | null }]
+  | [command: "twitch_event_feed", args?: Record<string, never>]
+  | [command: "twitch_chat_feed", args?: Record<string, never>]
   | [command: "chat_history", args?: Record<string, never>]
   | [command: "chat_catalog_status", args?: Record<string, never>]
   | [command: "refresh_chat_catalogs", args?: Record<string, never>]

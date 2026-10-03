@@ -459,7 +459,16 @@ export function listenExtensionPacksChanged(onChange: (change: ExtensionPackChan
 }
 
 export async function listenTwitchEvents(
-    onEvent: (event: Record<string, unknown>) => void,
+    onEvent: (event: TwitchRealtimeEvent) => void,
 ): Promise<() => void> {
-    return listenIfTauri("twitch-event", onEvent);
+    return listenIfTauri<TwitchRealtimeEvent>("twitch-event", onEvent);
 }
+
+export type TwitchRealtimeEvent = {
+    source: string;
+    type: string;
+    at: string;
+    summary: string;
+    data: Record<string, string>;
+};
+export type TwitchEventFeedSnapshot = { events: TwitchRealtimeEvent[] };

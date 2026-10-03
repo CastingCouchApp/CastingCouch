@@ -57,7 +57,7 @@ Implementierungsnachweise und verbleibende Betriebsabnahme: [Basis-Abnahme](TAUR
 | Abnahme | ID | Stand | Implementierung und verbleibende Arbeit |
 |---|---|---|---|
 | [ ] | TW1 | Implementiert | Kanalinformationen, Titel/Kategorie setzen und Kategoriesuche. |
-| [ ] | TW2 | Teilweise | EventSub Chat, Senden und History; abgelehnte Sendebestätigung als Fehler. App-Chat zeigt native/Drittanbieter-Emotes, Badges und Benutzerfarbe mit lesbarem Text-Fallback. Vollständiger Ereignisfeed und Live-Abnahme fehlen. |
+| [ ] | TW2 | Implementiert | EventSub-Chat, Senden und eigener App-Puffer mit 500 Nachrichten; native/Drittanbieter-Emotes, Badges, Benutzerfarbe und Uhrzeit. Getrennter Feed mit den letzten 200 Ereignissen einschließlich Warnungen und Moderation. Native Snapshots überstehen Seitenwechsel; Live-Hinweise, periodische Wiederherstellung und sichtbare Fehler. Abgelehnte Nachrichten erhalten den Entwurf. Installierte OAuth-/Chat-/EventSub-Betriebsabnahme offen. |
 | [ ] | TW3 | Teilweise | Eigenes Twitch-Popout-WebView; Windows mit eigenem persistenten Profil, macOS Standard-WebView-Speicher. Dauerhafter Login auf beiden Plattformen noch nachzuweisen. |
 | [ ] | TW4 | Teilweise | Ban/Unban/Timeout/Delete-Backend, UI für Timeout/Löschen/Clear; EventSub-Synchronisierung. Vollständige Moderationsoberfläche fehlt. |
 | [ ] | TW5 | Teilweise | Helix-Abfragen und einfache Anzeige für Follower/Subs/Chatter. B7 versorgt Viewer-Daten und vorhandene Zielkonfiguration im Overlay; der vollständige Ziele-Editor fehlt. |
@@ -111,7 +111,7 @@ Offen bleibt die gesamte Installations-/Betriebsabnahme auf Windows und macOS: D
 ## Nächste Umsetzungsschritte
 
 1. Installierte Pakete und echte Dienstverbindungen abnehmen; weitere Alert-Playback-Abbruchfälle im Feature-Paket AL2/AL3 prüfen.
-2. O6, vollständige Twitch-Oberflächen und Sessionerfassung für DA3/DA4 fertigstellen; O4 im installierten Paket abnehmen.
+2. Verbleibende Twitch-Oberflächen und Sessionerfassung für DA3/DA4 fertigstellen; O4/O6/TW2 im installierten Paket abnehmen.
 3. Verbleibende OBS-Quellen-/Filtereditoren, Twitch-Verwaltung und Alert-Sound fertigstellen; implementierte Szenenmusik und Musikzustände praktisch abnehmen.
 4. Dashboard, Einrichtung, Rechtstexte, Migration/Backups und Diagnostik umsetzen; Profile im installierten Paket abnehmen.
 5. Windows-/macOS-Installer bauen und jeden gewählten Nutzerablauf dokumentiert abnehmen; erst danach Cutover entscheiden.
@@ -380,3 +380,21 @@ O6 ist damit implementiert; praktische Standalone-/Canvas-/Solo-/OBS-Abnahme mit
 Lokale Validierung: vollständiger Rust-Workspace und alle 115 Canvas-Tests erfolgreich; generierte Command-Verträge, beide TypeScript-Typprüfungen sowie Canvas-/React-Produktionsbuild erfolgreich. Die React-Oberfläche wurde in diesem Schritt nicht geändert; ihre vorherigen 116 Tests gelten nicht als neue Prüfung dieses History-Schritts.
 
 Für den vorherigen Commit `e32c48c` sind [Build 37098294478](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37098294478) und [CodeQL 37098294482](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37098294482) erfolgreich abgeschlossen. Die CI-Prüfung dieses History-Schritts erfolgt nach dem Push.
+
+## TW2: Integrierter Chat und Ereignisfeed
+
+Die tatsächlich implementierte C#-Referenz `MainWindow.Services.Twitch.Bindings` hält 200 Einträge aus `EventReceived` und unabhängig davon 500 Chatnachrichten. Beide Listen folgen der Empfangsreihenfolge und zeigen lokale Uhrzeiten. Der neue Rust-Feed in `OverlayEventBridge` übernimmt alle Nicht-Chat-Ereignisse einschließlich `subscription.warning`, `revocation`, Moderations- und zukünftiger unbekannter Ereignistypen. App-/Musik-/Alert-Meldungen werden nicht als Twitch-Ereignisse aufgenommen. Der vollständige bestehende Envelope samt Datenfeldern bleibt unverändert; die gemeinsame Bridge versorgt Overlay-WebSocket und native App.
+
+`twitch_event_feed` liefert einen typisierten Feed-Snapshot. Der Appchat verwendet `twitch_chat_feed` mit eigener Kapazität von 500, unabhängig vom layoutabhängigen Overlay-Puffer. `ChatHistoryBuffer` unter `ccs-overlay-server/src/chat_history.rs` enthält nun die gemeinsame Speicherung, Deduplizierung und Moderationsbereinigung. App und Overlay nutzen getrennte Instanzen derselben Fachlogik. Nur der Overlay-Puffer besitzt wie bisher eine Dateibindung; Appchat und Ereignisfeed sind wie in C# App-Sitzungsdaten. Neustartpersistenz für Ereignisse und Streamverläufe bleibt TW9. Das bestehende `chat_history`-Command und die Overlay-HTTP-/WebSocket-Verträge bleiben erhalten.
+
+Die Dienste-Seite zeigt den Ereignisfeed und Chat mit lokalen Uhrzeiten, unbekannten Typen als Text und kenntlich gemachten Warnungen. Live-Ereignisse lösen gebündelte Snapshot-Abfragen aus; periodische Abfragen und manuelle Aktualisierung stellen nach verlorenen UI-Ereignissen den tatsächlichen Rust-Stand wieder her. Nach Listener-Registrierung wird erneut abgefragt, um die Lücke zur ersten Abfrage zu schließen. Frühere ausstehende Antworten dürfen einen neueren Stand nicht ersetzen. Seitenwechsel meldet Listener ab; verspätete Registrierungen werden sofort bereinigt. Fehler erscheinen sichtbar und löschen keinen vorhandenen Feed. Manuelle Aktualisierung versucht einen fehlgeschlagenen Listener erneut.
+
+Der integrierte Chat scrollt nach neuen Nachrichten wie C# ans Ende. Senden und Moderation bleiben die gemeinsamen nativen Twitch-Aktionen. Abgelehnte Nachrichten erhalten den Eingabeentwurf; Nachrichten ohne ID können nicht versehentlich eine vollständige Chatlöschung auslösen. Emote-/Badge-/Fragments-Darstellung bleibt erhalten, und Moderationsereignisse aktualisieren App- und Overlay-Verlauf über denselben Vertrag.
+
+Neue Rust-Tests prüfen 200/500-Grenzen, Empfangsreihenfolge, getrennte Kapazitäten, vollständige Payloads, unbekannte Ereignisse, Deduplizierung und Moderation. Eine echte lokale EventSub-WebSocket-Gegenstelle mit Helix-HTTP-Antworten liefert Subscription-Warnung, Sub, Chat, Raid, Löschung und unbekannte Ereignisse über die gemeinsame Bridge bis zum tatsächlichen Overlay-WebSocket. Nach Revocation und neuer Verbindung bleibt der Appfeed erhalten. Native Tauri-IPC prüft beide Snapshots, Seitenwechsel, deaktivierten Chat und unabhängige Overlay-Kapazität. React-Tests prüfen Darstellung, Fehler/Retry, Burst-Bündelung, Seitenwechsel, veraltete Antworten, Listener-Abmeldung, Moderation und abgelehnte Nachrichten.
+
+TW2 ist implementiert; tatsächliche OAuth-/Dienstverbindungen und installierte Windows-/macOS-Betriebsabnahme bleiben offen. DA2 benötigt weiterhin die Einbindung dieser Bedienung ins Dashboard; TW9 benötigt dauerhafte Ereignis-/Streamhistorien. Alle übrigen offenen Pakete bleiben im ursprünglichen Umfang.
+
+Lokale Validierung: 317 unterschiedliche Rust-Tests im vollständigen Workspace erfolgreich. Der vollständige React-Lauf prüft 125 Tests; nach der abschließenden Typisierung des nativen Ereignisses und Theme-Anpassung sind alle zehn Chat-/Feed-Tests einschließlich eines zusätzlichen Burst-Tests erneut erfolgreich. Command-Verträge, TypeScript-Typprüfung und Produktionsbuild mit Canvas-Bundles erfolgreich. Das gemeinsame Canvas-TypeScript wurde in diesem Schritt nicht geändert; seine vorherigen 115 Tests werden nicht als neue lokale Prüfung gezählt.
+
+Der vorherige History-Commit `6990ef9` ist in [Build 37099690080](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37099690080) und [CodeQL 37099690113](https://github.com/CastingCouchApp/CastingCouch/actions/runs/37099690113) erfolgreich geprüft, einschließlich Windows-/macOS-Build und Packaging. Das ersetzt keine Installation oder Live-Abnahme.

@@ -1,5 +1,5 @@
 import type { TwitchAction, TwitchQuery } from "../../lib/command-contract";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listenTwitchEvents, tauriInvoke } from "../../lib/api";
 import { Card } from "../../components/ui/card";
@@ -9,7 +9,13 @@ import { TwitchRewards } from "./TwitchRewards";
 import { TwitchVotes } from "./TwitchVotes";
 import { ChatCatalogStatusPanel } from "./ChatCatalogStatus";
 import { TwitchChatMessage } from "./TwitchChatMessage";
-type Event = { type: string; summary?: string; data: Record<string, string> };
+import { TwitchEventFeed, TwitchEventTime } from "./TwitchEventFeed";
+type Event = {
+    type: string;
+    at: string;
+    summary?: string;
+    data: Record<string, string>;
+};
 type Item = {
     id: string;
     title?: string;
@@ -38,9 +44,12 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
         query: "channel",
     });
     const [after, setAfter] = useState<string>();
+    const [chatListenerError, setChatListenerError] = useState<string>();
+    const [chatSubscriptionAttempt, setChatSubscriptionAttempt] = useState(0);
+    const chatList = useRef<HTMLDivElement>(null);
     const history = useQuery({
         queryKey: ["twitch-chat-history"],
-        queryFn: () => tauriInvoke<{ events: Event[] }>("chat_history"),
+        queryFn: () => tauriInvoke<{ events: Event[] }>("twitch_chat_feed"),
         refetchInterval: 15000,
     });
     const result = useQuery({
@@ -65,20 +74,48 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
     useEffect(() => {
         let cancelled = false;
         let unlisten: (() => void) | undefined;
-        void listenTwitchEvents(
-            () =>
-                void client.invalidateQueries({
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        setChatListenerError(undefined);
+        const refresh = async () => {
+            await client.cancelQueries({ queryKey: ["twitch-chat-history"] });
+            if (!cancelled)
+                await client.invalidateQueries({
                     queryKey: ["twitch-chat-history"],
-                }),
-        ).then((fn) => {
-            if (cancelled) fn();
-            else unlisten = fn;
-        });
+                });
+        };
+        void listenTwitchEvents((event) => {
+            if (
+                cancelled ||
+                typeof event.type !== "string" ||
+                !event.type.startsWith("channel.chat.") ||
+                timer
+            )
+                return;
+            timer = setTimeout(() => {
+                timer = undefined;
+                void refresh();
+            }, 150);
+        })
+            .then((fn) => {
+                if (cancelled) fn();
+                else {
+                    unlisten = fn;
+                    void refresh();
+                }
+            })
+            .catch((error) => {
+                if (!cancelled) setChatListenerError(String(error));
+            });
         return () => {
             cancelled = true;
             unlisten?.();
+            if (timer) clearTimeout(timer);
         };
-    }, [client]);
+    }, [client, chatSubscriptionAttempt]);
+    useEffect(() => {
+        if (chatList.current)
+            chatList.current.scrollTop = chatList.current.scrollHeight;
+    }, [history.data]);
     const select = (next: TwitchQuery) => {
         setAfter(undefined);
         setQuery(next);
@@ -86,15 +123,43 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
     const mutate = (value: TwitchAction) => action.mutate(value);
     return (
         <div className="grid gap-4 xl:grid-cols-2">
+            <TwitchEventFeed />
             <Card className="space-y-3">
                 <h2 className="text-lg font-semibold">Twitch-Chat</h2>
                 <ChatCatalogStatusPanel enabled={enabled} />
-                <div className="max-h-80 overflow-auto space-y-2">
+                {history.isPending && <p role="status">Chat wird geladen …</p>}
+                {(history.error || chatListenerError) && (
+                    <p role="alert">
+                        {[
+                            chatListenerError,
+                            history.error ? String(history.error) : undefined,
+                        ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                    </p>
+                )}
+                <Button
+                    variant="ghost"
+                    disabled={history.isFetching}
+                    onClick={() => {
+                        if (chatListenerError)
+                            setChatSubscriptionAttempt((value) => value + 1);
+                        else void history.refetch();
+                    }}
+                >
+                    Chat aktualisieren
+                </Button>
+                <div
+                    ref={chatList}
+                    aria-label="Twitch-Chatnachrichten"
+                    className="max-h-80 overflow-auto space-y-2"
+                >
                     {history.data?.events?.map((event, index) => (
                         <div
                             key={event.data.messageId ?? index}
                             className="flex gap-2 text-sm"
                         >
+                            <TwitchEventTime at={event.at} />
                             <TwitchChatMessage
                                 data={{
                                     ...event.data,
@@ -103,7 +168,11 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                                 }}
                             />
                             <Button
-                                disabled={!enabled || action.isPending}
+                                disabled={
+                                    !enabled ||
+                                    action.isPending ||
+                                    !event.data.messageId
+                                }
                                 variant="ghost"
                                 onClick={() =>
                                     mutate({
@@ -115,7 +184,11 @@ export function TwitchPanel({ enabled }: { enabled: boolean }) {
                                 Löschen
                             </Button>
                             <Button
-                                disabled={!enabled || action.isPending}
+                                disabled={
+                                    !enabled ||
+                                    action.isPending ||
+                                    !event.data.userId
+                                }
                                 variant="ghost"
                                 onClick={() =>
                                     mutate({

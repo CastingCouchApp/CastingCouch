@@ -246,6 +246,21 @@ async fn twitch_query(
         .map_err(|e| e.to_string())
 }
 #[tauri::command]
+fn twitch_event_feed(
+    state: State<'_, AppState>,
+) -> ccs_modules::overlay_bridge::TwitchEventFeedSnapshot {
+    state.bridge.twitch_event_feed()
+}
+#[tauri::command]
+async fn twitch_chat_feed(state: State<'_, AppState>) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    Ok(if settings.twitch.enable_chat {
+        state.bridge.twitch_chat_feed()
+    } else {
+        json!({"events":[]})
+    })
+}
+#[tauri::command]
 async fn chat_history(state: State<'_, AppState>) -> Result<Value, String> {
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     Ok(if settings.twitch.enable_chat {
@@ -1540,6 +1555,8 @@ pub fn run() {
             chat_catalog_status,
             refresh_chat_catalogs,
             chat_history,
+            twitch_event_feed,
+            twitch_chat_feed,
             countdown_status,
             set_countdown,
             spotify_action,
