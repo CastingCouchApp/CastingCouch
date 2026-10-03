@@ -2,6 +2,141 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 #[test]
+fn spotify_commands_update_shared_state_and_overlay_through_native_ipc() {
+    use ccs_modules::spotify::{SpotifyOAuthClient, SpotifyTokenRepository, SpotifyTokenSet};
+    use ccs_secrets::MemorySecretStore;
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let (spotify, server) = tauri::async_runtime::block_on(async {
+        let server = MockServer::start().await;
+        let secrets = Arc::new(MemorySecretStore::new());
+        SpotifyTokenRepository::new(secrets.clone())
+            .save(&SpotifyTokenSet::from_oauth(
+                "saved-access".into(),
+                "saved-refresh".into(),
+                3600,
+                "Bearer".into(),
+                vec![],
+            ))
+            .unwrap();
+        Mock::given(method("GET"))
+            .and(path("/me"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"id":"user"})))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET")).and(path("/me/player/currently-playing"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"is_playing":true,
+                "progress_ms":500,"item":{"id":"track","name":"Live contract","duration_ms":4000}})))
+            .mount(&server).await;
+        for endpoint in ["pause", "play"] {
+            Mock::given(method("PUT"))
+                .and(path(format!("/me/player/{endpoint}")))
+                .respond_with(ResponseTemplate::new(204))
+                .expect(1)
+                .mount(&server)
+                .await;
+        }
+        Mock::given(method("PUT"))
+            .and(path("/me/player/seek"))
+            .and(query_param("position_ms", "4000"))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        (
+            Arc::new(SpotifyClient::with_http(
+                secrets,
+                SpotifyOAuthClient::new(),
+                server.uri(),
+            )),
+            server,
+        )
+    });
+    let app = test_app_with_spotify(root.path().into(), Some(spotify));
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let original = call(&window, "get_settings", json!({})).unwrap();
+    let mut next = original.clone();
+    next["Spotify"]["ClientId"] = json!("contract-client-id-12345");
+    next["Spotify"]["OverlayHideWhenMuted"] = json!(false);
+    call(
+        &window,
+        "save_settings",
+        json!({"original":original,"settings":next}),
+    )
+    .unwrap();
+    call(&window, "music_player_connect", json!({})).unwrap();
+    call(
+        &window,
+        "music_player_action",
+        json!({"action":{"action":"pause"}}),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&window, "music_player_snapshot", json!({})).unwrap()["isPlaying"],
+        false
+    );
+    // The legacy command must use the same cache as the shared player.
+    call(
+        &window,
+        "spotify_action",
+        json!({"action":{"action":"play"}}),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&window, "music_overlay_snapshot", json!({})).unwrap()["isPlaying"],
+        true
+    );
+    call(
+        &window,
+        "music_player_action",
+        json!({"action":{"action":"seek","positionMs":9000}}),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&window, "music_player_snapshot", json!({})).unwrap()["progressMs"],
+        4000
+    );
+    tauri::async_runtime::block_on(async {
+        let state = app.state::<AppState>();
+        let settings = state.settings.load().await.unwrap();
+        let snapshot = state.music_player.snapshot().await.unwrap();
+        runtime::update_music_data(&state, &snapshot, &settings);
+        let file = root.path().join("data.json");
+        state.hub.live.write_snapshot(&file).await.unwrap();
+        let overlay = OverlayServer::start(
+            state.settings.clone(),
+            state.paths.clone(),
+            state.hub.clone(),
+            0,
+        )
+        .await
+        .unwrap();
+        let data: Value = reqwest::get(format!(
+            "http://127.0.0.1:{}/data/overlay-data.json",
+            overlay.port
+        ))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+        assert_eq!(data["music"]["isPlaying"], true);
+        assert_eq!(data["music"]["progressMs"], 4000);
+        assert_eq!(data["music"], data["spotify"]);
+        let disk: Value = serde_json::from_slice(&tokio::fs::read(file).await.unwrap()).unwrap();
+        assert_eq!(disk["music"], data["music"]);
+        overlay.stop();
+    });
+    call(&window, "music_player_disconnect", json!({})).unwrap();
+    tauri::async_runtime::block_on(server.verify());
+}
+
+#[test]
 fn music_overlay_settings_and_snapshot_cross_ipc_file_and_actual_http() {
     let root = tempfile::tempdir().unwrap();
     let app = test_app(root.path().into());

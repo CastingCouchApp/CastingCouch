@@ -107,6 +107,15 @@ fn track_uri(value: &str) -> ModuleResult<String> {
     Ok(format!("spotify:track:{}", valid_id(id)?))
 }
 impl SpotifyAction {
+    pub(crate) fn patch_playback(&self, playing: &mut super::NowPlaying) -> bool {
+        match self {
+            Self::Play => playing.is_playing = true,
+            Self::Pause => playing.is_playing = false,
+            Self::Seek { position_ms } => playing.progress_ms = i64::from(*position_ms),
+            _ => return false,
+        }
+        true
+    }
     pub fn validate(&self) -> ModuleResult<()> {
         self.request().map(|_| ())
     }
@@ -368,9 +377,15 @@ impl SpotifyClient {
     pub async fn action_on_device(
         &self,
         client_id: &str,
-        action: SpotifyAction,
+        mut action: SpotifyAction,
         device_id: Option<&str>,
     ) -> ModuleResult<Value> {
+        if let SpotifyAction::Seek { position_ms } = &mut action {
+            let duration = self.now_playing().await.duration_ms;
+            if duration > 0 {
+                *position_ms = u64::from(*position_ms).min(duration as u64) as u32;
+            }
+        }
         let mut request = action.request()?;
         if matches!(
             &action,
@@ -391,7 +406,9 @@ impl SpotifyClient {
                 request = request.param("device_id", id.trim());
             }
         }
-        self.perform_request(client_id, request).await
+        let result = self.perform_request(client_id, request).await?;
+        self.patch_cached_playback(&action).await;
+        Ok(result)
     }
 
     pub async fn set_device_volume(

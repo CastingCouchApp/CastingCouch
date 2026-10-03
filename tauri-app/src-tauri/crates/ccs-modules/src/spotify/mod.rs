@@ -10,7 +10,7 @@ pub use tokens::{NowPlaying, PlaybackSample, SpotifyTokenSet, SpotifyUser};
 
 use crate::{ConnectionState, ModuleError, ModuleResult, ServiceStatus};
 use ccs_secrets::{SecretStore, SPOTIFY_TOKEN_SET_KEY};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio::task::JoinHandle;
@@ -69,6 +69,7 @@ pub struct SpotifyClient {
     oauth: OAuth,
     api: Api,
     now_playing: RwLock<NowPlaying>,
+    playback_revision: AtomicU64,
     display_name: RwLock<String>,
     login_task: Mutex<Option<JoinHandle<()>>>,
     poll_task: Mutex<Option<JoinHandle<()>>>,
@@ -99,6 +100,7 @@ impl SpotifyClient {
             oauth: OAuth::new(),
             api: Api::new(),
             now_playing: RwLock::new(NowPlaying::default()),
+            playback_revision: AtomicU64::new(0),
             display_name: RwLock::new(String::new()),
             login_task: Mutex::new(None),
             poll_task: Mutex::new(None),
@@ -128,6 +130,7 @@ impl SpotifyClient {
             oauth,
             api: Api::with_base_url(api_base),
             now_playing: RwLock::new(NowPlaying::default()),
+            playback_revision: AtomicU64::new(0),
             display_name: RwLock::new(String::new()),
             login_task: Mutex::new(None),
             poll_task: Mutex::new(None),
@@ -204,15 +207,37 @@ impl SpotifyClient {
     }
 
     async fn store_now_playing(&self, playing: NowPlaying) {
+        self.store_current_playback(playing, None).await;
+    }
+
+    async fn store_current_playback(&self, playing: NowPlaying, revision: Option<u64>) -> bool {
+        let mut np = self.now_playing.write().await;
+        if revision
+            .is_some_and(|expected| expected != self.playback_revision.load(Ordering::SeqCst))
+        {
+            return false;
+        }
+        if revision.is_none() {
+            self.playback_revision.fetch_add(1, Ordering::SeqCst);
+        }
+        let changed = *np != playing;
+        *np = playing.clone();
         self.playback_sample(Some(playing.clone()), None);
-        let changed = {
-            let mut np = self.now_playing.write().await;
-            let changed = *np != playing;
-            *np = playing.clone();
-            changed
-        };
         if changed {
             let _ = self.now_playing_tx.send(playing);
+        }
+        true
+    }
+
+    async fn patch_cached_playback(&self, action: &SpotifyAction) {
+        let mut np = self.now_playing.write().await;
+        let old = np.clone();
+        if action.patch_playback(&mut np) {
+            self.playback_revision.fetch_add(1, Ordering::SeqCst);
+            if *np != old {
+                let _ = self.now_playing_tx.send(np.clone());
+            }
+            // A confirmed command is a cache update, not an observed statistics sample.
         }
     }
 
@@ -371,13 +396,19 @@ impl SpotifyClient {
     }
 
     pub async fn refresh_now_playing(&self, client_id: &str) -> ModuleResult<NowPlaying> {
+        let revision = self.playback_revision.load(Ordering::SeqCst);
         if !self.has_token() {
             self.playback_sample(None, None);
             return Ok(NowPlaying::default());
         }
         match self.fetch_now_playing(client_id).await {
             Ok(playing) => {
-                self.store_now_playing(playing.clone()).await;
+                if !self
+                    .store_current_playback(playing.clone(), Some(revision))
+                    .await
+                {
+                    return Ok(self.now_playing().await);
+                }
                 let display = self.display_name.read().await.clone();
                 if self.status().await.state == ConnectionState::Connected
                     || self.status().await.state == ConnectionState::Error
@@ -391,6 +422,9 @@ impl SpotifyClient {
                 Ok(playing)
             }
             Err(e) => {
+                if revision != self.playback_revision.load(Ordering::SeqCst) {
+                    return Ok(self.now_playing().await);
+                }
                 self.set_status(ConnectionState::Error, e.to_string()).await;
                 Err(e)
             }

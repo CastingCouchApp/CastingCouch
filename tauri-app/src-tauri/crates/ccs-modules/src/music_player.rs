@@ -9,7 +9,7 @@ use ccs_overlay_server::YouTubeMusicBridge;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
 use tokio::sync::Mutex;
@@ -80,6 +80,7 @@ pub struct MusicPlayerRuntime {
     gate: Mutex<Option<String>>,
     details: Mutex<PlaybackDetails>,
     last_playing: Mutex<Option<crate::spotify::NowPlaying>>,
+    connected_latched: AtomicBool,
     revision: AtomicU64,
 }
 impl MusicPlayerRuntime {
@@ -99,6 +100,7 @@ impl MusicPlayerRuntime {
             gate: Mutex::new(None),
             details: Mutex::new(PlaybackDetails::default()),
             last_playing: Mutex::new(None),
+            connected_latched: AtomicBool::new(false),
             revision: AtomicU64::new(0),
         }
     }
@@ -113,6 +115,7 @@ impl MusicPlayerRuntime {
         let mut details = self.details.lock().await;
         self.revision.fetch_add(1, Ordering::SeqCst);
         *details = PlaybackDetails::default();
+        self.connected_latched.store(false, Ordering::SeqCst);
         *self.last_playing.lock().await = None;
     }
     async fn synchronize(
@@ -122,8 +125,10 @@ impl MusicPlayerRuntime {
     ) -> ModuleResult<()> {
         let provider = settings.music_player.provider_id();
         if active.as_deref() != Some(provider) {
-            self.scene.shutdown().await;
-            self.clear_details().await;
+            if active.is_some() {
+                self.scene.shutdown().await;
+                self.clear_details().await;
+            }
             *active = Some(provider.into());
         }
         if provider == "ytmusic" {
@@ -223,7 +228,16 @@ impl MusicPlayerRuntime {
             MusicPlayerAction::Play => SpotifyAction::Play,
             MusicPlayerAction::Pause => SpotifyAction::Pause,
             MusicPlayerAction::PlayPause => {
-                if self.spotify.now_playing().await.is_playing {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(3),
+                    self.spotify
+                        .refresh_now_playing(&settings.spotify.client_id),
+                )
+                .await
+                .map_err(|_| {
+                    ModuleError::Message("Spotify-Wiedergabestatus: Zeitüberschreitung".into())
+                })??;
+                if self.snapshot().await?.is_playing {
                     SpotifyAction::Pause
                 } else {
                     SpotifyAction::Play
@@ -231,7 +245,16 @@ impl MusicPlayerRuntime {
             }
             MusicPlayerAction::Next => SpotifyAction::Next,
             MusicPlayerAction::Previous => SpotifyAction::Previous,
-            MusicPlayerAction::Seek { position_ms } => SpotifyAction::Seek { position_ms },
+            MusicPlayerAction::Seek { position_ms } => {
+                let duration = self.snapshot().await?.duration_ms;
+                SpotifyAction::Seek {
+                    position_ms: if duration > 0 {
+                        u64::from(position_ms).min(duration as u64) as u32
+                    } else {
+                        position_ms
+                    },
+                }
+            }
             MusicPlayerAction::Volume { percent } => {
                 let result = self
                     .ducking
@@ -249,13 +272,19 @@ impl MusicPlayerRuntime {
                 return Ok(result);
             }
         };
-        self.spotify
+        let result = self
+            .spotify
             .action_with_preferences(
                 &settings.spotify.client_id,
-                spotify_action,
+                spotify_action.clone(),
                 &settings.spotify.extra,
             )
-            .await
+            .await?;
+        // Empty API responses retain the verified track; commands must also update that latch.
+        if let Some(playing) = self.last_playing.lock().await.as_mut() {
+            spotify_action.patch_playback(playing);
+        }
+        Ok(result)
     }
     pub async fn refresh_details(&self) {
         let revision = self.revision.load(Ordering::SeqCst);
@@ -328,9 +357,14 @@ impl MusicPlayerRuntime {
                 || status.state == ConnectionState::Connecting
             {
                 *last = None;
+                self.connected_latched.store(false, Ordering::SeqCst);
+            }
+            if status.state == ConnectionState::Connected {
+                self.connected_latched.store(true, Ordering::SeqCst);
             }
             let connected = status.state == ConnectionState::Connected
-                || (status.state == ConnectionState::Error && last.is_some());
+                || (status.state == ConnectionState::Error
+                    && self.connected_latched.load(Ordering::SeqCst));
             if connected && (!current.title.is_empty() || !current.track_id.is_empty()) {
                 *last = Some(current.clone());
             }
