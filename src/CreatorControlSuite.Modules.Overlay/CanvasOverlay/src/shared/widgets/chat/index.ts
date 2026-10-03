@@ -70,6 +70,7 @@ const CHAT_EVENT_ICONS: Record<string, string> = {
 
 type ChatEl = HTMLElement & {
   _lines?: HTMLElement | null;
+  _restoring?: boolean;
   _seenMessageIds?: Set<string>;
   _showTwitchEvents?: boolean;
   _showEventIcons?: boolean;
@@ -388,9 +389,27 @@ export function updateChat(el: ChatEl, item: unknown, chatConfig: unknown): void
 }
 
 export function clearChatStatus(el: ChatEl): void {
-  const status = el._lines && el._lines.querySelector(".ccs-chat-status");
+  const status = el._lines?.firstElementChild?.classList.contains("ccs-chat-status");
   if (status) {
     el._lines!.innerHTML = "";
+  }
+}
+
+export function restoreChatHistory(el: ChatEl, entries: readonly { kind: string; data?: Record<string, unknown>; payload?: Record<string, unknown> }[]): void {
+  clearChat(el);
+  const visible = entries.filter(entry => entry.kind === "message"
+    ? !(el._hideCommands && partsPlainText(entry.data?.parts).trim().startsWith("!"))
+    : entry.kind === "event" && el._showTwitchEvents !== false);
+  const max = Math.min(2000, Math.max(1, Math.floor(Number(el._maxLines) || 80)));
+  el._restoring = true;
+  try {
+    for (const entry of visible.slice(-max)) {
+      if (entry.kind === "message") appendChatMessage(el, entry.data || {});
+      else appendChatEvent(el, entry.payload || {});
+    }
+  } finally {
+    el._restoring = false;
+    trimChatLines(el);
   }
 }
 
@@ -442,6 +461,7 @@ export function removeChatMessagesByUser(el: ChatEl, userLogin: string, userId =
 }
 
 export function trimChatLines(el: ChatEl): void {
+  if (el._restoring) return;
   const root = el._lines;
   if (!root) return;
   const max = el._maxLines || 80;

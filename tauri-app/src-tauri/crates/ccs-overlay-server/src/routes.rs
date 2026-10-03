@@ -183,7 +183,7 @@ async fn ws_upgrade(ws: WebSocketUpgrade, State(state): State<OverlayState>) -> 
             .hub
             .handle_socket(
                 socket,
-                OverlayLayoutStore::new(state.paths.overlay_layouts),
+                OverlayLayoutStore::with_hub(state.paths.overlay_layouts, state.hub.clone()),
                 canvases,
                 state.shutdown,
             )
@@ -196,7 +196,7 @@ async fn get_layout(
 
     State(state): State<OverlayState>,
 ) -> Response {
-    let store = OverlayLayoutStore::new(&state.paths.overlay_layouts);
+    let store = OverlayLayoutStore::with_hub(&state.paths.overlay_layouts, state.hub.clone());
 
     match store.load(&instance_id).await {
         Ok(layout) => Json(layout).into_response(),
@@ -222,7 +222,7 @@ async fn put_layout(
     if !body.is_object() {
         return Err(api_error("invalid layout"));
     }
-    let store = OverlayLayoutStore::new(&state.paths.overlay_layouts);
+    let store = OverlayLayoutStore::with_hub(&state.paths.overlay_layouts, state.hub.clone());
 
     store.save(&instance_id, &body).await.map_err(api_error)?;
 
@@ -460,7 +460,9 @@ async fn chat_asset(Path(file): Path<String>) -> Response {
 }
 async fn chat_config(State(state): State<OverlayState>) -> Result<Json<Value>, ApiError> {
     let settings = state.settings.load().await.map_err(api_error)?;
-    Ok(Json(crate::chat_config::config(&settings.overlay.chat)))
+    let mut config = crate::chat_config::config(&settings.overlay.chat);
+    config["maxBufferedMessages"] = json!(state.hub.chat_capacity());
+    Ok(Json(config))
 }
 async fn chat_history(State(state): State<OverlayState>) -> Json<Value> {
     let config = state.settings.load().await.ok().map(|s| s.overlay.chat);
@@ -468,7 +470,7 @@ async fn chat_history(State(state): State<OverlayState>) -> Json<Value> {
     let limit = config
         .as_ref()
         .filter(|c| c.enabled)
-        .map(|c| c.max_buffered_messages.clamp(0, 2000) as usize)
+        .map(|_| state.hub.chat_capacity())
         .unwrap_or(0);
     if let Some(events) = history["events"].as_array_mut() {
         let excess = events.len().saturating_sub(limit);

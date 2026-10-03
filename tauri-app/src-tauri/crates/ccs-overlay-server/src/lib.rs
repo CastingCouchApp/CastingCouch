@@ -54,7 +54,12 @@ impl OverlayServer {
         hub: Arc<RealtimeHub>,
         port: u16,
     ) -> Result<Self, OverlayServerError> {
-        hub.configure_history(paths.overlay_root.join("chat-history.json"))
+        OverlayLayoutStore::with_hub(&paths.overlay_layouts, hub.clone())
+            .refresh_chat_capacity()
+            .await
+            .map_err(std::io::Error::other)?;
+        let loaded = settings.load().await.map_err(std::io::Error::other)?;
+        hub.configure_history(chat_history_path(&paths, &loaded))
             .map_err(std::io::Error::other)?;
         let addr = SocketAddr::from(([127, 0, 0, 1], port));
         let listener = tokio::net::TcpListener::bind(addr)
@@ -99,6 +104,16 @@ impl OverlayServer {
     pub fn stop(&self) {
         let _ = self.shutdown.send(true);
     }
+}
+
+pub fn chat_history_path(paths: &AppPaths, settings: &ccs_core::AppSettings) -> std::path::PathBuf {
+    let root = settings.overlay.root_path.trim();
+    if root.is_empty() {
+        paths.overlay_root.clone()
+    } else {
+        ccs_core::paths::expand_path(root)
+    }
+    .join("chat-history.json")
 }
 
 pub fn router_for_tests(state: OverlayState) -> Router {

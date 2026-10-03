@@ -2,6 +2,133 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 #[test]
+fn native_canvas_deletion_updates_the_same_chat_capacity_and_history_as_http() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    tauri::async_runtime::block_on(async {
+        let state = app.state::<AppState>();
+        let layouts = OverlayLayoutStore::new(&state.paths.overlay_layouts);
+        layouts
+            .save(
+                "default",
+                &json!({"items":[{"type":"chat","props":{"maxLines":500}}]}),
+            )
+            .await
+            .unwrap();
+        let server = OverlayServer::start(
+            state.settings.clone(),
+            state.paths.clone(),
+            state.hub.clone(),
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.hub.chat_capacity(), 1000);
+        let copy = call(&window, "duplicate_canvas", json!({"id":"default"})).unwrap();
+        let id = copy["id"].as_str().unwrap();
+        let http = reqwest::Client::new();
+        http.put(format!("http://127.0.0.1:{}/layout/{id}", server.port))
+            .json(&json!({"items":[{"type":"chat","props":{"maxLines":120}}]}))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+        for index in 0..900 {
+            state.hub.publish(&json!({"source":"twitch","type":"channel.chat.message","data":{"messageId":index.to_string()}}));
+        }
+        call(&window, "delete_canvas", json!({"id":"default"})).unwrap();
+        assert_eq!(state.hub.chat_capacity(), 240);
+        assert_eq!(
+            call(&window, "chat_history", json!({})).unwrap()["events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            240
+        );
+        assert_eq!(state.hub.history()["events"][0]["data"]["messageId"], "660");
+        state.hub.flush_history().unwrap();
+        let fresh = Arc::new(RealtimeHub::new());
+        let second = OverlayServer::start(
+            state.settings.clone(),
+            state.paths.clone(),
+            fresh.clone(),
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(fresh.chat_capacity(), 240);
+        assert_eq!(fresh.history(), state.hub.history());
+        second.stop();
+        server.stop();
+    });
+}
+
+#[test]
+fn native_history_root_change_reports_failure_without_overwriting_the_corrupt_target() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    tauri::async_runtime::block_on(async {
+        let state = app.state::<AppState>();
+        let server = OverlayServer::start(
+            state.settings.clone(),
+            state.paths.clone(),
+            state.hub.clone(),
+            0,
+        )
+        .await
+        .unwrap();
+        state.hub.publish(&json!({"source":"twitch","type":"channel.chat.message","data":{"messageId":"retained"}}));
+        let target = root.path().join("other");
+        std::fs::create_dir_all(&target).unwrap();
+        let file = target.join("chat-history.json");
+        std::fs::write(&file, "corrupt").unwrap();
+        let original = call(&window, "get_settings", json!({})).unwrap();
+        let mut edited = original.clone();
+        edited["Overlay"]["RootPath"] = json!(target.to_string_lossy());
+        let result = call(
+            &window,
+            "save_settings",
+            json!({"original":original,"settings":edited}),
+        )
+        .unwrap();
+        assert_eq!(result["saved"], true);
+        assert!(result["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e.as_str().unwrap().contains("Chat-Verlauf")));
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "corrupt");
+        assert_eq!(
+            state.hub.history()["events"][0]["data"]["messageId"],
+            "retained"
+        );
+        let status = call(&window, "overlay_runtime_status", json!({})).unwrap();
+        assert!(status["error"].as_str().unwrap().contains("Chat-Verlauf"));
+        std::fs::write(&file, "[]").unwrap();
+        let saved = state.settings.load().await.unwrap();
+        state
+            .hub
+            .configure_history(ccs_overlay_server::chat_history_path(&state.paths, &saved))
+            .unwrap();
+        assert!(call(&window, "overlay_runtime_status", json!({})).unwrap()["error"].is_null());
+        assert!(state.hub.history()["events"].as_array().unwrap().is_empty());
+        let previous: Value = serde_json::from_slice(
+            &std::fs::read(state.paths.overlay_root.join("chat-history.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(previous[0]["data"]["messageId"], "retained");
+        server.stop();
+    });
+}
+
+#[test]
 fn saved_chat_appearance_notifies_actual_websocket_clients_and_survives_restart() {
     use futures_util::StreamExt;
     let root = tempfile::tempdir().unwrap();
@@ -916,6 +1043,8 @@ fn test_app_with_spotify(
             _lock: None,
         })
         .invoke_handler(tauri::generate_handler![
+            duplicate_canvas,
+            delete_canvas,
             chat_history,
             twitch_action,
             twitch_query,

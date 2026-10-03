@@ -61,6 +61,73 @@ function runtime(solo = false) {
 }
 
 describe("shared canvas/solo chat config", () => {
+    it("retains large widget histories through config changes and layout rebuilds", () => {
+        const { root, rt } = runtime();
+        const layout = rt.getLayout();
+        layout.items = [{ ...layout.items[0], props: { maxLines: 500 } }];
+        rt.setLayout(layout);
+        rt.setChatConfig({ enabled: true, maxBufferedMessages: 1000 });
+        rt.ingestChatHistory(
+            Array.from({ length: 1000 }, (_, i) => message(`m${i}`)),
+        );
+        expect(root.querySelectorAll("[data-message-id]")).toHaveLength(500);
+        rt.setChatConfig({
+            enabled: true,
+            maxBufferedMessages: 1000,
+            fontSizePx: 24,
+        });
+        rt.renderItems();
+        expect(root.querySelectorAll("[data-message-id]")).toHaveLength(500);
+        expect(root.querySelector('[data-message-id="m500"]')).not.toBeNull();
+        rt.handleRealtime({
+            source: "twitch",
+            type: "channel.chat.message_delete",
+            data: { messageId: "m999" },
+        });
+        rt.renderItems();
+        expect(root.querySelector('[data-message-id="m999"]')).toBeNull();
+        expect(root.querySelector('[data-message-id="m499"]')).not.toBeNull();
+    });
+
+    it("sizes live history for unsaved widget edits even before server config arrives", () => {
+        const { root, rt } = runtime(true);
+        const layout = rt.getLayout();
+        layout.items = [{ ...layout.items[0], props: { maxLines: 600 } }];
+        rt.setLayout(layout);
+        for (let i = 0; i < 700; i++) rt.handleRealtime(message(`live${i}`));
+        rt.renderItems();
+        expect(root.querySelectorAll("[data-message-id]")).toHaveLength(600);
+        expect(
+            root.querySelector('[data-message-id="live100"]'),
+        ).not.toBeNull();
+    });
+
+    it("fills visible history after filtering hidden commands and events", () => {
+        const { root, rt } = runtime();
+        const layout = rt.getLayout();
+        layout.items = [
+            {
+                ...layout.items[0],
+                props: {
+                    maxLines: 3,
+                    hideCommands: true,
+                    showTwitchEvents: false,
+                },
+            },
+        ];
+        rt.setLayout(layout);
+        rt.ingestChatHistory([
+            message("keep1"),
+            message("keep2"),
+            message("keep3"),
+            message("!command"),
+            { source: "twitch", type: "channel.follow", summary: "hidden" },
+        ]);
+        rt.renderItems();
+        expect(root.querySelectorAll("[data-message-id]")).toHaveLength(3);
+        expect(root.querySelector('[data-message-id="keep1"]')).not.toBeNull();
+        expect(root.querySelector('[data-message-id="!command"]')).toBeNull();
+    });
     for (const solo of [false, true])
         it(`reloads settings without reconnect and retains widget overrides (solo=${solo})`, async () => {
             const { root, rt } = runtime(solo);
@@ -70,17 +137,15 @@ describe("shared canvas/solo chat config", () => {
                 type: "channel.follow",
                 summary: "follow",
             });
-            const fetchMock = vi
-                .fn()
-                .mockResolvedValue({
-                    ok: true,
-                    json: async () => ({
-                        enabled: true,
-                        showTwitchEvents: false,
-                        fontSizePx: 24,
-                        paddingPx: 16,
-                    }),
-                });
+            const fetchMock = vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    enabled: true,
+                    showTwitchEvents: false,
+                    fontSizePx: 24,
+                    paddingPx: 16,
+                }),
+            });
             vi.stubGlobal("fetch", fetchMock);
             rt.handleRealtime({
                 source: "app",

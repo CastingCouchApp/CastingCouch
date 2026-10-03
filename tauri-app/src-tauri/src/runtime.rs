@@ -27,6 +27,15 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                     && settings.general.connection_watchdog_enabled
                     && settings.general.reconnect_spotify,
             );
+            if let Err(error) = state
+                .hub
+                .configure_history(ccs_overlay_server::chat_history_path(
+                    &state.paths,
+                    &settings,
+                ))
+            {
+                warn!(%error, "Chat-Verlauf konnte nicht geladen werden");
+            }
 
             let outputs = state.hub.live.data.read().unwrap()["obs"]["outputs"].clone();
             let music_snapshot = match music_player_snapshot(app.state::<AppState>()).await {

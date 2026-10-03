@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct RealtimeHub {
+    pub(crate) chat_layout_lock: Arc<tokio::sync::Mutex<()>>,
     pub live: Arc<crate::live::LiveState>,
     pub obs: Arc<std::sync::RwLock<Option<Arc<dyn crate::ObsOverlayProvider>>>>,
     tx: broadcast::Sender<String>,
@@ -21,6 +22,7 @@ impl RealtimeHub {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(256);
         Self {
+            chat_layout_lock: Arc::new(tokio::sync::Mutex::new(())),
             live: Arc::new(crate::live::LiveState::default()),
             obs: Arc::new(std::sync::RwLock::new(None)),
             tx,
@@ -52,13 +54,49 @@ impl RealtimeHub {
     }
 
     pub fn configure_history(&self, path: std::path::PathBuf) -> Result<(), String> {
-        self.live.configure_history(path)
+        let result = self.live.configure_history(path);
+        self.set_history_error(
+            "chatHistoryReadError",
+            result
+                .as_ref()
+                .err()
+                .map(|e| format!("Chat-Verlauf konnte nicht geladen werden: {e}")),
+        );
+        result
+    }
+    pub fn chat_capacity(&self) -> usize {
+        self.live.chat_capacity()
+    }
+    pub fn configure_chat_buffer(&self, capacity: usize) {
+        if self.live.configure_chat_buffer(capacity) {
+            self.publish(&serde_json::json!({"source":"app","type":"app.chat.config","at":chrono::Utc::now().to_rfc3339(),"summary":"Chat-Puffer aktualisiert","data":{}}));
+        }
     }
     pub fn history(&self) -> Value {
         self.live.history()
     }
     pub fn flush_history(&self) -> Result<(), String> {
-        self.live.flush_history()
+        let result = self.live.flush_history();
+        self.set_history_error(
+            "chatHistoryWriteError",
+            result
+                .as_ref()
+                .err()
+                .map(|e| format!("Chat-Verlauf konnte nicht gespeichert werden: {e}")),
+        );
+        result
+    }
+    pub(crate) fn set_history_error(&self, key: &str, message: Option<String>) {
+        let mut data = self.live.data.write().unwrap();
+        data[key] = message.map(Value::String).unwrap_or(Value::Null);
+        data["chatHistoryError"] = [
+            "chatHistoryReadError",
+            "chatHistoryWriteError",
+            "chatHistoryCapacityError",
+        ]
+        .iter()
+        .find_map(|key| data.get(*key).filter(|value| !value.is_null()).cloned())
+        .unwrap_or(Value::Null);
     }
     pub fn set_countdown(&self, seconds: i64, label: &str) -> Result<(), String> {
         self.live.set_countdown(seconds, label)?;

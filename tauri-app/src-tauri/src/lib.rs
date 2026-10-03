@@ -887,6 +887,16 @@ async fn save_settings_impl(
         state.alerts.clear_queue().await;
     }
     let mut warnings = Vec::<String>::new();
+    if old.overlay.root_path != next.overlay.root_path {
+        if let Err(error) = state
+            .hub
+            .configure_history(ccs_overlay_server::chat_history_path(&state.paths, &next))
+        {
+            warnings.push(format!(
+                "Einstellungen gespeichert; Chat-Verlauf konnte nicht gewechselt werden: {error}"
+            ));
+        }
+    }
     if let Err(error) = state.music_player.apply_provider().await {
         warnings.push(format!("Einstellungen gespeichert; Musikprovider konnte nicht vollständig gewechselt werden: {error}"));
     }
@@ -979,7 +989,10 @@ fn canvas_dto(settings: &AppSettings, id: &str, name: &str) -> CanvasDto {
 }
 
 fn canvas_service(state: &AppState) -> OverlayCanvasService<OverlayLayoutStore> {
-    OverlayCanvasService::new(OverlayLayoutStore::new(state.paths.overlay_layouts.clone()))
+    OverlayCanvasService::new(OverlayLayoutStore::with_hub(
+        state.paths.overlay_layouts.clone(),
+        state.hub.clone(),
+    ))
 }
 
 #[tauri::command]
@@ -1646,8 +1659,13 @@ async fn overlay_runtime_status(state: State<'_, AppState>) -> Result<Value, Str
     let server = state.overlay.lock().await;
     let settings = state.settings.load().await.ok();
     let data = state.hub.live.data.read().unwrap().clone();
+    let error = ["serverError", "dataError", "chatHistoryError"]
+        .iter()
+        .find_map(|key| data.get(*key).filter(|v| !v.is_null()))
+        .cloned()
+        .unwrap_or(Value::Null);
     Ok(
-        json!({"running":server.as_ref().is_some_and(|s|s.is_running()),"port":server.as_ref().map(|s|s.port),"configuredPort":settings.map(|s|s.overlay.web_server_port),"error":data.get("serverError").filter(|v|!v.is_null()).or_else(||data.get("dataError")).cloned().unwrap_or(Value::Null)}),
+        json!({"running":server.as_ref().is_some_and(|s|s.is_running()),"port":server.as_ref().map(|s|s.port),"configuredPort":settings.map(|s|s.overlay.web_server_port),"error":error}),
     )
 }
 fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {

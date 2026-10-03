@@ -1,5 +1,6 @@
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio::fs;
 
 #[derive(Debug, thiserror::Error)]
@@ -12,14 +13,104 @@ pub enum LayoutError {
     Json(#[from] serde_json::Error),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct OverlayLayoutStore {
     root: PathBuf,
+    hub: Option<Arc<crate::RealtimeHub>>,
+}
+impl std::fmt::Debug for OverlayLayoutStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OverlayLayoutStore")
+            .field("root", &self.root)
+            .finish_non_exhaustive()
+    }
 }
 
 impl OverlayLayoutStore {
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self {
+            root: root.into(),
+            hub: None,
+        }
+    }
+    pub fn with_hub(root: impl Into<PathBuf>, hub: Arc<crate::RealtimeHub>) -> Self {
+        Self {
+            root: root.into(),
+            hub: Some(hub),
+        }
+    }
+    pub async fn resolve_chat_capacity(&self) -> Result<usize, LayoutError> {
+        let mut max_lines: i64 = 80;
+        let mut files = match fs::read_dir(&self.root).await {
+            Ok(files) => files,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(160),
+            Err(error) => return Err(error.into()),
+        };
+        while let Some(file) = files.next_entry().await? {
+            if !file.file_type().await?.is_file()
+                || !file
+                    .path()
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+            {
+                continue;
+            }
+            let bytes = fs::read(file.path()).await?;
+            let Ok(layout) = serde_json::from_slice::<Value>(&bytes) else {
+                continue;
+            };
+            for item in layout["items"].as_array().into_iter().flatten() {
+                if !item["type"]
+                    .as_str()
+                    .is_some_and(|s| s.eq_ignore_ascii_case("chat"))
+                {
+                    continue;
+                }
+                let value = &item["props"]["maxLines"];
+                let lines = value
+                    .as_i64()
+                    .filter(|n| i32::try_from(*n).is_ok())
+                    .or_else(|| {
+                        value
+                            .as_str()
+                            .and_then(|s| s.trim().parse::<i32>().ok())
+                            .map(i64::from)
+                    })
+                    .unwrap_or(80);
+                max_lines = max_lines.max(lines);
+            }
+        }
+        Ok((max_lines * 2).clamp(0, 2000) as usize)
+    }
+    async fn refresh_capacity_unlocked(&self) -> Result<(), LayoutError> {
+        if let Some(hub) = &self.hub {
+            hub.configure_chat_buffer(self.resolve_chat_capacity().await?);
+            hub.set_history_error("chatHistoryCapacityError", None);
+        }
+        Ok(())
+    }
+    pub async fn refresh_chat_capacity(&self) -> Result<(), LayoutError> {
+        let _guard = if let Some(hub) = &self.hub {
+            Some(hub.chat_layout_lock.lock().await)
+        } else {
+            None
+        };
+        self.refresh_capacity_unlocked().await
+    }
+    async fn notify_capacity(&self) {
+        if let Err(error) = self.refresh_capacity_unlocked().await {
+            // The layout was already saved. Preserve the previous usable capacity.
+            tracing::warn!(%error, "Chat-Puffer konnte nicht aktualisiert werden");
+            if let Some(hub) = &self.hub {
+                hub.set_history_error(
+                    "chatHistoryCapacityError",
+                    Some(format!(
+                        "Chat-Puffer konnte nicht aktualisiert werden: {error}"
+                    )),
+                );
+            }
+        }
     }
 
     pub fn root(&self) -> &Path {
@@ -62,12 +153,18 @@ impl OverlayLayoutStore {
     }
 
     pub async fn save(&self, instance_id: &str, layout: &Value) -> Result<(), LayoutError> {
+        let _guard = if let Some(hub) = &self.hub {
+            Some(hub.chat_layout_lock.lock().await)
+        } else {
+            None
+        };
         let path = self.layout_path(instance_id)?;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await?;
         }
         let json = serde_json::to_vec_pretty(layout)?;
         fs::write(&path, json).await?;
+        self.notify_capacity().await;
         Ok(())
     }
 
@@ -77,12 +174,21 @@ impl OverlayLayoutStore {
     }
 
     pub async fn delete(&self, instance_id: &str) -> Result<(), LayoutError> {
+        let _guard = if let Some(hub) = &self.hub {
+            Some(hub.chat_layout_lock.lock().await)
+        } else {
+            None
+        };
         let path = self.layout_path(instance_id)?;
-        match fs::remove_file(&path).await {
+        let result = match fs::remove_file(&path).await {
             Ok(()) => Ok(()),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(err) => Err(err.into()),
+        };
+        if result.is_ok() {
+            self.notify_capacity().await;
         }
+        result
     }
 
     fn layout_path(&self, instance_id: &str) -> Result<PathBuf, LayoutError> {
@@ -108,6 +214,51 @@ fn normalize_instance_id(instance_id: &str) -> Result<&str, LayoutError> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn chat_capacity_uses_all_layouts_and_preserves_a_minimum_of_160() {
+        let dir = tempdir().unwrap();
+        let store = OverlayLayoutStore::new(dir.path());
+        assert_eq!(store.resolve_chat_capacity().await.unwrap(), 160);
+        for (value, expected) in [
+            (json!(40), 160),
+            (json!(120), 240),
+            (json!(" 750 "), 1500),
+            (json!(2000), 2000),
+            (json!(i32::MAX), 2000),
+            (json!(2147483648_i64), 160),
+            (json!(12.5), 160),
+            (json!("invalid"), 160),
+        ] {
+            store
+                .save(
+                    "main",
+                    &json!({"items":[{"type":"CHAT","props":{"maxLines":value}}]}),
+                )
+                .await
+                .unwrap();
+            assert_eq!(store.resolve_chat_capacity().await.unwrap(), expected);
+        }
+        std::fs::write(dir.path().join("broken.json"), "corrupt").unwrap();
+        std::fs::create_dir(dir.path().join("directory.json")).unwrap();
+        store.save("other", &json!({"items":[{"type":"chat","props":{"maxLines":"300"}},{"type":"text","props":{"maxLines":2000}}]})).await.unwrap();
+        assert_eq!(store.resolve_chat_capacity().await.unwrap(), 600);
+    }
+
+    #[tokio::test]
+    async fn concurrent_layout_mutations_update_one_shared_chat_buffer() {
+        let dir = tempdir().unwrap();
+        let hub = Arc::new(crate::RealtimeHub::new());
+        let store = OverlayLayoutStore::with_hub(dir.path(), hub.clone());
+        let high = json!({"items":[{"type":"chat","props":{"maxLines":500}}]});
+        let low = json!({"items":[{"type":"chat","props":{"maxLines":40}}]});
+        let (one, two) = tokio::join!(store.save("high", &high), store.save("low", &low));
+        one.unwrap();
+        two.unwrap();
+        assert_eq!(hub.chat_capacity(), 1000);
+        store.delete("high").await.unwrap();
+        assert_eq!(hub.chat_capacity(), 160);
+    }
 
     #[tokio::test]
     async fn duplicate_copies_layout_file() {

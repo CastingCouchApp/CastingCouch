@@ -12,7 +12,7 @@ import { applyCutoutStackMask } from '../shapes/cutout';
 import {
   updateOnline, updateSpotify, updateChat, updateEndingStats, updateText, updateImage,
   updateCountdown, updateSocials, updatePartnerRoulette, paintSpotifyProgress, paintEndingStats, paintCountdown,
-  enqueueAlert, appendChatMessage, appendChatEvent, clearChat, removeChatMessageById, removeChatMessagesByUser,
+  enqueueAlert, appendChatMessage, appendChatEvent, clearChat, restoreChatHistory, removeChatMessageById, removeChatMessagesByUser,
   CHAT_EVENT_TYPES,
   updateGoalBar, updateEventTicker, pushEventTickerItem, updateViewerCount, updateLowerThird,
   updateQrCode, updateBrbPanel, paintBrbPanel, updateAnnouncementBar, updateBubatzCantina, updateFruppisLandadel,
@@ -37,14 +37,24 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     const onAfterRender = opts.onAfterRender || null;
     const chatHistory = [];
     const seenMessageIds = new Set();
-    const CHAT_HISTORY_LIMIT = 200;
+    function chatHistoryLimit() {
+      let maxLines = 80;
+      for (const item of layout.items || []) {
+        if (String(item.type).toLowerCase() !== "chat") continue;
+        const lines = Number(item.props?.maxLines ?? 80);
+        if (Number.isFinite(lines)) maxLines = Math.max(maxLines, lines);
+      }
+      const configured = Number(chatConfig?.maxBufferedMessages ?? 160);
+      return Math.min(2000, Math.max(maxLines * 2, Number.isFinite(configured) ? configured : 160));
+    }
 
     const canvas = document.createElement("div");
     canvas.className = "ccs-canvas";
     root.appendChild(canvas);
 
     function trimChatHistory() {
-      while (chatHistory.length > CHAT_HISTORY_LIMIT) {
+      const limit = chatHistoryLimit();
+      while (chatHistory.length > limit) {
         const removed = chatHistory.shift();
         if (removed && removed.kind === "message" && removed.data && removed.data.messageId) {
           seenMessageIds.delete(String(removed.data.messageId));
@@ -109,17 +119,10 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
 
     function restoreChatWidget(el) {
       if (!el || !el._lines) return;
-      clearChat(el);
       el.hidden = chatConfig?.enabled === false;
       el.style.display = el.hidden ? "none" : "";
-      if (el.hidden) return;
-      for (const entry of chatHistory) {
-        if (entry.kind === "message") {
-          appendChatMessage(el, entry.data || {});
-        } else if (entry.kind === "event" && el._showTwitchEvents !== false) {
-          appendChatEvent(el, entry.payload || {});
-        }
-      }
+      if (el.hidden) { clearChat(el); return; }
+      restoreChatHistory(el, chatHistory);
     }
 
     function restoreAllChatWidgets() {
@@ -183,6 +186,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     }
 
     function renderItems() {
+      trimChatHistory();
       clearItems();
       const items = (layout.items || []).slice().sort((a, b) => (a.z || 0) - (b.z || 0));
       let cutoutSeq = 0;
@@ -288,6 +292,7 @@ export function createRuntime(options: RuntimeOptions): CreateRuntime {
     function setChatConfig(next) {
       chatConfigRevision++;
       chatConfig = next || null;
+      trimChatHistory();
       for (const node of itemNodes.values()) {
         if (node.item.type === "chat") {
           updateChat(node.content, node.item, chatConfig);

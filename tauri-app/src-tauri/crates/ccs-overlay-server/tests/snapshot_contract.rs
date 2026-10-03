@@ -49,7 +49,7 @@ fn event_updates_and_partial_snapshots_preserve_other_data() {
     hub.live
         .merge_snapshot(&json!({"stream":{"isLive":true,"elapsedSeconds":12}}));
     hub.publish(&json!({"type":"channel.follow","summary":"New follower","data":{"user":"Alice"}}));
-    hub.publish(&json!({"type":"channel.chat.message","data":{"messageId":"1","userId":"u"}}));
+    hub.publish(&json!({"source":"twitch","type":"channel.chat.message","data":{"messageId":"1","userId":"u"}}));
     hub.live.merge_snapshot(&json!({"music":{"title":"Track"}}));
     let data = hub.live.data.read().unwrap();
     assert_eq!(data["stats"]["followersGained"], 1);
