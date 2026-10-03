@@ -2,14 +2,22 @@ use super::*;
 pub(super) fn bind_stream_history(
     obs: &ObsClient,
     history: Arc<ccs_modules::stream_history::StreamHistoryRuntime>,
+    stream_end: Arc<ccs_modules::stream_end::StreamEndRuntime>,
 ) {
     obs.set_stream_observer(Arc::new(move |event| {
         if let Err(error) = history.observe_stream_event(event.active, event.at) {
             warn!(%error,"OBS-Sitzungsereignis konnte nicht gespeichert werden");
         }
+        if !event.active {
+            let runtime = stream_end.clone();
+            tauri::async_runtime::spawn(async move {
+                runtime.observe_obs_stopped().await;
+            });
+        }
     }));
 }
 pub(super) fn spawn_runtime(app: AppHandle) {
+    stream_end_host::spawn_events(app.clone(), app.state::<AppState>().stream_end.clone());
     spawn_stream_history_events(app.clone(), app.state::<AppState>().stream_history.clone());
     spawn_extension_pack_events(app.clone(), app.state::<AppState>().hub.clone());
     spawn_obs_data(app.clone());
@@ -195,6 +203,13 @@ fn spawn_obs_data(app: AppHandle) {
             let revision = state.obs.stream_revision();
             let requested_at = state.stream_history.begin_poll();
             let outputs = state.obs.output_status().await.unwrap_or(Value::Null);
+            if outputs
+                .pointer("/stream/outputActive")
+                .and_then(Value::as_bool)
+                == Some(false)
+            {
+                state.stream_end.observe_obs_stopped().await;
+            }
             let scene = state.obs.current_program_scene().await.unwrap_or_default();
             let metrics =
                 serde_json::to_value(state.twitch_metrics.snapshot().await).unwrap_or(Value::Null);

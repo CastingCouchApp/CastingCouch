@@ -1,6 +1,63 @@
 use super::*;
 
 #[test]
+fn stream_end_preferences_cross_native_ipc_preserve_parallel_settings_and_restart_idle() {
+    tauri::async_runtime::block_on(async {
+        let root = tempfile::tempdir().unwrap();
+        let app = test_app(root.path().into());
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let initial = call(&window, "stream_end_snapshot", json!({})).unwrap();
+        assert_eq!(initial["draft"]["mode"], "EndSceneThenStop");
+        assert_eq!(
+            call(&window, "stream_end_status", json!({})).unwrap()["phase"],
+            "idle"
+        );
+        let mut original = initial["original"].clone();
+        original["Branding"]["DisplayName"] = json!("parallel");
+        call(
+            &window,
+            "save_settings",
+            json!({"original":initial["original"],"settings":original}),
+        )
+        .unwrap();
+        let mut draft = initial["draft"].clone();
+        draft["endSceneSeconds"] = json!(3);
+        draft["plannedSeconds"] = json!(600);
+        let saved = call(
+            &window,
+            "save_stream_end_preferences",
+            json!({"original":initial["original"],"draft":draft}),
+        )
+        .unwrap();
+        assert_eq!(saved["original"]["Branding"]["DisplayName"], "parallel");
+        assert_eq!(saved["original"]["Twitch"]["EndSceneDurationSeconds"], 3);
+        assert_eq!(saved["original"]["Workflow"]["EndSceneSeconds"], 3);
+        draft["endSceneSeconds"] = json!(4);
+        assert!(call(
+            &window,
+            "save_stream_end_preferences",
+            json!({"original":initial["original"],"draft":draft})
+        )
+        .is_err());
+        assert!(call(&window, "start_stream_end", json!({"planned":false})).is_err());
+        let restarted = test_app(root.path().into());
+        let next = WebviewWindowBuilder::new(&restarted, "main", Default::default())
+            .build()
+            .unwrap();
+        assert_eq!(
+            call(&next, "stream_end_snapshot", json!({})).unwrap()["draft"]["plannedSeconds"],
+            600
+        );
+        assert_eq!(
+            call(&next, "stream_end_status", json!({})).unwrap()["phase"],
+            "idle"
+        );
+    });
+}
+
+#[test]
 fn dashboard_commands_persist_layout_keep_parallel_settings_and_report_conflicts() {
     use tauri::Listener;
     tauri::async_runtime::block_on(async {
@@ -228,6 +285,8 @@ fn native_obs_commands_capture_immediate_session_events_and_forward_history_chan
         runtime::spawn_stream_history_events(app.handle().clone(), state.stream_history.clone());
         let server = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = server.local_addr().unwrap().port();
+        let requests = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let server_requests = requests.clone();
         let task = tokio::spawn(async move {
             let (socket, _) = server.accept().await.unwrap();
             let mut ws = tokio_tungstenite::accept_async(socket).await.unwrap();
@@ -246,10 +305,13 @@ fn native_obs_commands_capture_immediate_session_events_and_forward_history_chan
             ))
             .await
             .unwrap();
+            let mut streaming = false;
             while let Some(Ok(Message::Text(text))) = ws.next().await {
                 let request: Value = serde_json::from_str(&text).unwrap();
                 let kind = request["d"]["requestType"].as_str().unwrap();
+                server_requests.lock().unwrap().push(kind.to_string());
                 if matches!(kind, "StartStream" | "StopStream") {
+                    streaming = kind == "StartStream";
                     ws.send(Message::Text(json!({"op":5,"d":{"eventType":"StreamStateChanged","eventData":{"outputActive":kind=="StartStream","outputState":if kind=="StartStream" {"OBS_WEBSOCKET_OUTPUT_STARTED"}else{"OBS_WEBSOCKET_OUTPUT_STOPPED"}}}}).to_string().into())).await.unwrap();
                 }
                 let data = if kind == "GetSceneList" {
@@ -260,6 +322,8 @@ fn native_obs_commands_capture_immediate_session_events_and_forward_history_chan
                     assert_eq!(request["d"]["requestData"]["sourceName"], "Live");
                     assert_eq!(request["d"]["requestData"]["imageWidth"], 960);
                     json!({"imageData":"data:image/png;base64,iVBORw0KGgo="})
+                } else if kind == "GetStreamStatus" {
+                    json!({"outputActive":streaming,"outputDuration":1000})
                 } else {
                     json!({})
                 };
@@ -297,6 +361,79 @@ fn native_obs_commands_capture_immediate_session_events_and_forward_history_chan
         let snapshot = call(&window, "stream_history_snapshot", json!({})).unwrap();
         assert!(snapshot["active"].is_null());
         assert_eq!(snapshot["sessions"][0]["NewSubscriptions"], 1);
+        // The actual assistant crosses Tauri IPC and the real OBS v5 client.
+        let original = call(&window, "get_settings", json!({})).unwrap();
+        let mut configured = original.clone();
+        configured["Obs"]["EndScene"] = json!("End");
+        configured["Obs"]["StartScene"] = json!("Start");
+        configured["Spotify"]["PauseOnStreamEnd"] = json!(false);
+        configured["Twitch"]["EndSceneDurationSeconds"] = json!(1);
+        call(
+            &window,
+            "save_settings",
+            json!({"original":original,"settings":configured}),
+        )
+        .unwrap();
+        stream_end_host::spawn_events(app.handle().clone(), state.stream_end.clone());
+        call(
+            &window,
+            "obs_control",
+            json!({"control":{"action":"start_stream"}}),
+        )
+        .unwrap();
+        call(
+            &window,
+            "start_stream_end",
+            json!({"planned":true,"seconds":30}),
+        )
+        .unwrap();
+        assert_eq!(
+            call(&window, "stream_end_status", json!({})).unwrap()["phase"],
+            "scheduled"
+        );
+        let blocked = call(&window, "start_twitch_raid", json!({"login":"target"})).unwrap_err();
+        assert!(blocked.as_str().unwrap().contains("Assistent"));
+        call(&window, "stream_end_control", json!({"action":"abort"})).unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            while state.stream_end.snapshot().await.active {
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            requests
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|kind| kind.as_str() == "StopStream")
+                .count(),
+            1
+        );
+        call(&window, "start_stream_end", json!({"planned":false})).unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(4), async {
+            while state.stream_end.snapshot().await.active {
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        let end = call(&window, "stream_end_status", json!({})).unwrap();
+        assert_eq!(end["phase"], "completed", "{end}");
+        assert_eq!(
+            state.obs.current_program_scene().await.as_deref(),
+            Some("Start")
+        );
+        assert_eq!(
+            requests
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|kind| kind.as_str() == "StopStream")
+                .count(),
+            2
+        );
+        assert!(call(&window, "stream_history_snapshot", json!({})).unwrap()["active"].is_null());
         let notification = tokio::time::timeout(std::time::Duration::from_secs(2), received.recv())
             .await
             .unwrap()
@@ -2340,7 +2477,8 @@ fn test_app_with_clients(
         hub.clone(),
     ));
     bridge.set_stream_history(stream_history.clone());
-    runtime::bind_stream_history(&obs, stream_history.clone());
+    let stream_end = Arc::new(ccs_modules::stream_end::StreamEndRuntime::default());
+    runtime::bind_stream_history(&obs, stream_history.clone(), stream_end.clone());
     let creator_intelligence = Arc::new(
         ccs_modules::creator_intelligence::CreatorIntelligenceRuntime::new(
             paths.data_root.clone(),
@@ -2354,6 +2492,8 @@ fn test_app_with_clients(
     mock_builder()
         .manage(StartupState::default())
         .manage(AppState {
+            stream_end,
+            stream_end_gate: Mutex::new(()),
             ytm,
             music_player,
             music_overlay,
@@ -2380,6 +2520,11 @@ fn test_app_with_clients(
             _lock: None,
         })
         .invoke_handler(tauri::generate_handler![
+            stream_end_snapshot,
+            stream_end_status,
+            save_stream_end_preferences,
+            start_stream_end,
+            stream_end_control,
             dashboard_snapshot,
             save_dashboard,
             dashboard_image_preview,

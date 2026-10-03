@@ -101,6 +101,13 @@ impl OverlayEventBridge {
         at: DateTime<Utc>,
         data: BTreeMap<String, String>,
     ) -> Value {
+        let event_type = if event_type == "channel.raid"
+            && data.get("raidDirection").is_some_and(|s| s == "outgoing")
+        {
+            "channel.raid.outgoing"
+        } else {
+            event_type
+        };
         self.publish(&OverlayRealtimeEvent::new(
             "twitch", event_type, at, summary, data,
         ))
@@ -443,6 +450,56 @@ mod tests {
         assert_eq!(root["source"], "twitch");
         assert_eq!(root["type"], "channel.follow");
         assert_eq!(root["data"]["user_name"], "alice");
+    }
+
+    #[test]
+    fn outgoing_raid_has_a_distinct_envelope_and_never_counts_as_incoming() {
+        let root = tempfile::tempdir().unwrap();
+        let hub = Arc::new(RealtimeHub::default());
+        let history = Arc::new(crate::stream_history::StreamHistoryRuntime::new(
+            root.path().into(),
+            hub.clone(),
+        ));
+        history
+            .observe(
+                &serde_json::json!({"stream":{"available":true,"isLive":true}}),
+                &serde_json::json!({}),
+                &serde_json::json!({}),
+                at(),
+            )
+            .unwrap();
+        let bridge = OverlayEventBridge::new(hub.clone());
+        bridge.set_stream_history(history.clone());
+        let outgoing = bridge.from_twitch(
+            "channel.raid",
+            "raid",
+            at(),
+            map_of([
+                ("raidDirection", "outgoing"),
+                ("to_broadcaster_user_name", "Target"),
+            ]),
+        );
+        assert_eq!(outgoing["type"], "channel.raid.outgoing");
+        assert_eq!(
+            crate::twitch::alert_type_for_event(outgoing["type"].as_str().unwrap()),
+            None
+        );
+        assert_eq!(
+            history.snapshot(None).unwrap().active.unwrap()["IncomingRaids"],
+            0
+        );
+        assert_eq!(hub.live.data.read().unwrap()["stats"]["incomingRaids"], 0);
+        bridge.from_twitch(
+            "channel.raid",
+            "incoming",
+            at(),
+            map_of([("from_broadcaster_user_name", "Other")]),
+        );
+        assert_eq!(
+            history.snapshot(None).unwrap().active.unwrap()["IncomingRaids"],
+            1
+        );
+        assert_eq!(bridge.twitch_event_feed().events.len(), 2);
     }
 
     #[tokio::test]

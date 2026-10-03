@@ -844,3 +844,60 @@ async fn abort_while_successful_cancel_is_in_flight_does_not_cancel_twice() {
         .await
         .contains(&StreamEndOperation::StopStream));
 }
+
+#[tokio::test(start_paused = true)]
+async fn external_obs_stop_aborts_planning_and_raid_without_another_stop_request() {
+    for mode in ["Immediate", "EndSceneRaidThenStop"] {
+        let (runtime, io) = setup(mode, if mode == "Immediate" { 60 } else { 0 }).await;
+        runtime.observe_obs_stopped().await;
+        settle().await;
+        assert_eq!(runtime.snapshot().await.phase, "aborted");
+        assert!(runtime.snapshot().await.status.contains("außerhalb"));
+        assert!(!io
+            .calls
+            .lock()
+            .await
+            .contains(&StreamEndOperation::StopStream));
+    }
+}
+#[tokio::test(start_paused = true)]
+async fn unresolved_idle_raid_can_be_cleared_only_after_explicit_external_resolution() {
+    let (runtime, io) = setup("EndSceneRaidThenStop", 0).await;
+    assert!(runtime.resolve_pending_raid().await.is_err());
+    io.replies
+        .lock()
+        .await
+        .push_back((StreamEndOperation::CancelRaid, Err("Twitch API 403".into())));
+    runtime.control("abort").await.unwrap();
+    settle().await;
+    assert!(runtime.snapshot().await.raid_pending);
+    runtime.resolve_pending_raid().await.unwrap();
+    runtime
+        .start(plan("Immediate"), 0, io.clone())
+        .await
+        .unwrap();
+    settle().await;
+    assert_eq!(runtime.snapshot().await.phase, "completed");
+}
+
+#[tokio::test(start_paused = true)]
+async fn queued_abort_is_visible_until_the_mutation_settles_and_cleanup_finishes() {
+    let runtime = Arc::new(StreamEndRuntime::default());
+    let io = Arc::new(FakeIo::default());
+    io.hold_start.store(true, Ordering::SeqCst);
+    runtime
+        .start(plan("EndSceneRaidThenStop"), 0, io.clone())
+        .await
+        .unwrap();
+    settle().await;
+    runtime.control("abort").await.unwrap();
+    assert_eq!(
+        runtime.snapshot().await.pending_action.as_deref(),
+        Some("abort")
+    );
+    assert!(runtime.snapshot().await.active);
+    io.release_start.notify_one();
+    settle().await;
+    assert_eq!(runtime.snapshot().await.phase, "aborted");
+    assert_eq!(runtime.snapshot().await.pending_action, None);
+}

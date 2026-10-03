@@ -18,7 +18,7 @@ mod tokens;
 pub use chat_catalog::ChatCatalogStatus;
 pub use operations::{TwitchAction, TwitchQuery};
 
-pub use eventsub::{alert_type_for_event, EventSubClient, TwitchEvent};
+pub use eventsub::{alert_type_for_event, EventSubClient, OutgoingRaidSubscription, TwitchEvent};
 pub use helix::{TwitchHelixClient, HELIX_BASE_URL};
 pub use oauth::{TwitchOAuthClient, OAUTH_DEVICE_URL, OAUTH_TOKEN_URL, OAUTH_VALIDATE_URL};
 pub use tokens::{TwitchDeviceCode, TwitchHelixUser, TwitchTokenSet, TwitchTokenValidation};
@@ -258,6 +258,34 @@ impl TwitchClient {
 
     pub async fn needs_eventsub_reconnect(&self) -> bool {
         self.needs_reconnect(true).await
+    }
+    pub async fn outgoing_raid_subscription(&self) -> OutgoingRaidSubscription {
+        self.eventsub.outgoing_raid_subscription().await
+    }
+    pub async fn raid_broadcaster(
+        &self,
+        client_id: &str,
+        channel: &str,
+    ) -> ModuleResult<(String, String)> {
+        let (helix, id, _) = self.operation_client(client_id, channel).await?;
+        if channel.trim().is_empty() {
+            let user = self
+                .current_user()
+                .await
+                .ok_or_else(|| ModuleError::Message("Twitch nicht verbunden".into()))?;
+            Ok((id, user.login))
+        } else {
+            let user = helix
+                .get_user_by_login(channel)
+                .await?
+                .ok_or_else(|| ModuleError::Message("Twitch-Kanal nicht gefunden".into()))?;
+            if user.id != id {
+                return Err(ModuleError::Message(
+                    "Twitch-Kanal hat sich während der Prüfung geändert".into(),
+                ));
+            }
+            Ok((id, user.login))
+        }
     }
     pub async fn needs_reconnect(&self, eventsub_enabled: bool) -> bool {
         self.want_connected.load(Ordering::SeqCst)

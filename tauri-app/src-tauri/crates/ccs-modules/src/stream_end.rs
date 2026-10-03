@@ -248,6 +248,7 @@ pub struct RaidIdentity {
 pub enum StreamEndReply {
     Done,
     Target(Option<RaidIdentity>),
+    Warnings(Vec<String>),
 }
 pub type IoFuture<'a> = Pin<Box<dyn Future<Output = Result<StreamEndReply, String>> + Send + 'a>>;
 /// Adapter uses the same OBS/Twitch/music clients as the normal service commands.
@@ -270,6 +271,9 @@ pub struct StreamEndSnapshot {
     pub target_display_name: String,
     pub can_raid_now: bool,
     pub raid_pending: bool,
+    pub pending_action: Option<String>,
+    pub broadcaster_id: String,
+    pub broadcaster_login: String,
     pub error: Option<String>,
     pub warnings: Vec<String>,
 }
@@ -287,6 +291,9 @@ impl Default for StreamEndSnapshot {
             target_display_name: String::new(),
             can_raid_now: false,
             raid_pending: false,
+            pending_action: None,
+            broadcaster_id: String::new(),
+            broadcaster_login: String::new(),
             error: None,
             warnings: vec![],
         }
@@ -295,6 +302,7 @@ impl Default for StreamEndSnapshot {
 enum Message {
     Control(String),
     Event(TwitchEvent),
+    ExternalStop,
 }
 #[derive(Default)]
 struct RuntimeState {
@@ -407,6 +415,8 @@ impl StreamEndRuntime {
             target_login: crate::twitch::normalize_raid_channel(
                 &plan.preferences.selected_raid_channel,
             ),
+            broadcaster_id: plan.broadcaster_id.clone(),
+            broadcaster_login: plan.broadcaster_login.clone(),
             ..StreamEndSnapshot::default()
         };
         state.snapshot = snapshot.clone();
@@ -427,6 +437,7 @@ impl StreamEndRuntime {
             raid_now: false,
             skip_end: false,
             start_now: false,
+            external_stop: false,
             raid_confirmed: false,
             raid_requested_at: None,
             target: None,
@@ -436,7 +447,7 @@ impl StreamEndRuntime {
         Ok(snapshot)
     }
     pub async fn control(&self, action: &str) -> Result<(), String> {
-        let state = self.state.lock().await;
+        let mut state = self.state.lock().await;
         let snapshot = &state.snapshot;
         let permitted = match action {
             "abort" => {
@@ -468,7 +479,10 @@ impl StreamEndRuntime {
             .as_ref()
             .ok_or("Streamende bereits abgeschlossen")?
             .try_send(Message::Control(action.into()))
-            .map_err(|_| "Streamende-Steuerung ausgelastet; erneut versuchen".into())
+            .map_err(|_| "Streamende-Steuerung ausgelastet; erneut versuchen".to_string())?;
+        state.snapshot.pending_action = Some(action.into());
+        let _ = self.changes.send(state.snapshot.clone());
+        Ok(())
     }
     pub async fn observe_twitch(&self, event: TwitchEvent) {
         if event.event_type != "channel.raid" {
@@ -486,6 +500,27 @@ impl StreamEndRuntime {
                 confirmations.send_replace(Some(event));
             }
         }
+    }
+    pub async fn observe_obs_stopped(&self) {
+        let state = self.state.lock().await;
+        if state.snapshot.active
+            && !matches!(state.snapshot.phase.as_str(), "stopping" | "finalizing")
+        {
+            if let Some(commands) = &state.commands {
+                let _ = commands.try_send(Message::ExternalStop);
+            }
+        }
+    }
+    /// Host calls this only after a successful Twitch cancellation or explicit manual
+    /// acknowledgement. It never completes an active raid/stream-end flow.
+    pub async fn resolve_pending_raid(&self) -> Result<(), String> {
+        let mut state = self.state.lock().await;
+        if state.snapshot.active {
+            return Err("Aktiven Raid im Streamende-Assistenten steuern".into());
+        }
+        state.snapshot.raid_pending = false;
+        let _ = self.changes.send(state.snapshot.clone());
+        Ok(())
     }
     async fn publish(&self, snapshot: &StreamEndSnapshot, expected: Option<RaidProof>) {
         let mut state = self.state.lock().await;
@@ -556,6 +591,7 @@ struct Worker {
     raid_now: bool,
     skip_end: bool,
     start_now: bool,
+    external_stop: bool,
     raid_confirmed: bool,
     raid_requested_at: Option<DateTime<Utc>>,
     target: Option<RaidIdentity>,
@@ -585,6 +621,9 @@ impl Worker {
         self.runtime.publish(&self.snapshot, self.proof()).await;
     }
     async fn phase(&mut self, phase: &str, status: &str) {
+        if self.snapshot.active {
+            self.drain();
+        }
         self.snapshot.phase = phase.into();
         self.snapshot.status = status.into();
         self.snapshot.can_raid_now = false;
@@ -592,17 +631,24 @@ impl Worker {
     }
     fn consume(&mut self, message: Message) {
         match message {
-            Message::Control(action) => match action.as_str() {
-                "abort" => self.abort = true,
-                "skip_raid" => self.skip_raid = true,
-                "cancel_raid" => self.cancel_raid = true,
-                "raid_now" => self.raid_now = true,
-                "skip_end" => self.skip_end = true,
-                "start_now" => self.start_now = true,
-                _ => {}
-            },
+            Message::Control(action) => {
+                self.snapshot.pending_action = Some(action.clone());
+                match action.as_str() {
+                    "abort" => self.abort = true,
+                    "skip_raid" => self.skip_raid = true,
+                    "cancel_raid" => self.cancel_raid = true,
+                    "raid_now" => self.raid_now = true,
+                    "skip_end" => self.skip_end = true,
+                    "start_now" => self.start_now = true,
+                    _ => {}
+                }
+            }
             Message::Event(event) => {
                 self.raid_confirmed |= self.proof().is_some_and(|proof| proof.matches(&event));
+            }
+            Message::ExternalStop => {
+                self.external_stop = true;
+                self.abort = true;
             }
         }
     }
@@ -666,14 +712,17 @@ impl Worker {
         }
         self.start_now = false;
         self.skip_end = false;
+        self.snapshot.pending_action = None;
         self.snapshot.remaining_seconds = 0;
         true
     }
     async fn warning_operation(&mut self, operation: StreamEndOperation, label: &str) {
-        if let Err(error) = self.io.execute(operation).await {
-            self.snapshot.warnings.push(format!("{label}: {error}"));
-            self.publish().await;
+        match self.io.execute(operation).await {
+            Err(error) => self.snapshot.warnings.push(format!("{label}: {error}")),
+            Ok(StreamEndReply::Warnings(warnings)) => self.snapshot.warnings.extend(warnings),
+            _ => return,
         }
+        self.publish().await;
     }
     async fn abort_cleanup(&mut self) {
         self.drain();
@@ -694,13 +743,18 @@ impl Worker {
         }
         self.finish(
             "aborted",
-            "Streamende abgebrochen; Stream läuft weiter",
+            if self.external_stop {
+                "Stream wurde außerhalb des Assistenten beendet"
+            } else {
+                "Streamende abgebrochen; Stream läuft weiter"
+            },
             None,
         )
         .await;
     }
     async fn finish(&mut self, phase: &str, status: &str, error: Option<String>) {
         self.snapshot.active = false;
+        self.snapshot.pending_action = None;
         self.snapshot.can_raid_now = false;
         self.snapshot.remaining_seconds = 0;
         self.snapshot.error = error;
@@ -721,6 +775,10 @@ impl Worker {
         }
         if self.plan.preferences.mode != "Immediate" {
             self.phase("preparing", "Endszene wird vorbereitet").await;
+            if self.abort {
+                self.abort_cleanup().await;
+                return;
+            }
             if !self.plan.end_scene.trim().is_empty() {
                 if let Err(error) = self
                     .io
@@ -803,6 +861,10 @@ impl Worker {
             return;
         }
         self.phase("stopping", "OBS-Stream wird beendet").await;
+        if self.abort {
+            self.abort_cleanup().await;
+            return;
+        }
         let mut last_error = String::new();
         let mut stopped = false;
         for attempt in 0..3 {
@@ -911,6 +973,12 @@ impl Worker {
                     self.target = Some(target);
                     self.phase("raid_starting", "Raid wird bei Twitch angefragt")
                         .await;
+                    if self.abort {
+                        return RaidOutcome::Aborted;
+                    }
+                    if self.skip_raid {
+                        return RaidOutcome::Skipped;
+                    }
                     self.raid_requested_at = Some(Utc::now());
                     // Mark in-flight before awaiting I/O so queued EventSub proofs are not discarded.
                     self.snapshot.raid_pending = true;
@@ -922,7 +990,10 @@ impl Worker {
                         })
                         .await;
                     match result {
-                        Ok(_) => {
+                        Ok(reply) => {
+                            if let StreamEndReply::Warnings(warnings) = reply {
+                                self.snapshot.warnings.extend(warnings);
+                            }
                             self.raid_started = Some(Instant::now());
                             self.phase(
                                 "raid_countdown",
@@ -979,7 +1050,7 @@ impl Worker {
                         "Raid-Ziel nicht gefunden oder offline; wird erneut geprüft".into();
                     5
                 }
-                Ok(StreamEndReply::Done) => {
+                Ok(StreamEndReply::Done | StreamEndReply::Warnings(_)) => {
                     self.snapshot
                         .warnings
                         .push("Raid-Zielprüfung lieferte ungültige Antwort".into());
@@ -1032,6 +1103,7 @@ impl Worker {
                         self.raid_requested_at = None;
                         self.raid_started = None;
                         self.snapshot.error = None;
+                        self.snapshot.pending_action = None;
                         self.raid_now = false;
                         if self.abort {
                             return RaidOutcome::Aborted;
@@ -1043,6 +1115,7 @@ impl Worker {
                         };
                     }
                     Err(error) => {
+                        self.snapshot.pending_action = None;
                         self.snapshot.error =
                             Some(format!("Raid konnte nicht abgebrochen werden: {error}"));
                         self.publish().await;
@@ -1061,6 +1134,7 @@ impl Worker {
                     self.snapshot.error =
                         Some(format!("Raid-Befehl konnte nicht gesendet werden: {error}"));
                 }
+                self.snapshot.pending_action = None;
                 // A sent chat command never replaces outgoing EventSub confirmation.
             }
             let elapsed = self.raid_started.map_or(0, |at| {

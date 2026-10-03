@@ -1,4 +1,5 @@
 mod runtime;
+mod stream_end_host;
 use ccs_core::{
     apply_verified_update, evaluate_signed_check, github_releases_url, launch_installer, logging,
     parse_manifest_bytes, parse_releases_bytes, select_release, store_verified_package,
@@ -24,6 +25,56 @@ use tokio::sync::{broadcast, Mutex};
 use tracing::{error, info, warn};
 
 const OBS_PASSWORD_SECRET_KEY: &str = "obs.password";
+
+#[tauri::command]
+async fn stream_end_snapshot(state: State<'_, AppState>) -> Result<Value, String> {
+    stream_end_host::snapshot(&state).await
+}
+#[tauri::command]
+async fn stream_end_status(
+    state: State<'_, AppState>,
+) -> Result<ccs_modules::stream_end::StreamEndSnapshot, String> {
+    Ok(state.stream_end.snapshot().await)
+}
+#[tauri::command]
+async fn save_stream_end_preferences<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    original: Value,
+    draft: ccs_modules::stream_end::StreamEndPreferences,
+) -> Result<Value, String> {
+    let _mutation = state.settings_mutation.lock().await;
+    let edited = draft.apply(&original)?;
+    state
+        .settings
+        .save_edit(&original, &edited)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut snapshot = stream_end_host::snapshot(&state).await?;
+    if let Err(error) = app.emit("stream-end-settings-changed", json!({"changed":true})) {
+        snapshot["warnings"] = json!([format!(
+            "Einstellungen gespeichert; Benachrichtigung fehlgeschlagen: {error}"
+        )]);
+    }
+    Ok(snapshot)
+}
+#[tauri::command]
+async fn start_stream_end(
+    state: State<'_, AppState>,
+    planned: bool,
+    seconds: Option<u32>,
+    reviewed: Option<Value>,
+) -> Result<ccs_modules::stream_end::StreamEndSnapshot, String> {
+    stream_end_host::start(&state, planned, seconds, reviewed).await
+}
+#[tauri::command]
+async fn stream_end_control(
+    state: State<'_, AppState>,
+    action: String,
+) -> Result<ccs_modules::stream_end::StreamEndSnapshot, String> {
+    state.stream_end.control(&action).await?;
+    Ok(state.stream_end.snapshot().await)
+}
 
 #[tauri::command]
 async fn dashboard_snapshot(
@@ -212,6 +263,8 @@ async fn apply_profile(
 }
 
 pub struct AppState {
+    pub stream_end: Arc<ccs_modules::stream_end::StreamEndRuntime>,
+    pub stream_end_gate: Mutex<()>,
     pub ytm: Arc<Mutex<Option<Arc<ccs_overlay_server::YouTubeMusicBridge>>>>,
     pub music_player: Arc<ccs_modules::music_player::MusicPlayerRuntime>,
     pub music_overlay: Arc<ccs_modules::music_overlay::MusicOverlayRuntime>,
@@ -321,6 +374,18 @@ async fn twitch_action(
     state: State<'_, AppState>,
     action: ccs_modules::twitch::TwitchAction,
 ) -> Result<Value, String> {
+    let _raid_gate = if matches!(
+        action,
+        ccs_modules::twitch::TwitchAction::Raid { .. }
+            | ccs_modules::twitch::TwitchAction::CancelRaid
+    ) {
+        Some(state.stream_end_gate.lock().await)
+    } else {
+        None
+    };
+    if _raid_gate.is_some() {
+        stream_end_host::reject_active(&state).await?;
+    }
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     if !settings.twitch.enable_chat
         && matches!(action, ccs_modules::twitch::TwitchAction::SendChat { .. })
@@ -628,6 +693,8 @@ async fn start_twitch_raid<R: tauri::Runtime>(
     state: State<'_, AppState>,
     login: String,
 ) -> Result<ccs_modules::twitch::RaidStarted, String> {
+    let _raid_gate = state.stream_end_gate.lock().await;
+    stream_end_host::reject_active(&state).await?;
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     let result = state
         .twitch
@@ -657,12 +724,17 @@ async fn cancel_twitch_raid<R: tauri::Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    let _raid_gate = state.stream_end_gate.lock().await;
+    stream_end_host::reject_active(&state).await?;
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     let result = state
         .twitch
         .community_cancel(&settings.twitch.client_id, &settings.twitch.channel_name)
         .await
         .map_err(|e| e.to_string());
+    if result.is_ok() {
+        state.stream_end.resolve_pending_raid().await?;
+    }
     let _ = app.emit("twitch-raids-changed", json!({"changed":true}));
     result
 }
@@ -671,7 +743,10 @@ async fn acknowledge_twitch_raid<R: tauri::Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    let _raid_gate = state.stream_end_gate.lock().await;
+    stream_end_host::reject_active(&state).await?;
     state.twitch.acknowledge_raid().await;
+    state.stream_end.resolve_pending_raid().await?;
     app.emit("twitch-raids-changed", json!({"changed":true}))
         .map_err(|e| e.to_string())
 }
@@ -2060,6 +2135,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            stream_end_snapshot,
+            stream_end_status,
+            save_stream_end_preferences,
+            start_stream_end,
+            stream_end_control,
             dashboard_snapshot,
             save_dashboard,
             dashboard_image_preview,
@@ -2469,7 +2549,8 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         hub.clone(),
     ));
     bridge.set_stream_history(stream_history.clone());
-    runtime::bind_stream_history(&obs, stream_history.clone());
+    let stream_end = Arc::new(ccs_modules::stream_end::StreamEndRuntime::default());
+    runtime::bind_stream_history(&obs, stream_history.clone(), stream_end.clone());
     let creator_intelligence = Arc::new(
         ccs_modules::creator_intelligence::CreatorIntelligenceRuntime::new(
             paths.data_root.clone(),
@@ -2477,6 +2558,8 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ),
     );
     app.manage(AppState {
+        stream_end,
+        stream_end_gate: Mutex::new(()),
         ytm,
         music_player,
         music_overlay,
@@ -2530,6 +2613,7 @@ fn spawn_live_event_bridges(
             match twitch_events.recv().await {
                 Ok(mut evt) => {
                     if let Some(state) = app_twitch_evt.try_state::<AppState>() {
+                        state.stream_end.observe_twitch(evt.clone()).await;
                         state.twitch_metrics.notify_event(&evt.event_type);
                     }
                     if evt.event_type == "channel.chat.message" {
@@ -2549,7 +2633,10 @@ fn spawn_live_event_bridges(
                         evt.data.clone(),
                     );
                     alerts_twitch
-                        .enqueue_matching(&evt.event_type, &evt.data)
+                        .enqueue_matching(
+                            overlay["type"].as_str().unwrap_or(&evt.event_type),
+                            &evt.data,
+                        )
                         .await;
                     let _ = app_twitch_evt.emit("twitch-event", &overlay);
                 }

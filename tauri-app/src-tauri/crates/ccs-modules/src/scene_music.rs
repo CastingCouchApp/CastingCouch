@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex as StdMutex,
     },
     time::Duration,
@@ -108,6 +108,30 @@ pub struct SceneMusicEngine {
     stream: StdMutex<Option<bool>>,
     status_tx: broadcast::Sender<MusicAutomationStatus>,
     closed: AtomicBool,
+    stream_end_owners: AtomicUsize,
+    managed_stop: AtomicBool,
+    managed_scene: StdMutex<Option<String>>,
+}
+pub struct StreamEndMusicLease {
+    engine: Arc<SceneMusicEngine>,
+    retain_stop: AtomicBool,
+}
+impl StreamEndMusicLease {
+    pub fn mark_stop_started(&self) {
+        self.engine.managed_stop.store(true, Ordering::SeqCst);
+    }
+    pub fn mark_stop_completed(&self) {
+        self.retain_stop.store(true, Ordering::SeqCst);
+    }
+}
+impl Drop for StreamEndMusicLease {
+    fn drop(&mut self) {
+        if self.engine.stream_end_owners.fetch_sub(1, Ordering::SeqCst) == 1
+            && !self.retain_stop.load(Ordering::SeqCst)
+        {
+            self.engine.managed_stop.store(false, Ordering::SeqCst);
+        }
+    }
 }
 impl SceneMusicEngine {
     pub fn new(
@@ -126,11 +150,36 @@ impl SceneMusicEngine {
             stream: StdMutex::new(None),
             status_tx: broadcast::channel(32).0,
             closed: AtomicBool::new(false),
+            stream_end_owners: AtomicUsize::new(0),
+            managed_stop: AtomicBool::new(false),
+            managed_scene: StdMutex::new(None),
         }
     }
     pub fn cancel(&self) {
         let _guard = self.ticket_lock.lock().unwrap();
         self.generation.send_modify(|n| *n = n.wrapping_add(1));
+    }
+    pub fn claim_stream_end(self: &Arc<Self>) -> StreamEndMusicLease {
+        self.stream_end_owners.fetch_add(1, Ordering::SeqCst);
+        self.cancel();
+        StreamEndMusicLease {
+            engine: self.clone(),
+            retain_stop: AtomicBool::new(false),
+        }
+    }
+    /// Prevent a delayed OBS notification from executing an already managed scene twice.
+    /// The next distinct scene releases this marker and resumes normal scene rules.
+    pub fn manage_scene(&self, scene: &str) {
+        *self.managed_scene.lock().unwrap() = Some(scene.into());
+    }
+    pub fn release_managed_scene(&self, scene: &str) {
+        let mut managed = self.managed_scene.lock().unwrap();
+        if managed
+            .as_ref()
+            .is_some_and(|s| s.eq_ignore_ascii_case(scene))
+        {
+            *managed = None;
+        }
     }
     pub async fn shutdown(&self) {
         self.cancel();
@@ -205,6 +254,21 @@ impl SceneMusicEngine {
                             continue;
                         }
                         previous = scene.clone();
+                        let managed = {
+                            let mut owned = engine.managed_scene.lock().unwrap();
+                            if owned
+                                .as_ref()
+                                .is_some_and(|s| s.eq_ignore_ascii_case(&scene))
+                            {
+                                true
+                            } else {
+                                *owned = None;
+                                false
+                            }
+                        };
+                        if managed {
+                            continue;
+                        }
                         engine.dispatch(MusicAction::Scene {
                             scene,
                             force: false,
@@ -254,6 +318,14 @@ impl SceneMusicEngine {
             *previous = Some(active);
             ended
         };
+        if active {
+            self.managed_stop.store(false, Ordering::SeqCst);
+            if self.stream_end_owners.load(Ordering::SeqCst) > 0 {
+                return None;
+            }
+        } else if ended && self.managed_stop.swap(false, Ordering::SeqCst) {
+            return None;
+        }
         let settings = match self.settings.read_value().await {
             Ok(value) => value,
             Err(error) => {

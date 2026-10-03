@@ -1,4 +1,8 @@
 import type {AlertDefinition, UpdatePackage} from "./api";
+export type StreamEndPreferences = { mode: string; endSceneSeconds: number; raidOnStreamEnd: boolean; selectedRaidChannel: string; raidCountdownSeconds: number; raidStartTimeoutSeconds: number; stopStreamAfterRaid: boolean; stopMusicAfterRaid: boolean; plannedSeconds: number; plannedMinutes: number };
+
+export type StreamEndSnapshot = { runId: number; active: boolean; phase: string; status: string; remainingSeconds: number; totalSeconds: number; attempt: number; targetLogin: string; targetDisplayName: string; canRaidNow: boolean; raidPending: boolean; pendingAction: string | null; broadcasterId: string; broadcasterLogin: string; error: string | null; warnings: Array<string> };
+
 export type DashboardDraft = { cards: Array<DashboardCardDraft>; sceneButtons: Array<SceneButtonDraft>; preferences: DashboardPreferences };
 
 export type DashboardPreferences = { showServiceStatus: boolean; showStreamControls: boolean; showLivePanels: boolean; showQuickServices: boolean; showAdvancedTools: boolean; showNotifications: boolean; showStreamHistory: boolean; autoFocusModeOnStreamStart: boolean; autoExitFocusModeOnStreamEnd: boolean; obsScenePreviewSize: string; dashboardStatistic: string; streamEndExpanded: boolean };
@@ -175,6 +179,11 @@ export type TwitchQuery =
   | { query: "redemptions"; rewardId: string; status?: string | null };
 // Generated from src-tauri/src/lib.rs. Run npm run contracts:generate.
 export type CommandInvocation =
+  | [command: "stream_end_snapshot", args?: Record<string, never>]
+  | [command: "stream_end_status", args?: Record<string, never>]
+  | [command: "save_stream_end_preferences", args: { original: unknown; draft: StreamEndPreferences }]
+  | [command: "start_stream_end", args: { planned: boolean; seconds?: number | null; reviewed?: unknown | null }]
+  | [command: "stream_end_control", args: { action: string }]
   | [command: "dashboard_snapshot", args?: Record<string, never>]
   | [command: "save_dashboard", args: { original: unknown; draft: DashboardDraft }]
   | [command: "dashboard_image_preview", args: { path: string }]

@@ -83,6 +83,29 @@ fn scene(name: &str, force: bool) -> MusicAction {
         force,
     }
 }
+
+#[tokio::test]
+async fn managed_stream_end_cancels_start_automation_and_prevents_a_second_automatic_pause() {
+    let (engine, _, server, _root) =
+        engine(json!({"StartOnStreamStart":false,"FadeOutEnabled":false})).await;
+    // The observed stream edge is retained while ownership suppresses automatic actions.
+    let lease = engine.claim_stream_end();
+    assert!(engine.observe_stream(Some(true)).await.is_none());
+    lease.mark_stop_started();
+    lease.mark_stop_completed();
+    drop(lease);
+    assert!(engine.observe_stream(Some(false)).await.is_none());
+    assert!(server.received_requests().await.unwrap().is_empty());
+    assert!(engine.observe_stream(Some(true)).await.is_none());
+    engine
+        .observe_stream(Some(false))
+        .await
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(writes(&server).await.len(), 1);
+}
 async fn writes(server: &MockServer) -> Vec<wiremock::Request> {
     server
         .received_requests()

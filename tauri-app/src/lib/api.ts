@@ -1,4 +1,4 @@
-import type { CommandInvocation } from "./command-contract";
+import type { CommandInvocation, StreamEndSnapshot } from "./command-contract";
 import { QueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import dashboardDemoDraft from "../features/dashboard/dashboard-default.json";
@@ -430,6 +430,12 @@ export function listenMusicStatesChanged(onChange: () => void) {
 }
 export function listenDashboardChanged(onChange: () => void) {
     return listenIfTauri<{ changed: boolean }>("dashboard-changed", () => onChange());
+}
+export function listenStreamEnd(onChange: (status: StreamEndSnapshot) => void) {
+    return listenIfTauri<StreamEndSnapshot>("stream-end-changed", onChange);
+}
+export function listenStreamEndSettings(onChange: () => void) {
+    return listenIfTauri<{ changed: boolean }>("stream-end-settings-changed", () => onChange());
 }
 export function listenMusicStatisticsChanged(onChange: () => void) {
     return listenIfTauri<{ changed: boolean }>("music-statistics-changed", () => onChange());

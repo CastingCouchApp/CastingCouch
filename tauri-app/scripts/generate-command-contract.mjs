@@ -29,6 +29,8 @@ const domainFiles = {
     TwitchQuery: ["twitch/operations.rs", "query"],
 };
 const structFiles = {
+    StreamEndPreferences: "stream_end.rs",
+    StreamEndSnapshot: "stream_end.rs",
     DashboardDraft: "dashboard.rs",
     DashboardPreferences: "dashboard.rs",
     DashboardCardDraft: "dashboard.rs",

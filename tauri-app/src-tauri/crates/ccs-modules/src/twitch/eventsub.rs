@@ -90,7 +90,24 @@ pub fn parse_eventsub_message_at(
                 .cloned()
                 .unwrap_or(Value::Object(Default::default()));
             let mut data = flatten_event_data(&event_data);
-            if let Some(id) = root.pointer("/metadata/message_id").and_then(Value::as_str).filter(|id| !id.is_empty()) {
+            if event_type == "channel.raid" {
+                let outgoing = root
+                    .pointer("/payload/subscription/condition/from_broadcaster_user_id")
+                    .and_then(Value::as_str);
+                if outgoing.is_some_and(|id| {
+                    !id.is_empty()
+                        && data
+                            .get("from_broadcaster_user_id")
+                            .is_some_and(|from| from == id)
+                }) {
+                    data.insert("raidDirection".into(), "outgoing".into());
+                }
+            }
+            if let Some(id) = root
+                .pointer("/metadata/message_id")
+                .and_then(Value::as_str)
+                .filter(|id| !id.is_empty())
+            {
                 data.insert("eventSubMessageId".into(), id.into());
             }
             if let Some(timestamp) = root
@@ -204,6 +221,28 @@ pub struct EventSubClient {
     cancel: AtomicBool,
     session: Mutex<Option<LiveSession>>,
     receive_task: Mutex<Option<JoinHandle<()>>>,
+    outgoing: Mutex<OutgoingRaidSubscription>,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutgoingRaidSubscription {
+    pub available: bool,
+    pub broadcaster_id: String,
+    pub error: Option<String>,
+}
+impl Default for OutgoingRaidSubscription {
+    fn default() -> Self {
+        Self {
+            available: false,
+            broadcaster_id: String::new(),
+            error: Some("Twitch EventSub nicht verbunden".into()),
+        }
+    }
+}
+struct SubscriptionSetup {
+    active: usize,
+    outgoing: OutgoingRaidSubscription,
 }
 
 impl EventSubClient {
@@ -213,6 +252,7 @@ impl EventSubClient {
             cancel: AtomicBool::new(false),
             session: Mutex::new(None),
             receive_task: Mutex::new(None),
+            outgoing: Mutex::new(OutgoingRaidSubscription::default()),
         }
     }
 
@@ -248,7 +288,8 @@ impl EventSubClient {
             &events_tx,
         )
         .await?;
-        if active == 0 {
+        *self.outgoing.lock().await = active.outgoing;
+        if active.active == 0 {
             let _ = writer;
             return Err(ModuleError::Message(
                 "Twitch EventSub konnte keine Chat- oder Event-Abonnements anlegen. \
@@ -264,6 +305,16 @@ Bitte Twitch erneut autorisieren und die benötigten Berechtigungen bestätigen.
 
     pub fn is_running(&self) -> bool {
         self.alive.load(Ordering::SeqCst)
+    }
+    pub async fn outgoing_raid_subscription(&self) -> OutgoingRaidSubscription {
+        let mut status = self.outgoing.lock().await.clone();
+        if !self.is_running() {
+            status.available = false;
+            if status.error.is_none() {
+                status.error = Some("Twitch EventSub nicht verbunden".into());
+            }
+        }
+        status
     }
 
     async fn spawn_receive(
@@ -411,7 +462,7 @@ async fn subscribe_events(
     user_id: &str,
     session_id: &str,
     events_tx: &broadcast::Sender<TwitchEvent>,
-) -> ModuleResult<usize> {
+) -> ModuleResult<SubscriptionSetup> {
     let mut specs: Vec<(&str, &str, Value, bool)> = vec![
         (
             "channel.chat.message",
@@ -477,6 +528,12 @@ async fn subscribe_events(
             false,
         ),
         (
+            "channel.raid",
+            "1",
+            serde_json::json!({"from_broadcaster_user_id":broadcaster_user_id}),
+            false,
+        ),
+        (
             "channel.guest_star_guest.update",
             "beta",
             serde_json::json!({
@@ -521,29 +578,46 @@ async fn subscribe_events(
         ));
     }
     let mut active = 0usize;
+    let mut outgoing = OutgoingRaidSubscription {
+        broadcaster_id: broadcaster_user_id.into(),
+        ..Default::default()
+    };
     for (ty, version, condition, silent) in specs {
+        let is_outgoing =
+            ty == "channel.raid" && condition.get("from_broadcaster_user_id").is_some();
+        let condition_text = condition.to_string();
         match helix
             .create_eventsub_subscription(ty, version, condition, session_id)
             .await
         {
-            Ok(()) => active += 1,
+            Ok(()) => {
+                active += 1;
+                if is_outgoing {
+                    outgoing.available = true;
+                    outgoing.error = None;
+                }
+            }
             Err(e) if silent => {
                 warn!(subscription = ty, error = %e, "optional EventSub skipped");
             }
             Err(e) => {
+                if is_outgoing {
+                    outgoing.error = Some(e.to_string());
+                }
                 let _ = events_tx.send(TwitchEvent {
                     event_type: "subscription.warning".into(),
                     summary: format!("{ty} konnte nicht aktiviert werden: {e}"),
                     received_at: Utc::now(),
                     data: BTreeMap::from([
                         ("subscription_type".into(), ty.to_string()),
+                        ("subscription_condition".into(), condition_text),
                         ("error".into(), e.to_string()),
                     ]),
                 });
             }
         }
     }
-    Ok(active)
+    Ok(SubscriptionSetup { active, outgoing })
 }
 
 #[cfg(test)]
@@ -610,7 +684,10 @@ mod tests {
                 assert_eq!(evt.summary, "alice folgt dem Kanal.");
                 assert_eq!(evt.data.get("user_name").map(String::as_str), Some("alice"));
                 assert_eq!(evt.data.get("user_id").map(String::as_str), Some("1"));
-                assert_eq!(evt.data.get("eventSubMessageId").map(String::as_str), Some("notif-follow-1"));
+                assert_eq!(
+                    evt.data.get("eventSubMessageId").map(String::as_str),
+                    Some("notif-follow-1")
+                );
             }
             other => panic!("expected notification, got {other:?}"),
         }
@@ -730,6 +807,83 @@ mod tests {
 
 #[cfg(test)]
 mod chat_contract_tests {
+    #[tokio::test]
+    async fn raid_subscriptions_cover_both_directions_and_report_outgoing_denial() {
+        use super::*;
+        use wiremock::{
+            matchers::{body_partial_json, method, path},
+            Mock, MockServer, ResponseTemplate,
+        };
+        let http = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/eventsub/subscriptions"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({"data":[]})))
+            .mount(&http)
+            .await;
+        Mock::given(method("POST")).and(path("/eventsub/subscriptions"))
+            .and(body_partial_json(serde_json::json!({"type":"channel.raid","condition":{"from_broadcaster_user_id":"channel"}})))
+            .respond_with(ResponseTemplate::new(403).set_body_json(serde_json::json!({"message":"outgoing denied"}))).with_priority(1).mount(&http).await;
+        let helix = TwitchHelixClient::with_base_url(format!("{}/", http.uri()), "client", "token");
+        let (tx, mut rx) = broadcast::channel(64);
+        let setup = subscribe_events(&helix, "channel", "moderator", "session", &tx)
+            .await
+            .unwrap();
+        assert!(setup.active > 0);
+        assert!(!setup.outgoing.available);
+        assert_eq!(setup.outgoing.broadcaster_id, "channel");
+        assert!(setup.outgoing.error.unwrap().contains("outgoing denied"));
+        let requests = http.received_requests().await.unwrap();
+        let raids: Vec<Value> = requests
+            .iter()
+            .map(|r| serde_json::from_slice::<Value>(&r.body).unwrap())
+            .filter(|r| r["type"] == "channel.raid")
+            .collect();
+        assert_eq!(raids.len(), 2);
+        assert!(raids
+            .iter()
+            .any(|r| r["condition"] == serde_json::json!({"to_broadcaster_user_id":"channel"})));
+        assert!(raids
+            .iter()
+            .any(|r| r["condition"] == serde_json::json!({"from_broadcaster_user_id":"channel"})));
+        let warning = rx.recv().await.unwrap();
+        assert_eq!(
+            warning.data["subscription_condition"],
+            "{\"from_broadcaster_user_id\":\"channel\"}"
+        );
+    }
+    #[test]
+    fn outgoing_raid_direction_uses_subscription_condition_and_actual_sender() {
+        let notification = |condition: serde_json::Value, from: &str| {
+            serde_json::json!({"metadata":{"message_type":"notification"},"payload":{"subscription":{"type":"channel.raid","condition":condition},"event":{"from_broadcaster_user_id":from,"to_broadcaster_user_id":"target"}}}).to_string()
+        };
+        for (condition, from, outgoing) in [
+            (
+                serde_json::json!({"from_broadcaster_user_id":"channel"}),
+                "channel",
+                true,
+            ),
+            (
+                serde_json::json!({"to_broadcaster_user_id":"target"}),
+                "channel",
+                false,
+            ),
+            (
+                serde_json::json!({"from_broadcaster_user_id":"channel"}),
+                "other",
+                false,
+            ),
+        ] {
+            let super::EventSubMessage::Notification(event) =
+                super::parse_eventsub_message(&notification(condition, from)).unwrap()
+            else {
+                panic!("notification")
+            };
+            assert_eq!(
+                event.data.get("raidDirection").map(String::as_str) == Some("outgoing"),
+                outgoing
+            );
+        }
+    }
     #[test]
     fn notification_preserves_server_timestamp_for_raid_completion_freshness() {
         let raw = serde_json::json!({
@@ -737,12 +891,17 @@ mod chat_contract_tests {
                 "message_timestamp":"2026-10-03T10:00:00Z"},
             "payload": {"subscription":{"type":"channel.raid"},
                 "event":{"from_broadcaster_user_id":"own","to_broadcaster_user_id":"target"}}
-        }).to_string();
-        let super::EventSubMessage::Notification(event) = super::parse_eventsub_message(&raw).unwrap()
+        })
+        .to_string();
+        let super::EventSubMessage::Notification(event) =
+            super::parse_eventsub_message(&raw).unwrap()
         else {
             panic!("notification expected")
         };
-        assert_eq!(event.data["eventSubMessageTimestamp"], "2026-10-03T10:00:00Z");
+        assert_eq!(
+            event.data["eventSubMessageTimestamp"],
+            "2026-10-03T10:00:00Z"
+        );
         assert_eq!(event.data["eventSubMessageId"], "raid-proof");
     }
     #[tokio::test]
