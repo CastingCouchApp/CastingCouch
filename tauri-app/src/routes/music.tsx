@@ -1,3 +1,4 @@
+import { YouTubeMusicSetup } from "../features/music/YouTubeMusicSetup";
 import { SpotifyLibrary } from "../features/music/SpotifyLibrary";
 import { SceneMusic } from "../features/music/SceneMusic";
 import { SavedMusicStates } from "../features/music/SavedMusicStates";
@@ -7,7 +8,6 @@ import { MusicAutomation } from "../features/music/MusicAutomation";
 import { SpotifyDevices } from "../features/music/SpotifyDevices";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import {
     cloneSettings,
     musicProvider,
@@ -21,7 +21,6 @@ import {
     queryKeys,
     tauriInvoke,
     type NowPlaying,
-    type YtmNowPlaying,
 } from "../lib/api";
 export const Route = createFileRoute("/music")({ component: MusicPage });
 function MusicPage() {
@@ -57,16 +56,10 @@ function MusicPage() {
             }>("spotify_query", { query: { query: "playback" } }),
         refetchInterval: 5000,
     });
-    const [setup, setSetup] = useState("");
     const now = useQuery({
         queryKey: queryKeys.nowPlaying,
         queryFn: () => tauriInvoke<NowPlaying>("now_playing"),
         refetchInterval: FALLBACK_POLL_MS,
-    });
-    const ytm = useQuery({
-        queryKey: queryKeys.ytmNowPlaying,
-        queryFn: () => tauriInvoke<YtmNowPlaying>("ytm_now_playing"),
-        refetchInterval: 2000,
     });
     const act = useMutation({
         mutationFn: (action: SpotifyAction) =>
@@ -78,29 +71,7 @@ function MusicPage() {
             void client.invalidateQueries({ queryKey: ["spotify-devices"] });
         },
     });
-    const ytmAct = useMutation({
-        mutationFn: (command: string) =>
-            tauriInvoke("ytm_command", { command }),
-    });
-    const connect = useMutation({
-        mutationFn: () => tauriInvoke<string>("ytm_connect"),
-        onSuccess: setSetup,
-    });
-    const disconnect = useMutation({
-        mutationFn: () => tauriInvoke("ytm_disconnect"),
-        onSuccess: () => {
-            setSetup("");
-            void client.invalidateQueries({
-                queryKey: queryKeys.ytmNowPlaying,
-            });
-        },
-    });
-    const error =
-        provider.error ??
-        act.error ??
-        ytmAct.error ??
-        connect.error ??
-        disconnect.error;
+    const error = provider.error ?? act.error;
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-semibold">Musik</h1>
@@ -237,53 +208,7 @@ function MusicPage() {
                     </label>
                     <SpotifyDevices />
                 </Card>
-                <Card className="space-y-4">
-                    <h2 className="text-lg font-semibold">YouTube Music</h2>
-                    <p>
-                        {ytm.data?.title ||
-                            ytm.data?.statusText ||
-                            "Nicht verbunden"}
-                    </p>
-                    <p>{ytm.data?.artist}</p>
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            disabled={connect.isPending}
-                            onClick={() => connect.mutate()}
-                        >
-                            YouTube Music verbinden
-                        </Button>
-                        <Button onClick={() => disconnect.mutate()}>
-                            Trennen
-                        </Button>
-                    </div>
-                    {setup && (
-                        <a
-                            className="underline"
-                            href={setup}
-                            target="_blank"
-                            rel="noreferrer"
-                        >
-                            Bookmarklet einrichten
-                        </a>
-                    )}
-                    <div className="flex gap-2">
-                        {[
-                            ["previous", "Zurück"],
-                            ["playpause", "Play/Pause"],
-                            ["next", "Weiter"],
-                        ].map(([command, label]) => (
-                            <Button
-                                key={command}
-                                disabled={
-                                    !ytm.data?.connected || ytmAct.isPending
-                                }
-                                onClick={() => ytmAct.mutate(command)}
-                            >
-                                {label}
-                            </Button>
-                        ))}
-                    </div>
-                </Card>
+                <YouTubeMusicSetup />
             </div>
             <SpotifyLibrary />
         </div>

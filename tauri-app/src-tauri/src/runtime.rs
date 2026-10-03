@@ -24,25 +24,33 @@ pub(super) fn spawn_runtime(app: AppHandle) {
 
             let outputs = state.hub.live.data.read().unwrap()["obs"]["outputs"].clone();
             let spotify = state.spotify.now_playing().await;
-            let ytm = state
-                .ytm
-                .lock()
-                .await
-                .as_ref()
-                .map(|bridge| bridge.snapshot());
+            let ytm = state.ytm.lock().await.as_ref().map(|bridge| {
+                bridge.set_timeout_seconds(settings.you_tube_music.timeout_seconds());
+                bridge.snapshot()
+            });
             let mut music = if settings.music_player.provider_id() == "ytmusic" {
-                serde_json::to_value(ytm.unwrap_or_default()).unwrap_or(Value::Null)
+                serde_json::to_value(ytm.unwrap_or_else(|| ccs_overlay_server::MusicSnapshot {
+                    provider: "ytmusic".into(),
+                    status_text: "Bridge gestoppt".into(),
+                    ..Default::default()
+                }))
+                .unwrap_or(Value::Null)
             } else {
                 json!({"provider":"spotify","connected":state.spotify.status().await.state==ccs_modules::ConnectionState::Connected,"isPlaying":spotify.is_playing,"title":spotify.title,"artist":spotify.artist,"album":spotify.album,"coverUrl":spotify.cover_url,"cover":spotify.cover_url,"progressMs":spotify.progress_ms,"durationMs":spotify.duration_ms})
             };
             music["cover"] = music["coverUrl"].clone();
-            music["statusText"] = json!(if music["connected"] != true {
-                "Nicht verbunden"
-            } else if music["isPlaying"] == true {
-                "Wiedergabe"
-            } else {
-                "Pausiert"
-            });
+            if music["statusText"]
+                .as_str()
+                .is_none_or(|text| text.is_empty())
+            {
+                music["statusText"] = json!(if music["connected"] != true {
+                    "Nicht verbunden"
+                } else if music["isPlaying"] == true {
+                    "Wiedergabe"
+                } else {
+                    "Pausiert"
+                });
+            }
             music["providerDisplayName"] = json!(if music["provider"] == "ytmusic" {
                 "YouTube Music"
             } else {

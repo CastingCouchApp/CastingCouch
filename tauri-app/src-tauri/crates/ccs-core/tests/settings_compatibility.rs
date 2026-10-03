@@ -2,6 +2,37 @@ use ccs_core::JsonSettingsStore;
 use serde_json::json;
 
 #[tokio::test]
+async fn youtube_music_preferences_validate_and_preserve_imported_extra_fields() {
+    let root = tempfile::tempdir().unwrap();
+    let store = JsonSettingsStore::new(root.path().join("settings.json"));
+    let original = store.read_value().await.unwrap();
+    for (key, value) in [
+        ("BridgePort", json!(0)),
+        ("BridgePort", json!(65536)),
+        ("BridgePort", json!("43831")),
+        ("StateTimeoutSeconds", json!(2)),
+        ("StateTimeoutSeconds", json!(121)),
+        ("AutoConnect", json!(1)),
+    ] {
+        let mut invalid = original.clone();
+        invalid["YouTubeMusic"][key] = value;
+        assert!(store.save_edit(&original, &invalid).await.is_err(), "{key}");
+        assert_eq!(store.read_value().await.unwrap(), original);
+    }
+    let mut next = original.clone();
+    next["YouTubeMusic"] = json!({"BridgePort":43900,"StateTimeoutSeconds":30,"AutoConnect":false,"Future":{"keep":42}});
+    store.save_edit(&original, &next).await.unwrap();
+    let config = store.load().await.unwrap();
+    assert_eq!(config.you_tube_music.bridge_port(), 43900);
+    assert_eq!(config.you_tube_music.timeout_seconds(), 30);
+    assert!(!config.you_tube_music.auto_connect());
+    assert_eq!(
+        store.read_value().await.unwrap()["YouTubeMusic"]["Future"]["keep"],
+        42
+    );
+}
+
+#[tokio::test]
 async fn invalid_music_recovery_preferences_are_rejected_without_changing_settings() {
     let root = tempfile::tempdir().unwrap();
     let store = JsonSettingsStore::new(root.path().join("settings.json"));

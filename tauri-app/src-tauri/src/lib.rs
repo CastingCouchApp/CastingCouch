@@ -125,6 +125,7 @@ async fn apply_profile(
 
 pub struct AppState {
     pub ytm: Mutex<Option<Arc<ccs_overlay_server::YouTubeMusicBridge>>>,
+    pub ytm_error: Mutex<Option<String>>,
     pub paths: AppPaths,
     pub settings_mutation: Mutex<()>,
     pub settings: Arc<JsonSettingsStore>,
@@ -523,32 +524,77 @@ async fn obs_output_status(state: State<'_, AppState>) -> Result<Value, String> 
 }
 #[tauri::command]
 async fn ytm_connect(state: State<'_, AppState>) -> Result<String, String> {
+    let _mutation = state.settings_mutation.lock().await;
     let mut current = state.ytm.lock().await;
-    if current.is_none() {
-        let settings = state.settings.load().await.map_err(|e| e.to_string())?;
-        let port = settings
-            .you_tube_music
-            .extra
-            .get("BridgePort")
-            .and_then(Value::as_u64)
-            .unwrap_or(43831);
-        let port = u16::try_from(port).map_err(|_| "Ungültiger YouTube-Music-Port")?;
-        if port == 0 {
-            return Err("YouTube-Music-Port muss positiv sein".into());
+    if current.as_ref().is_none_or(|bridge| !bridge.is_running()) {
+        if let Some(previous) = current.take() {
+            previous.stop_and_wait().await;
         }
-        *current = Some(ccs_overlay_server::YouTubeMusicBridge::start(port).await?);
+        let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+        ccs_core::store::validate_settings(&settings).map_err(|e| e.to_string())?;
+        match ccs_overlay_server::YouTubeMusicBridge::start_with_timeout(
+            settings.you_tube_music.bridge_port(),
+            settings.you_tube_music.timeout_seconds(),
+        )
+        .await
+        {
+            Ok(bridge) => {
+                *current = Some(bridge);
+                *state.ytm_error.lock().await = None;
+            }
+            Err(error) => {
+                *state.ytm_error.lock().await = Some(error.clone());
+                return Err(error);
+            }
+        }
     }
-    Ok(format!(
-        "http://127.0.0.1:{}/ytmusic/install",
-        current.as_ref().unwrap().port
-    ))
+    Ok(current.as_ref().unwrap().install_url())
 }
 #[tauri::command]
 async fn ytm_disconnect(state: State<'_, AppState>) -> Result<(), String> {
+    let _mutation = state.settings_mutation.lock().await;
     if let Some(bridge) = state.ytm.lock().await.take() {
-        bridge.stop();
+        bridge.stop_and_wait().await;
     }
+    *state.ytm_error.lock().await = None;
     Ok(())
+}
+#[tauri::command]
+async fn ytm_runtime_status(state: State<'_, AppState>) -> Result<Value, String> {
+    let settings = state.settings.load().await.map_err(|e| e.to_string())?;
+    let current = state.ytm.lock().await;
+    let bridge = current.as_ref();
+    let snapshot =
+        bridge
+            .map(|b| b.snapshot())
+            .unwrap_or_else(|| ccs_overlay_server::MusicSnapshot {
+                provider: "ytmusic".into(),
+                status_text: "Bridge gestoppt".into(),
+                ..Default::default()
+            });
+    Ok(
+        json!({"running":bridge.is_some_and(|b|b.is_running()),"port":bridge.map(|b|b.port),"configuredPort":settings.you_tube_music.bridge_port(),"installUrl":bridge.map(|b|b.install_url()),"bookmarklet":bridge.filter(|b|b.is_running()).map(|b|b.bookmarklet()),"snapshot":snapshot,"error":bridge.and_then(|b|b.error()).or(state.ytm_error.lock().await.clone())}),
+    )
+}
+
+async fn initial_ytm(
+    settings: &AppSettings,
+) -> (
+    Option<Arc<ccs_overlay_server::YouTubeMusicBridge>>,
+    Option<String>,
+) {
+    if settings.music_player.provider_id() != "ytmusic" || !settings.you_tube_music.auto_connect() {
+        return (None, None);
+    }
+    match ccs_overlay_server::YouTubeMusicBridge::start_with_timeout(
+        settings.you_tube_music.bridge_port(),
+        settings.you_tube_music.timeout_seconds(),
+    )
+    .await
+    {
+        Ok(bridge) => (Some(bridge), None),
+        Err(error) => (None, Some(error)),
+    }
 }
 #[tauri::command]
 async fn ytm_now_playing(
@@ -633,11 +679,44 @@ async fn save_settings_impl(
         } else {
             None
         };
+    let original_ytm_port = original
+        .pointer("/YouTubeMusic/BridgePort")
+        .and_then(Value::as_u64)
+        .unwrap_or(43831);
+    let ytm_replacement = if original_ytm_port != u64::from(requested.you_tube_music.bridge_port())
+        && old.you_tube_music.bridge_port() != requested.you_tube_music.bridge_port()
+        && state
+            .ytm
+            .lock()
+            .await
+            .as_ref()
+            .is_some_and(|bridge| bridge.is_running())
+    {
+        match ccs_overlay_server::YouTubeMusicBridge::start_with_timeout(
+            requested.you_tube_music.bridge_port(),
+            requested.you_tube_music.timeout_seconds(),
+        )
+        .await
+        {
+            Ok(bridge) => Some(bridge),
+            Err(error) => {
+                if let Some(server) = replacement {
+                    server.stop();
+                }
+                return Err(error);
+            }
+        }
+    } else {
+        None
+    };
     let saved = match state.settings.save_edit(&original, &settings).await {
         Ok(saved) => saved,
         Err(error) => {
             if let Some(server) = replacement {
                 server.stop();
+            }
+            if let Some(bridge) = ytm_replacement {
+                bridge.stop_and_wait().await;
             }
             return Err(error.to_string());
         }
@@ -649,6 +728,16 @@ async fn save_settings_impl(
         state.hub.live.data.write().unwrap()["serverError"] = Value::Null;
     }
     let next: AppSettings = serde_json::from_value(saved).map_err(|e| e.to_string())?;
+    if let Some(bridge) = ytm_replacement {
+        let previous = state.ytm.lock().await.replace(bridge);
+        if let Some(previous) = previous {
+            previous.stop_and_wait().await;
+        }
+        *state.ytm_error.lock().await = None;
+    }
+    if let Some(bridge) = state.ytm.lock().await.as_ref() {
+        bridge.set_timeout_seconds(next.you_tube_music.timeout_seconds());
+    }
     if old.spotify.extra != next.spotify.extra
         || old.spotify.client_id != next.spotify.client_id
         || old.music_player.provider_id() != next.music_player.provider_id()
@@ -1295,6 +1384,7 @@ pub fn run() {
             ytm_connect,
             ytm_disconnect,
             ytm_now_playing,
+            ytm_runtime_status,
             ytm_command,
             get_settings,
             save_settings,
@@ -1352,6 +1442,7 @@ pub fn run() {
                     tauri::async_runtime::spawn(async move {
                         if let Some(state) = app.try_state::<AppState>() {
                             state.music_statistics.close().await;
+                            if let Some(bridge)=state.ytm.lock().await.take() { bridge.stop_and_wait().await; }
                             state.scene_music.close().await;
                             match tokio::time::timeout(std::time::Duration::from_secs(12), state.alerts.shutdown()).await {
                                 Ok(Ok(())) => {},
@@ -1583,8 +1674,13 @@ fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    let (ytm_bridge, ytm_error) = tauri::async_runtime::block_on(initial_ytm(&loaded));
+    if let Some(error) = &ytm_error {
+        warn!(%error,"YouTube-Music-Autostart fehlgeschlagen");
+    }
     app.manage(AppState {
-        ytm: Mutex::new(None),
+        ytm: Mutex::new(ytm_bridge),
+        ytm_error: Mutex::new(ytm_error),
         paths,
         settings_mutation: Mutex::new(()),
         settings,

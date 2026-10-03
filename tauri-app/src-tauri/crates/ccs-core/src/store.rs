@@ -201,6 +201,29 @@ fn merge_edit(
 }
 
 pub fn validate_settings(settings: &AppSettings) -> Result<(), SettingsError> {
+    for (key, min, max) in [("BridgePort", 1, 65535), ("StateTimeoutSeconds", 3, 120)] {
+        if settings.you_tube_music.extra.get(key).is_some_and(|value| {
+            value
+                .as_u64()
+                .is_none_or(|number| number < min || number > max)
+        }) {
+            return Err(SettingsError::Validation(format!(
+                "YouTube Music {key} muss zwischen {min} und {max} liegen."
+            )));
+        }
+    }
+    for key in ["AutoConnect", "ConnectOnPrepare"] {
+        if settings
+            .you_tube_music
+            .extra
+            .get(key)
+            .is_some_and(|value| !value.is_boolean())
+        {
+            return Err(SettingsError::Validation(format!(
+                "YouTube Music {key} muss ein Wahrheitswert sein."
+            )));
+        }
+    }
     for (key, min, max) in [
         ("SavedStateMaxAgeMinutes", 1, 10080),
         ("SavedStateCleanupIntervalMinutes", 1, 1440),

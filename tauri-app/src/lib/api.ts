@@ -81,6 +81,10 @@ export type YtmNowPlaying = {
     artist: string;
     album: string;
     statusText: string;
+    bridgeRunning?: boolean;
+    coverUrl?: string;
+    progressMs?: number;
+    durationMs?: number;
 };
 
 export const EMPTY_YTM_NOW_PLAYING: YtmNowPlaying = {

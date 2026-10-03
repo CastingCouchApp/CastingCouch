@@ -167,6 +167,7 @@ export type CommandInvocation =
   | [command: "obs_output_status", args?: Record<string, never>]
   | [command: "ytm_connect", args?: Record<string, never>]
   | [command: "ytm_disconnect", args?: Record<string, never>]
+  | [command: "ytm_runtime_status", args?: Record<string, never>]
   | [command: "ytm_now_playing", args?: Record<string, never>]
   | [command: "ytm_command", args: { command: string }]
   | [command: "get_settings", args?: Record<string, never>]

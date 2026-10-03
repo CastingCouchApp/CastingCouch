@@ -2,6 +2,152 @@ use super::*;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
 
 #[test]
+fn youtube_autostart_respects_selected_provider_and_reports_busy_port_without_aborting_app() {
+    tauri::async_runtime::block_on(async {
+        let mut settings = AppSettings::default();
+        assert!(initial_ytm(&settings).await.0.is_none());
+        settings.music_player.source = "ytmusic".into();
+        settings.you_tube_music.extra = json!({"AutoConnect":false});
+        assert!(initial_ytm(&settings).await.0.is_none());
+        let blocked = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = blocked.local_addr().unwrap().port();
+        settings.you_tube_music.extra =
+            json!({"BridgePort":port,"AutoConnect":true,"StateTimeoutSeconds":30});
+        let (bridge, error) = initial_ytm(&settings).await;
+        assert!(bridge.is_none());
+        assert!(error.unwrap().contains(&port.to_string()));
+        drop(blocked);
+        let (bridge, error) = initial_ytm(&settings).await;
+        assert!(error.is_none());
+        let bridge = bridge.unwrap();
+        assert!(bridge.is_running());
+        bridge.stop_and_wait().await;
+    });
+}
+
+#[test]
+fn youtube_bridge_port_changes_are_transactional_and_setup_crosses_native_ipc() {
+    let root = tempfile::tempdir().unwrap();
+    let app = test_app(root.path().into());
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let first = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let first_port = first.local_addr().unwrap().port();
+    drop(first);
+    let original = call(&window, "get_settings", json!({})).unwrap();
+    let mut next = original.clone();
+    next["YouTubeMusic"] =
+        json!({"BridgePort":first_port,"StateTimeoutSeconds":30,"AutoConnect":true,"Custom":42});
+    call(
+        &window,
+        "save_settings",
+        json!({"original":original,"settings":next}),
+    )
+    .unwrap();
+    let install = call(&window, "ytm_connect", json!({})).unwrap();
+    assert!(install.as_str().unwrap().contains(&first_port.to_string()));
+    let status = call(&window, "ytm_runtime_status", json!({})).unwrap();
+    assert_eq!(status["running"], true);
+    assert_eq!(status["port"], first_port);
+    assert!(status["bookmarklet"]
+        .as_str()
+        .unwrap()
+        .starts_with("javascript:%"));
+    tauri::async_runtime::block_on(async {
+        let client = reqwest::Client::new();
+        let base = format!("http://127.0.0.1:{first_port}/ytmusic");
+        client.post(format!("{base}/state")).json(&json!({"title":"Song","artist":"Artist","coverUrl":"https://example.com/cover.png","durationMs":5000,"progressMs":2000})).send().await.unwrap().error_for_status().unwrap();
+        assert_eq!(
+            call(&window, "ytm_now_playing", json!({})).unwrap()["title"],
+            "Song"
+        );
+        call(&window, "ytm_command", json!({"command":"pause"})).unwrap();
+        let commands: Value = client
+            .get(format!("{base}/commands"))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(commands["commands"], json!(["pause"]));
+    });
+    let blocked = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let blocked_port = blocked.local_addr().unwrap().port();
+    let mut invalid = next.clone();
+    invalid["YouTubeMusic"]["BridgePort"] = json!(blocked_port);
+    assert!(call(
+        &window,
+        "save_settings",
+        json!({"original":next,"settings":invalid})
+    )
+    .is_err());
+    assert_eq!(
+        call(&window, "get_settings", json!({})).unwrap()["YouTubeMusic"]["BridgePort"],
+        first_port
+    );
+    assert_eq!(
+        call(&window, "ytm_now_playing", json!({})).unwrap()["title"],
+        "Song"
+    );
+    drop(blocked);
+    let mut concurrent = next.clone();
+    concurrent["YouTubeMusic"]["StateTimeoutSeconds"] = json!(40);
+    tauri::async_runtime::block_on(
+        app.state::<AppState>()
+            .settings
+            .save_edit(&next, &concurrent),
+    )
+    .unwrap();
+    let mut conflicting = invalid.clone();
+    conflicting["YouTubeMusic"]["StateTimeoutSeconds"] = json!(50);
+    assert!(call(
+        &window,
+        "save_settings",
+        json!({"original":next,"settings":conflicting})
+    )
+    .is_err());
+    let candidate =
+        std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, blocked_port)).unwrap();
+    drop(candidate);
+    assert_eq!(
+        call(&window, "ytm_runtime_status", json!({})).unwrap()["port"],
+        first_port
+    );
+    let mut changed = next.clone();
+    changed["YouTubeMusic"]["BridgePort"] = json!(blocked_port);
+    call(
+        &window,
+        "save_settings",
+        json!({"original":next,"settings":changed}),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&window, "ytm_runtime_status", json!({})).unwrap()["port"],
+        blocked_port
+    );
+    assert_eq!(
+        call(&window, "get_settings", json!({})).unwrap()["YouTubeMusic"]["Custom"],
+        42
+    );
+    assert_eq!(
+        call(&window, "get_settings", json!({})).unwrap()["YouTubeMusic"]["StateTimeoutSeconds"],
+        40
+    );
+    let rebound = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, first_port)).unwrap();
+    drop(rebound);
+    call(&window, "ytm_disconnect", json!({})).unwrap();
+    assert_eq!(
+        call(&window, "ytm_runtime_status", json!({})).unwrap()["running"],
+        false
+    );
+    let rebound =
+        std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, blocked_port)).unwrap();
+    drop(rebound);
+}
+
+#[test]
 fn statistics_http_samples_emit_native_changes_and_reset_survives_restart() {
     use tauri::Listener;
     use wiremock::{
@@ -120,6 +266,7 @@ fn test_app_with_spotify(
         .manage(StartupState::default())
         .manage(AppState {
             ytm: Mutex::new(None),
+            ytm_error: Mutex::new(None),
             settings_mutation: Mutex::new(()),
             obs: ObsClient::new_shared("127.0.0.1", 4455),
             twitch: TwitchClient::new_shared(secrets.clone()),
@@ -149,6 +296,11 @@ fn test_app_with_spotify(
             music_state_action,
             music_state_snapshot,
             music_statistics_snapshot,
+            ytm_connect,
+            ytm_disconnect,
+            ytm_command,
+            ytm_now_playing,
+            ytm_runtime_status,
             reset_music_statistics,
             set_spotify_playlist_favorite,
             startup_error,

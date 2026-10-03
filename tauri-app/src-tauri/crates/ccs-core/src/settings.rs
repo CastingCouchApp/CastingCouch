@@ -489,6 +489,24 @@ pub struct YouTubeMusicSettings {
     #[serde(flatten)]
     pub extra: serde_json::Value,
 }
+impl YouTubeMusicSettings {
+    pub fn bridge_port(&self) -> u16 {
+        self.extra["BridgePort"]
+            .as_u64()
+            .and_then(|value| u16::try_from(value).ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(43831)
+    }
+    pub fn timeout_seconds(&self) -> u64 {
+        self.extra["StateTimeoutSeconds"]
+            .as_u64()
+            .unwrap_or(12)
+            .clamp(3, 120)
+    }
+    pub fn auto_connect(&self) -> bool {
+        self.extra["AutoConnect"].as_bool().unwrap_or(true)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase")]

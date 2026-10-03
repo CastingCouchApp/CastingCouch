@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { routeTree } from "../../routeTree.gen";
 import { defaultAppSettings } from "../../lib/app-settings";
 const invokeMock = vi.fn();
+let ytmRunning = false;
 vi.mock("../../lib/api", async (original) => ({
     ...(await original<typeof import("../../lib/api")>()),
     tauriInvoke: (cmd: string, args: unknown) =>
@@ -34,6 +35,7 @@ function renderMusic() {
 }
 describe("Native music", () => {
     beforeEach(() => {
+        ytmRunning = false;
         invokeMock.mockReset().mockImplementation(async (cmd: string) => {
             if (cmd === "get_settings") return defaultAppSettings();
             if (cmd === "now_playing")
@@ -46,8 +48,27 @@ describe("Native music", () => {
             if (cmd === "ytm_now_playing")
                 return { connected: false, statusText: "Bridge gestoppt" };
             if (cmd === "spotify_query") return { devices: [], items: [] };
-            if (cmd === "ytm_connect")
+            if (cmd === "ytm_runtime_status")
+                return {
+                    running: ytmRunning,
+                    port: ytmRunning ? 43831 : null,
+                    configuredPort: 43831,
+                    installUrl: ytmRunning
+                        ? "http://127.0.0.1:43831/ytmusic/install"
+                        : null,
+                    bookmarklet: ytmRunning ? "javascript:%28example%29" : null,
+                    error: null,
+                    snapshot: {
+                        connected: false,
+                        statusText: ytmRunning
+                            ? "Bookmarklet inaktiv"
+                            : "Bridge gestoppt",
+                    },
+                };
+            if (cmd === "ytm_connect") {
+                ytmRunning = true;
                 return "http://127.0.0.1:43831/ytmusic/install";
+            }
             return null;
         });
     });
@@ -75,7 +96,7 @@ describe("Native music", () => {
             }),
         );
         expect(
-            await screen.findByRole("link", { name: "Bookmarklet einrichten" }),
+            await screen.findByRole("link", { name: "Install-Seite öffnen" }),
         ).toHaveAttribute("href", "http://127.0.0.1:43831/ytmusic/install");
         expect(invokeMock).toHaveBeenCalledWith("ytm_connect", undefined);
     });
