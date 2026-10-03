@@ -155,6 +155,7 @@ export type CommandInvocation =
   | [command: "music_automation_status", args?: Record<string, never>]
   | [command: "music_state_action", args: { action: MusicStateAction }]
   | [command: "music_state_snapshot", args?: Record<string, never>]
+  | [command: "open_music_state_folder", args: { backups: boolean }]
   | [command: "set_spotify_playlist_favorite", args: { uri: string; favorite: boolean }]
   | [command: "activate_spotify_device", args: { play: boolean }]
   | [command: "spotify_query", args: { query: SpotifyQuery; offset?: number | null }]

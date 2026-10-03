@@ -341,3 +341,116 @@ async fn artist_context_restore_rejects_unsupported_track_offset_before_changing
     assert_eq!(server.received_requests().await.unwrap().len(), before);
     assert!(store.get("Intro").await.is_ok());
 }
+
+async fn connect_player(player: &SpotifyClient, server: &MockServer) {
+    Mock::given(method("GET"))
+        .and(path("/me"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"id":"user"})))
+        .mount(server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/me/player/currently-playing"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(server)
+        .await;
+    player
+        .connect(&ccs_modules::spotify::SpotifyConnectOptions {
+            client_id: "client".into(),
+            redirect_uri: "http://127.0.0.1:4382/spotify-callback".into(),
+            scopes: vec![],
+        })
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn health_does_not_interrupt_running_fades_or_run_after_close() {
+    let (runtime, engine, _, server, _root, player) = setup().await;
+    connect_player(&player, &server).await;
+    Mock::given(method("GET"))
+        .and(path("/me/player"))
+        .respond_with(ResponseTemplate::new(204))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    let fade = engine.dispatch(MusicAction::FadeTo {
+        percent: 20,
+        milliseconds: 10000,
+        pause_at_end: false,
+    });
+    for _ in 0..100 {
+        if engine.status().await["running"] == true {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    assert_eq!(
+        engine.status().await["running"],
+        true,
+        "{}",
+        engine.status().await
+    );
+    runtime.tick_at(chrono::Utc::now(), false).await.unwrap();
+    assert!(!server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .any(|r| r.method.as_str() == "PUT" && r.url.path() == "/me/player"));
+    engine.close().await;
+    assert!(fade.await.unwrap().is_err());
+    let count = server.received_requests().await.unwrap().len();
+    runtime
+        .tick_at(chrono::Utc::now() + chrono::Duration::minutes(5), false)
+        .await
+        .unwrap();
+    assert_eq!(server.received_requests().await.unwrap().len(), count);
+}
+
+#[tokio::test]
+async fn slow_health_query_does_not_block_state_snapshot_and_startup_cleanup_persists() {
+    let (runtime, _, _, server, root, player) = setup().await;
+    runtime
+        .action(MusicStateAction::Capture {
+            group: "Old".into(),
+        })
+        .await
+        .unwrap();
+    let store = SpotifyStateStore::new(root.path());
+    let mut old = store.get("Old").await.unwrap();
+    old.saved_at_utc = chrono::Utc::now() - chrono::Duration::minutes(181);
+    store.save("Old", old).await.unwrap();
+    connect_player(&player, &server).await;
+    Mock::given(method("GET"))
+        .and(path("/me/player"))
+        .respond_with(ResponseTemplate::new(204).set_delay(Duration::from_millis(600)))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    let monitor = runtime.clone();
+    let job = tokio::spawn(async move { monitor.tick_at(chrono::Utc::now(), true).await });
+    tokio::time::sleep(Duration::from_millis(80)).await;
+    let snapshot = tokio::time::timeout(Duration::from_millis(150), runtime.snapshot())
+        .await
+        .expect("state snapshot blocked by Spotify network")
+        .unwrap();
+    assert!(snapshot["states"].as_object().unwrap().is_empty());
+    job.await.unwrap().unwrap();
+    assert!(SpotifyStateStore::new(root.path())
+        .get("Old")
+        .await
+        .is_err());
+}
+
+#[tokio::test]
+async fn maintenance_cannot_acquire_player_while_a_manual_command_owns_it() {
+    let (_, engine, _, server, _root, _) = setup().await;
+    let _command = engine.manual_player_guard().await;
+    let before = server.received_requests().await.unwrap().len();
+    assert!(engine
+        .recover_missing_device("client", &json!({"PreferredDeviceId":"device"}))
+        .await
+        .unwrap()
+        .is_none());
+    assert_eq!(server.received_requests().await.unwrap().len(), before);
+}

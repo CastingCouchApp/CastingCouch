@@ -20,6 +20,9 @@ const MAX_BYTES: usize = 16 * 1024 * 1024;
 const HISTORY: &str = "spotify-saved-state-history.json";
 const STATES: &str = "spotify-saved-states.json";
 const PROFILES: &str = "spotify-history-restore-profiles.json";
+fn name_eq(a: &str, b: &str) -> bool {
+    a.to_lowercase() == b.to_lowercase()
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
@@ -66,6 +69,15 @@ impl SpotifyStateStore {
             gate: Mutex::new(()),
             last_backup: StdMutex::new(None),
         }
+    }
+    pub async fn prepare_folder(&self, backups: bool) -> Result<PathBuf> {
+        let path = if backups {
+            self.root.join("Backups/SpotifyHistory")
+        } else {
+            self.root.clone()
+        };
+        fs::create_dir_all(&path).await?;
+        Ok(path)
     }
     async fn states(&self) -> Result<Value> {
         let value = read_or(
@@ -540,7 +552,7 @@ impl SpotifyStateStore {
         let name = profile["Name"].as_str().unwrap();
         if builtins()
             .iter()
-            .any(|p| p["Name"].as_str().unwrap().eq_ignore_ascii_case(name))
+            .any(|p| name_eq(p["Name"].as_str().unwrap(), name))
         {
             return Err(invalid("Integrierte Profile sind schreibgeschützt"));
         }
@@ -548,7 +560,7 @@ impl SpotifyStateStore {
         let rows = custom.as_array_mut().unwrap();
         if let Some(existing) = rows
             .iter_mut()
-            .find(|p| p["Name"].as_str().unwrap().eq_ignore_ascii_case(name))
+            .find(|p| name_eq(p["Name"].as_str().unwrap(), name))
         {
             for (k, v) in profile.as_object().unwrap() {
                 existing[k] = v.clone();
@@ -562,7 +574,7 @@ impl SpotifyStateStore {
         let _guard = self.gate.lock().await;
         if builtins()
             .iter()
-            .any(|p| p["Name"].as_str().unwrap().eq_ignore_ascii_case(name))
+            .any(|p| name_eq(p["Name"].as_str().unwrap(), name))
         {
             return Err(invalid("Integrierte Profile können nicht gelöscht werden"));
         }
@@ -570,7 +582,7 @@ impl SpotifyStateStore {
         custom
             .as_array_mut()
             .unwrap()
-            .retain(|p| !p["Name"].as_str().unwrap().eq_ignore_ascii_case(name));
+            .retain(|p| !name_eq(p["Name"].as_str().unwrap(), name));
         atomic_write(&self.root.join(PROFILES), &encode(&custom)?).await
     }
     pub async fn export_profiles(&self) -> Result<Value> {
@@ -602,7 +614,7 @@ impl SpotifyStateStore {
         let _guard = self.gate.lock().await;
         let original = self.custom_profiles().await?;
         let rows=imported.into_iter().map(|profile|{
-            let existing=original.as_array().unwrap().iter().find(|p|p["Name"].as_str().unwrap().eq_ignore_ascii_case(profile["Name"].as_str().unwrap()));
+            let existing=original.as_array().unwrap().iter().find(|p| name_eq(p["Name"].as_str().unwrap(), profile["Name"].as_str().unwrap()));
             json!({"status":match existing{None=>"new",Some(p) if p==&profile=>"unchanged",_=>"changed"},"profile":profile})
         }).collect::<Vec<_>>();
         Ok(json!({"original":original,"profiles":rows}))
@@ -642,13 +654,13 @@ impl SpotifyStateStore {
             if action == "copy"
                 || builtins()
                     .iter()
-                    .any(|p| p["Name"].as_str().unwrap().eq_ignore_ascii_case(&name))
+                    .any(|p| name_eq(p["Name"].as_str().unwrap(), &name))
             {
                 let mut index = 2;
                 let mut candidate = name.clone();
                 while all_names
                     .iter()
-                    .any(|p| p["Name"].as_str().unwrap().eq_ignore_ascii_case(&candidate))
+                    .any(|p| name_eq(p["Name"].as_str().unwrap(), &candidate))
                 {
                     candidate = format!("{name} {index}");
                     index += 1;
@@ -659,7 +671,7 @@ impl SpotifyStateStore {
                 .as_array_mut()
                 .unwrap()
                 .iter_mut()
-                .find(|p| p["Name"].as_str().unwrap().eq_ignore_ascii_case(&name))
+                .find(|p| name_eq(p["Name"].as_str().unwrap(), &name))
             {
                 *existing = profile;
             } else {
@@ -684,7 +696,7 @@ fn find_key<'a>(value: &'a Value, name: &str) -> Option<&'a str> {
     value
         .as_object()?
         .keys()
-        .find(|key| key.eq_ignore_ascii_case(name))
+        .find(|key| name_eq(key, name))
         .map(String::as_str)
 }
 fn strings(v: &Value) -> Vec<String> {
@@ -860,7 +872,7 @@ fn parse_profiles(value: Value) -> Result<Vec<Value>> {
         }
         let profile = profile_value(row.clone())?;
         let name = profile["Name"].as_str().unwrap();
-        result.retain(|p| !p["Name"].as_str().unwrap().eq_ignore_ascii_case(name));
+        result.retain(|p| !name_eq(p["Name"].as_str().unwrap(), name));
         result.push(profile);
     }
     Ok(result)

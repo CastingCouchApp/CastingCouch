@@ -201,6 +201,37 @@ fn merge_edit(
 }
 
 pub fn validate_settings(settings: &AppSettings) -> Result<(), SettingsError> {
+    for (key, min, max) in [
+        ("SavedStateMaxAgeMinutes", 1, 10080),
+        ("SavedStateCleanupIntervalMinutes", 1, 1440),
+        ("HealthCheckIntervalSeconds", 5, 300),
+    ] {
+        if let Some(value) = settings.spotify.extra.get(key) {
+            if value.as_u64().is_none_or(|n| n < min || n > max) {
+                return Err(SettingsError::Validation(format!(
+                    "Spotify {key} muss zwischen {min} und {max} liegen."
+                )));
+            }
+        }
+    }
+    for key in [
+        "SavedStateCleanupOnStartup",
+        "SavedStateCleanupOnSave",
+        "SavedStateCleanupIntervalEnabled",
+        "HealthMonitorEnabled",
+        "AutoRecoverPlayback",
+    ] {
+        if settings
+            .spotify
+            .extra
+            .get(key)
+            .is_some_and(|value| !value.is_boolean())
+        {
+            return Err(SettingsError::Validation(format!(
+                "Spotify {key} muss ein Wahrheitswert sein."
+            )));
+        }
+    }
     if settings.overlay.web_server_port == 0 || settings.obs.port == 0 {
         return Err(SettingsError::Validation(
             "Port muss zwischen 1 und 65535 liegen.".into(),

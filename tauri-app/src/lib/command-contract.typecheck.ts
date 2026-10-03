@@ -1,6 +1,20 @@
 import { tauriInvoke } from "./api";
 // Compiled by tsc; these calls are never executed. Stale argument names must fail compilation.
 export function commandContractTypeAssertions() {
+    void tauriInvoke("music_state_action", {
+        action: { action: "restore", group: "Intro", fadeSeconds: 3 },
+    });
+    const badRestore = {
+        action: "restore" as const,
+        group: "Intro",
+        fade_seconds: 3,
+    };
+    // @ts-expect-error Rust restore requires camelCase fadeSeconds.
+    void tauriInvoke("music_state_action", { action: badRestore });
+    // @ts-expect-error Reviewed original is required for selective restoration.
+    void tauriInvoke("music_state_action", {
+        action: { action: "backup_restore", id: "backup.json", options: {} },
+    });
     const oldQuery = { query: "scene_items" as const, scene_name: "Live" };
     // @ts-expect-error Nested domain actions use the actual Rust contract.
     void tauriInvoke("obs_query", { query: oldQuery });

@@ -3,6 +3,7 @@ pub(super) fn spawn_runtime(app: AppHandle) {
     spawn_obs_data(app.clone());
     spawn_twitch_data(app.clone());
     spawn_watchdog(app.clone());
+    spawn_music_state_monitor(app.clone());
     tauri::async_runtime::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -112,6 +113,25 @@ pub(super) fn spawn_runtime(app: AppHandle) {
                 warn!(%error,"Chat-Verlauf konnte nicht gespeichert werden");
             }
             state.hub.publish(&state.hub.countdown());
+        }
+    });
+}
+
+fn spawn_music_state_monitor(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(5));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut startup = true;
+        loop {
+            tick.tick().await;
+            let state = app.state::<AppState>();
+            if state.scene_music.is_closed() {
+                break;
+            }
+            match state.music_states.tick(startup).await {
+                Ok(()) => startup = false,
+                Err(error) => warn!(%error, "Spotify-Zustandsüberwachung fehlgeschlagen"),
+            }
         }
     });
 }

@@ -392,6 +392,9 @@ export type MusicAutomationStatus = {
 export function listenMusicAutomation(onStatus: (status: MusicAutomationStatus) => void) {
     return listenIfTauri<MusicAutomationStatus>("music-automation-status",onStatus);
 }
+export function listenMusicStatesChanged(onChange: () => void) {
+    return listenIfTauri<{ changed: boolean }>("music-states-changed", () => onChange());
+}
 
 export async function listenServiceStatus(
     onStatus: (status: ServiceStatus) => void,

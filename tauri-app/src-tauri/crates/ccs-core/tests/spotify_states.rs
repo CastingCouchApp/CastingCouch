@@ -185,3 +185,56 @@ async fn malformed_or_future_documents_never_get_overwritten_by_mutation() {
         .await
         .is_err());
 }
+
+#[tokio::test]
+async fn german_group_and_profile_names_are_case_insensitive_and_newer_captures_survive_restore() {
+    let root = tempfile::tempdir().unwrap();
+    let store = SpotifyStateStore::new(root.path());
+    let first = state(Utc::now());
+    store.save("Übergang", first.clone()).await.unwrap();
+    let mut newer = first.clone();
+    newer.progress_ms = 9000;
+    store.save("ÜBERGANG", newer.clone()).await.unwrap();
+    assert_eq!(
+        store.snapshot().await.unwrap()["states"]
+            .as_object()
+            .unwrap()
+            .len(),
+        1
+    );
+    store.consume("übergang", &first).await.unwrap();
+    assert_eq!(store.get("übergang").await.unwrap().progress_ms, 9000);
+    store
+        .save_profile(json!({"Name":"Änderung","Entries":true}))
+        .await
+        .unwrap();
+    store
+        .save_profile(json!({"Name":"änderung","Notes":true}))
+        .await
+        .unwrap();
+    assert_eq!(
+        store.export_profiles().await.unwrap()["Profiles"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    store.delete_profile("ÄNDERUNG").await.unwrap();
+    assert!(store.export_profiles().await.unwrap()["Profiles"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn music_data_folders_resolve_to_the_owned_data_root_and_are_created() {
+    let root = tempfile::tempdir().unwrap();
+    let store = SpotifyStateStore::new(root.path().join("MusicData"));
+    assert_eq!(
+        store.prepare_folder(false).await.unwrap(),
+        root.path().join("MusicData")
+    );
+    let backup = store.prepare_folder(true).await.unwrap();
+    assert_eq!(backup, root.path().join("MusicData/Backups/SpotifyHistory"));
+    assert!(backup.is_dir());
+}

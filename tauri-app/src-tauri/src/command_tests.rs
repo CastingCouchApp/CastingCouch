@@ -344,6 +344,47 @@ fn playlist_favorites_and_successful_playback_persist_through_native_ipc() {
             ["FavoritePlaylistUris"],
         settings["Spotify"]["FavoritePlaylistUris"]
     );
+    tauri::async_runtime::block_on(async {
+        Mock::given(method("PUT"))
+            .respond_with(
+                ResponseTemplate::new(204).set_delay(std::time::Duration::from_millis(100)),
+            )
+            .mount(&server)
+            .await;
+        let state = app.state::<AppState>();
+        let saving = state.settings_mutation.lock().await;
+        let concurrent_settings = async {
+            for _ in 0..100 {
+                if server
+                    .received_requests()
+                    .await
+                    .unwrap()
+                    .iter()
+                    .any(|r| r.method.as_str() == "PUT")
+                {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+            tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                state.scene_music.shutdown(),
+            )
+            .await
+            .expect("playlist history persistence deadlocked with settings save");
+            drop(saving);
+        };
+        let (result, ()) = tokio::join!(
+            spotify_action(
+                app.state::<AppState>(),
+                ccs_modules::spotify::SpotifyAction::PlayPlaylist {
+                    uri: "spotify:playlist:concurrent".into()
+                }
+            ),
+            concurrent_settings
+        );
+        result.unwrap();
+    });
 }
 fn call(
     window: &tauri::WebviewWindow<MockRuntime>,

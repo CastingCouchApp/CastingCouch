@@ -245,14 +245,16 @@ async fn spotify_action(
     state: State<'_, AppState>,
     action: ccs_modules::spotify::SpotifyAction,
 ) -> Result<Value, String> {
-    if !matches!(
+    let _player_guard = if !matches!(
         &action,
         ccs_modules::spotify::SpotifyAction::SaveTrack { .. }
             | ccs_modules::spotify::SpotifyAction::RemoveSavedTrack { .. }
             | ccs_modules::spotify::SpotifyAction::Queue { .. }
     ) {
-        state.scene_music.shutdown().await;
-    }
+        Some(state.scene_music.manual_player_guard().await)
+    } else {
+        None
+    };
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     if let ccs_modules::spotify::SpotifyAction::Volume { percent } = &action {
         if let Some(music) = state.alerts.music_ducking() {
@@ -275,6 +277,8 @@ async fn spotify_action(
         .action_with_preferences(&settings.spotify.client_id, action, &settings.spotify.extra)
         .await
         .map_err(|e| e.to_string())?;
+    // Settings changes also wait for the player: release it before persisting playlist history.
+    drop(_player_guard);
     if let Some(uri) = playlist {
         let _guard = state.settings_mutation.lock().await;
         let original = state
@@ -348,6 +352,22 @@ async fn music_state_snapshot(state: State<'_, AppState>) -> Result<Value, Strin
 }
 
 #[tauri::command]
+async fn open_music_state_folder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    backups: bool,
+) -> Result<(), String> {
+    let path = state
+        .music_states
+        .prepare_folder(backups)
+        .await
+        .map_err(|e| e.to_string())?;
+    app.opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn set_spotify_playlist_favorite(
     state: State<'_, AppState>,
     uri: String,
@@ -385,6 +405,7 @@ async fn set_spotify_playlist_favorite(
 }
 #[tauri::command]
 async fn activate_spotify_device(state: State<'_, AppState>, play: bool) -> Result<Value, String> {
+    let _player_guard = state.scene_music.manual_player_guard().await;
     let settings = state.settings.load().await.map_err(|e| e.to_string())?;
     state
         .spotify
@@ -1218,6 +1239,7 @@ pub fn run() {
             music_automation_status,
             music_state_action,
             music_state_snapshot,
+            open_music_state_folder,
             set_spotify_playlist_favorite,
             activate_spotify_device,
             spotify_query,

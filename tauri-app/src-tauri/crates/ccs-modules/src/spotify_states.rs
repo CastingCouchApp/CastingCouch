@@ -96,6 +96,7 @@ pub struct SpotifyStateRuntime {
     ducking: Arc<AlertDucking>,
     changed: broadcast::Sender<()>,
     monitor: Mutex<Monitor>,
+    tick_gate: Mutex<()>,
 }
 impl SpotifyStateRuntime {
     pub fn new(
@@ -113,10 +114,14 @@ impl SpotifyStateRuntime {
             ducking,
             changed: broadcast::channel(32).0,
             monitor: Mutex::new(Monitor::default()),
+            tick_gate: Mutex::new(()),
         }
     }
     pub fn subscribe(&self) -> broadcast::Receiver<()> {
         self.changed.subscribe()
+    }
+    pub async fn prepare_folder(&self, backups: bool) -> ModuleResult<std::path::PathBuf> {
+        self.store.prepare_folder(backups).await.map_err(error)
     }
     pub async fn snapshot(&self) -> ModuleResult<Value> {
         let mut snapshot = self.store.snapshot().await.map_err(error)?;
@@ -125,11 +130,20 @@ impl SpotifyStateRuntime {
             json!({"detail":monitor.detail,"error":monitor.error,"lastRecovery":monitor.recovered});
         Ok(snapshot)
     }
+    pub async fn tick(&self, startup: bool) -> ModuleResult<()> {
+        self.tick_at(chrono::Utc::now(), startup).await
+    }
     pub async fn tick_at(
         &self,
         now: chrono::DateTime<chrono::Utc>,
         startup: bool,
     ) -> ModuleResult<()> {
+        let Ok(_tick) = self.tick_gate.try_lock() else {
+            return Ok(());
+        };
+        if self.engine.is_closed() {
+            return Ok(());
+        }
         let settings = self.settings.load().await.map_err(error)?;
         let options = &settings.spotify.extra;
         let mut monitor = self.monitor.lock().await;
@@ -137,13 +151,15 @@ impl SpotifyStateRuntime {
             .as_u64()
             .unwrap_or(15)
             .clamp(1, 1440) as i64;
-        if (startup && options["SavedStateCleanupOnStartup"] != false)
+        if (startup && monitor.cleaned.is_none() && options["SavedStateCleanupOnStartup"] != false)
             || (options["SavedStateCleanupIntervalEnabled"] == true
                 && monitor
                     .cleaned
                     .is_none_or(|last| now - last >= chrono::Duration::minutes(cleanup_interval)))
         {
+            drop(monitor);
             self.store.cleanup(ttl(options), now).await.map_err(error)?;
+            monitor = self.monitor.lock().await;
             monitor.cleaned = Some(now);
             let _ = self.changed.send(());
         }
@@ -151,10 +167,14 @@ impl SpotifyStateRuntime {
             || options["HealthMonitorEnabled"] == false
         {
             monitor.detail = "Musiküberwachung deaktiviert".into();
+            monitor.error = None;
+            let _ = self.changed.send(());
             return Ok(());
         }
         if self.player.status().await.state != crate::ConnectionState::Connected {
             monitor.detail = "Spotify nicht verbunden".into();
+            monitor.error = None;
+            let _ = self.changed.send(());
             return Ok(());
         }
         let interval = options["HealthCheckIntervalSeconds"]
@@ -168,6 +188,7 @@ impl SpotifyStateRuntime {
             return Ok(());
         }
         monitor.checked = Some(now);
+        drop(monitor);
         let playback = match self
             .player
             .query(&settings.spotify.client_id, SpotifyQuery::Playback, None)
@@ -175,11 +196,13 @@ impl SpotifyStateRuntime {
         {
             Ok(value) => value,
             Err(error) => {
+                let mut monitor = self.monitor.lock().await;
                 monitor.error = Some(error.to_string());
                 let _ = self.changed.send(());
                 return Err(error);
             }
         };
+        let mut monitor = self.monitor.lock().await;
         monitor.error = None;
         monitor.detail = if playback["device"].is_null() {
             "Kein aktives Gerät"
@@ -197,19 +220,24 @@ impl SpotifyStateRuntime {
                 .recovered
                 .is_none_or(|last| now - last >= chrono::Duration::minutes(2))
         {
-            monitor.recovered = Some(now);
+            drop(monitor);
             match self
-                .player
-                .activate_preferred_device(&settings.spotify.client_id, options, false)
+                .engine
+                .recover_missing_device(&settings.spotify.client_id, options)
                 .await
             {
-                Ok(device) => {
+                Ok(Some(device)) => {
+                    let mut monitor = self.monitor.lock().await;
+                    monitor.recovered = Some(now);
                     monitor.detail = format!(
                         "Gerät '{}' wieder aktiviert",
                         device["name"].as_str().unwrap_or("Spotify")
                     )
                 }
+                Ok(None) => {}
                 Err(error) => {
+                    let mut monitor = self.monitor.lock().await;
+                    monitor.recovered = Some(now);
                     monitor.error = Some(error.to_string());
                     let _ = self.changed.send(());
                     return Err(error);

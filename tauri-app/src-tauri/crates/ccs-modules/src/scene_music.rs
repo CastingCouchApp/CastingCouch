@@ -136,9 +136,39 @@ impl SceneMusicEngine {
         self.cancel();
         let _idle = self.gate.lock().await;
     }
+    pub async fn manual_player_guard(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.cancel();
+        self.gate.lock().await
+    }
     pub async fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
         self.shutdown().await;
+    }
+    pub fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::SeqCst)
+    }
+    /// Maintenance never cancels a user action and rechecks playback after acquiring the gate.
+    pub async fn recover_missing_device(
+        &self,
+        client: &str,
+        options: &Value,
+    ) -> ModuleResult<Option<Value>> {
+        let Ok(_idle) = self.gate.try_lock() else {
+            return Ok(None);
+        };
+        if self.is_closed() || self.ducking.desired_volume().await.is_some() {
+            return Ok(None);
+        }
+        let mut ticket = self.generation.subscribe();
+        tokio::select! {
+            biased;
+            _ = ticket.changed() => Err(cancelled()),
+            result = async {
+                let current = self.player.query(client, SpotifyQuery::Playback, None).await?;
+                if !current["device"].is_null() || self.is_closed() { return Ok(None); }
+                self.player.activate_preferred_device(client, options, false).await.map(Some)
+            } => result,
+        }
     }
     pub async fn status(&self) -> Value {
         json!(self.snapshot().await)

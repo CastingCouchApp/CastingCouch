@@ -2,6 +2,27 @@ use ccs_core::JsonSettingsStore;
 use serde_json::json;
 
 #[tokio::test]
+async fn invalid_music_recovery_preferences_are_rejected_without_changing_settings() {
+    let root = tempfile::tempdir().unwrap();
+    let store = JsonSettingsStore::new(root.path().join("settings.json"));
+    let original = store.read_value().await.unwrap();
+    for (key, value) in [
+        ("SavedStateMaxAgeMinutes", json!(0)),
+        ("SavedStateCleanupIntervalMinutes", json!(1441)),
+        ("HealthCheckIntervalSeconds", json!(301)),
+        ("HealthMonitorEnabled", json!("false")),
+    ] {
+        let mut draft = original.clone();
+        draft["Spotify"][key] = value;
+        assert!(
+            store.save_edit(&original, &draft).await.is_err(),
+            "accepted {key}"
+        );
+        assert_eq!(store.read_value().await.unwrap(), original);
+    }
+}
+
+#[tokio::test]
 async fn typed_save_preserves_unknown_nested_wpf_fields() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("settings.json");
